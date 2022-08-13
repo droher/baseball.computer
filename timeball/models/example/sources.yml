@@ -39,3 +39,11 @@ sources:
       - name: game_lineup_appearance
       - name: game_team
       - name: game_umpire
+  - name: misc
+    tables:
+      - name: franchise
+      - name: gamelog
+      - name: park
+      - name: people
+      - name: roster
+      - name: schedule

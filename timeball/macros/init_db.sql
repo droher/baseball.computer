@@ -1,13 +1,14 @@
 {% macro init_db(args) %}
-  {% set base_url = "https://boxball.s3.us-west-002.backblazeb2.com/timeball-site" %}
-  {% set parquet_dir = "../parquet" %}
+  {% set base_url = "https://baseball.computer" %}
+  {% set parquet_dir = "/Users/davidroher/Repos/timeball-dbt/parquet" %}
 
   {% set sql %}
     INSTALL 'httpfs';
     LOAD 'httpfs';
 
     {% for node in graph.sources.values() %}
-      CREATE VIEW {{ node.name }} AS (SELECT * FROM '{{ parquet_dir }}/{{ node.name }}.parquet');
+        {% set prefix = "simple" if node.schema == "misc" else "event" %}
+      CREATE OR REPLACE VIEW {{ node.name }} AS (SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet');
     {% endfor %}
   {% endset %}
 
