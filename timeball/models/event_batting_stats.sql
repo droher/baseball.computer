@@ -1,0 +1,68 @@
+---- STANDARD
+-- Games
+-- PA
+-- AB
+-- R
+-- H
+-- 2B
+-- 3B
+-- HR
+-- RBI
+-- SB
+-- CS
+-- BB
+-- SO
+-- BA
+-- OBP
+-- SLG
+-- OPS
+-- OPS+
+-- TB
+-- GDP
+-- HBP
+-- SH
+-- SF
+-- IBB
+
+---- Advanced
+-- rOBA
+-- Rbat+
+-- BAbip
+-- ISO
+-- HR%
+-- SO%
+-- BB%
+-- LD%
+-- FB%
+-- GB%
+-- Pull%
+-- Cent%
+-- Oppo%
+-- WPA
+-- cWPA
+-- RE24
+-- RS%
+-- SB%
+-- XBT%
+
+---- Sabermetric
+-- RC
+-- RC/G
+
+---- Value
+-- Rbat
+-- Rbaser
+-- Rdp
+-- Rfield
+-- Rpos
+-- RAA
+-- WAA
+-- Rrep
+-- RAR
+-- WAR
+-- oWAR
+
+---- Ratios (just ratios)
+
+---- 
+SELECT 1

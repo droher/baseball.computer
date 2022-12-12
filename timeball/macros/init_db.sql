@@ -8,9 +8,12 @@
 
     {% for node in graph.sources.values() %}
         {% set prefix = "simple" if node.schema == "misc" else "event" %}
-      CREATE OR REPLACE VIEW {{ node.name }} AS (SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet');
+      CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
+      SET SCHEMA = '{{ node.schema }}';
+      CREATE TABLE IF NOT EXISTS {{ node.schema }}.{{ node.name }} AS (SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet');
     {% endfor %}
   {% endset %}
 
+{% do log(sql, info=True)%}
 {% do run_query(sql) %}
 {% endmacro %}
