@@ -1,0 +1,11 @@
+name,primary_classification,is_bunt
+Fly,FlyBall,false
+Unknown,Unknown,false
+PopFly,FlyBall,false
+GroundBallBunt,GroundBall,true
+GroundBall,GroundBall,false
+LineDrive,LineDrive,false
+PopUpBunt,FlyBall,true
+FoulBunt,Unknown,true
+LineDriveBunt,LineDrive,true
+UnspecifiedBunt,GroundBall,true
