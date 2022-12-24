@@ -26,4 +26,4 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 models:
   timeball:
-    +materialized: table
+    +materialized: view

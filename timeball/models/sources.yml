@@ -2,10 +2,15 @@ version: 2
 
 sources:
   - name: misc
-    description: ""
+    description: |
+      Datasets from a hodgepodge of sources. To maintain a single source of truth,
+      all data is sourced from Retrosheet play-by-play as much as possible.
     tables:
       - name: franchise
-        description: ""
+        description: |
+          Provides franchise attributes for a given time period,
+          such as location and division. This allows us to construct/track the
+          standings and league structure for all years.
         meta:
           primary_keys:
             - current_franchise_id
@@ -46,9 +51,10 @@ sources:
 
       - name: gamelog
         description: |
-          A truncated version of Retrosheet's gamelog file, including only
+          A truncated version of Retrosheet's gamelog file. It includes only
           games prior to 1901 (for which box sores are generally not available).
-          This is our only source of info for those games.
+          This is our only source of info for those games, so it does not conflict
+          with any of the later data in the play-by-play.
         meta:
           id_expression: "strftime(date, '%Y%m%d') || home_team || double_header"
         columns:
@@ -376,7 +382,8 @@ sources:
             description: ""
 
       - name: park
-        description: ""
+        description: |
+          Information about each ballpark.
         meta:
           primary_keys:
             - park_id
@@ -410,7 +417,9 @@ sources:
             description: ""
 
       - name: people
-        description: ""
+        description: |
+          Biographical information on each player/umpire/manager.
+          Sourced from the Chadwick Bureau people register.
         meta:
           primary_keys:
             - player_id
@@ -472,11 +481,15 @@ sources:
               - unique
 
       - name: roster
-        description: ""
+        description: |
+          Contains one entry for any valid combination of year/team/player.
+          The biographical information may conflict with the info in the `people`
+          table, as handedness/names are not necessarily the same from year to year.
         meta:
           primary_keys:
             - year
             - player_id
+            - team_id
         columns:
           - name: year
             description: ""
@@ -506,7 +519,10 @@ sources:
               - not_null
 
       - name: schedule
-        description: ""
+        description: |
+          Information about the original scheduled slate of games. Each row
+          represents an originally scheduled game. This will
+          differ from the `game` table in cases of postponements.
         meta:
           id_expression: "strftime(date, '%Y%m%d') || home_team || double_header"
         columns:
@@ -536,7 +552,22 @@ sources:
             description: ""
 
   - name: box_score
-    description: ""
+    description: |
+      These datasets are directly pulled from Retrosheet's box score files.
+      Only games without original play-by-play accounts will have box score data;
+      games with derived play-by-play accounts will have both box score and
+      play-by-play data. In those dual-account games, box score data can still
+      be useful for compiling fielding stats that cannot be directly attributed
+      to a play.
+
+      Unlike the play-by-play data, which is heavily parsed
+      during data extraction, box score data is largely passed through
+      without any enrichment or modification. Game-level metadata has the same shape
+      as the game-level data from play-by-play games. Other tables come directly
+      from a specific type of row in the box score file. These types
+      can be divided into two groups:
+      "lines", which roll up statistics to a player or team, and "events",
+      which give more detailed information on notable plays.
     tables:
       - name: box_score_batting_lines
         meta:
@@ -620,12 +651,8 @@ sources:
               - not_null
           - name: pitcher_id
             description: ""
-            tests:
-              - not_null
           - name: catcher_id
             description: ""
-            tests:
-              - not_null
           - name: inning
             description: ""
 
@@ -642,8 +669,6 @@ sources:
               - not_null
           - name: fielders
             description: ""
-            tests:
-              - not_null
 
       - name: box_score_fielding_lines
         description: ""
@@ -741,7 +766,9 @@ sources:
           - name: park_id
             description: ""
             tests:
-              - not_null
+              - not_null:
+                  config:
+                    where: "game_type != 'NegroLeagues'"
           - name: temperature_fahrenheit
             description: ""
           - name: attendance
@@ -955,8 +982,6 @@ sources:
               - not_null
           - name: pitcher_id
             description: ""
-            tests:
-              - not_null
           - name: catcher_id
             description: ""
           - name: inning
@@ -1107,8 +1132,6 @@ sources:
               - not_null
           - name: fielders
             description: ""
-            tests:
-              - not_null
 
       - name: box_score_umpire
         description: ""
@@ -1242,8 +1265,6 @@ sources:
               - not_null
           - name: at_base
             description: ""
-            tests:
-              - not_null
 
       - name: event_fielding_play
         description: ""
@@ -1515,16 +1536,10 @@ sources:
               - not_null
           - name: winning_pitcher
             description: ""
-            tests:
-              - not_null
           - name: losing_pitcher
             description: ""
-            tests:
-              - not_null
           - name: save_pitcher
             description: ""
-            tests:
-              - not_null
           - name: game_winning_rbi
             description: ""
           - name: time_of_game_minutes

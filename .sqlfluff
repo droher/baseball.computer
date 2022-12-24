@@ -1,0 +1,17 @@
+[sqlfluff]
+templater = dbt
+dialect = postgres
+exclude_rules = L031, L032
+warnings = L016, L034
+
+[sqlfluff:rules]
+max_line_length = 100
+
+[sqlfluff:rules:L010]
+capitalisation_policy = upper
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
+
+[sqlfluff:templater:dbt]
+project_dir = ./timeball

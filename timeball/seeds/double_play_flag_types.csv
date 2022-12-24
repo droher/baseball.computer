@@ -1,0 +1,10 @@
+name,is_double_play,is_ground_ball_double_play,is_triple_play
+BuntGroundIntoDoublePlay,true,true,false
+BuntPoppedIntoDoublePlay,true,false,false
+FlyBallDoublePlay,true,false,false
+GroundBallDoublePlay,true,true,false
+LinedIntoDoublePlay,true,false,false
+UnspecifiedDoublePlay,true,false,false
+UnspecifiedTriplePlay,false,false,true
+LinedIntoTriplePlay,false,false,true
+GroundBallTriplePlay,false,false,true

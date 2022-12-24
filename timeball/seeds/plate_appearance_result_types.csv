@@ -7,7 +7,7 @@ SacrificeFly,false,true,false,true,false,true,0
 SacrificeBunt,false,false,false,true,false,true,0
 Walk,false,true,true,false,false,false,0
 HitByPitch,false,true,true,false,false,false,0
-IntentionalWalk,false,true,true,false,false,false,false,0
+IntentionalWalk,false,true,true,false,false,false,0
 Interference,false,false,false,false,false,false,0
 Single,true,true,true,true,true,true,1
 Double,true,true,true,true,true,true,2
