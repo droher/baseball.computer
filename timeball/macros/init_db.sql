@@ -7,7 +7,7 @@
         {% set prefix = "simple" if node.schema == "misc" else "event" %}
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';
-      CREATE TABLE {{ node.schema }}.{{ node.name }} AS (SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet');
+      CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet');
     {% endfor %}
   {% endset %}
 
