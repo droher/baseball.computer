@@ -2,6 +2,6 @@
 target/
 dbt_packages/
 logs/
-timeball.db*
+timeball*.db*
 parquet/
 .python-version

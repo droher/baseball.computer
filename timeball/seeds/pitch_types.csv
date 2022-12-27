@@ -18,7 +18,8 @@ SwingingOnPitchout,true,true,false,true,true,false,Strike
 FoulOnPitchout,true,true,false,false,true,true,Strike
 SwingingStrike,true,true,false,true,true,false,Strike
 FoulTip,true,true,false,true,true,false,Strike
-Unknown,false,false,false,false,false,false,Unknown
 AutomaticBall,true,false,false,false,false,false,Ball
 InPlay,true,true,true,false,true,true,InPlay
 InPlayOnPitchout,true,true,true,false,true,true,InPlay
+Unrecognized,false,false,false,false,false,false,NoPitch
+Unknown,true,false,false,false,false,false,Unknown

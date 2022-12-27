@@ -1,0 +1,7 @@
+- Pitches
+    - A no-play or baserunning play event may have a sequence but does not have to.
+    - A plate appearance event must have a sequence and must have a pitch as part of that sequence.
+    - The number of balls in the count must equal the number of balls in the sequence prior to the final pitch.
+    - Strikes are the same except that an unlimited number of fouls are allowed if there are 2 strikes in the count.
+- Fielding
+  - Any out must have a putout.
