@@ -67,7 +67,7 @@
 ---- 
 WITH plate_appearances AS (
     SELECT *
-    FROM {{ source('event', 'event_plate_appearance') }}
+    FROM {{ ref('event_plate_appearances') }}
 ),
 
 result_types AS (
@@ -77,7 +77,7 @@ result_types AS (
 
 flags AS (
     SELECT *
-    FROM {{ source('event', 'event_flag') }}
+    FROM {{ ref('event_flags') }}
 ),
 
 dp_flag_types AS (
@@ -132,7 +132,7 @@ pre_agg AS (
     FROM plate_appearances
     LEFT JOIN result_types
         ON result_types.name = plate_appearances.plate_appearance_result
-    LEFT JOIN double_plays USING (game_id, event_id)
+    LEFT JOIN double_plays USING (event_key)
 )
 
 SELECT * FROM pre_agg
