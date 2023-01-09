@@ -49,7 +49,7 @@ final AS (
     FROM counts
     LEFT JOIN pitch_agg USING (event_key)
     WHERE counts.has_plate_appearance
-        OR pitch_agg.game_id IS NOT NULL
+        OR pitch_agg.event_key IS NOT NULL
 )
 
 SELECT * FROM final

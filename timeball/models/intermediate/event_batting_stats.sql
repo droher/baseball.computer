@@ -87,8 +87,7 @@ dp_flag_types AS (
 
 double_plays AS (
     SELECT
-        flags.game_id,
-        flags.event_id,
+        flags.event_key,
         BOOL_OR(dp_flag_types.is_double_play) AS is_double_play,
         BOOL_OR(dp_flag_types.is_triple_play) AS is_triple_play,
         BOOL_OR(
@@ -96,14 +95,12 @@ double_plays AS (
         ) AS is_ground_ball_double_play
     FROM flags
     INNER JOIN dp_flag_types ON (flags.flag = dp_flag_types.name)
-    GROUP BY 1, 2
+    GROUP BY 1
 ),
 
 pre_agg AS (
     SELECT
-        plate_appearances.game_id,
-        plate_appearances.event_id,
-
+        plate_appearances.event_key,
         1 AS plate_appearances,
         result_types.is_at_bat::INT AS at_bats,
         result_types.is_hit::INT AS hits,
@@ -120,7 +117,8 @@ pre_agg AS (
         (result_types.name = 'SacrificeFly')::INT AS sacrifice_flies,
         (result_types.name = 'SacrificeHit')::INT AS sacrifice_hits,
         (result_types.name = 'FieldersChoice')::INT AS fielders_choices,
-        (result_types.name = 'ReachedOnErrors')::INT AS reached_on_errors,
+        (result_types.name = 'ReachedOnError')::INT AS reached_on_errors,
+        (result_types.name = 'Interference')::INT AS reached_on_interferences,
 
         double_plays.is_ground_ball_double_play::INT AS ground_ball_double_plays,
         double_plays.is_double_play::INT AS double_plays,

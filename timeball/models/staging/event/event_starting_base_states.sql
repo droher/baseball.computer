@@ -9,7 +9,8 @@ renamed AS (
         baserunner,
         runner_lineup_position,
         charged_to_pitcher_id,
-        game_id || '-' || event_id AS event_key
+        game_id || '-' || event_id AS event_key,
+        game_id || '-' || event_id || '-' || baserunner AS baserunner_key
 
     FROM source
 )
