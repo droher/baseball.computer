@@ -11,7 +11,7 @@ renamed AS (
         attempted_advance_to,
         is_successful,
         advanced_on_error_flag,
-        safe_on_error_flag,
+        explicit_out_flag,
         rbi_flag,
         team_unearned_flag,
         game_id || '-' || event_id AS event_key,

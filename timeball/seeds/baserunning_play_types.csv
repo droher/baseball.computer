@@ -1,0 +1,11 @@
+baserunning_play_type,applies_to_all_runners
+AdvancedOnError,true
+Balk,true
+CaughtStealing,false
+DefensiveIndifference,true
+OtherAdvance,true
+PassedBall,true
+PickedOff,false
+PickedOffCaughtStealing,false
+StolenBase,false
+WildPitch,true

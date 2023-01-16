@@ -27,8 +27,8 @@ renamed AS (
         game_winning_rbi,
         time_of_game_minutes,
         protest_info,
-        completion_info
-
+        completion_info,
+        EXTRACT(YEAR FROM date) AS season
     FROM source
 )
 

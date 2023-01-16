@@ -1,7 +1,7 @@
 [sqlfluff]
 templater = dbt
 dialect = postgres
-exclude_rules = L031, L032
+exclude_rules = L031, L032, L038
 warnings = L016, L034
 
 [sqlfluff:rules]

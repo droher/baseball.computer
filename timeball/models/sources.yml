@@ -1463,6 +1463,7 @@ sources:
             description: ""
             tests:
               - not_null
+      -  name: event_raw
 
   - name: game
     description: ""
