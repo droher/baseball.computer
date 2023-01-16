@@ -75,10 +75,10 @@ multi_year_range AS (
         player_id,
         player_type,
         {%- for stat in stats %}
-            SUM({{ stat }}) 
-                OVER (PARTITION BY park_id, player_id, player_type
-                    ORDER BY season
-                    RANGE BETWEEN 2 PRECEDING AND CURRENT ROW)
+            SUM({{ stat }})
+            OVER (PARTITION BY park_id, player_id, player_type
+                ORDER BY season
+                RANGE BETWEEN 2 PRECEDING AND CURRENT ROW)
             AS {{ stat }},
         {%- endfor %}
     FROM batting_agg
@@ -148,15 +148,15 @@ weighted_average AS (
         SUM(sample_size) AS sample_size,
         {%- for stat in rate_stats %}
             SUM(this_{{ stat }}_per_pa * sample_size)
-                / SUM(sample_size) AS avg_this_{{ stat }}_per_pa,
+            / SUM(sample_size) AS avg_this_{{ stat }}_per_pa,
             SUM(other_{{ stat }}_per_pa * sample_size)
-                / SUM(sample_size) AS avg_other_{{ stat }}_per_pa,
+            / SUM(sample_size) AS avg_other_{{ stat }}_per_pa,
             avg_this_{{ stat }}_per_pa
-                / (1 - avg_this_{{ stat }}_per_pa) AS this_{{ stat }}_odds,
+            / (1 - avg_this_{{ stat }}_per_pa) AS this_{{ stat }}_odds,
             avg_other_{{ stat }}_per_pa
-                / (1 - avg_other_{{ stat }}_per_pa) AS other_{{ stat }}_odds,
+            / (1 - avg_other_{{ stat }}_per_pa) AS other_{{ stat }}_odds,
             this_{{ stat }}_odds
-                / other_{{ stat }}_odds AS {{ stat }}_park_factor,
+            / other_{{ stat }}_odds AS {{ stat }}_park_factor,
         {%- endfor %}
     FROM rate_calculation
     GROUP BY 1, 2

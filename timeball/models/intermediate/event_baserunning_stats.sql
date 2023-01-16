@@ -61,12 +61,12 @@ joined AS (
         a.is_successful,
         a.advanced_on_error_flag,
         a.explicit_out_flag,
-        COALESCE(bp.baserunning_play_type, 'None') AS baserunning_play_type,
         baserunner_meta.numeric_value AS number_base_from,
         bases_meta.numeric_value AS number_base_to,
         pa.plate_appearance_result,
-        COALESCE(pam.total_bases, 0) AS batter_total_bases,
-        pam.is_in_play
+        pam.is_in_play,
+        COALESCE(bp.baserunning_play_type, 'None') AS baserunning_play_type,
+        COALESCE(pam.total_bases, 0) AS batter_total_bases
     FROM advances AS a
     INNER JOIN states_full AS sf USING (baserunner_key)
     LEFT JOIN plate_appearances AS pa USING (event_key)
@@ -95,7 +95,7 @@ final AS (
         (baserunning_play_type LIKE '%CaughtStealing')::INT AS caught_stealing,
         (baserunning_play_type LIKE 'PickedOff%')::INT AS pickoffs,
         explicit_out_flag::INT AS caught_on_basepaths,
-      
+
         (baserunning_play_type = 'WildPitch')::INT AS advances_on_wild_pitches,
         (baserunning_play_type = 'PassedBall')::INT AS advances_on_passed_balls,
         (baserunning_play_type = 'Balk')::INT AS advances_on_balks,
