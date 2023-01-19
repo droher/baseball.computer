@@ -1,2 +1,2 @@
 SELECT * FROM {{ ref('event_raw') }}
-WHERE raw_play LIKE '%99%'
+WHERE event_key = 'BOS190310010-3'
