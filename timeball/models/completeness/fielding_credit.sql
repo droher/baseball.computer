@@ -37,12 +37,7 @@ final AS (
         -- and its absence doesn't indicate missing data
         COALESCE(fpa.has_fielder_putouts, TRUE) AS has_fielder_putouts,
         COALESCE(fpa.has_fielder_assists, TRUE) AS has_fielder_assists,
-        COALESCE(fpa.has_fielder_errors, TRUE) AS has_fielder_errors,
-        -- Similarly, a hit_to_fielder is not missing if there was no
-        -- plate appearance (e.g. on a baserunning play)
-        COALESCE(
-            plate_appearances.hit_to_fielder != 'Unknown' OR NOT rt.is_fielded, TRUE
-        ) AS has_hit_to_fielder
+        COALESCE(fpa.has_fielder_errors, TRUE) AS has_fielder_errors
     FROM fielding_play_agg AS fpa
     FULL OUTER JOIN plate_appearances USING (event_key)
     LEFT JOIN result_types AS rt ON rt.name = plate_appearances.plate_appearance_result
