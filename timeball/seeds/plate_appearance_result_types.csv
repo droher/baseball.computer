@@ -4,7 +4,7 @@ StrikeOut,true,true,false,true,false,false,false,0
 ReachedOnError,true,true,false,true,true,false,true,0
 FieldersChoice,true,true,false,true,true,false,true,0
 SacrificeFly,false,true,false,true,true,false,true,0
-SacrificeBunt,false,false,false,true,true,false,true,0
+SacrificeHit,false,false,false,true,true,false,true,0
 Walk,false,true,true,false,false,false,false,0
 HitByPitch,false,true,true,false,false,false,false,0
 IntentionalWalk,false,true,true,false,false,false,false,0
