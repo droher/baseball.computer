@@ -1,7 +1,8 @@
-
 target/
 dbt_packages/
 logs/
 timeball*.db*
 parquet/
 .python-version
+scratch.sql
+profile.log
