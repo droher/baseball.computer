@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH event_info AS (
     SELECT *
     FROM {{ ref('events') }}

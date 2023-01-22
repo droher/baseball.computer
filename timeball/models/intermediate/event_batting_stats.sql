@@ -85,19 +85,9 @@ lineups AS (
     FROM {{ ref('event_lineup_states') }}
 ),
 
-defenses AS (
+double_plays AS (
     SELECT *
-    FROM {{ ref('event_fielding_states') }}
-),
-
-flags AS (
-    SELECT *
-    FROM {{ ref('event_flags') }}
-),
-
-dp_flag_types AS (
-    SELECT *
-    FROM {{ ref('double_play_flag_types') }}
+    FROM {{ ref('event_double_plays') }}
 ),
 
 advances AS (
@@ -111,19 +101,6 @@ rbi AS (
         COUNT(*) AS runs_batted_in
     FROM advances
     WHERE rbi_flag
-    GROUP BY 1
-),
-
-double_plays AS (
-    SELECT
-        flags.event_key,
-        BOOL_OR(dp_flag_types.is_double_play) AS is_double_play,
-        BOOL_OR(dp_flag_types.is_triple_play) AS is_triple_play,
-        BOOL_OR(
-            dp_flag_types.is_ground_ball_double_play
-        ) AS is_ground_ball_double_play
-    FROM flags
-    INNER JOIN dp_flag_types ON (flags.flag = dp_flag_types.name)
     GROUP BY 1
 ),
 
