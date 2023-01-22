@@ -1,6 +1,6 @@
 WITH flags AS (
     SELECT *
-    FROM {{ ref('event_flags') }}
+    FROM {{ ref('stg_event_flags') }}
 ),
 
 dp_flag_types AS (

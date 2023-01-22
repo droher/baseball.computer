@@ -72,7 +72,7 @@
 ---- 
 WITH plate_appearances AS (
     SELECT *
-    FROM {{ ref('event_plate_appearances') }}
+    FROM {{ ref('stg_event_plate_appearances') }}
 ),
 
 result_types AS (
@@ -85,6 +85,11 @@ lineups AS (
     FROM {{ ref('event_lineup_states') }}
 ),
 
+defenses AS (
+    SELECT *
+    FROM {{ ref('event_fielding_states') }}
+),
+
 double_plays AS (
     SELECT *
     FROM {{ ref('event_double_plays') }}
@@ -92,7 +97,7 @@ double_plays AS (
 
 advances AS (
     SELECT *
-    FROM {{ ref('event_baserunning_advance_attempts') }}
+    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
 ),
 
 rbi AS (

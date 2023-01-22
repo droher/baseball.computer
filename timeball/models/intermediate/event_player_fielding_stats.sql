@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH states AS (
     SELECT *
     FROM {{ ref('event_fielding_states') }}
@@ -10,7 +5,7 @@ WITH states AS (
 
 fielding_plays AS (
     SELECT *
-    FROM {{ ref('event_fielding_plays') }}
+    FROM {{ ref('stg_event_fielding_plays') }}
 ),
 
 double_plays AS (
@@ -20,12 +15,12 @@ double_plays AS (
 
 outs AS (
     SELECT *
-    FROM {{ ref('event_outs') }}
+    FROM {{ ref('stg_event_outs') }}
 ),
 
 plate_appearances AS (
     SELECT *
-    FROM {{ ref('event_plate_appearances') }}
+    FROM {{ ref('stg_event_plate_appearances') }}
 ),
 
 pa_result_types AS (

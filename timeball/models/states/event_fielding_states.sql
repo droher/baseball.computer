@@ -4,7 +4,15 @@
     )
 }}
 WITH teams AS (
-    SELECT * FROM {{ ref('game_teams') }}
+    SELECT * FROM {{ ref('stg_game_teams') }}
+),
+
+game_fielding_appearances AS (
+    SELECT * FROM {{ ref('stg_game_fielding_appearances') }}
+),
+
+events AS (
+    SELECT * FROM {{ ref('stg_events') }}
 ),
 
 final AS (
@@ -16,11 +24,11 @@ final AS (
         t.team_id,
         gfa.player_id,
         gfa.fielding_position
-    FROM {{ ref('game_fielding_appearances') }} AS gfa
+    FROM game_fielding_appearances AS gfa
     INNER JOIN teams AS t
         ON gfa.game_id = t.game_id
             AND gfa.side = t.side
-    INNER JOIN {{ ref('events') }} AS e
+    INNER JOIN events AS e
         ON gfa.game_id = e.game_id
             AND e.event_id BETWEEN gfa.start_event_id AND gfa.end_event_id
             AND e.batting_side != gfa.side

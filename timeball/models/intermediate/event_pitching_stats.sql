@@ -5,7 +5,7 @@
 }}
 WITH plate_appearances AS (
     SELECT *
-    FROM {{ ref('event_plate_appearances') }}
+    FROM {{ ref('stg_event_plate_appearances') }}
 ),
 
 result_types AS (
@@ -25,7 +25,7 @@ defenses AS (
 
 flags AS (
     SELECT *
-    FROM {{ ref('event_flags') }}
+    FROM {{ ref('stg_event_flags') }}
 ),
 
 dp_flag_types AS (
@@ -35,7 +35,7 @@ dp_flag_types AS (
 
 advances AS (
     SELECT *
-    FROM {{ ref('event_baserunning_advance_attempts') }}
+    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
 ),
 
 rbi AS (

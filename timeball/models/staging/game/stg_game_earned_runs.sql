@@ -1,7 +1,8 @@
 WITH source AS (
       SELECT * FROM {{ source('game', 'game_earned_runs') }}
 ),
-renamed as (
+
+renamed AS (
     SELECT
         game_id,
         player_id,
@@ -10,4 +11,3 @@ renamed as (
 )
 
 SELECT * FROM renamed
-  

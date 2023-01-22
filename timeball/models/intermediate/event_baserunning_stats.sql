@@ -5,27 +5,27 @@
 }}
 WITH event_info AS (
     SELECT *
-    FROM {{ ref('events') }}
+    FROM {{ ref('stg_events') }}
 ),
 
 states AS (
     SELECT *
-    FROM {{ ref('event_starting_base_states') }}
+    FROM {{ ref('stg_event_starting_base_states') }}
 ),
 
 baserunning_plays AS (
     SELECT *
-    FROM {{ ref('event_baserunning_plays') }}
+    FROM {{ ref('stg_event_baserunning_plays') }}
 ),
 
 advances AS (
     SELECT *
-    FROM {{ ref('event_baserunning_advance_attempts') }}
+    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
 ),
 
 plate_appearances AS (
     SELECT *
-    FROM {{ ref('event_plate_appearances') }}
+    FROM {{ ref('stg_event_plate_appearances') }}
 ),
 
 baserunner_meta AS (

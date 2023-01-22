@@ -6,12 +6,12 @@ WITH result_types AS (
 
 plate_appearances AS (
     SELECT *
-    FROM {{ ref('event_plate_appearances') }}
+    FROM {{ ref('stg_event_plate_appearances') }}
     WHERE plate_appearance_result IN (SELECT name FROM result_types)
 ),
 
 hit_locations AS (
-    SELECT * FROM {{ ref('event_hit_locations') }}
+    SELECT * FROM {{ ref('stg_event_hit_locations') }}
 ),
 
 final AS (

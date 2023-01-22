@@ -4,11 +4,15 @@
     )
 }}
 WITH appearances AS (
-    SELECT * FROM {{ ref('game_lineup_appearances') }}
+    SELECT * FROM {{ ref('stg_game_lineup_appearances') }}
 ),
 
 teams AS (
-    SELECT * FROM {{ ref('game_teams') }}
+    SELECT * FROM {{ ref('stg_game_teams') }}
+),
+
+events AS (
+    SELECT * FROM {{ ref('stg_events') }}
 ),
 
 final AS (
@@ -26,7 +30,7 @@ final AS (
     INNER JOIN teams AS t
         ON a.side = t.side
             AND a.game_id = t.game_id
-    INNER JOIN {{ ref('events') }} AS e
+    INNER JOIN events AS e
         ON a.game_id = e.game_id
             AND e.event_id BETWEEN a.start_event_id AND a.end_event_id
             AND a.side = e.batting_side

@@ -4,11 +4,11 @@ WITH result_types AS (
 ),
 
 plate_appearances AS (
-    SELECT * FROM {{ ref('event_plate_appearances') }}
+    SELECT * FROM {{ ref('stg_event_plate_appearances') }}
 ),
 
 fielding_plays AS (
-    SELECT * FROM {{ ref('event_fielding_plays') }}
+    SELECT * FROM {{ ref('stg_event_fielding_plays') }}
 ),
 
 fielding_play_agg AS (

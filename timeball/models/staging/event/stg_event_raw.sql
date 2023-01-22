@@ -1,5 +1,5 @@
 WITH source AS (
-    SELECT * FROM {{ source('event', 'event_plate_appearance') }}
+    SELECT * FROM {{ source('event', 'event_raw') }}
 ),
 
 renamed AS (

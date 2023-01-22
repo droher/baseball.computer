@@ -2,7 +2,11 @@ WITH plate_appearances AS (
     -- We don't use baserunning-only plays as criteria
     -- for determining whether pitch data is missing,
     -- as it is neither necessary nor sufficient for complete data.
-    SELECT * FROM {{ ref('event_plate_appearances') }}
+    SELECT * FROM {{ ref('stg_event_plate_appearances') }}
+),
+
+events AS (
+    SELECT * FROM {{ ref('stg_events') }}
 ),
 
 counts AS (
@@ -14,12 +18,12 @@ counts AS (
         e.count_balls IS NOT NULL AS has_count_balls,
         e.count_strikes IS NOT NULL AS has_count_strikes,
         e.count_balls + e.count_strikes IS NOT NULL AS has_count
-    FROM {{ ref('events') }} AS e
+    FROM events AS e
     LEFT JOIN plate_appearances USING (event_key)
 ),
 
 pitch_sequences AS (
-    SELECT * FROM {{ ref('event_pitch_sequences') }}
+    SELECT * FROM {{ ref('stg_event_pitch_sequences') }}
 ),
 
 pitch_agg AS (

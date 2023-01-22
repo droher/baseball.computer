@@ -4,7 +4,7 @@
 
 WITH game_info AS (
     SELECT *
-    FROM {{ ref('games') }}
+    FROM {{ ref('stg_games') }}
     WHERE game_type = 'RegularSeason'
 ),
 
