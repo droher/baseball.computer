@@ -9,7 +9,7 @@ renamed AS (
         plate_appearance_result,
         contact,
         hit_to_fielder,
-        game_id || '-' || event_id AS event_key
+        event_key
 
     FROM source
 )

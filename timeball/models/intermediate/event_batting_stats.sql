@@ -122,7 +122,7 @@ add_ids AS (
     INNER JOIN defenses
         ON defenses.event_key = plate_appearances.event_key
     WHERE lineups.is_at_bat
-        AND defenses.fielding_position = 'Pitcher'
+        AND defenses.fielding_position = 1
 ),
 
 final AS (

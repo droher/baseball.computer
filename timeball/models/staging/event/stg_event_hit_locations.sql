@@ -10,7 +10,7 @@ renamed AS (
         depth,
         angle,
         strength,
-        game_id || '-' || event_id AS event_key
+        event_key
 
     FROM source
 )

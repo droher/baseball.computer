@@ -45,14 +45,28 @@ plate_appearance_meta AS (
 
 states_full AS (
     SELECT
-        baserunner_key,
+        event_key,
+        baserunner,
         runner_lineup_position
     FROM states
     UNION ALL
     SELECT
-        event_key || '-' || 'Batter' AS baserunner_key,
+        event_key,
+        'Batter' AS baserunner,
         at_bat AS runner_lineup_position
     FROM event_info
+),
+
+runner_specific_plays AS (
+    SELECT *
+    FROM baserunning_plays
+    WHERE baserunner IS NOT NULL
+),
+
+runner_generic_plays AS (
+    SELECT *
+    FROM baserunning_plays
+    WHERE baserunner IS NULL
 ),
 
 joined AS (
@@ -60,7 +74,6 @@ joined AS (
         a.game_id,
         a.event_id,
         a.event_key,
-        a.baserunner_key,
         a.baserunner,
         sf.runner_lineup_position,
         a.is_successful,
@@ -70,21 +83,16 @@ joined AS (
         bases_meta.numeric_value AS number_base_to,
         pa.plate_appearance_result,
         pam.is_in_play,
-        COALESCE(bp.baserunning_play_type, 'None') AS baserunning_play_type,
+        COALESCE(rsp.baserunning_play_type, rgp.baserunning_play_type, 'None') AS baserunning_play_type,
         COALESCE(pam.total_bases, 0) AS batter_total_bases
     FROM advances AS a
-    INNER JOIN states_full AS sf USING (baserunner_key)
+    INNER JOIN states_full AS sf USING (event_key, baserunner)
+    LEFT JOIN runner_specific_plays AS rsp USING (event_key, baserunner)
+    LEFT JOIN runner_generic_plays AS rgp USING (event_key)
     LEFT JOIN plate_appearances AS pa USING (event_key)
     LEFT JOIN baserunner_meta ON a.baserunner = baserunner_meta.baserunner
     LEFT JOIN bases_meta ON a.attempted_advance_to = bases_meta.base
     LEFT JOIN plate_appearance_meta AS pam ON pa.plate_appearance_result = pam.name
-    LEFT JOIN baserunning_plays AS bp
-        ON a.event_key = bp.event_key
-    -- This can't be part of the above join because it will cause a nested loop,
-    -- but it should be. We need to make sure that the baserunner is the
-    -- same as the one in the baserunning play, or that no baserunner
-    -- was specified (meaning that the play applies to all baserunners).
-    WHERE a.baserunner = bp.baserunner OR bp.baserunning_play_type IS NULL
 ),
 
 final AS (
@@ -92,7 +100,6 @@ final AS (
         game_id,
         event_id,
         event_key,
-        baserunner_key,
         baserunner,
         runner_lineup_position,
         (is_successful AND number_base_to = 4)::INT AS runs_scored,
@@ -125,5 +132,4 @@ final AS (
     FROM joined
 )
 
-SELECT COUNT(*) FROM final
-WHERE caught_stealing > 0
+SELECT * FROM final
