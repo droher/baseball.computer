@@ -1,0 +1,54 @@
+WITH pitches AS (
+    SELECT *
+    FROM {{ ref('stg_event_pitch_sequences') }}
+),
+
+pitch_meta AS (
+    SELECT *
+    FROM {{ ref('pitch_types') }}
+),
+
+add_meta AS (
+    SELECT
+        pitches.event_key,
+        pitches.runners_going_flag,
+        pitches.blocked_by_catcher_flag,
+        pitches.catcher_pickoff_attempt_at_base,
+        pitch_meta.*
+    FROM pitches
+    INNER JOIN pitch_meta ON pitches.sequence_item = pitch_meta.name
+),
+
+final AS (
+    SELECT
+        event_key,
+        COUNT(*) FILTER (WHERE is_pitch) AS pitches_thrown,
+
+        COUNT(*) FILTER (WHERE is_swing) AS swings,
+        COUNT(*) FILTER (WHERE is_contact) AS swings_with_contact,
+
+        COUNT(*) FILTER (WHERE is_strike) AS strikes_thrown,
+        COUNT(*) FILTER (WHERE is_swing AND NOT is_contact) AS strikes_swinging,
+        COUNT(*) FILTER (WHERE is_swing AND is_contact AND NOT is_in_play AND NOT can_be_strike_three) AS strikes_foul,
+        COUNT(*) FILTER (WHERE name LIKE 'FoulTip%') AS strikes_foul_tip,
+        COUNT(*) FILTER (WHERE is_in_play) AS strikes_in_play,
+        COUNT(*) FILTER (WHERE name = 'StrikeUnknownType') AS strikes_unknown,
+
+        COUNT(*) FILTER (WHERE is_pitch AND NOT is_strike) AS balls_thrown,
+        COUNT(*) FILTER (WHERE name = 'Ball') AS balls_called,
+        COUNT(*) FILTER (WHERE name = 'IntentionalBall') AS balls_intentional,
+        COUNT(*) FILTER (WHERE name = 'AutomaticBall') AS balls_automatic,
+
+        COUNT(*) FILTER (WHERE category = 'Unknown') AS unknown_pitches_thrown,
+
+        COUNT(*) FILTER (WHERE name LIKE '%Pitchout') AS pitchouts,
+        COUNT(*) FILTER (WHERE name LIKE 'Pickoff%') AS pitcher_pickoff_attempts,
+        COUNT(*) FILTER (WHERE catcher_pickoff_attempt_at_base IS NOT NULL) AS catcher_pickoff_attempts,
+        COUNT(*) FILTER (WHERE blocked_by_catcher_flag) AS pitches_blocked_by_catcher,
+        COUNT(*) FILTER (WHERE is_pitch AND runners_going_flag) AS pitches_with_runners_going,
+
+    FROM add_meta
+    GROUP BY 1
+)
+
+SELECT * FROM final
