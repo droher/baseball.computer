@@ -2,7 +2,7 @@
   {% set base_url = "https://baseball.computer" %}
 
   {% set sql %}
-    {% for node in graph.sources.values() %}
+    {% for node in graph.sources.values() if node.schema == "misc" %}
         {% set prefix = "simple" if node.schema == "misc" else "event" %}
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';

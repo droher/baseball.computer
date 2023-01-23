@@ -1,16 +1,6 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH states AS (
     SELECT *
     FROM {{ ref('event_fielding_states') }}
-),
-
-fielding_plays AS (
-    SELECT *
-    FROM {{ ref('stg_event_fielding_plays') }}
 ),
 
 double_plays AS (
