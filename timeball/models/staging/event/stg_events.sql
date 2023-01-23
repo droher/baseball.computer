@@ -13,7 +13,7 @@ renamed AS (
         outs,
         count_balls,
         count_strikes,
-        game_id || '-' || event_id AS event_key
+        event_key
 
     FROM source
 )

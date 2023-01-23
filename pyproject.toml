@@ -8,7 +8,7 @@ authors = ["David Roher <davidroher@davids-air.home>"]
 python = "^3.10.8"
 dbt-core = "^1.3.2"
 dbt-duckdb = "^1.3.4"
-duckdb = "0.6.2.dev1218"
+duckdb = "0.6.1"
 
 [tool.poetry.dev-dependencies]
 

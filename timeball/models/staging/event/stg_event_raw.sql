@@ -9,7 +9,7 @@ renamed AS (
         filename,
         line_number,
         raw_play,
-        game_id || '-' || event_id AS event_key
+        event_key
     FROM source
 )
 
