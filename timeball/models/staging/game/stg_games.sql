@@ -5,6 +5,7 @@ WITH source AS (
 renamed AS (
     SELECT
         game_id,
+        game_key,
         date,
         start_time,
         doubleheader_status,
@@ -15,7 +16,6 @@ renamed AS (
         field_condition,
         precipitation,
         wind_direction,
-        scoring_method,
         park_id,
         temperature_fahrenheit,
         attendance,
@@ -28,6 +28,12 @@ renamed AS (
         time_of_game_minutes,
         protest_info,
         completion_info,
+        scorer,
+        scoring_method,
+        inputter,
+        translator,
+        date_inputted,
+        date_edited,
         EXTRACT(YEAR FROM date) AS season
     FROM source
 )

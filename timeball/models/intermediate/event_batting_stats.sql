@@ -127,8 +127,6 @@ add_ids AS (
 
 final AS (
     SELECT
-        add_ids.game_id,
-        add_ids.event_id,
         add_ids.event_key,
         add_ids.batter_id,
         add_ids.batting_team_id,

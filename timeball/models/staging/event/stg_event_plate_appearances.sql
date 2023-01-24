@@ -4,12 +4,10 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        game_id,
-        event_id,
+        event_key,
         plate_appearance_result,
         contact,
         hit_to_fielder,
-        event_key
 
     FROM source
 )

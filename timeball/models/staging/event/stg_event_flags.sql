@@ -4,11 +4,9 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        game_id,
-        event_id,
+        event_key,
         sequence_id,
         flag,
-        event_key,
         event_key || '-' || sequence_id AS sequence_key
 
     FROM source

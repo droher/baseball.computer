@@ -66,8 +66,6 @@ runner_generic_plays AS (
 
 joined AS (
     SELECT
-        a.game_id,
-        a.event_id,
         a.event_key,
         a.baserunner,
         sf.runner_lineup_position,
@@ -92,8 +90,6 @@ joined AS (
 
 final AS (
     SELECT
-        game_id,
-        event_id,
         event_key,
         baserunner,
         runner_lineup_position,

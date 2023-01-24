@@ -15,10 +15,8 @@ pitch_meta AS (
 
 counts AS (
     SELECT
-        e.game_id,
-        e.event_id,
         event_key,
-        plate_appearances.game_id IS NOT NULL AS has_plate_appearance,
+        plate_appearances.event_key IS NOT NULL AS has_plate_appearance,
         e.count_balls IS NOT NULL AS has_count_balls,
         e.count_strikes IS NOT NULL AS has_count_strikes,
         e.count_balls + e.count_strikes IS NOT NULL AS has_count
@@ -45,8 +43,6 @@ pitch_agg AS (
 final AS (
     SELECT
         event_key,
-        counts.game_id,
-        counts.event_id,
         counts.has_count_balls,
         counts.has_count_strikes,
         counts.has_count,

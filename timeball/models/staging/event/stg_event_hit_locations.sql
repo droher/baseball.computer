@@ -4,14 +4,11 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        game_id,
-        event_id,
+        event_key,
         general_location,
         depth,
         angle,
-        strength,
-        event_key
-
+        strength
     FROM source
 )
 

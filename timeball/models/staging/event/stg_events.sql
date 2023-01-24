@@ -6,6 +6,7 @@ renamed AS (
     SELECT
         game_id,
         event_id,
+        event_key,
         batting_side,
         inning,
         frame,
@@ -13,7 +14,6 @@ renamed AS (
         outs,
         count_balls,
         count_strikes,
-        event_key
 
     FROM source
 )

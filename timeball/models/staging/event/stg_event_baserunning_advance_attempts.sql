@@ -4,8 +4,7 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        game_id,
-        event_id,
+        event_key,
         sequence_id,
         baserunner,
         attempted_advance_to,
@@ -14,7 +13,6 @@ renamed AS (
         explicit_out_flag,
         rbi_flag,
         team_unearned_flag,
-        event_key,
         event_key || '-' || sequence_id AS sequence_key,
         event_key || '-' || baserunner AS baserunner_key
 

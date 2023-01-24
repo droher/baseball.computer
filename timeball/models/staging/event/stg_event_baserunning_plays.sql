@@ -4,12 +4,10 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        game_id,
-        event_id,
+        event_key,
         sequence_id,
         baserunning_play_type,
         baserunner,
-        event_key,
         event_key || '-' || sequence_id AS sequence_key,
         event_key || '-' || baserunner AS baserunner_key
 
