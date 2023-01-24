@@ -9,6 +9,10 @@ events AS (
     SELECT * FROM {{ ref('stg_events') }}
 ),
 
+pitch_meta AS (
+    SELECT * FROM {{ ref('pitch_types') }}
+),
+
 counts AS (
     SELECT
         e.game_id,
@@ -29,13 +33,12 @@ pitch_sequences AS (
 pitch_agg AS (
     SELECT
         ps.event_key,
-        BOOL_OR(pt.is_pitch) AS has_pitches,
-        BOOL_AND(pt.category != 'Unknown') AS has_pitch_calls,
-        BOOL_AND(pt.category != 'Unknown' AND pt.name != 'StrikeUnknownType') AS has_strike_types
+        BOOL_OR(pm.is_pitch) AS has_pitches,
+        BOOL_AND(pm.category != 'Unknown') AS has_pitch_calls,
+        BOOL_AND(pm.category != 'Unknown' AND pm.sequence_item != 'StrikeUnknownType') AS has_strike_types
     FROM pitch_sequences AS ps
-    INNER JOIN {{ ref('pitch_types') }} AS pt
-        ON pt.name = ps.sequence_item
-    WHERE pt.is_pitch
+    INNER JOIN pitch_meta AS pm USING (sequence_item)
+    WHERE pm.is_pitch
     GROUP BY 1
 ),
 

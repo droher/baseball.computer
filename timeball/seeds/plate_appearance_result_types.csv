@@ -1,4 +1,4 @@
-name,is_at_bat,is_on_base_opportunity,is_on_base_success,is_batting_out,is_in_play,is_hit,is_fielded,total_bases
+plate_appearance_result,is_at_bat,is_on_base_opportunity,is_on_base_success,is_batting_out,is_in_play,is_hit,is_fielded,total_bases
 InPlayOut,true,true,false,true,true,false,true,0
 StrikeOut,true,true,false,true,false,false,false,0
 ReachedOnError,true,true,false,true,true,false,true,0

@@ -1,4 +1,4 @@
-name,is_double_play,is_ground_ball_double_play,is_triple_play
+flag,is_double_play,is_ground_ball_double_play,is_triple_play
 BuntGroundIntoDoublePlay,true,true,false
 BuntPoppedIntoDoublePlay,true,false,false
 FlyBallDoublePlay,true,false,false

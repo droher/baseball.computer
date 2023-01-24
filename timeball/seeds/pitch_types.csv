@@ -1,4 +1,4 @@
-name,is_pitch,is_strike,is_in_play,can_be_strike_three,is_swing,is_contact,category
+sequence_item,is_pitch,is_strike,is_in_play,can_be_strike_three,is_swing,is_contact,category
 PickoffAttemptFirst,false,false,false,false,false,false,NoPitch
 PickoffAttemptSecond,false,false,false,false,false,false,NoPitch
 PickoffAttemptThird,false,false,false,false,false,false,NoPitch

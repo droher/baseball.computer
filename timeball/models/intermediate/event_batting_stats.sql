@@ -144,15 +144,15 @@ final AS (
         (result_types.total_bases = 4)::INT AS home_runs,
         result_types.total_bases,
 
-        (result_types.name = 'StrikeOut')::INT AS strikeouts,
-        (result_types.name IN ('Walk', 'IntentionalWalk'))::INT AS walks,
-        (result_types.name = 'IntentionalWalk')::INT AS intentional_walks,
-        (result_types.name = 'HitByPitch')::INT AS hit_by_pitches,
-        (result_types.name = 'SacrificeFly')::INT AS sacrifice_flies,
-        (result_types.name = 'SacrificeHit')::INT AS sacrifice_hits,
-        (result_types.name = 'FieldersChoice')::INT AS fielders_choices,
-        (result_types.name = 'ReachedOnError')::INT AS reached_on_errors,
-        (result_types.name = 'Interference')::INT AS reached_on_interferences,
+        (result_types.plate_appearance_result = 'StrikeOut')::INT AS strikeouts,
+        (result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk'))::INT AS walks,
+        (result_types.plate_appearance_result = 'IntentionalWalk')::INT AS intentional_walks,
+        (result_types.plate_appearance_result = 'HitByPitch')::INT AS hit_by_pitches,
+        (result_types.plate_appearance_result = 'SacrificeFly')::INT AS sacrifice_flies,
+        (result_types.plate_appearance_result = 'SacrificeHit')::INT AS sacrifice_hits,
+        (result_types.plate_appearance_result = 'FieldersChoice')::INT AS fielders_choices,
+        (result_types.plate_appearance_result = 'ReachedOnError')::INT AS reached_on_errors,
+        (result_types.plate_appearance_result = 'Interference')::INT AS reached_on_interferences,
 
         COALESCE(rbi.runs_batted_in, 0) AS runs_batted_in,
 
@@ -168,8 +168,7 @@ final AS (
         result_types.is_batting_out::INT + ground_ball_double_plays AS batting_outs
 
     FROM add_ids
-    INNER JOIN result_types
-        ON result_types.name = add_ids.plate_appearance_result
+    INNER JOIN result_types USING (plate_appearance_result)
     LEFT JOIN double_plays USING (event_key)
     LEFT JOIN rbi USING (event_key)
 )

@@ -7,7 +7,6 @@ WITH result_types AS (
 plate_appearances AS (
     SELECT *
     FROM {{ ref('stg_event_plate_appearances') }}
-    WHERE plate_appearance_result IN (SELECT name FROM result_types)
 ),
 
 hit_locations AS (
@@ -27,7 +26,7 @@ final AS (
             has_non_default_depth OR has_non_default_angle OR has_non_default_strength, FALSE
         ) AS has_any_location_modifier
     FROM plate_appearances AS pa
-    INNER JOIN result_types AS rt ON pa.plate_appearance_result = rt.name
+    INNER JOIN result_types AS rt USING (plate_appearance_result)
     LEFT JOIN hit_locations AS hl USING (event_key)
 )
 

@@ -40,7 +40,6 @@ final AS (
         COALESCE(fpa.has_fielder_errors, TRUE) AS has_fielder_errors
     FROM fielding_play_agg AS fpa
     FULL OUTER JOIN plate_appearances USING (event_key)
-    LEFT JOIN result_types AS rt ON rt.name = plate_appearances.plate_appearance_result
 )
 
 SELECT * FROM final

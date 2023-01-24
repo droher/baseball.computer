@@ -17,7 +17,7 @@ final AS (
             dp_flag_types.is_ground_ball_double_play
         ) AS is_ground_ball_double_play
     FROM flags
-    INNER JOIN dp_flag_types ON (flags.flag = dp_flag_types.name)
+    INNER JOIN dp_flag_types USING (flag)
     GROUP BY 1
 )
 

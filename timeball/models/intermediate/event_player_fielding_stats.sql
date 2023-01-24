@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH states AS (
     SELECT *
     FROM {{ ref('event_fielding_states') }}
@@ -68,7 +63,7 @@ event_level_agg AS (
         dp.is_ground_ball_double_play
     FROM outs_agg AS oa
     FULL OUTER JOIN plate_appearances AS pa USING (event_key)
-    LEFT JOIN pa_result_types AS prt ON pa.plate_appearance_result = prt.name
+    LEFT JOIN pa_result_types AS prt USING (plate_appearance_result)
     LEFT JOIN double_plays AS dp USING (event_key)
 ),
 

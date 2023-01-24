@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH event_info AS (
     SELECT *
     FROM {{ ref('stg_events') }}
@@ -90,9 +85,9 @@ joined AS (
     LEFT JOIN runner_specific_plays AS rsp USING (event_key, baserunner)
     LEFT JOIN runner_generic_plays AS rgp USING (event_key)
     LEFT JOIN plate_appearances AS pa USING (event_key)
+    LEFT JOIN plate_appearance_meta AS pam USING (plate_appearance_result)
     LEFT JOIN baserunner_meta ON a.baserunner = baserunner_meta.baserunner
     LEFT JOIN bases_meta ON a.attempted_advance_to = bases_meta.base
-    LEFT JOIN plate_appearance_meta AS pam ON pa.plate_appearance_result = pam.name
 ),
 
 final AS (
