@@ -1,12 +1,15 @@
 [sqlfluff]
 templater = dbt
 dialect = duckdb
-exclude_rules = L031, L032, L038
-warnings = L016, L034
+exclude_rules = aliasing.forbid, structure.using, convention.select_trailing_comma
+warnings = layout.long_lines, structure.column_order
 max_line_length = 100
 
-[sqlfluff:rules:L010]
+[sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = upper
+
+[sqlfluff:indentation]
+allow_implicit_indents = True
 
 [sqlfluff:templater:jinja]
 apply_dbt_builtins = True

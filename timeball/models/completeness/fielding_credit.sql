@@ -1,9 +1,4 @@
-WITH result_types AS (
-    SELECT *
-    FROM {{ ref('plate_appearance_result_types') }}
-),
-
-plate_appearances AS (
+WITH plate_appearances AS (
     SELECT * FROM {{ ref('stg_event_plate_appearances') }}
 ),
 

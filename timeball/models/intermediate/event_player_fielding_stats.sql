@@ -57,10 +57,10 @@ event_level_agg AS (
         oa.innings_played,
         pa.hit_to_fielder,
         (pa.event_key IS NOT NULL)::INT AS plate_appearances_in_field,
-        CASE WHEN prt.is_in_play THEN 1 ELSE 0 END AS plate_appearances_in_field_with_ball_in_play,
         dp.is_double_play,
         dp.is_triple_play,
-        dp.is_ground_ball_double_play
+        dp.is_ground_ball_double_play,
+        CASE WHEN prt.is_in_play THEN 1 ELSE 0 END AS plate_appearances_in_field_with_ball_in_play
     FROM outs_agg AS oa
     FULL OUTER JOIN plate_appearances AS pa USING (event_key)
     LEFT JOIN pa_result_types AS prt USING (plate_appearance_result)
@@ -85,15 +85,15 @@ final AS (
         -- Only count double plays for the fielder who made a putout
         -- or assist on the play
         CASE WHEN e.is_double_play AND fp.putouts + fp.assists > 0
-            THEN 1
+                THEN 1
             ELSE 0
         END AS double_plays,
         CASE WHEN e.is_triple_play AND fp.putouts + fp.assists > 0
-            THEN 1
+                THEN 1
             ELSE 0
         END AS triple_plays,
         CASE WHEN e.is_ground_ball_double_play AND fp.putouts + fp.assists > 0
-            THEN 1
+                THEN 1
             ELSE 0
         END AS ground_ball_double_plays
     FROM states AS s

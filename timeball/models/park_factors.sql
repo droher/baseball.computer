@@ -1,4 +1,5 @@
-{% set stats = ["plate_appearances", "singles", "doubles", "triples", "home_runs", "strikeouts", "walks", "batting_outs"] %}
+{% set stats = ["plate_appearances", "singles", "doubles", "triples", 
+                "home_runs", "strikeouts", "walks", "batting_outs"] %}
 {% set rate_stats = stats[1:] %}
 {% set prior_sample_size = "10000 / COUNT(park_id) OVER (PARTITION BY season)" %}
 
@@ -76,9 +77,11 @@ multi_year_range AS (
         player_type,
         {%- for stat in stats %}
             SUM({{ stat }})
-            OVER (PARTITION BY park_id, player_id, player_type
-                ORDER BY season
-                RANGE BETWEEN 2 PRECEDING AND CURRENT ROW)
+                OVER (
+                    PARTITION BY park_id, player_id, player_type
+                    ORDER BY season
+                    RANGE BETWEEN 2 PRECEDING AND CURRENT ROW
+                )
             AS {{ stat }},
         {%- endfor %}
     FROM batting_agg

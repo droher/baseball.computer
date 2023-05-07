@@ -80,6 +80,11 @@ result_types AS (
     FROM {{ ref('plate_appearance_result_types') }}
 ),
 
+event_base AS (
+    SELECT *
+    FROM {{ ref('stg_events') }}
+),
+
 lineups AS (
     SELECT *
     FROM {{ ref('event_lineup_states') }}
@@ -115,18 +120,19 @@ add_ids AS (
         lineups.team_id AS batting_team_id,
         lineups.player_id AS batter_id,
         defenses.team_id AS pitching_team_id,
-        defenses.player_id AS pitcher_id
+        defenses.player_id AS pitcher_id,
+        event_base.game_id
     FROM plate_appearances
-    INNER JOIN lineups
-        ON lineups.event_key = plate_appearances.event_key
-    INNER JOIN defenses
-        ON defenses.event_key = plate_appearances.event_key
+    INNER JOIN lineups USING (event_key)
+    INNER JOIN defenses USING (event_key)
+    INNER JOIN event_base USING (event_key)
     WHERE lineups.is_at_bat
         AND defenses.fielding_position = 1
 ),
 
 final AS (
     SELECT
+        add_ids.game_id,
         add_ids.event_key,
         add_ids.batter_id,
         add_ids.batting_team_id,
@@ -152,14 +158,14 @@ final AS (
         (result_types.plate_appearance_result = 'ReachedOnError')::INT AS reached_on_errors,
         (result_types.plate_appearance_result = 'Interference')::INT AS reached_on_interferences,
 
-        COALESCE(rbi.runs_batted_in, 0) AS runs_batted_in,
+        result_types.is_on_base_opportunity::INT AS on_base_opportunities,
 
+        result_types.is_on_base_success::INT AS on_base_successes,
+        COALESCE(rbi.runs_batted_in, 0) AS runs_batted_in,
         COALESCE(double_plays.is_ground_ball_double_play::INT, 0) AS ground_ball_double_plays,
+
         COALESCE(double_plays.is_double_play::INT, 0) AS double_plays,
         COALESCE(double_plays.is_triple_play::INT, 0) AS triple_plays,
-
-        result_types.is_on_base_opportunity::INT AS on_base_opportunities,
-        result_types.is_on_base_success::INT AS on_base_successes,
         -- The extra out from GIDPs is attributed to the batter,
         -- but for other types of double plays, the other out
         -- is considered to be a baserunning out.

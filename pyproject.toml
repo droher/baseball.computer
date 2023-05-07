@@ -5,10 +5,10 @@ description = ""
 authors = ["David Roher <davidroher@davids-air.home>"]
 
 [tool.poetry.dependencies]
-python = "^3.10.8"
-dbt-core = "^1.3.2"
-dbt-duckdb = "^1.3.4"
-duckdb = "0.6.1"
+python = "^3.11.0"
+dbt-core = "^1.5.0"
+dbt-duckdb = "^1.5.0"
+duckdb = "^0.7.1"
 
 [tool.poetry.dev-dependencies]
 

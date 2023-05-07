@@ -76,7 +76,9 @@ joined AS (
         bases_meta.numeric_value AS number_base_to,
         pa.plate_appearance_result,
         pam.is_in_play,
-        COALESCE(rsp.baserunning_play_type, rgp.baserunning_play_type, 'None') AS baserunning_play_type,
+        COALESCE(
+            rsp.baserunning_play_type, rgp.baserunning_play_type, 'None'
+        ) AS baserunning_play_type,
         COALESCE(pam.total_bases, 0) AS batter_total_bases
     FROM advances AS a
     INNER JOIN states_full AS sf USING (event_key, baserunner)
@@ -103,21 +105,27 @@ final AS (
         (baserunning_play_type = 'PassedBall')::INT AS advances_on_passed_balls,
         (baserunning_play_type = 'Balk')::INT AS advances_on_balks,
         (baserunning_play_type = 'OtherAdvance')::INT AS advances_on_unspecified_plays,
-        (baserunning_play_type = 'DefensiveIndifference')::INT AS advances_on_defensive_indifference,
-        (baserunning_play_type = 'AdvancedOnError' OR advanced_on_error_flag)::INT AS advances_on_errors,
+        (
+            baserunning_play_type = 'DefensiveIndifference'
+        )::INT AS advances_on_defensive_indifference,
+        (
+            baserunning_play_type = 'AdvancedOnError' OR advanced_on_error_flag
+        )::INT AS advances_on_errors,
 
         is_in_play::INT AS balls_in_play_while_running,
 
         CASE WHEN is_successful
-            THEN number_base_to - number_base_from
+                THEN number_base_to - number_base_from
             ELSE 0
         END AS bases_advanced,
         CASE WHEN is_successful AND is_in_play AND NOT advanced_on_error_flag
-            THEN number_base_to - number_base_from
+                THEN number_base_to - number_base_from
             ELSE 0
         END AS bases_advanced_on_balls_in_play,
         CASE WHEN is_successful AND NOT advanced_on_error_flag
-            THEN number_base_to - number_base_from - LEAST(4 - number_base_from, batter_total_bases)
+                THEN number_base_to
+                    - number_base_from
+                    - LEAST(4 - number_base_from, batter_total_bases)
             ELSE 0
         END AS extra_bases_advanced_on_balls_in_play
     FROM joined

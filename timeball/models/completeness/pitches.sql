@@ -33,7 +33,9 @@ pitch_agg AS (
         ps.event_key,
         BOOL_OR(pm.is_pitch) AS has_pitches,
         BOOL_AND(pm.category != 'Unknown') AS has_pitch_calls,
-        BOOL_AND(pm.category != 'Unknown' AND pm.sequence_item != 'StrikeUnknownType') AS has_strike_types
+        BOOL_AND(
+            pm.category != 'Unknown' AND pm.sequence_item != 'StrikeUnknownType'
+        ) AS has_strike_types
     FROM pitch_sequences AS ps
     INNER JOIN pitch_meta AS pm USING (sequence_item)
     WHERE pm.is_pitch
