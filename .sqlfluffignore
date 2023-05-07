@@ -1,3 +1,4 @@
 timeball/dbt_packages/
 timeball/macros/
 timeball/target/
+timeball/analyses

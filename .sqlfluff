@@ -1,10 +1,8 @@
 [sqlfluff]
 templater = dbt
-dialect = postgres
+dialect = duckdb
 exclude_rules = L031, L032, L038
 warnings = L016, L034
-
-[sqlfluff:rules]
 max_line_length = 100
 
 [sqlfluff:rules:L010]
@@ -15,3 +13,4 @@ apply_dbt_builtins = True
 
 [sqlfluff:templater:dbt]
 project_dir = ./timeball
+profiles_dir = ~/.dbt

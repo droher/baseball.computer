@@ -37,6 +37,7 @@ final AS (
         COALESCE(hl.depth = 'ExtraDeep', FALSE) AS has_extra_deep_depth,
         COALESCE(hl.angle != 'Default', FALSE) AS has_angle,
         COALESCE(hl.angle = 'Foul', FALSE) AS has_foul_angle,
+        
         COALESCE(hl.strength != 'Default', FALSE) AS has_strength,
         COALESCE(lt.is_mid_position, FALSE) AS has_mid_position,
         COALESCE(ct.broad_classification = 'GroundBall' AND hl.general_location IS NOT NULL,

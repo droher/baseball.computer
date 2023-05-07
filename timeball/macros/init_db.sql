@@ -2,7 +2,7 @@
   {% set base_url = "https://baseball.computer" %}
 
   {% set sql %}
-    {% for node in graph.sources.values() if node.schema == "misc" %}
+    {% for node in graph.sources.values() %}
         {% set prefix = "simple" if node.schema == "misc" else "event" %}
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';
@@ -12,7 +12,7 @@
 
 {% do log(sql, info=True)%}
 {% do run_query(sql) %}
-{% do init_db_csv_rust(args) %}
+
 {% endmacro %}
 
 {% macro init_db_csv_rust(args) %}
