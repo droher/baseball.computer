@@ -30,7 +30,7 @@ final AS (
             FALSE
         ) AS has_hit_to_fielder,
         has_hit_to_fielder OR has_general_location AS has_any_location,
-        -- Coverage of the fields below can't be determined at an event level, so
+        -- Coverage of the fields below can't be determined at an event granularity, so
         -- the false negative issue above isn't a concern. Coverage should be inferred
         -- by having at least ~1 predicate-satisfying event over the course of
         -- a game or another appropriate sample.
