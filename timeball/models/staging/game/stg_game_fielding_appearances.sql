@@ -7,10 +7,9 @@ renamed AS (
         game_id,
         player_id,
         side,
-        fielding_position,
-        start_event_id,
-        end_event_id
-
+        fielding_position::TINYINT AS fielding_position,
+        start_event_id::UTINYINT AS start_event_id,
+        end_event_id::UTINYINT AS end_event_id,
     FROM source
 )
 

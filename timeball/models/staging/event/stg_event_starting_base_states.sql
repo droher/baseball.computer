@@ -4,9 +4,9 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        event_key,
+        event_key::INT AS event_key,
         baserunner,
-        runner_lineup_position,
+        runner_lineup_position::TINYINT AS runner_lineup_position,
         charged_to_pitcher_id,
         event_key || '-' || baserunner AS baserunner_key
 

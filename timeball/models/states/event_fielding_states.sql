@@ -23,7 +23,7 @@ final AS (
         gfa.side AS fielding_side,
         t.team_id,
         gfa.player_id,
-        gfa.fielding_position
+        gfa.fielding_position,
     FROM game_fielding_appearances AS gfa
     INNER JOIN teams AS t
         ON gfa.game_id = t.game_id

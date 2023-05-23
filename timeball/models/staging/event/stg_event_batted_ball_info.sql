@@ -1,10 +1,12 @@
 WITH source AS (
-    SELECT * FROM {{ source('event', 'event_hit_location') }}
+    SELECT * FROM {{ source('event', 'event_batted_ball_info') }}
 ),
 
 renamed AS (
     SELECT
-        event_key,
+        event_key::INT as event_key,
+        contact,
+        hit_to_fielder,
         general_location,
         depth,
         angle,

@@ -5,10 +5,10 @@ WITH source AS (
 renamed AS (
     SELECT
         game_id,
-        event_id,
+        event_id::TINYINT AS event_id,
         filename,
         line_number,
-        event_key
+        event_key::INT AS event_key,
     FROM source
 )
 
