@@ -15,6 +15,10 @@ events AS (
     SELECT * FROM {{ ref('stg_events') }}
 ),
 
+no_plays AS (
+    SELECT * FROM {{ ref('event_no_plays')  }}
+),
+
 final AS (
     SELECT
         e.game_id,
@@ -36,6 +40,7 @@ final AS (
         ON a.game_id = e.game_id
             AND e.event_id BETWEEN a.start_event_id AND a.end_event_id
             AND a.side = e.batting_side
+    WHERE e.event_key NOT IN (SELECT event_key FROM no_plays)
 )
 
 SELECT * FROM final

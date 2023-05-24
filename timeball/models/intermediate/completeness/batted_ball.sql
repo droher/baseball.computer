@@ -90,12 +90,11 @@ final AS (
             AND lt.category_edge = 'Middle'
             AND bbi.depth NOT LIKE '%Deep'
         ) AS has_misclassified_home_run_distance,
-    FROM plate_appearances AS pa
+    FROM plate_appearances
     INNER JOIN result_types AS rt USING (plate_appearance_result)
-    LEFT JOIN batted_ball_info AS bbi USING (event_key)
+    INNER JOIN batted_ball_info AS bbi USING (event_key)
     LEFT JOIN location_types AS lt USING (general_location)
     LEFT JOIN contact_types AS ct USING (contact)
-    WHERE rt.is_in_play
 )
 
 SELECT * FROM final

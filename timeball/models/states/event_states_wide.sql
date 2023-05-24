@@ -1,14 +1,31 @@
-WITH lineups AS (
-    SELECT * 
-    FROM {{ ref('event_lineup_states') }}
-    WHERE hash(event_key) % 10 = 0
+WITH events AS (
+    SELECT * FROM {{ ref('stg_events') }}
 ),
 
-pivoter AS (
-    PIVOT lineups
-    ON lineup_position IN (1, 2, 3, 4, 5, 6, 7, 8, 9)
-    USING FIRST(player_id)
-    GROUP BY event_key
+lineups AS (
+    SELECT * FROM {{ ref('event_lineup_states') }}
+),
+
+{% for pos in range(1, 10) -%}
+lineup_{{ pos }} AS (
+    SELECT
+        event_key,
+        player_id AS lineup_{{ pos }}_id,
+    FROM lineups
+    WHERE lineup_position = {{ pos }}
+),
+
+{% endfor %}
+final AS (
+    SELECT
+        event_key,
+        {% for pos in range(1, 10) -%}
+            lineup_{{ pos }}_id,
+        {% endfor %}
+    FROM events
+    {%- for pos in range(1, 10) %}
+    INNER JOIN lineup_{{ pos }} USING (event_key)
+    {%- endfor %}
 )
 
-SELECT * FROM pivoter
+SELECT * FROM final
