@@ -8,8 +8,8 @@ renamed AS (
         player_id,
         last_name,
         first_name,
-        bats,
-        throws,
+        NULLIF(bats, '?') AS bats,
+        NULLIF(throws, '?') AS throws,
         team_id,
         position
 
