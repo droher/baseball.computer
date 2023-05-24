@@ -759,10 +759,6 @@ sources:
             description: ""
             tests:
               - not_null
-          - name: scoring_method
-            description: ""
-            tests:
-              - not_null
           - name: park_id
             description: ""
             tests:
@@ -792,6 +788,22 @@ sources:
           - name: protest_info
             description: ""
           - name: completion_info
+            description: ""
+          - name: scorer
+            description: ""
+          - name: scoring_method
+            description: ""
+            tests:
+              - not_null
+          - name: inputter
+            description: ""
+          - name: translator
+            description: ""
+          - name: date_inputted
+            description: ""
+          - name: date_edited
+            description: ""
+          - name: game_key
             description: ""
 
       - name: box_score_hit_by_pitches
@@ -1158,8 +1170,7 @@ sources:
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
         columns:
           - name: game_id
             description: ""
@@ -1173,11 +1184,11 @@ sources:
             description: ""
             tests:
               - not_null
-          - name: frame
+          - name: inning
             description: ""
             tests:
               - not_null
-          - name: inning
+          - name: frame
             description: ""
             tests:
               - not_null
@@ -1198,15 +1209,10 @@ sources:
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
             - sequence_id
         columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: event_id
+          - name: event_key
             description: ""
             tests:
               - not_null
@@ -1243,15 +1249,10 @@ sources:
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
             - sequence_id
         columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: event_id
+          - name: event_key
             description: ""
             tests:
               - not_null
@@ -1263,75 +1264,26 @@ sources:
             description: ""
             tests:
               - not_null
-          - name: at_base
-            description: ""
-
-      - name: event_fielding_play
-        description: ""
-        meta:
-          primary_keys:
-            - game_id
-            - event_id
-            - sequence_id
-        columns:
-          - name: game_id
+          - name: baserunner
             description: ""
             tests:
               - not_null
-          - name: event_id
-            description: ""
-            tests:
-              - not_null
-          - name: sequence_id
-            description: ""
-            tests:
-              - not_null
-          - name: fielding_position
-            description: ""
-            tests:
-              - not_null
-          - name: fielding_play
-            description: ""
-            tests:
-              - not_null
-
-      - name: event_flag
-        description: ""
-        meta:
-          primary_keys:
-            - game_id
-            - event_id
-            - sequence_id
-        columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: event_id
-            description: ""
-            tests:
-              - not_null
-          - name: sequence_id
-            description: ""
-            tests:
-              - not_null
-          - name: flag
-            description: ""
-            tests:
-              - not_null
-
+  
       - name: event_batted_ball_info
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
         columns:
-          - name: game_id
+          - name: event_key
             description: ""
             tests:
               - not_null
-          - name: event_id
+          - name: contact
+            description: ""
+            tests:
+              - not_null
+          - name: hit_to_fielder
             description: ""
             tests:
               - not_null
@@ -1352,19 +1304,58 @@ sources:
             tests:
               - not_null
 
+      - name: event_fielding_play
+        description: ""
+        meta:
+          primary_keys:
+            - event_key
+            - sequence_id
+        columns:
+          - name: event_key
+            description: ""
+            tests:
+              - not_null
+          - name: sequence_id
+            description: ""
+            tests:
+              - not_null
+          - name: fielding_position
+            description: ""
+            tests:
+              - not_null
+          - name: fielding_play
+            description: ""
+            tests:
+              - not_null
+
+      - name: event_flag
+        description: ""
+        meta:
+          primary_keys:
+            - event_key
+            - sequence_id
+        columns:
+          - name: event_key
+            description: ""
+            tests:
+              - not_null
+          - name: sequence_id
+            description: ""
+            tests:
+              - not_null
+          - name: flag
+            description: ""
+            tests:
+              - not_null
+
       - name: event_out
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
             - sequence_id
         columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: event_id
+          - name: event_key
             description: ""
             tests:
               - not_null
@@ -1381,15 +1372,10 @@ sources:
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
             - sequence_id
         columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: event_id
+          - name: event_key
             description: ""
             tests:
               - not_null
@@ -1416,14 +1402,9 @@ sources:
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
         columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: event_id
+          - name: event_key
             description: ""
             tests:
               - not_null
@@ -1431,23 +1412,41 @@ sources:
             description: ""
             tests:
               - not_null
-          - name: contact
-            description: ""
-          - name: hit_to_fielder
-            description: ""
 
-      - name: event_starting_base_state
+      - name: event_raw
         description: ""
         meta:
           primary_keys:
-            - game_id
-            - event_id
+            - event_key
         columns:
+          - name: event_key
+            description: ""
+            tests:
+              - not_null
           - name: game_id
             description: ""
             tests:
               - not_null
           - name: event_id
+            description: ""
+            tests:
+              - not_null
+          - name: filename
+            description: ""
+            tests:
+              - not_null
+          - name: line_number
+            description: ""
+            tests:
+              - not_null
+
+      - name: event_starting_base_state
+        description: ""
+        meta:
+          primary_keys:
+            - event_key
+        columns:
+          - name: event_key
             description: ""
             tests:
               - not_null
@@ -1463,8 +1462,6 @@ sources:
             description: ""
             tests:
               - not_null
-      -  name: event_raw
-
   - name: game
     description: ""
     tables:
@@ -1517,10 +1514,6 @@ sources:
             description: ""
             tests:
               - not_null
-          - name: scoring_method
-            description: ""
-            tests:
-              - not_null
           - name: park_id
             description: ""
             tests:
@@ -1549,6 +1542,42 @@ sources:
             description: ""
           - name: completion_info
             description: ""
+          - name: scorer
+            description: ""
+          - name: scoring_method
+            description: ""
+            tests:
+              - not_null
+          - name: inputter
+            description: ""
+          - name: translator
+            description: ""
+          - name: date_inputted
+            description: ""
+          - name: date_edited
+            description: ""
+          - name: game_key
+            description: ""
+
+      - name: game_earned_runs
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - player_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: player_id
+            description: ""
+            tests:
+              - not_null
+          - name: earned_runs
+            description: ""
+            tests:
+              - not_null
 
       - name: game_fielding_appearance
         description: ""
@@ -1626,7 +1655,7 @@ sources:
         meta:
           primary_keys:
             - game_id
-            - team_id
+            - side
         columns:
           - name: game_id
             description: ""
@@ -1660,4 +1689,3 @@ sources:
             description: ""
             tests:
               - not_null
-      - name: game_earned_runs
