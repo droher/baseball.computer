@@ -1,31 +1,24 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH events AS (
     SELECT * FROM {{ ref('stg_events') }}
 ),
 
 lineups AS (
-    SELECT * FROM {{ ref('event_lineup_states') }}
+    SELECT *, hash(event_key) % 10 AS grp FROM {{ ref('event_lineup_states') }}
 ),
 
-{% for pos in range(1, 10) -%}
-lineup_{{ pos }} AS (
-    SELECT
-        event_key,
-        player_id AS lineup_{{ pos }}_id,
-    FROM lineups
-    WHERE lineup_position = {{ pos }}
-),
-
-{% endfor %}
-final AS (
-    SELECT
-        event_key,
-        {% for pos in range(1, 10) -%}
-            lineup_{{ pos }}_id,
-        {% endfor %}
-    FROM events
-    {%- for pos in range(1, 10) %}
-    INNER JOIN lineup_{{ pos }} USING (event_key)
-    {%- endfor %}
+pivoter AS (
+    {% for i in range(10) %}
+    PIVOT (SELECT * FROM lineups WHERE grp = {{ i }})
+    ON lineup_position IN (1, 2, 3, 4, 5, 6, 7, 8, 9)
+    USING FIRST(player_id)
+    GROUP BY event_key
+    {{ 'UNION ALL' if not loop.last }}
+    {% endfor %}
 )
 
-SELECT * FROM final
+SELECT * FROM pivoter
