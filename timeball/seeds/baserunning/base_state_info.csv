@@ -1,4 +1,4 @@
-base_state_id,as_string,is_runner_on_first,is_runner_on_second,is_runner_on_third
+base_state,base_state_string,is_runner_on_first,is_runner_on_second,is_runner_on_third
 0,"000",false,false,false
 1,"001",true,false,false
 2,"010",false,true,false
