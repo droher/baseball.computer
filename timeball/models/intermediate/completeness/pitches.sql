@@ -10,7 +10,7 @@ events AS (
 ),
 
 pitch_meta AS (
-    SELECT * FROM {{ ref('pitch_types') }}
+    SELECT * FROM {{ ref('seed_pitch_types') }}
 ),
 
 counts AS (

@@ -1,8 +1,4 @@
-WITH result_types AS (
-    SELECT * FROM {{ ref('plate_appearance_result_types') }}
-),
-
-plate_appearances AS (
+WITH plate_appearances AS (
     SELECT * FROM {{ ref('stg_event_plate_appearances') }}
 ),
 
@@ -11,11 +7,15 @@ batted_ball_info AS (
 ),
 
 location_types AS (
-    SELECT * FROM {{ ref('hit_location_categories') }}
+    SELECT * FROM {{ ref('seed_hit_location_categories') }}
 ),
 
 contact_types AS (
-    SELECT * FROM {{ ref('plate_appearance_contact_types') }}
+    SELECT * FROM {{ ref('seed_plate_appearance_contact_types') }}
+),
+
+result_types AS (
+    SELECT * FROM {{ ref('seed_plate_appearance_result_types') }}
 ),
 
 final AS (

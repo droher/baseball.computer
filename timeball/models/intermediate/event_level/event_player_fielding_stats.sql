@@ -20,7 +20,7 @@ plate_appearances AS (
 
 pa_result_types AS (
     SELECT *
-    FROM {{ ref('plate_appearance_result_types') }}
+    FROM {{ ref('seed_plate_appearance_result_types') }}
 ),
 
 fielding_plays AS (

@@ -12,7 +12,7 @@ lineups AS (
 ),
 
 base_state_ref AS (
-    SELECT * FROM {{ ref('base_state_info') }}
+    SELECT * FROM {{ ref('seed_base_state_info') }}
 ),
 
 base_states_players AS (

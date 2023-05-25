@@ -5,7 +5,7 @@ WITH flags AS (
 
 dp_flag_types AS (
     SELECT *
-    FROM {{ ref('double_play_flag_types') }}
+    FROM {{ ref('seed_double_play_flag_types') }}
 ),
 
 final AS (

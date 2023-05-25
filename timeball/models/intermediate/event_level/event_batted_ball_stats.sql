@@ -10,17 +10,17 @@ batted_ball_info AS (
 
 result_types AS (
     SELECT *
-    FROM {{ ref('plate_appearance_result_types') }}
+    FROM {{ ref('seed_plate_appearance_result_types') }}
 ),
 
 contact_types AS (
     SELECT *
-    FROM {{ ref('plate_appearance_contact_types') }}
+    FROM {{ ref('seed_plate_appearance_contact_types') }}
 ),
 
 location_types AS (
     SELECT *
-    FROM {{ ref('hit_location_categories') }}
+    FROM {{ ref('seed_hit_location_categories') }}
 ),
 
 joined AS (

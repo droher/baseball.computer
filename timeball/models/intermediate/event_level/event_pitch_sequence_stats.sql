@@ -5,7 +5,7 @@ WITH pitches AS (
 
 pitch_meta AS (
     SELECT *
-    FROM {{ ref('pitch_types') }}
+    FROM {{ ref('seed_pitch_types') }}
 ),
 
 add_meta AS (

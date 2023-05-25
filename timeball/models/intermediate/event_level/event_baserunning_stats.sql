@@ -25,17 +25,17 @@ plate_appearances AS (
 
 baserunner_meta AS (
     SELECT *
-    FROM {{ ref('baserunner_info') }}
+    FROM {{ ref('seed_baserunner_info') }}
 ),
 
 bases_meta AS (
     SELECT *
-    FROM {{ ref('bases_info') }}
+    FROM {{ ref('seed_bases_info') }}
 ),
 
 plate_appearance_meta AS (
     SELECT *
-    FROM {{ ref('plate_appearance_result_types') }}
+    FROM {{ ref('seed_plate_appearance_result_types') }}
 ),
 
 states_full AS (

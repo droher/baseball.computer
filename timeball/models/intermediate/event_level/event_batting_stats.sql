@@ -77,7 +77,7 @@ WITH plate_appearances AS (
 
 result_types AS (
     SELECT *
-    FROM {{ ref('plate_appearance_result_types') }}
+    FROM {{ ref('seed_plate_appearance_result_types') }}
 ),
 
 event_base AS (
