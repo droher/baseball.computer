@@ -150,7 +150,7 @@ final AS (
 
         (result_types.plate_appearance_result = 'StrikeOut')::INT AS strikeouts,
         (result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk'))::INT AS walks,
-        (result_types.plate_appearance_result = 'IntentionalWalk')::INT AS intentional_walks,
+        (result_types.plate_appearance_resuzlt = 'IntentionalWalk')::INT AS intentional_walks,
         (result_types.plate_appearance_result = 'HitByPitch')::INT AS hit_by_pitches,
         (result_types.plate_appearance_result = 'SacrificeFly')::INT AS sacrifice_flies,
         (result_types.plate_appearance_result = 'SacrificeHit')::INT AS sacrifice_hits,

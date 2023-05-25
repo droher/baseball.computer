@@ -4,7 +4,7 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        event_key::INT AS event_key,
+        event_key,
         plate_appearance_result,
     FROM source
 )

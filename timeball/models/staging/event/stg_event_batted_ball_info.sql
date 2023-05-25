@@ -4,7 +4,7 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        event_key::INT as event_key,
+        event_key,
         contact,
         hit_to_fielder,
         general_location,

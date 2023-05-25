@@ -1174,36 +1174,50 @@ sources:
         columns:
           - name: game_id
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: event_id
             description: ""
+            data_type: UTINYINT
+            tests:
+              - not_null
+          - name: event_key
+            description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: batting_side
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: inning
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: frame
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: at_bat
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: outs
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: count_balls
             description: ""
+            data_type: UTINYINT
           - name: count_strikes
             description: ""
+            data_type: UTINYINT
 
       - name: event_baserunning_advance_attempt
         description: ""
@@ -1214,34 +1228,42 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: sequence_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: baserunner
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: attempted_advance_to
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: is_successful
             description: ""
+            data_type: BOOLEAN
             tests:
               - not_null
           - name: advanced_on_error_flag
             description: ""
+            data_type: BOOLEAN
             tests:
               - not_null
           - name: rbi_flag
             description: ""
+            data_type: BOOLEAN
             tests:
               - not_null
           - name: team_unearned_flag
             description: ""
+            data_type: BOOLEAN
             tests:
               - not_null
 
@@ -1254,18 +1276,22 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: sequence_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: baserunning_play_type
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: baserunner
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
   
@@ -1277,30 +1303,37 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: contact
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: hit_to_fielder
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: general_location
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: depth
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: angle
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: strength
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
 
@@ -1313,18 +1346,22 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: sequence_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: fielding_position
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: fielding_play
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
 
@@ -1337,14 +1374,17 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: sequence_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: flag
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
 
@@ -1357,14 +1397,17 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: sequence_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: baserunner_out
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
 
@@ -1377,26 +1420,32 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: sequence_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: sequence_item
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: runners_going_flag
             description: ""
+            data_type: BOOLEAN
             tests:
               - not_null
           - name: blocked_by_catcher_flag
             description: ""
+            data_type: BOOLEAN
             tests:
               - not_null
           - name: catcher_pickoff_attempt_at_base
             description: ""
+            data_type: VARCHAR
 
       - name: event_plate_appearance
         description: ""
@@ -1406,10 +1455,12 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: plate_appearance_result
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
 
@@ -1421,22 +1472,27 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: game_id
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: event_id
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: filename
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: line_number
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
 
@@ -1448,20 +1504,25 @@ sources:
         columns:
           - name: event_key
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: baserunner
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: runner_lineup_position
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: charged_to_pitcher_id
             description: ""
+            data_type: VARCHAR
             tests:
               - not_null
+
   - name: game
     description: ""
     tables:
@@ -1558,6 +1619,10 @@ sources:
             description: ""
           - name: game_key
             description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+              - unique
 
       - name: game_earned_runs
         description: ""
@@ -1602,14 +1667,17 @@ sources:
               - not_null
           - name: fielding_position
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: start_event_id
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: end_event_id
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
 
@@ -1635,6 +1703,7 @@ sources:
               - not_null
           - name: lineup_position
             description: ""
+            data_type: UTINYINT
             tests:
               - not_null
           - name: entered_game_as
@@ -1643,10 +1712,12 @@ sources:
               - not_null
           - name: start_event_id
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
           - name: end_event_id
             description: ""
+            data_type: UINTEGER
             tests:
               - not_null
 

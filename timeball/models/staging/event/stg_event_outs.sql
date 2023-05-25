@@ -4,7 +4,7 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        event_key::INT AS event_key,
+        event_key,
         sequence_id,
         baserunner_out,
         event_key || '-' || sequence_id AS sequence_key
