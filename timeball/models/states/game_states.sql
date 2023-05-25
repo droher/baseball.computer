@@ -1,4 +1,4 @@
-SELECT
+{# SELECT
     game_id,
     team_id,
     event_key,
@@ -19,4 +19,5 @@ SELECT
     runs_scored,
     away_team_runs_end,
     home_team_runs_end,
-    outs_end,
+    outs_end, #}
+SELECT 1

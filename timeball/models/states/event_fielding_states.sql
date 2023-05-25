@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH teams AS (
     SELECT * FROM {{ ref('stg_game_teams') }}
 ),

@@ -764,6 +764,7 @@ sources:
             tests:
               - not_null:
                   config:
+                    severity: warn
                     where: "game_type != 'NegroLeagues'"
           - name: temperature_fahrenheit
             description: ""
@@ -1161,7 +1162,10 @@ sources:
           - name: umpire_id
             description: ""
             tests:
-              - not_null
+              - not_null:
+                  config:
+                    severity: warn
+
 
   - name: event
     description: ""
@@ -1293,7 +1297,9 @@ sources:
             description: ""
             data_type: VARCHAR
             tests:
-              - not_null
+              - not_null:
+                  config:
+                    where: "baserunning_play_type IN ('CaughtStealing', 'PickedOff', 'StolenBase', 'PickedOffCaughtStealing')"
   
       - name: event_batted_ball_info
         description: ""

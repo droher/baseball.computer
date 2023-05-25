@@ -14,6 +14,8 @@ defenses AS (
 lineups_flat AS (
     SELECT
         event_key,
+        FIRST(game_id) AS game_id,
+        FIRST(team_id) AS batting_team_id,
         {%- for i in range(1, 10) %}
         FIRST(player_id) FILTER (WHERE lineup_position = {{ i }}) AS lineup_{{ i }}_id,
         {%- endfor %}
@@ -27,6 +29,7 @@ lineups_flat AS (
 defenses_flat AS (
     SELECT
         event_key,
+        FIRST(team_id) AS fielding_team_id,
         {%- for i in range(1, 11) %}
         FIRST(player_id) FILTER (WHERE fielding_position = {{ i }}) AS defense_{{ i }}_id,
         {%- endfor %}

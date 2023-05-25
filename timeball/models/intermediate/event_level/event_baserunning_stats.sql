@@ -96,7 +96,7 @@ final AS (
         baserunner,
         runner_lineup_position,
         -- TODO: Get this for batter as well or just use event_id
-        responsible_pitcher_id,
+        -- responsible_pitcher_id,
         (is_successful AND number_base_to = 4)::INT AS runs_scored,
         (baserunning_play_type = 'StolenBase')::INT AS stolen_bases,
         (baserunning_play_type LIKE '%CaughtStealing')::INT AS caught_stealing,

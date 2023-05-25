@@ -31,38 +31,25 @@ runs AS (
     SELECT * FROM {{ ref('event_score_states') }}
 ),
 
-lineups AS (
-    SELECT * FROM {{ ref('event_lineup_states') }}
+personnel AS (
+    SELECT * FROM {{ ref('event_states_wide') }}
 ),
 
-fielding AS (
-    SELECT * FROM {{ ref('event_fielding_states') }}
-),
-
-hitter_bio AS (
+add_bio AS (
     SELECT
-        lineups.*,
-        rosters.bats,
-    FROM lineups
-    INNER JOIN games USING (game_id)
-    LEFT JOIN rosters
-        ON lineups.player_id = rosters.player_id
-        AND games.season = rosters.year
-        AND lineups.team_id = rosters.team_id
-    WHERE lineups.is_at_bat
-),
-
-pitcher_bio AS (
-    SELECT
-        fielding.*,
-        rosters.throws,
-    FROM fielding
-    INNER JOIN games USING (game_id)
-    LEFT JOIN rosters
-        ON fielding.player_id = rosters.player_id
-            AND games.season = rosters.year
-            AND fielding.team_id = rosters.team_id
-    WHERE fielding.fielding_position = 1
+        p.*,
+        r_b.bats,
+        r_p.throws
+    FROM personnel AS p
+    INNER JOIN games AS g USING (game_id)
+    LEFT JOIN rosters AS r_b
+        ON p.batter_id = r_b.player_id
+            AND g.season = r_b.year
+            AND p.batting_team_id = r_b.team_id
+    LEFT JOIN rosters AS r_p
+        ON p.defense_1_id = r_p.player_id
+            AND g.season = r_p.year
+            AND p.fielding_team_id = r_p.team_id
 ),
 
 game_full AS (
@@ -100,21 +87,21 @@ final AS (
         e.batting_side,
         CASE WHEN e.batting_side = 'Home' THEN 'Away' ELSE 'Home' END AS fielding_side,
         COALESCE(b.base_state, 0) AS base_state,
-        runs.score_home,
-        runs.score_away,
+        runs.score_home_start AS score_home,
+        runs.score_away_start AS score_away,
         -- TODO: Update "weird state" section to get overrides,
         -- and get handedness from chadwick register as fallback
         CASE
-            WHEN hitter_bio.bats = 'B' AND pitcher_bio.throws = 'L' THEN 'R'
-            WHEN hitter_bio.bats = 'B' AND pitcher_bio.throws = 'R' THEN 'L'
-            ELSE hitter_bio.bats
+            WHEN add_bio.bats = 'B' AND add_bio.throws = 'L' THEN 'R'
+            WHEN add_bio.bats = 'B' AND add_bio.throws = 'R' THEN 'L'
+            ELSE add_bio.bats
         END AS batter_hand,
         CASE
-            WHEN pitcher_bio.throws = 'B' AND hitter_bio.bats = 'L' THEN 'R'
-            WHEN pitcher_bio.throws = 'B' AND hitter_bio.bats = 'R' THEN 'L'
-            ELSE pitcher_bio.throws
+            WHEN add_bio.throws = 'B' AND add_bio.bats = 'L' THEN 'R'
+            WHEN add_bio.throws = 'B' AND add_bio.bats = 'R' THEN 'L'
+            ELSE add_bio.throws
         END AS pitcher_hand,
-        hitter_bio.lineup_position AS batter_lineup_position,
+        add_bio.batter_lineup_position,
         g.away_team_id,
         g.home_team_id,
         CASE
@@ -129,8 +116,8 @@ final AS (
             WHEN e.frame = 'Top' AND g.bat_first_side = 'Home' THEN g.away_team_id
             WHEN e.frame = 'Bottom' AND g.bat_first_side = 'Home' THEN g.home_team_id
         END AS pitching_team_id,
-        hitter_bio.player_id AS batter_id,
-        pitcher_bio.player_id AS pitcher_id,
+        add_bio.batter_id,
+        add_bio.defense_1_id AS pitcher_id,
         b.first_base_runner_id AS runner_on_first_id,
         b.second_base_runner_id AS runner_on_second_id,
         b.third_base_runner_id AS runner_on_third_id,
@@ -138,8 +125,7 @@ final AS (
     INNER JOIN game_full AS g USING (game_id)
     LEFT JOIN base_states AS b USING (event_key)
     LEFT JOIN runs USING (event_key)
-    LEFT JOIN hitter_bio USING (event_key)
-    LEFT JOIN pitcher_bio USING (event_key)
+    LEFT JOIN add_bio USING (event_key)
 )
 
 SELECT * FROM final

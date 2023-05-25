@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH appearances AS (
     SELECT * FROM {{ ref('stg_game_lineup_appearances') }}
 ),

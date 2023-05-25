@@ -85,16 +85,6 @@ event_base AS (
     FROM {{ ref('stg_events') }}
 ),
 
-lineups AS (
-    SELECT *
-    FROM {{ ref('event_lineup_states') }}
-),
-
-defenses AS (
-    SELECT *
-    FROM {{ ref('event_fielding_states') }}
-),
-
 double_plays AS (
     SELECT *
     FROM {{ ref('event_double_plays') }}
@@ -117,28 +107,14 @@ rbi AS (
 add_ids AS (
     SELECT
         plate_appearances.*,
-        lineups.team_id AS batting_team_id,
-        lineups.player_id AS batter_id,
-        defenses.team_id AS pitching_team_id,
-        defenses.player_id AS pitcher_id,
         event_base.game_id
     FROM plate_appearances
-    INNER JOIN lineups USING (event_key)
-    INNER JOIN defenses USING (event_key)
     INNER JOIN event_base USING (event_key)
-    WHERE lineups.is_at_bat
-        AND defenses.fielding_position = 1
 ),
 
 final AS (
     SELECT
-        add_ids.game_id,
         add_ids.event_key,
-        add_ids.batter_id,
-        add_ids.batting_team_id,
-        add_ids.pitcher_id,
-        add_ids.pitching_team_id,
-
         1 AS plate_appearances,
         result_types.is_at_bat::INT AS at_bats,
         result_types.is_hit::INT AS hits,
@@ -150,7 +126,7 @@ final AS (
 
         (result_types.plate_appearance_result = 'StrikeOut')::INT AS strikeouts,
         (result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk'))::INT AS walks,
-        (result_types.plate_appearance_resuzlt = 'IntentionalWalk')::INT AS intentional_walks,
+        (result_types.plate_appearance_result = 'IntentionalWalk')::INT AS intentional_walks,
         (result_types.plate_appearance_result = 'HitByPitch')::INT AS hit_by_pitches,
         (result_types.plate_appearance_result = 'SacrificeFly')::INT AS sacrifice_flies,
         (result_types.plate_appearance_result = 'SacrificeHit')::INT AS sacrifice_hits,
