@@ -1,0 +1,238 @@
+sources:
+  - name: game
+    description: ""
+    tables:
+      - name: game
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - unique
+              - not_null
+          - name: date
+            description: ""
+            tests:
+              - not_null
+          - name: start_time
+            description: ""
+          - name: doubleheader_status
+            description: ""
+            tests:
+              - not_null
+          - name: time_of_day
+            description: ""
+            tests:
+              - not_null
+          - name: game_type
+            description: ""
+            tests:
+              - not_null
+          - name: bat_first_side
+            description: ""
+            tests:
+              - not_null
+          - name: sky
+            description: ""
+            tests:
+              - not_null
+          - name: field_condition
+            description: ""
+            tests:
+              - not_null
+          - name: precipitation
+            description: ""
+            tests:
+              - not_null
+          - name: wind_direction
+            description: ""
+            tests:
+              - not_null
+          - name: park_id
+            description: ""
+            tests:
+              - not_null
+          - name: temperature_fahrenheit
+            description: ""
+          - name: attendance
+            description: ""
+          - name: wind_speed_mph
+            description: ""
+          - name: use_dh
+            description: ""
+            tests:
+              - not_null
+          - name: winning_pitcher
+            description: ""
+          - name: losing_pitcher
+            description: ""
+          - name: save_pitcher
+            description: ""
+          - name: game_winning_rbi
+            description: ""
+          - name: time_of_game_minutes
+            description: ""
+          - name: protest_info
+            description: ""
+          - name: completion_info
+            description: ""
+          - name: scorer
+            description: ""
+          - name: scoring_method
+            description: ""
+            tests:
+              - not_null
+          - name: inputter
+            description: ""
+          - name: translator
+            description: ""
+          - name: date_inputted
+            description: ""
+          - name: date_edited
+            description: ""
+          - name: game_key
+            description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+              - unique
+
+      - name: game_earned_runs
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - player_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: player_id
+            description: ""
+            tests:
+              - not_null
+          - name: earned_runs
+            description: ""
+            tests:
+              - not_null
+
+      - name: game_fielding_appearance
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - player_id
+            - fielding_position
+            - start_event_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: player_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: fielding_position
+            description: ""
+            data_type: UTINYINT
+            tests:
+              - not_null
+          - name: start_event_id
+            description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+          - name: end_event_id
+            description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+
+      - name: game_lineup_appearance
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - player_id
+            - lineup_position
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: player_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: lineup_position
+            description: ""
+            data_type: UTINYINT
+            tests:
+              - not_null
+          - name: entered_game_as
+            description: ""
+            tests:
+              - not_null
+          - name: start_event_id
+            description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+          - name: end_event_id
+            description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+
+      - name: game_team
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - side
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: team_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+
+      - name: game_umpire
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - position
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: position
+            description: ""
+            tests:
+              - not_null
+          - name: umpire_id
+            description: ""
+            tests:
+              - not_null

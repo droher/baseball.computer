@@ -1,0 +1,615 @@
+sources:
+  - name: box_score
+    description: |
+      These datasets are directly pulled from Retrosheet's box score files.
+      Only games without original play-by-play accounts will have box score data;
+      games with derived play-by-play accounts will have both box score and
+      play-by-play data. In those dual-account games, box score data can still
+      be useful for compiling fielding stats that cannot be directly attributed
+      to a play.
+
+      Unlike the play-by-play data, which is heavily parsed
+      during data extraction, box score data is largely passed through
+      without any enrichment or modification. Game-level metadata has the same shape
+      as the game-level data from play-by-play games. Other tables come directly
+      from a specific type of row in the box score file. These types
+      can be divided into two groups:
+      "lines", which roll up statistics to a player or team, and "events",
+      which give more detailed information on notable plays.
+    tables:
+      - name: box_score_batting_lines
+        meta:
+          primary_keys:
+            - game_id
+            - batter_id
+            - lineup_position
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: batter_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: lineup_position
+            description: ""
+            tests:
+              - not_null
+          - name: nth_player_at_position
+            description: ""
+            tests:
+              - not_null
+          - name: at_bats
+            description: ""
+            tests:
+              - not_null
+          - name: runs
+            description: ""
+          - name: hits
+            description: ""
+          - name: doubles
+            description: ""
+          - name: triples
+            description: ""
+          - name: home_runs
+            description: ""
+          - name: rbi
+            description: ""
+          - name: sacrifice_hits
+            description: ""
+          - name: sacrifice_flies
+            description: ""
+          - name: hit_by_pitch
+            description: ""
+          - name: walks
+            description: ""
+          - name: intentional_walks
+            description: ""
+          - name: strikeouts
+            description: ""
+          - name: stolen_bases
+            description: ""
+          - name: caught_stealing
+            description: ""
+          - name: grounded_into_double_plays
+            description: ""
+          - name: reached_on_interference
+            description: ""
+
+      - name: box_score_caught_stealing
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: running_side
+            description: ""
+            tests:
+              - not_null
+          - name: runner_id
+            description: ""
+            tests:
+              - not_null
+          - name: pitcher_id
+            description: ""
+          - name: catcher_id
+            description: ""
+          - name: inning
+            description: ""
+
+      - name: box_score_double_plays
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: defense_side
+            description: ""
+            tests:
+              - not_null
+          - name: fielders
+            description: ""
+
+      - name: box_score_fielding_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - fielder_id
+            - fielding_position
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: fielder_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: fielding_position
+            description: ""
+            tests:
+              - not_null
+          - name: nth_position_played_by_player
+            description: ""
+            tests:
+              - not_null
+          - name: outs_played
+            description: ""
+          - name: putouts
+            description: ""
+          - name: assists
+            description: ""
+          - name: errors
+            description: ""
+          - name: double_plays
+            description: ""
+          - name: triple_plays
+            description: ""
+          - name: passed_balls
+            description: ""
+
+      - name: box_score_game
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: date
+            description: ""
+            tests:
+              - not_null
+          - name: start_time
+            description: ""
+          - name: doubleheader_status
+            description: ""
+            tests:
+              - not_null
+          - name: time_of_day
+            description: ""
+          - name: game_type
+            description: ""
+            tests:
+              - not_null
+          - name: bat_first_side
+            description: ""
+            tests:
+              - not_null
+          - name: sky
+            description: ""
+            tests:
+              - not_null
+          - name: field_condition
+            description: ""
+            tests:
+              - not_null
+          - name: precipitation
+            description: ""
+            tests:
+              - not_null
+          - name: wind_direction
+            description: ""
+            tests:
+              - not_null
+          - name: park_id
+            description: ""
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+                    where: "game_type != 'NegroLeagues'"
+          - name: temperature_fahrenheit
+            description: ""
+          - name: attendance
+            description: ""
+          - name: wind_speed_mph
+            description: ""
+          - name: use_dh
+            description: ""
+            tests:
+              - not_null
+          - name: winning_pitcher
+            description: ""
+          - name: losing_pitcher
+            description: ""
+          - name: save_pitcher
+            description: ""
+          - name: game_winning_rbi
+            description: ""
+          - name: time_of_game_minutes
+            description: ""
+          - name: protest_info
+            description: ""
+          - name: completion_info
+            description: ""
+          - name: scorer
+            description: ""
+          - name: scoring_method
+            description: ""
+            tests:
+              - not_null
+          - name: inputter
+            description: ""
+          - name: translator
+            description: ""
+          - name: date_inputted
+            description: ""
+          - name: date_edited
+            description: ""
+          - name: game_key
+            description: ""
+
+      - name: box_score_hit_by_pitches
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+          - name: pitching_side
+            description: ""
+          - name: pitcher_id
+            description: ""
+          - name: batter_id
+            description: ""
+
+      - name: box_score_home_runs
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: batting_side
+            description: ""
+            tests:
+              - not_null
+          - name: batter_id
+            description: ""
+            tests:
+              - not_null
+          - name: pitcher_id
+            description: ""
+            tests:
+              - not_null
+          - name: inning
+            description: ""
+          - name: runners_on
+            description: ""
+          - name: outs
+            description: ""
+
+      - name: box_score_pinch_hitting_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - pinch_hitter_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: pinch_hitter_id
+            description: ""
+            tests:
+              - not_null
+          - name: inning
+            description: ""
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: at_bats
+            description: ""
+          - name: runs
+            description: ""
+          - name: hits
+            description: ""
+          - name: doubles
+            description: ""
+          - name: triples
+            description: ""
+          - name: home_runs
+            description: ""
+          - name: rbi
+            description: ""
+          - name: sacrifice_hits
+            description: ""
+          - name: sacrifice_flies
+            description: ""
+          - name: hit_by_pitch
+            description: ""
+          - name: walks
+            description: ""
+          - name: intentional_walks
+            description: ""
+          - name: strikeouts
+            description: ""
+          - name: stolen_bases
+            description: ""
+          - name: caught_stealing
+            description: ""
+          - name: grounded_into_double_plays
+            description: ""
+          - name: reached_on_interference
+            description: ""
+
+      - name: box_score_pinch_running_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - pinch_runner_id
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: pinch_runner_id
+            description: ""
+            tests:
+              - not_null
+          - name: inning
+            description: ""
+          - name: side
+            description: ""
+          - name: runs
+            description: ""
+          - name: stolen_bases
+            description: ""
+          - name: caught_stealing
+            description: ""
+
+      - name: box_score_pitching_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - pitcher_id
+            - nth_pitcher
+        columns:
+          - name: game_id
+            description: ""
+          - name: pitcher_id
+            description: ""
+          - name: side
+            description: ""
+          - name: nth_pitcher
+            description: ""
+          - name: outs_recorded
+            description: ""
+          - name: no_out_batters
+            description: ""
+          - name: batters_faced
+            description: ""
+          - name: hits
+            description: ""
+          - name: doubles
+            description: ""
+          - name: triples
+            description: ""
+          - name: home_runs
+            description: ""
+          - name: runs
+            description: ""
+          - name: earned_runs
+            description: ""
+          - name: walks
+            description: ""
+          - name: intentional_walks
+            description: ""
+          - name: strikeouts
+            description: ""
+          - name: hit_batsmen
+            description: ""
+          - name: wild_pitches
+            description: ""
+          - name: balks
+            description: ""
+          - name: sacrifice_hits
+            description: ""
+          - name: sacrifice_flies
+            description: ""
+
+      - name: box_score_stolen_bases
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: running_side
+            description: ""
+            tests:
+              - not_null
+          - name: runner_id
+            description: ""
+            tests:
+              - not_null
+          - name: pitcher_id
+            description: ""
+          - name: catcher_id
+            description: ""
+          - name: inning
+            description: ""
+
+      - name: box_score_team
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - side
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: team_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+
+      - name: box_score_team_batting_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - side
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: at_bats
+            description: ""
+            tests:
+              - not_null
+          - name: runs
+            description: ""
+            tests:
+              - not_null
+          - name: hits
+            description: ""
+            tests:
+              - not_null
+          - name: doubles
+            description: ""
+          - name: triples
+            description: ""
+          - name: home_runs
+            description: ""
+          - name: rbi
+            description: ""
+          - name: sacrifice_hits
+            description: ""
+          - name: sacrifice_flies
+            description: ""
+          - name: hit_by_pitch
+            description: ""
+          - name: walks
+            description: ""
+          - name: intentional_walks
+            description: ""
+          - name: strikeouts
+            description: ""
+          - name: stolen_bases
+            description: ""
+          - name: caught_stealing
+            description: ""
+          - name: grounded_into_double_plays
+            description: ""
+          - name: reached_on_interference
+            description: ""
+
+      - name: box_score_team_fielding_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - side
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: outs_played
+            description: ""
+            tests:
+              - not_null
+          - name: putouts
+            description: ""
+          - name: assists
+            description: ""
+          - name: errors
+            description: ""
+          - name: double_plays
+            description: ""
+          - name: triple_plays
+            description: ""
+          - name: passed_balls
+            description: ""
+
+      - name: box_score_team_miscellaneous_lines
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - side
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: side
+            description: ""
+            tests:
+              - not_null
+          - name: left_on_base
+            description: ""
+          - name: team_earned_runs
+            description: ""
+          - name: double_plays_turned
+            description: ""
+          - name: triple_plays_turned
+            description: ""
+
+      - name: box_score_triple_plays
+        description: ""
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: defense_side
+            description: ""
+            tests:
+              - not_null
+          - name: fielders
+            description: ""
+
+      - name: box_score_umpire
+        description: ""
+        meta:
+          primary_keys:
+            - game_id
+            - position
+        columns:
+          - name: game_id
+            description: ""
+            tests:
+              - not_null
+          - name: position
+            description: ""
+          - name: umpire_id
+            description: ""
+            tests:
+              - not_null:
+                  config:
+                    severity: warn

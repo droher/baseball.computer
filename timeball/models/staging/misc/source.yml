@@ -1,0 +1,551 @@
+sources:
+  - name: misc
+    description: |
+      Datasets from a hodgepodge of sources. To maintain a single source of truth,
+      all data is sourced from Retrosheet play-by-play as much as possible.
+    tables:
+      - name: franchise
+        description: |
+          Provides franchise attributes for a given time period,
+          such as location and division. This allows us to construct/track the
+          standings and league structure for all years.
+        meta:
+          primary_keys:
+            - current_franchise_id
+            - date_start
+        columns:
+          - name: current_franchise_id
+            description: ""
+            tests:
+              - not_null
+          - name: team_id
+            description: ""
+            tests:
+              - not_null
+          - name: league
+            description: ""
+          - name: division
+            description: ""
+          - name: location
+            description: ""
+          - name: nickname
+            description: ""
+          - name: alternate_nicknames
+            description: ""
+          - name: date_start
+            description: ""
+            tests:
+              - not_null
+          - name: date_end
+            description: ""
+          - name: city
+            description: ""
+            tests:
+              - not_null
+          - name: state
+            description: ""
+            tests:
+              - not_null
+
+      - name: gamelog
+        description: |
+          A truncated version of Retrosheet's gamelog file. It includes only
+          games prior to 1901 (for which box sores are generally not available).
+          This is our only source of info for those games, so it does not conflict
+          with any of the later data in the play-by-play.
+        meta:
+          id_expression: "strftime(date, '%Y%m%d') || home_team || double_header"
+        columns:
+          - name: date
+            description: ""
+          - name: double_header
+            description: ""
+          - name: day_of_week
+            description: ""
+          - name: visiting_team
+            description: ""
+          - name: visiting_team_league
+            description: ""
+          - name: visiting_team_game_number
+            description: ""
+          - name: home_team
+            description: ""
+          - name: home_team_league
+            description: ""
+          - name: home_team_game_number
+            description: ""
+          - name: visitor_runs_scored
+            description: ""
+          - name: home_runs_score
+            description: ""
+          - name: length_in_outs
+            description: ""
+          - name: day_night
+            description: ""
+          - name: completion_info
+            description: ""
+          - name: forfeit_info
+            description: ""
+          - name: protest_info
+            description: ""
+          - name: park_id
+            description: ""
+          - name: attendance
+            description: ""
+          - name: duration
+            description: ""
+          - name: vistor_line_score
+            description: ""
+          - name: home_line_score
+            description: ""
+          - name: visitor_ab
+            description: ""
+          - name: visitor_h
+            description: ""
+          - name: visitor_d
+            description: ""
+          - name: visitor_t
+            description: ""
+          - name: visitor_hr
+            description: ""
+          - name: visitor_rbi
+            description: ""
+          - name: visitor_sh
+            description: ""
+          - name: visitor_sf
+            description: ""
+          - name: visitor_hbp
+            description: ""
+          - name: visitor_bb
+            description: ""
+          - name: visitor_ibb
+            description: ""
+          - name: visitor_k
+            description: ""
+          - name: visitor_sb
+            description: ""
+          - name: visitor_cs
+            description: ""
+          - name: visitor_gdp
+            description: ""
+          - name: visitor_ci
+            description: ""
+          - name: visitor_lob
+            description: ""
+          - name: visitor_pitchers
+            description: ""
+          - name: visitor_er
+            description: ""
+          - name: visitor_ter
+            description: ""
+          - name: visitor_wp
+            description: ""
+          - name: visitor_balks
+            description: ""
+          - name: visitor_po
+            description: ""
+          - name: visitor_a
+            description: ""
+          - name: visitor_e
+            description: ""
+          - name: visitor_passed
+            description: ""
+          - name: visitor_db
+            description: ""
+          - name: visitor_tp
+            description: ""
+          - name: home_ab
+            description: ""
+          - name: home_h
+            description: ""
+          - name: home_d
+            description: ""
+          - name: home_t
+            description: ""
+          - name: home_hr
+            description: ""
+          - name: home_rbi
+            description: ""
+          - name: home_sh
+            description: ""
+          - name: home_sf
+            description: ""
+          - name: home_hbp
+            description: ""
+          - name: home_bb
+            description: ""
+          - name: home_ibb
+            description: ""
+          - name: home_k
+            description: ""
+          - name: home_sb
+            description: ""
+          - name: home_cs
+            description: ""
+          - name: home_gdp
+            description: ""
+          - name: home_ci
+            description: ""
+          - name: home_lob
+            description: ""
+          - name: home_pitchers
+            description: ""
+          - name: home_er
+            description: ""
+          - name: home_ter
+            description: ""
+          - name: home_wp
+            description: ""
+          - name: home_balks
+            description: ""
+          - name: home_po
+            description: ""
+          - name: home_a
+            description: ""
+          - name: home_e
+            description: ""
+          - name: home_passed
+            description: ""
+          - name: home_db
+            description: ""
+          - name: home_tp
+            description: ""
+          - name: umpire_h_id
+            description: ""
+          - name: umpire_h_name
+            description: ""
+          - name: umpire_1b_id
+            description: ""
+          - name: umpire_1b_name
+            description: ""
+          - name: umpire_2b_id
+            description: ""
+          - name: umpire_2b_name
+            description: ""
+          - name: umpire_3b_id
+            description: ""
+          - name: umpire_3b_name
+            description: ""
+          - name: umpire_lf_id
+            description: ""
+          - name: umpire_lf_name
+            description: ""
+          - name: umpire_rf_id
+            description: ""
+          - name: umpire_rf_name
+            description: ""
+          - name: visitor_manager_id
+            description: ""
+          - name: visitor_manager_name
+            description: ""
+          - name: home_manager_id
+            description: ""
+          - name: home_manager_name
+            description: ""
+          - name: winning_pitcher_id
+            description: ""
+          - name: winning_pitcher_name
+            description: ""
+          - name: losing_pitcher_id
+            description: ""
+          - name: losing_pitcher_name
+            description: ""
+          - name: saving_pitcher_id
+            description: ""
+          - name: saving_pitcher_name
+            description: ""
+          - name: game_winning_rbi_id
+            description: ""
+          - name: game_winning_rbi_name
+            description: ""
+          - name: visitor_starting_pitcher_id
+            description: ""
+          - name: visitor_starting_pitcher_name
+            description: ""
+          - name: home_starting_pitcher_id
+            description: ""
+          - name: home_starting_pitcher_name
+            description: ""
+          - name: visitor_batting_1_player_id
+            description: ""
+          - name: visitor_batting_1_name
+            description: ""
+          - name: visitor_batting_1_position
+            description: ""
+          - name: visitor_batting_2_player_id
+            description: ""
+          - name: visitor_batting_2_name
+            description: ""
+          - name: visitor_batting_2_position
+            description: ""
+          - name: visitor_batting_3_player_id
+            description: ""
+          - name: visitor_batting_3_name
+            description: ""
+          - name: visitor_batting_3_position
+            description: ""
+          - name: visitor_batting_4_player_id
+            description: ""
+          - name: visitor_batting_4_name
+            description: ""
+          - name: visitor_batting_4_position
+            description: ""
+          - name: visitor_batting_5_player_id
+            description: ""
+          - name: visitor_batting_5_name
+            description: ""
+          - name: visitor_batting_5_position
+            description: ""
+          - name: visitor_batting_6_player_id
+            description: ""
+          - name: visitor_batting_6_name
+            description: ""
+          - name: visitor_batting_6_position
+            description: ""
+          - name: visitor_batting_7_player_id
+            description: ""
+          - name: visitor_batting_7_name
+            description: ""
+          - name: visitor_batting_7_position
+            description: ""
+          - name: visitor_batting_8_player_id
+            description: ""
+          - name: visitor_batting_8_name
+            description: ""
+          - name: visitor_batting_8_position
+            description: ""
+          - name: visitor_batting_9_player_id
+            description: ""
+          - name: visitor_batting_9_name
+            description: ""
+          - name: visitor_batting_9_position
+            description: ""
+          - name: home_batting_1_player_id
+            description: ""
+          - name: home_batting_1_name
+            description: ""
+          - name: home_batting_1_position
+            description: ""
+          - name: home_batting_2_player_id
+            description: ""
+          - name: home_batting_2_name
+            description: ""
+          - name: home_batting_2_position
+            description: ""
+          - name: home_batting_3_player_id
+            description: ""
+          - name: home_batting_3_name
+            description: ""
+          - name: home_batting_3_position
+            description: ""
+          - name: home_batting_4_player_id
+            description: ""
+          - name: home_batting_4_name
+            description: ""
+          - name: home_batting_4_position
+            description: ""
+          - name: home_batting_5_player_id
+            description: ""
+          - name: home_batting_5_name
+            description: ""
+          - name: home_batting_5_position
+            description: ""
+          - name: home_batting_6_player_id
+            description: ""
+          - name: home_batting_6_name
+            description: ""
+          - name: home_batting_6_position
+            description: ""
+          - name: home_batting_7_player_id
+            description: ""
+          - name: home_batting_7_name
+            description: ""
+          - name: home_batting_7_position
+            description: ""
+          - name: home_batting_8_player_id
+            description: ""
+          - name: home_batting_8_name
+            description: ""
+          - name: home_batting_8_position
+            description: ""
+          - name: home_batting_9_player_id
+            description: ""
+          - name: home_batting_9_name
+            description: ""
+          - name: home_batting_9_position
+            description: ""
+          - name: additional_info
+            description: ""
+          - name: acquisition_info
+            description: ""
+
+      - name: park
+        description: |
+          Information about each ballpark.
+        meta:
+          primary_keys:
+            - park_id
+        columns:
+          - name: park_id
+            description: ""
+            tests:
+              - not_null
+              - unique
+          - name: name
+            description: ""
+            tests:
+              - not_null
+          - name: aka
+            description: ""
+          - name: city
+            description: ""
+            tests:
+              - not_null
+          - name: state
+            description: ""
+          - name: start_date
+            description: ""
+            tests:
+              - not_null
+          - name: end_date
+            description: ""
+          - name: league
+            description: ""
+          - name: notes
+            description: ""
+
+      - name: people
+        description: |
+          Biographical information on each player/umpire/manager.
+          Sourced from the Chadwick Bureau people register.
+        meta:
+          primary_keys:
+            - player_id
+        columns:
+          - name: playerid
+            description: ""
+            tests:
+              - unique
+              - not_null
+          - name: birthyear
+            description: ""
+          - name: birthmonth
+            description: ""
+          - name: birthday
+            description: ""
+          - name: birthcountry
+            description: ""
+          - name: birthstate
+            description: ""
+          - name: birthcity
+            description: ""
+          - name: deathyear
+            description: ""
+          - name: deathmonth
+            description: ""
+          - name: deathday
+            description: ""
+          - name: deathcountry
+            description: ""
+          - name: deathstate
+            description: ""
+          - name: deathcity
+            description: ""
+          - name: namefirst
+            description: ""
+          - name: namelast
+            description: ""
+          - name: namegiven
+            description: ""
+          - name: weight
+            description: ""
+          - name: height
+            description: ""
+          - name: bats
+            description: ""
+          - name: throws
+            description: ""
+          - name: debut
+            description: ""
+          - name: finalgame
+            description: ""
+          - name: retroid
+            description: ""
+            tests:
+              - unique
+          - name: bbrefid
+            description: ""
+            tests:
+              - unique
+
+      - name: roster
+        description: |
+          Contains one entry for any valid combination of year/team/player.
+          The biographical information may conflict with the info in the `people`
+          table, as handedness/names are not necessarily the same from year to year.
+        meta:
+          primary_keys:
+            - year
+            - player_id
+            - team_id
+        columns:
+          - name: year
+            description: ""
+            tests:
+              - not_null
+          - name: player_id
+            description: ""
+            tests:
+              - not_null
+          - name: last_name
+            description: ""
+            tests:
+              - not_null
+          - name: first_name
+            description: ""
+          - name: bats
+            description: ""
+          - name: throws
+            description: ""
+          - name: team_id
+            description: ""
+            tests:
+              - not_null
+          - name: position
+            description: ""
+            tests:
+              - not_null
+
+      - name: schedule
+        description: |
+          Information about the original scheduled slate of games. Each row
+          represents an originally scheduled game. This will
+          differ from the `game` table in cases of postponements.
+        meta:
+          id_expression: "strftime(date, '%Y%m%d') || home_team || double_header"
+        columns:
+          - name: date
+            description: ""
+          - name: double_header
+            description: ""
+          - name: day_of_week
+            description: ""
+          - name: visiting_team
+            description: ""
+          - name: visiting_team_league
+            description: ""
+          - name: visiting_team_game_number
+            description: ""
+          - name: home_team
+            description: ""
+          - name: home_team_league
+            description: ""
+          - name: home_team_game_number
+            description: ""
+          - name: day_night
+            description: ""
+          - name: postponement_indicator
+            description: ""
+          - name: makeup_dates
+            description: ""
+  
