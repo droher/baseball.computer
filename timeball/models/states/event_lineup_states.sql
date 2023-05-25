@@ -22,16 +22,14 @@ no_plays AS (
 final AS (
     SELECT
         e.game_id,
-        e.event_id,
         e.event_key,
         t.team_id,
         t.side,
         a.player_id,
         a.lineup_position,
-        a.start_event_id = e.event_id AS is_start_of_appearance,
-        a.end_event_id = e.event_id AS is_end_of_appearance,
         (e.at_bat = a.lineup_position) AS is_at_bat,
-        (a.lineup_position - e.at_bat + 9) % 9 AS nth_next_batter_up,
+        -- Cast to avoid overflow from unsigned int
+        (a.lineup_position::INT - e.at_bat::INT + 9) % 9 AS nth_next_batter_up,
     FROM appearances AS a
     INNER JOIN teams AS t
         ON a.side = t.side

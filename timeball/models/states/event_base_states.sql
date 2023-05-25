@@ -1,9 +1,6 @@
 {{
   config(
     materialized = 'table',
-    post_hook = """
-      AL
-      """
     )
 }}
 WITH base_states AS (
