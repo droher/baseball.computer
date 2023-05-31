@@ -3,22 +3,12 @@
 {% set rate_stats = stats[1:] %}
 {% set prior_sample_size = "10000 / COUNT(park_id) OVER (PARTITION BY season)" %}
 
-WITH game_info AS (
-    SELECT *
-    FROM {{ ref('stg_games') }}
-    WHERE game_type = 'RegularSeason'
-),
-
-batting AS (
-    SELECT *
-    FROM {{ ref('event_batting_stats') }}
-),
-
-unique_park_seasons AS (
+WITH unique_park_seasons AS (
     SELECT DISTINCT
         park_id,
         season
-    FROM game_info
+    FROM {{ ref('stg_games') }}
+    WHERE game_type = 'RegularSeason'
 ),
 
 with_park_info AS (
@@ -31,7 +21,7 @@ with_park_info AS (
             batting.{{ stat }}::NUMERIC AS {{ stat }},
         {%- endfor %}
     FROM game_info
-    INNER JOIN batting USING (game_id)
+    INNER JOIN {{ ref('event_batting_stats') }} AS batting USING (game_id)
 ),
 
 unioned AS (

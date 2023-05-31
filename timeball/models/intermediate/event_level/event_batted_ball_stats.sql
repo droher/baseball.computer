@@ -1,40 +1,15 @@
-WITH plate_appearances AS (
-    SELECT *
-    FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-batted_ball_info AS (
-    SELECT *
-    FROM {{ ref('stg_event_batted_ball_info') }}
-),
-
-result_types AS (
-    SELECT *
-    FROM {{ ref('seed_plate_appearance_result_types') }}
-),
-
-contact_types AS (
-    SELECT *
-    FROM {{ ref('seed_plate_appearance_contact_types') }}
-),
-
-location_types AS (
-    SELECT *
-    FROM {{ ref('seed_hit_location_categories') }}
-),
-
-joined AS (
+WITH joined AS (
     SELECT
         pa.*,
         bbi.*,
         ct.*,
         lt.*,
         rt.*
-    FROM plate_appearances AS pa
-    INNER JOIN result_types AS rt USING (plate_appearance_result)
-    INNER JOIN batted_ball_info AS bbi USING (event_key)
-    LEFT JOIN contact_types AS ct USING (contact)
-    LEFT JOIN location_types AS lt USING (general_location)
+    FROM {{ ref('stg_event_plate_appearances') }} AS pa
+    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
+    INNER JOIN {{ ref('stg_event_batted_ball_info') }} AS bbi USING (event_key)
+    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS ct USING (contact)
+    LEFT JOIN {{ ref('seed_hit_location_categories') }} AS lt USING (general_location)
 ),
 
 final AS (

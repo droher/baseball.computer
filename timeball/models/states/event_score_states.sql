@@ -3,19 +3,11 @@
     materialized = 'table',
     )
 }}
-WITH events AS (
-    SELECT * FROM {{ ref('stg_events') }}
-),
-
-advances AS (
-    SELECT * FROM {{ ref('stg_event_baserunning_advance_attempts') }}
-),
-
-advance_agg AS (
+WITH advance_agg AS (
     SELECT
         event_key,
         COUNT(*) AS runs
-    FROM advances
+    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
     WHERE is_successful
         AND attempted_advance_to = 'Home'
     GROUP BY 1
@@ -28,7 +20,7 @@ windowed AS (
         SUM(a.runs) FILTER (WHERE e.batting_side = 'Away') OVER start_event AS score_away_start,
         SUM(a.runs) FILTER (WHERE e.batting_side = 'Home') OVER end_event AS score_home_end,
         SUM(a.runs) FILTER (WHERE e.batting_side = 'Away') OVER end_event AS score_away_end,
-    FROM events AS e
+    FROM {{ ref('stg_events') }} AS e
     LEFT JOIN advance_agg AS a USING (event_key)
     WINDOW
         start_event AS (

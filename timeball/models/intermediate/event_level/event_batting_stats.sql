@@ -3,103 +3,11 @@
     materialized = 'table',
     )
 }}
----- STANDARD
--- Games
--- PA
--- AB
--- R
--- H
--- 2B
--- 3B
--- HR
--- RBI
--- SB
--- CS
--- BB
--- SO
--- BA
--- OBP
--- SLG
--- OPS
--- OPS+
--- TB
--- GDP
--- HBP
--- SH
--- SF
--- IBB
-
----- Advanced
--- rOBA
--- Rbat+
--- BAbip
--- ISO
--- HR%
--- SO%
--- BB%
--- LD%
--- FB%
--- GB%
--- Pull%
--- Cent%
--- Oppo%
--- WPA
--- cWPA
--- RE24
--- RS%
--- SB%
--- XBT%
-
----- Sabermetric
--- RC
--- RC/G
-
----- Value
--- Rbat
--- Rbaser
--- Rdp
--- Rfield
--- Rpos
--- RAA
--- WAA
--- Rrep
--- RAR
--- WAR
--- oWAR
-
----- Ratios (just ratios)
-
----- 
-WITH plate_appearances AS (
-    SELECT *
-    FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-result_types AS (
-    SELECT *
-    FROM {{ ref('seed_plate_appearance_result_types') }}
-),
-
-event_base AS (
-    SELECT *
-    FROM {{ ref('stg_events') }}
-),
-
-double_plays AS (
-    SELECT *
-    FROM {{ ref('event_double_plays') }}
-),
-
-advances AS (
-    SELECT *
-    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
-),
-
-rbi AS (
+WITH rbi AS (
     SELECT
         event_key,
         COUNT(*) AS runs_batted_in
-    FROM advances
+    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
     WHERE rbi_flag
     GROUP BY 1
 ),
@@ -107,9 +15,9 @@ rbi AS (
 add_ids AS (
     SELECT
         plate_appearances.*,
-        event_base.game_id
-    FROM plate_appearances
-    INNER JOIN event_base USING (event_key)
+        events.game_id
+    FROM {{ ref('stg_event_plate_appearances') }} AS plate_appearances
+    INNER JOIN {{ ref('stg_events') }} AS events USING (event_key)
 ),
 
 final AS (
@@ -148,8 +56,9 @@ final AS (
         result_types.is_batting_out::INT + ground_ball_double_plays AS batting_outs
 
     FROM add_ids
-    INNER JOIN result_types USING (plate_appearance_result)
-    LEFT JOIN double_plays USING (event_key)
+    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS result_types
+        USING (plate_appearance_result)
+    LEFT JOIN {{ ref('event_double_plays') }} AS double_plays USING (event_key)
     LEFT JOIN rbi USING (event_key)
 )
 

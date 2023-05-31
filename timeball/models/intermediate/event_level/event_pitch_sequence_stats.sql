@@ -1,22 +1,12 @@
-WITH pitches AS (
-    SELECT *
-    FROM {{ ref('stg_event_pitch_sequences') }}
-),
-
-pitch_meta AS (
-    SELECT *
-    FROM {{ ref('seed_pitch_types') }}
-),
-
-add_meta AS (
+WITH add_meta AS (
     SELECT
         pitch_meta.*,
         pitches.event_key,
         pitches.runners_going_flag,
         pitches.blocked_by_catcher_flag,
         pitches.catcher_pickoff_attempt_at_base
-    FROM pitches
-    INNER JOIN pitch_meta USING (sequence_item)
+    FROM {{ ref('stg_event_pitch_sequences') }} AS pitches
+    INNER JOIN {{ ref('seed_pitch_types') }} AS pitch_meta USING (sequence_item)
 ),
 
 final AS (

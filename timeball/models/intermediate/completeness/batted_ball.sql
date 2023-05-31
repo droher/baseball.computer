@@ -1,24 +1,4 @@
-WITH plate_appearances AS (
-    SELECT * FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-batted_ball_info AS (
-    SELECT * FROM {{ ref('stg_event_batted_ball_info') }}
-),
-
-location_types AS (
-    SELECT * FROM {{ ref('seed_hit_location_categories') }}
-),
-
-contact_types AS (
-    SELECT * FROM {{ ref('seed_plate_appearance_contact_types') }}
-),
-
-result_types AS (
-    SELECT * FROM {{ ref('seed_plate_appearance_result_types') }}
-),
-
-final AS (
+WITH final AS (
     SELECT
         event_key,
         COALESCE(bbi.contact != 'Unknown', FALSE) AS has_contact,
@@ -90,11 +70,11 @@ final AS (
             AND lt.category_edge = 'Middle'
             AND bbi.depth NOT LIKE '%Deep'
         ) AS has_misclassified_home_run_distance,
-    FROM plate_appearances
-    INNER JOIN result_types AS rt USING (plate_appearance_result)
-    INNER JOIN batted_ball_info AS bbi USING (event_key)
-    LEFT JOIN location_types AS lt USING (general_location)
-    LEFT JOIN contact_types AS ct USING (contact)
+    FROM {{ ref('stg_event_plate_appearances') }}
+    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
+    INNER JOIN {{ ref('stg_event_batted_ball_info') }} AS bbi USING (event_key)
+    LEFT JOIN {{ ref('seed_hit_location_categories') }} AS lt USING (general_location)
+    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS ct USING (contact)
 )
 
 SELECT * FROM final

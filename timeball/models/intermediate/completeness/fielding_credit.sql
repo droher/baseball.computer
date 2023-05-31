@@ -1,12 +1,4 @@
-WITH plate_appearances AS (
-    SELECT * FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-fielding_plays AS (
-    SELECT * FROM {{ ref('stg_event_fielding_plays') }}
-),
-
-fielding_play_agg AS (
+WITH fielding_play_agg AS (
     SELECT
         event_key,
         NOT BOOL_OR(
@@ -21,7 +13,7 @@ fielding_play_agg AS (
         NOT BOOL_OR(
             fielding_position = 'Unknown' AND fielding_play = 'Error'
         ) AS has_fielder_errors
-    FROM fielding_plays
+    FROM {{ ref('stg_event_fielding_plays') }}
     GROUP BY 1
 ),
 
@@ -34,7 +26,7 @@ final AS (
         COALESCE(fpa.has_fielder_assists, TRUE) AS has_fielder_assists,
         COALESCE(fpa.has_fielder_errors, TRUE) AS has_fielder_errors
     FROM fielding_play_agg AS fpa
-    FULL OUTER JOIN plate_appearances USING (event_key)
+    FULL OUTER JOIN {{ ref('stg_event_plate_appearances') }} USING (event_key)
 )
 
 SELECT * FROM final

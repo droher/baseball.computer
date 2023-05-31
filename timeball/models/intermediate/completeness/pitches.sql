@@ -1,27 +1,15 @@
-WITH plate_appearances AS (
-    -- We don't use baserunning-only plays as criteria
-    -- for determining whether pitch data is missing,
-    -- as it is neither necessary nor sufficient for complete data.
-    SELECT * FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-events AS (
-    SELECT * FROM {{ ref('stg_events') }}
-),
-
-pitch_meta AS (
-    SELECT * FROM {{ ref('seed_pitch_types') }}
-),
-
-counts AS (
+WITH counts AS (
     SELECT
         event_key,
-        plate_appearances.event_key IS NOT NULL AS has_plate_appearance,
+        pa.event_key IS NOT NULL AS has_plate_appearance,
         e.count_balls IS NOT NULL AS has_count_balls,
         e.count_strikes IS NOT NULL AS has_count_strikes,
         e.count_balls + e.count_strikes IS NOT NULL AS has_count
-    FROM events AS e
-    LEFT JOIN plate_appearances USING (event_key)
+    FROM {{ ref('stg_events') }} AS e
+    -- We don't use baserunning-only plays as criteria
+    -- for determining whether pitch data is missing,
+    -- as it is neither necessary nor sufficient for complete data.
+    LEFT JOIN {{ ref('stg_event_plate_appearances') }} AS pa USING (event_key)
 ),
 
 pitch_sequences AS (
@@ -31,14 +19,14 @@ pitch_sequences AS (
 pitch_agg AS (
     SELECT
         ps.event_key,
-        BOOL_OR(pm.is_pitch) AS has_pitches,
-        BOOL_AND(pm.category != 'Unknown') AS has_pitch_calls,
+        BOOL_OR(spt.is_pitch) AS has_pitches,
+        BOOL_AND(spt.category != 'Unknown') AS has_pitch_calls,
         BOOL_AND(
-            pm.category != 'Unknown' AND pm.sequence_item != 'StrikeUnknownType'
+            spt.category != 'Unknown' AND spt.sequence_item != 'StrikeUnknownType'
         ) AS has_strike_types
     FROM pitch_sequences AS ps
-    INNER JOIN pitch_meta AS pm USING (sequence_item)
-    WHERE pm.is_pitch
+    INNER JOIN {{ ref('seed_pitch_types') }} AS spt USING (sequence_item)
+    WHERE spt.is_pitch
     GROUP BY 1
 ),
 

@@ -1,39 +1,4 @@
-WITH states AS (
-    SELECT *
-    FROM {{ ref('event_fielding_states') }}
-),
-
-double_plays AS (
-    SELECT *
-    FROM {{ ref('event_double_plays') }}
-),
-
-outs AS (
-    SELECT *
-    FROM {{ ref('stg_event_outs') }}
-),
-
-plate_appearances AS (
-    SELECT *
-    FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-pa_result_types AS (
-    SELECT *
-    FROM {{ ref('seed_plate_appearance_result_types') }}
-),
-
-fielding_plays AS (
-    SELECT *
-    FROM {{ ref('stg_event_fielding_plays') }}
-),
-
-batted_ball_info AS (
-    SELECT *
-    FROM {{ ref('stg_event_batted_ball_info') }}
-),
-
-fielding_plays_agg AS (
+WITH fielding_plays_agg AS (
     SELECT
         event_key,
         fielding_position,
@@ -42,7 +7,7 @@ fielding_plays_agg AS (
         COUNT(*) FILTER (WHERE fielding_play = 'Assist') AS assists,
         COUNT(*) FILTER (WHERE fielding_play = 'Error') AS errors,
         COUNT(*) FILTER (WHERE fielding_play = 'FieldersChoice') AS fielders_choices,
-    FROM fielding_plays
+    FROM {{ ref('stg_event_fielding_plays') }}
     GROUP BY 1, 2
 ),
 
@@ -50,7 +15,7 @@ outs_agg AS (
     SELECT
         event_key,
         ROUND(COUNT(*) / 3::NUMERIC, 2) AS innings_played,
-    FROM outs
+    FROM {{ ref('stg_event_outs') }}
     GROUP BY 1
 ),
 
@@ -67,10 +32,10 @@ event_level_agg AS (
         dp.is_ground_ball_double_play,
         CASE WHEN prt.is_in_play THEN 1 ELSE 0 END AS plate_appearances_in_field_with_ball_in_play
     FROM outs_agg AS oa
-    FULL OUTER JOIN plate_appearances AS pa USING (event_key)
-    LEFT JOIN pa_result_types AS prt USING (plate_appearance_result)
-    LEFT JOIN double_plays AS dp USING (event_key)
-    LEFT JOIN batted_ball_info AS bbi USING (event_key)
+    FULL OUTER JOIN {{ ref('stg_event_plate_appearances') }} AS pa USING (event_key)
+    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS prt USING (plate_appearance_result)
+    LEFT JOIN {{ ref('event_double_plays') }} AS dp USING (event_key)
+    LEFT JOIN {{ ref('stg_event_batted_ball_info') }} AS bbi USING (event_key)
 ),
 
 final AS (
@@ -102,7 +67,7 @@ final AS (
                 THEN 1
             ELSE 0
         END AS ground_ball_double_plays
-    FROM states AS s
+    FROM {{ ref('event_fielding_states') }} AS s
     LEFT JOIN event_level_agg AS e USING (event_key)
     LEFT JOIN fielding_plays_agg AS fp USING (event_key, fielding_position)
 )

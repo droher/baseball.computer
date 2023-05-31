@@ -1,66 +1,26 @@
-WITH event_info AS (
-    SELECT *
-    FROM {{ ref('stg_events') }}
-),
-
-states AS (
-    SELECT *
-    FROM {{ ref('stg_event_starting_base_states') }}
-),
-
-baserunning_plays AS (
-    SELECT *
-    FROM {{ ref('stg_event_baserunning_plays') }}
-),
-
-advances AS (
-    SELECT *
-    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
-),
-
-plate_appearances AS (
-    SELECT *
-    FROM {{ ref('stg_event_plate_appearances') }}
-),
-
-baserunner_meta AS (
-    SELECT *
-    FROM {{ ref('seed_baserunner_info') }}
-),
-
-bases_meta AS (
-    SELECT *
-    FROM {{ ref('seed_bases_info') }}
-),
-
-plate_appearance_meta AS (
-    SELECT *
-    FROM {{ ref('seed_plate_appearance_result_types') }}
-),
-
-states_full AS (
+WITH states_full AS (
     SELECT
         event_key,
         baserunner,
         runner_lineup_position
-    FROM states
+    FROM {{ ref('stg_event_starting_base_states') }}
     UNION ALL
     SELECT
         event_key,
         'Batter' AS baserunner,
         at_bat AS runner_lineup_position
-    FROM event_info
+    FROM {{ ref('stg_events') }}
 ),
 
 runner_specific_plays AS (
     SELECT *
-    FROM baserunning_plays
+    FROM {{ ref('stg_event_baserunning_plays') }}
     WHERE baserunner IS NOT NULL
 ),
 
 runner_generic_plays AS (
     SELECT *
-    FROM baserunning_plays
+    FROM {{ ref('stg_event_baserunning_plays') }}
     WHERE baserunner IS NULL
 ),
 
@@ -80,14 +40,16 @@ joined AS (
             rsp.baserunning_play_type, rgp.baserunning_play_type, 'None'
         ) AS baserunning_play_type,
         COALESCE(pam.total_bases, 0) AS batter_total_bases
-    FROM advances AS a
+    FROM {{ ref('stg_event_baserunning_advance_attempts') }} AS a
     INNER JOIN states_full AS sf USING (event_key, baserunner)
     LEFT JOIN runner_specific_plays AS rsp USING (event_key, baserunner)
     LEFT JOIN runner_generic_plays AS rgp USING (event_key)
-    LEFT JOIN plate_appearances AS pa USING (event_key)
-    LEFT JOIN plate_appearance_meta AS pam USING (plate_appearance_result)
-    LEFT JOIN baserunner_meta ON a.baserunner = baserunner_meta.baserunner
-    LEFT JOIN bases_meta ON a.attempted_advance_to = bases_meta.base
+    LEFT JOIN {{ ref('stg_event_plate_appearances') }} AS pa USING (event_key)
+    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS pam USING (plate_appearance_result)
+    LEFT JOIN {{ ref('seed_baserunner_info') }} AS baserunner_meta
+        ON a.baserunner = baserunner_meta.baserunner
+    LEFT JOIN {{ ref('seed_bases_info') }} AS bases_meta
+        ON a.attempted_advance_to = bases_meta.base
 ),
 
 final AS (

@@ -3,25 +3,13 @@
     materialized = 'table',
     )
 }}
-WITH base_states AS (
-    SELECT * FROM {{ ref('stg_event_starting_base_states') }}
-),
-
-lineups AS (
-    SELECT * FROM {{ ref('event_lineup_states') }}
-),
-
-base_state_ref AS (
-    SELECT * FROM {{ ref('seed_base_state_info') }}
-),
-
-base_states_players AS (
+WITH base_states_players AS (
     SELECT
         base_states.event_key,
         base_states.baserunner,
         lineups.player_id
-    FROM base_states
-    INNER JOIN lineups
+    FROM {{ ref('stg_event_starting_base_states') }} AS base_states
+    INNER JOIN {{ ref('event_lineup_states') }} AS lineups
         ON base_states.event_key = lineups.event_key
             AND base_states.runner_lineup_position = lineups.lineup_position
 ),
@@ -48,7 +36,8 @@ final AS (
         base_state_ref.base_state,
         base_state_ref.base_state_string
     FROM add_flags
-    INNER JOIN base_state_ref USING (is_runner_on_first, is_runner_on_second, is_runner_on_third)
+    INNER JOIN {{ ref('seed_base_state_info') }} AS base_state_ref
+        USING (is_runner_on_first, is_runner_on_second, is_runner_on_third)
 )
 
 SELECT * FROM final

@@ -3,15 +3,7 @@
     materialized = 'table',
     )
 }}
-WITH lineups AS (
-    SELECT * FROM {{ ref('event_lineup_states') }}
-),
-
-defenses AS (
-    SELECT * FROM {{ ref('event_fielding_states') }}
-),
-
-lineups_flat AS (
+WITH lineups_flat AS (
     SELECT
         event_key,
         FIRST(game_id) AS game_id,
@@ -22,7 +14,7 @@ lineups_flat AS (
         FIRST(lineup_position) FILTER (WHERE is_at_bat) AS batter_lineup_position,
         FIRST(player_id) FILTER (WHERE is_at_bat) AS batter_id,
         FIRST(player_id) FILTER (WHERE nth_next_batter_up = 1) AS on_deck_batter_id
-    FROM lineups
+    FROM {{ ref('event_lineup_states') }}
     GROUP BY 1
 ),
 
@@ -33,7 +25,7 @@ defenses_flat AS (
         {%- for i in range(1, 11) %}
         FIRST(player_id) FILTER (WHERE fielding_position = {{ i }}) AS defense_{{ i }}_id,
         {%- endfor %}
-    FROM defenses
+    FROM {{ ref('event_fielding_states') }}
     GROUP BY 1
 ),
 

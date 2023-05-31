@@ -3,50 +3,18 @@
     materialized = 'table',
     )
 }}
-WITH games AS (
-    SELECT * FROM {{ ref('stg_games') }}
-),
-
-franchises AS (
-    SELECT * FROM {{ ref('stg_franchises') }}
-),
-
-teams AS (
-    SELECT * FROM {{ ref('stg_game_teams') }}
-),
-
-events AS (
-    SELECT * FROM {{ ref('stg_events') }}
-),
-
-rosters AS (
-    SELECT * FROM {{ ref('stg_rosters') }}
-),
-
-base_states AS (
-    SELECT * FROM {{ ref('event_base_states') }}
-),
-
-runs AS (
-    SELECT * FROM {{ ref('event_score_states') }}
-),
-
-personnel AS (
-    SELECT * FROM {{ ref('event_states_wide') }}
-),
-
-add_bio AS (
+WITH add_bio AS (
     SELECT
         p.*,
         r_b.bats,
         r_p.throws
-    FROM personnel AS p
-    INNER JOIN games AS g USING (game_id)
-    LEFT JOIN rosters AS r_b
+    FROM {{ ref('event_states_wide') }} AS p
+    INNER JOIN {{ ref('stg_games') }} AS g USING (game_id)
+    LEFT JOIN {{ ref('stg_rosters') }} AS r_b
         ON p.batter_id = r_b.player_id
             AND g.season = r_b.year
             AND p.batting_team_id = r_b.team_id
-    LEFT JOIN rosters AS r_p
+    LEFT JOIN {{ ref('stg_rosters') }} AS r_p
         ON p.defense_1_id = r_p.player_id
             AND g.season = r_p.year
             AND p.fielding_team_id = r_p.team_id
@@ -58,14 +26,14 @@ game_full AS (
         franchises.league,
         away.team_id AS away_team_id,
         home.team_id AS home_team_id,
-    FROM games
-    INNER JOIN teams AS away
+    FROM {{ ref('stg_games') }} AS games
+    INNER JOIN {{ ref('stg_game_teams') }} AS away
         ON games.game_id = away.game_id
             AND away.side = 'Away'
-    INNER JOIN teams AS home
+    INNER JOIN {{ ref('stg_game_teams') }} AS home
         ON games.game_id = home.game_id
             AND home.side = 'Home'
-    INNER JOIN franchises
+    INNER JOIN {{ ref('stg_franchises') }} AS franchises
         ON home.team_id = franchises.team_id
             AND games.season BETWEEN franchises.season_start AND franchises.season_end
 ),
@@ -121,10 +89,10 @@ final AS (
         b.first_base_runner_id AS runner_on_first_id,
         b.second_base_runner_id AS runner_on_second_id,
         b.third_base_runner_id AS runner_on_third_id,
-    FROM events AS e
+    FROM {{ ref('stg_events') }} AS e
     INNER JOIN game_full AS g USING (game_id)
-    LEFT JOIN base_states AS b USING (event_key)
-    LEFT JOIN runs USING (event_key)
+    LEFT JOIN {{ ref('event_base_states') }} AS b USING (event_key)
+    LEFT JOIN {{ ref('event_score_states') }} AS runs USING (event_key)
     LEFT JOIN add_bio USING (event_key)
 )
 
