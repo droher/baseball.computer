@@ -1,15 +1,16 @@
 WITH joined AS (
     SELECT
-        pa.*,
-        bbi.*,
-        ct.*,
-        lt.*,
-        rt.*
-    FROM {{ ref('stg_event_plate_appearances') }} AS pa
-    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
-    INNER JOIN {{ ref('stg_event_batted_ball_info') }} AS bbi USING (event_key)
-    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS ct USING (contact)
-    LEFT JOIN {{ ref('seed_hit_location_categories') }} AS lt USING (general_location)
+        batted_ball.event_key,
+        batted_ball.contact,
+        contact.primary_classification,
+        contact.broad_classification,
+        contact.is_bunt,
+        loc.category_depth,
+        loc.category_side,
+        loc.category_edge,
+    FROM {{ ref('stg_event_batted_ball_info') }} AS batted_ball
+    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS contact USING (contact)
+    LEFT JOIN {{ ref('seed_hit_location_categories') }} AS loc USING (general_location)
 ),
 
 final AS (

@@ -5,19 +5,32 @@
 }}
 WITH add_bio AS (
     SELECT
-        p.*,
-        r_b.bats,
-        r_p.throws
-    FROM {{ ref('event_states_wide') }} AS p
-    INNER JOIN {{ ref('stg_games') }} AS g USING (game_id)
-    LEFT JOIN {{ ref('stg_rosters') }} AS r_b
-        ON p.batter_id = r_b.player_id
-            AND g.season = r_b.year
-            AND p.batting_team_id = r_b.team_id
-    LEFT JOIN {{ ref('stg_rosters') }} AS r_p
-        ON p.defense_1_id = r_p.player_id
-            AND g.season = r_p.year
-            AND p.fielding_team_id = r_p.team_id
+        states.event_key,
+        states.batter_id,
+        states.batter_lineup_position,
+        states.defense_1_id AS pitcher_id,
+        -- TODO: Update "weird state" section to get overrides,
+        -- and get handedness from chadwick register as fallback
+        CASE
+            WHEN batters.bats = 'B' AND pitchers.throws = 'L' THEN 'R'
+            WHEN batters.bats = 'B' AND pitchers.throws = 'R' THEN 'L'
+            ELSE batters.bats
+        END AS batter_hand,
+        CASE
+            WHEN pitchers.throws = 'B' AND batters.bats = 'L' THEN 'R'
+            WHEN pitchers.throws = 'B' AND batters.bats = 'R' THEN 'L'
+            ELSE pitchers.throws
+        END AS pitcher_hand,
+    FROM {{ ref('event_states_wide') }} AS states
+    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
+    LEFT JOIN {{ ref('stg_rosters') }} AS batters
+        ON states.batter_id = batters.player_id
+            AND games.season = batters.year
+            AND states.batting_team_id = batters.team_id
+    LEFT JOIN {{ ref('stg_rosters') }} AS pitchers
+        ON states.defense_1_id = pitchers.player_id
+            AND games.season = pitchers.year
+            AND states.fielding_team_id = pitchers.team_id
 ),
 
 game_full AS (
@@ -57,18 +70,8 @@ final AS (
         COALESCE(b.base_state, 0) AS base_state,
         runs.score_home_start AS score_home,
         runs.score_away_start AS score_away,
-        -- TODO: Update "weird state" section to get overrides,
-        -- and get handedness from chadwick register as fallback
-        CASE
-            WHEN add_bio.bats = 'B' AND add_bio.throws = 'L' THEN 'R'
-            WHEN add_bio.bats = 'B' AND add_bio.throws = 'R' THEN 'L'
-            ELSE add_bio.bats
-        END AS batter_hand,
-        CASE
-            WHEN add_bio.throws = 'B' AND add_bio.bats = 'L' THEN 'R'
-            WHEN add_bio.throws = 'B' AND add_bio.bats = 'R' THEN 'L'
-            ELSE add_bio.throws
-        END AS pitcher_hand,
+        add_bio.batter_hand,
+        add_bio.pitcher_hand,
         add_bio.batter_lineup_position,
         g.away_team_id,
         g.home_team_id,
@@ -85,7 +88,7 @@ final AS (
             WHEN e.frame = 'Bottom' AND g.bat_first_side = 'Home' THEN g.home_team_id
         END AS pitching_team_id,
         add_bio.batter_id,
-        add_bio.defense_1_id AS pitcher_id,
+        add_bio.pitcher_id,
         b.first_base_runner_id AS runner_on_first_id,
         b.second_base_runner_id AS runner_on_second_id,
         b.third_base_runner_id AS runner_on_third_id,

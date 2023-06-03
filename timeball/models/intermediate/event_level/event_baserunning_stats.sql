@@ -12,6 +12,10 @@ WITH states_full AS (
     FROM {{ ref('stg_events') }}
 ),
 
+-- When baserunner is NULL, it means the play is generic and applies to all
+-- baserunners. When it is not NULL, it means the play is specific to that
+-- baserunner. This means that the join keys are different for each of these
+-- two cases (event_key, baserunner) vs (event_key).
 runner_specific_plays AS (
     SELECT *
     FROM {{ ref('stg_event_baserunning_plays') }}
@@ -34,18 +38,18 @@ joined AS (
         a.explicit_out_flag,
         baserunner_meta.numeric_value AS number_base_from,
         bases_meta.numeric_value AS number_base_to,
-        pa.plate_appearance_result,
-        pam.is_in_play,
+        part.is_in_play,
         COALESCE(
             rsp.baserunning_play_type, rgp.baserunning_play_type, 'None'
         ) AS baserunning_play_type,
-        COALESCE(pam.total_bases, 0) AS batter_total_bases
+        COALESCE(part.total_bases, 0) AS batter_total_bases
     FROM {{ ref('stg_event_baserunning_advance_attempts') }} AS a
     INNER JOIN states_full AS sf USING (event_key, baserunner)
     LEFT JOIN runner_specific_plays AS rsp USING (event_key, baserunner)
     LEFT JOIN runner_generic_plays AS rgp USING (event_key)
-    LEFT JOIN {{ ref('stg_event_plate_appearances') }} AS pa USING (event_key)
-    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS pam USING (plate_appearance_result)
+    LEFT JOIN {{ ref('stg_event_plate_appearances') }} USING (event_key)
+    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS part
+        USING (plate_appearance_result)
     LEFT JOIN {{ ref('seed_baserunner_info') }} AS baserunner_meta
         ON a.baserunner = baserunner_meta.baserunner
     LEFT JOIN {{ ref('seed_bases_info') }} AS bases_meta
