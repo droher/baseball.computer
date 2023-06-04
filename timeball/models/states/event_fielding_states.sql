@@ -16,7 +16,7 @@ WITH final AS (
             AND e.event_id BETWEEN gfa.start_event_id AND gfa.end_event_id
             AND e.batting_side != gfa.side
     -- TODO: Investigate dupes on no-plays
-    WHERE e.event_key NOT IN (SELECT event_key FROM {{ ref('event_no_plays')  }} )
+    WHERE e.event_key NOT IN (SELECT event_key FROM {{ ref('event_no_plays') }})
 )
 
 SELECT * FROM final
