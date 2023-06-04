@@ -8,6 +8,8 @@ WITH fielding_plays_agg AS (
         COUNT(*) FILTER (WHERE fielding_play = 'Error') AS errors,
         COUNT(*) FILTER (WHERE fielding_play = 'FieldersChoice') AS fielders_choices,
     FROM {{ ref('stg_event_fielding_plays') }}
+    -- Exclude unknown attributions
+    WHERE fielding_position != 0
     GROUP BY 1, 2
 ),
 
