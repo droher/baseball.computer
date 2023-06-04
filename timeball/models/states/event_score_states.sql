@@ -20,6 +20,7 @@ windowed AS (
         SUM(a.runs) FILTER (WHERE e.batting_side = 'Away') OVER start_event AS score_away_start,
         SUM(a.runs) FILTER (WHERE e.batting_side = 'Home') OVER end_event AS score_home_end,
         SUM(a.runs) FILTER (WHERE e.batting_side = 'Away') OVER end_event AS score_away_end,
+        COALESCE(a.runs, 0)::UTINYINT AS runs_on_play,
     FROM {{ ref('stg_events') }} AS e
     LEFT JOIN advance_agg AS a USING (event_key)
     WINDOW
@@ -32,7 +33,7 @@ windowed AS (
             PARTITION BY e.game_id
             ORDER BY e.event_key
             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    )
+        )
 ),
 
 final AS (
@@ -41,7 +42,8 @@ final AS (
         COALESCE(score_home_start, 0)::UTINYINT AS score_home_start,
         COALESCE(score_away_end, 0)::UTINYINT AS score_away_start,
         COALESCE(score_home_end, 0)::UTINYINT AS score_home_end,
-        COALESCE(score_away_end, 0)::UTINYINT AS score_away_end
+        COALESCE(score_away_end, 0)::UTINYINT AS score_away_end,
+        runs_on_play
     FROM windowed
 )
 

@@ -6,6 +6,8 @@
 WITH add_bio AS (
     SELECT
         states.event_key,
+        states.batting_team_id,
+        states.fielding_team_id,
         states.batter_id,
         states.batter_lineup_position,
         states.defense_1_id AS pitcher_id,
@@ -58,6 +60,7 @@ final AS (
         e.event_key,
         g.season,
         g.league,
+        g.game_type,
         g.date,
         g.park_id,
         e.frame,
@@ -75,23 +78,15 @@ final AS (
         add_bio.batter_lineup_position,
         g.away_team_id,
         g.home_team_id,
-        CASE
-            WHEN e.frame = 'Top' AND g.bat_first_side = 'Away' THEN g.away_team_id
-            WHEN e.frame = 'Bottom' AND g.bat_first_side = 'Away' THEN g.home_team_id
-            WHEN e.frame = 'Top' AND g.bat_first_side = 'Home' THEN g.home_team_id
-            WHEN e.frame = 'Bottom' AND g.bat_first_side = 'Home' THEN g.away_team_id
-        END AS batting_team_id,
-        CASE
-            WHEN e.frame = 'Top' AND g.bat_first_side = 'Away' THEN g.home_team_id
-            WHEN e.frame = 'Bottom' AND g.bat_first_side = 'Away' THEN g.away_team_id
-            WHEN e.frame = 'Top' AND g.bat_first_side = 'Home' THEN g.away_team_id
-            WHEN e.frame = 'Bottom' AND g.bat_first_side = 'Home' THEN g.home_team_id
-        END AS pitching_team_id,
+        add_bio.batting_team_id,
+        add_bio.fielding_team_id,
         add_bio.batter_id,
         add_bio.pitcher_id,
         b.first_base_runner_id AS runner_on_first_id,
         b.second_base_runner_id AS runner_on_second_id,
         b.third_base_runner_id AS runner_on_third_id,
+        -- TODO: Future state ok to include here?
+        runs.runs_on_play,
     FROM {{ ref('stg_events') }} AS e
     INNER JOIN game_full AS g USING (game_id)
     LEFT JOIN {{ ref('event_base_states') }} AS b USING (event_key)
