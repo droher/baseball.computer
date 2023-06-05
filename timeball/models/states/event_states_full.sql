@@ -1,41 +1,4 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
-WITH add_bio AS (
-    SELECT
-        states.event_key,
-        states.batting_team_id,
-        states.fielding_team_id,
-        states.batter_id,
-        states.batter_lineup_position,
-        states.defense_1_id AS pitcher_id,
-        -- TODO: Update "weird state" section to get overrides,
-        -- and get handedness from chadwick register as fallback
-        CASE
-            WHEN batters.bats = 'B' AND pitchers.throws = 'L' THEN 'R'
-            WHEN batters.bats = 'B' AND pitchers.throws = 'R' THEN 'L'
-            ELSE batters.bats
-        END AS batter_hand,
-        CASE
-            WHEN pitchers.throws = 'B' AND batters.bats = 'L' THEN 'R'
-            WHEN pitchers.throws = 'B' AND batters.bats = 'R' THEN 'L'
-            ELSE pitchers.throws
-        END AS pitcher_hand,
-    FROM {{ ref('event_states_wide') }} AS states
-    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
-    LEFT JOIN {{ ref('stg_rosters') }} AS batters
-        ON states.batter_id = batters.player_id
-            AND games.season = batters.year
-            AND states.batting_team_id = batters.team_id
-    LEFT JOIN {{ ref('stg_rosters') }} AS pitchers
-        ON states.defense_1_id = pitchers.player_id
-            AND games.season = pitchers.year
-            AND states.fielding_team_id = pitchers.team_id
-),
-
-game_full AS (
+WITH game_full AS (
     SELECT
         games.*,
         franchises.league,
@@ -55,9 +18,11 @@ game_full AS (
 
 final AS (
     SELECT
+        -- IDs
         game_id,
         e.event_id,
         e.event_key,
+        -- Basic state
         g.season,
         g.league,
         g.game_type,
@@ -65,33 +30,43 @@ final AS (
         g.park_id,
         e.frame,
         e.inning,
-        e.outs,
-        e.count_balls,
-        e.count_strikes,
-        e.batting_side,
-        CASE WHEN e.batting_side = 'Home' THEN 'Away' ELSE 'Home' END AS fielding_side,
-        COALESCE(b.base_state, 0) AS base_state,
-        runs.score_home_start AS score_home,
-        runs.score_away_start AS score_away,
+        base_out.outs_start,
+        add_bio.batting_side,
+        add_bio.fielding_side,
+        runs.score_home_start,
+        runs.score_away_start,
+        add_bio.batter_lineup_position,
+        -- Player/Team IDs and info
         add_bio.batter_hand,
         add_bio.pitcher_hand,
-        add_bio.batter_lineup_position,
         g.away_team_id,
         g.home_team_id,
         add_bio.batting_team_id,
         add_bio.fielding_team_id,
         add_bio.batter_id,
         add_bio.pitcher_id,
-        b.first_base_runner_id AS runner_on_first_id,
-        b.second_base_runner_id AS runner_on_second_id,
-        b.third_base_runner_id AS runner_on_third_id,
-        -- TODO: Future state ok to include here?
+        base_out.base_state_start,
+        base_out.first_base_runner_id_start,
+        base_out.second_base_runner_id_start,
+        base_out.third_base_runner_id_start,
+        base_out.frame_start_flag,
+        -- Future state
+        -- TODO: Enforce clearer separation
+        e.count_balls,
+        e.count_strikes,
+        base_out.outs_on_play,
+        base_out.outs_end,
+        base_out.base_state_end,
         runs.runs_on_play,
+        runs.score_home_end,
+        runs.score_away_end,
+        base_out.frame_end_flag,
+        base_out.truncated_frame_flag,
     FROM {{ ref('stg_events') }} AS e
     INNER JOIN game_full AS g USING (game_id)
-    LEFT JOIN {{ ref('event_base_states') }} AS b USING (event_key)
-    LEFT JOIN {{ ref('event_score_states') }} AS runs USING (event_key)
-    LEFT JOIN add_bio USING (event_key)
+    INNER JOIN {{ ref('event_base_out_states') }} AS base_out USING (event_key)
+    INNER JOIN {{ ref('event_score_states') }} AS runs USING (event_key)
+    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS add_bio USING (event_key)
 )
 
 SELECT * FROM final

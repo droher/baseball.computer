@@ -3,7 +3,7 @@ WITH final AS (
         e.game_id,
         e.event_key,
         t.team_id,
-        t.side,
+        t.side AS batting_side,
         a.player_id,
         a.lineup_position,
         (e.at_bat = a.lineup_position) AS is_at_bat,
