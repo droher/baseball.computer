@@ -1,3 +1,8 @@
+{{ 
+    config(
+        materialized = 'table',
+    )
+}}
 WITH final AS (
     SELECT
         season,
@@ -22,7 +27,6 @@ SELECT
     league,
     base_state_start,
     outs_start,
-    COUNT(*) AS num_plays,
-    AVG(runs_scored) AS run_expectancy
+    AVG(runs_scored) AS avg_runs_scored
 FROM final
 GROUP BY 1, 2, 3, 4

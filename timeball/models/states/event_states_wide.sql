@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH lineups_flat AS (
     SELECT
         event_key,

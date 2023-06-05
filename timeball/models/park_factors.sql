@@ -13,15 +13,15 @@ WITH unique_park_seasons AS (
 
 with_park_info AS (
     SELECT
-        game_info.park_id,
-        game_info.season,
-        batting.batter_id,
-        batting.pitcher_id,
+        states.park_id,
+        states.season,
+        states.batter_id,
+        states.pitcher_id,
         {%- for stat in stats %}
             batting.{{ stat }}::NUMERIC AS {{ stat }},
         {%- endfor %}
-    FROM game_info
-    INNER JOIN {{ ref('event_batting_stats') }} AS batting USING (game_id)
+    FROM {{ ref('event_states_full') }} AS states
+    INNER JOIN {{ ref('event_batting_stats') }} AS batting USING (event_key)
 ),
 
 unioned AS (
