@@ -1,37 +1,20 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
-WITH states AS (
-    SELECT
-        event_key,
-        season,
-        league,
-        inning_start,
-        frame_start,
-        truncated_home_margin_start,
-        batting_side,
-        base_state_start,
-        outs_start,
-        inning_end,
-        frame_end,
-        truncated_home_margin_end,
-        base_state_end,
-        outs_end,
-        runs_on_play,
-        game_end_flag
-    FROM {{ ref('event_states_full') }}
-    WINDOW rest_of_inning AS (
-        PARTITION BY game_id, frame, inning
-        ORDER BY event_id
-        ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
-    )
-
-)
-
 SELECT
     states.event_key,
+    states.season,
+    states.league,
+    states.inning_start,
+    states.frame_start,
+    states.truncated_home_margin_start,
+    states.batting_side,
+    states.base_state_start,
+    states.outs_start,
+    states.inning_end,
+    states.frame_end,
+    states.truncated_home_margin_end,
+    states.base_state_end,
+    states.outs_end,
+    states.runs_on_play,
+    states.game_end_flag,
     ROUND(
         states.runs_on_play
         + COALESCE(runs_end.avg_runs_scored, 0)
@@ -53,7 +36,7 @@ SELECT
     CASE WHEN states.batting_side = 'Home' THEN expected_home_win_change
         ELSE -expected_home_win_change
     END AS expected_batting_win_change
-FROM states
+FROM {{ ref('event_states_full') }} AS states
 -- TODO: Add hashes to full_state table to make these joins not awful
 LEFT JOIN {{ ref('run_expectancy_matrix') }} AS runs_start
     ON runs_start.season = states.season

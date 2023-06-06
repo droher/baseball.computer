@@ -5,7 +5,8 @@
 }}
 WITH states AS (
     SELECT
-        -- Treat 9th and later as the same to increase sample size 
+        -- Treat 9th and later as the same to increase sample size
+        -- TODO: Put add upstream `truncated_inning` col
         LEAST(inning_start, 9) AS inning,
         frame_start AS frame,
         truncated_home_margin_start AS truncated_home_margin,
@@ -25,6 +26,7 @@ WITH states AS (
         LAST(score_home_end::INT - score_away_end > 0) OVER rest_of_game AS home_team_win
     FROM {{ ref('event_states_full') }}
     -- Exclude the rare cases where the home team bats first
+    -- TODO: Should also exclude/differentiate any bullshit extra innings runner on 2nd stuff
     WHERE bat_first_side = 'Away'
     WINDOW
         rest_of_game AS (
@@ -68,7 +70,7 @@ final AS (
         -- Use the "broad" category as a prior to smooth out rare states
         ROUND(
             (home_team_wins_narrow + win_rate_broad * 10) / (sample_size_narrow + 10), 3
-        ) AS home_win_rate,
+        )::DECIMAL AS home_win_rate,
     FROM agg
 )
 
