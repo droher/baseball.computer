@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH states AS (
     SELECT
         event_key,
@@ -6,6 +11,7 @@ WITH states AS (
         inning_start,
         frame_start,
         truncated_home_margin_start,
+        batting_side,
         base_state_start,
         outs_start,
         inning_end,
@@ -43,7 +49,10 @@ SELECT
             ELSE wins_end.home_win_rate - wins_start.home_win_rate
         END,
         3
-    ) AS expected_home_win_change
+    ) AS expected_home_win_change,
+    CASE WHEN states.batting_side = 'Home' THEN expected_home_win_change
+        ELSE -expected_home_win_change
+    END AS expected_batting_win_change
 FROM states
 -- TODO: Add hashes to full_state table to make these joins not awful
 LEFT JOIN {{ ref('run_expectancy_matrix') }} AS runs_start
@@ -56,15 +65,15 @@ LEFT JOIN {{ ref('run_expectancy_matrix') }} AS runs_end
         AND runs_end.league = states.league
         AND runs_end.outs = states.outs_end
         AND runs_end.base_state = states.base_state_end
-LEFT JOIN {{ ref('win_expectancy_matrix' )}} AS wins_start
-    ON wins_start.inning = states.inning_start
+LEFT JOIN {{ ref('win_expectancy_matrix' ) }} AS wins_start
+    ON wins_start.inning = LEAST(states.inning_start, 9)
         AND wins_start.frame = states.frame_start
         AND wins_start.truncated_home_margin = states.truncated_home_margin_start
         AND wins_start.outs = states.outs_start
         AND wins_start.base_state = states.base_state_start
-LEFT JOIN {{ ref('win_expectancy_matrix' )}} AS wins_end
-    ON wins_end.inning = states.inning_end
+LEFT JOIN {{ ref('win_expectancy_matrix' ) }} AS wins_end
+    ON wins_end.inning = LEAST(states.inning_end, 9)
         AND wins_end.frame = states.frame_end
         AND wins_end.truncated_home_margin = states.truncated_home_margin_end
-        AND wins_end.outs = states.outs_end
-        AND wins_end.base_state = states.base_state_end
+        AND wins_end.outs = states.outs_end % 3
+        AND wins_end.base_state = COALESCE(states.base_state_end, 0)

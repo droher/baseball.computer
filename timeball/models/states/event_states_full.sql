@@ -36,9 +36,9 @@ final AS (
         add_bio.fielding_side,
         runs.score_home_start,
         runs.score_away_start,
-        runs.score_home_start::INT - runs.score_away_start AS home_margin,
+        runs.score_home_start::INT - runs.score_away_start AS home_margin_start,
         -- Perform upstream for consistency
-        GREATEST(LEAST(home_margin, 10), -10) AS truncated_home_margin,
+        GREATEST(LEAST(home_margin_start, 10), -10) AS truncated_home_margin_start,
         add_bio.batter_lineup_position,
         -- Player/Team IDs and info
         add_bio.batter_hand,
@@ -66,6 +66,9 @@ final AS (
         runs.runs_on_play,
         runs.score_home_end,
         runs.score_away_end,
+        runs.score_home_end::INT - runs.score_away_end AS home_margin_end,
+        -- Perform upstream for consistency
+        GREATEST(LEAST(home_margin_end, 10), -10) AS truncated_home_margin_end,
         base_out.frame_end_flag,
         base_out.truncated_frame_flag,
         base_out.game_end_flag

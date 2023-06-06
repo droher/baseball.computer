@@ -8,17 +8,17 @@ WITH states AS (
         -- Treat 9th and later as the same to increase sample size 
         LEAST(inning_start, 9) AS inning,
         frame_start AS frame,
-        truncated_home_margin,
+        truncated_home_margin_start AS truncated_home_margin,
         base_state_start AS base_state,
         outs_start AS outs,
         -- Buckets for merging low-sample-size states, see next query for integration
         ROUND(CASE
-            WHEN home_margin = 0 THEN 0
-            WHEN home_margin BETWEEN 1 AND 3 THEN 1
-            WHEN home_margin BETWEEN 4 AND 6 THEN 2
-            WHEN home_margin >= 7 THEN 3
-            WHEN home_margin BETWEEN -3 AND -1 THEN -1
-            WHEN home_margin BETWEEN -6 AND -4 THEN -2
+            WHEN home_margin_start = 0 THEN 0
+            WHEN home_margin_start BETWEEN 1 AND 3 THEN 1
+            WHEN home_margin_start BETWEEN 4 AND 6 THEN 2
+            WHEN home_margin_start >= 7 THEN 3
+            WHEN home_margin_start BETWEEN -3 AND -1 THEN -1
+            WHEN home_margin_start BETWEEN -6 AND -4 THEN -2
             ELSE -3
         END, 0) AS home_margin_bucket,
         base_state_start > 0 AS any_runners_on,
