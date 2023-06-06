@@ -36,9 +36,10 @@ add_outs AS (
     SELECT
         event_key,
         events.inning,
+        events.frame,
         -- Next two cols are transformed to reduce size of partition key in next step
         event_key // 255 AS game_key,
-        CASE events.frame WHEN 'Top' THEN 0 ELSE 1 END AS frame,
+        CASE events.frame WHEN 'Top' THEN 0 ELSE 1 END AS frame_key,
         events.outs AS outs_start,
         COALESCE(outs_agg.outs, 0) AS outs_on_play,
         events.outs + COALESCE(outs_agg.outs, 0) AS outs_end,
@@ -102,7 +103,7 @@ final AS (
             ORDER BY event_key
         ),
         narrow AS (
-            PARTITION BY game_key, inning, frame
+            PARTITION BY game_key, inning, frame_key
             ORDER BY event_key
         )
 )
