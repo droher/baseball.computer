@@ -28,13 +28,17 @@ final AS (
         g.game_type,
         g.date,
         g.park_id,
-        e.frame,
-        e.inning,
+        g.bat_first_side,
+        base_out.inning_start,
+        base_out.frame_start,
         base_out.outs_start,
         add_bio.batting_side,
         add_bio.fielding_side,
         runs.score_home_start,
         runs.score_away_start,
+        runs.score_home_start::INT - runs.score_away_start AS home_margin,
+        -- Perform upstream for consistency
+        GREATEST(LEAST(home_margin, 10), -10) AS truncated_home_margin,
         add_bio.batter_lineup_position,
         -- Player/Team IDs and info
         add_bio.batter_hand,
@@ -54,6 +58,8 @@ final AS (
         -- TODO: Enforce clearer separation
         e.count_balls,
         e.count_strikes,
+        base_out.inning_end,
+        base_out.frame_end,
         base_out.outs_on_play,
         base_out.outs_end,
         base_out.base_state_end,
@@ -62,6 +68,7 @@ final AS (
         runs.score_away_end,
         base_out.frame_end_flag,
         base_out.truncated_frame_flag,
+        base_out.game_end_flag
     FROM {{ ref('stg_events') }} AS e
     INNER JOIN game_full AS g USING (game_id)
     INNER JOIN {{ ref('event_base_out_states') }} AS base_out USING (event_key)

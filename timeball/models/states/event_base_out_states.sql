@@ -67,33 +67,44 @@ add_state_ref AS (
 final AS (
     SELECT
         event_key,
+        inning AS inning_start,
+        LEAD(inning) OVER wide AS inning_end,
+        frame AS frame_start,
+        LEAD(frame) OVER wide AS frame_end,
         outs_start,
         outs_end,
         outs_on_play,
         first_base_runner_id AS first_base_runner_id_start,
         second_base_runner_id AS second_base_runner_id_start,
         third_base_runner_id AS third_base_runner_id_start,
-        LEAD(first_base_runner_id) OVER w AS first_base_runner_id_end,
-        LEAD(second_base_runner_id) OVER w AS second_base_runner_id_end,
-        LEAD(third_base_runner_id) OVER w AS third_base_runner_id_end,
+        LEAD(first_base_runner_id) OVER narrow AS first_base_runner_id_end,
+        LEAD(second_base_runner_id) OVER narrow AS second_base_runner_id_end,
+        LEAD(third_base_runner_id) OVER narrow AS third_base_runner_id_end,
         is_runner_on_first AS is_runner_on_first_start,
         is_runner_on_second AS is_runner_on_second_start,
         is_runner_on_third AS is_runner_on_third_start,
-        LEAD(is_runner_on_first) OVER w AS is_runner_on_first_end,
-        LEAD(is_runner_on_second) OVER w AS is_runner_on_second_end,
-        LEAD(is_runner_on_third) OVER w AS is_runner_on_third_end,
+        LEAD(is_runner_on_first) OVER narrow AS is_runner_on_first_end,
+        LEAD(is_runner_on_second) OVER narrow AS is_runner_on_second_end,
+        LEAD(is_runner_on_third) OVER narrow AS is_runner_on_third_end,
         base_state AS base_state_start,
         base_state_string AS base_state_string_start,
-        LEAD(base_state) OVER w AS base_state_end,
-        LEAD(base_state_string) OVER w AS base_state_string_end,
-        LAG(event_key) OVER w IS NULL AS frame_start_flag,
-        LEAD(event_key) OVER w IS NULL AS frame_end_flag,
-        LEAD(event_key) OVER w IS NULL AND outs_end != 3 AS truncated_frame_flag,
+        LEAD(base_state) OVER narrow AS base_state_end,
+        LEAD(base_state_string) OVER narrow AS base_state_string_end,
+        LAG(event_key) OVER narrow IS NULL AS frame_start_flag,
+        LEAD(event_key) OVER narrow IS NULL AS frame_end_flag,
+        LEAD(event_key) OVER narrow IS NULL AND outs_end != 3 AS truncated_frame_flag,
+        LAG(event_key) OVER wide IS NULL AS game_start_flag,
+        LEAD(event_key) OVER wide IS NULL AS game_end_flag,
     FROM add_state_ref
-    WINDOW w AS (
-        PARTITION BY game_key, inning, frame
-        ORDER BY event_key
-    )
+    WINDOW
+        wide AS (
+            PARTITION BY game_key
+            ORDER BY event_key
+        ),
+        narrow AS (
+            PARTITION BY game_key, inning, frame
+            ORDER BY event_key
+        )
 )
 
 SELECT * FROM final
