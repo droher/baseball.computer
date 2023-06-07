@@ -1,12 +1,12 @@
 WITH source AS (
-    SELECT * FROM {{ source('misc', 'people') }}
+    SELECT * FROM {{ source('baseballdatabank', 'people') }}
 ),
 
 renamed AS (
     SELECT
         retroid AS retrosheet_player_id,
         bbrefid AS baseball_reference_player_id,
-        playerid AS chadwick_player_id,
+        playerid AS databank_player_id,
         birthyear AS birth_year,
         birthmonth AS birth_month,
         birthday AS birth_day,

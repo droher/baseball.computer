@@ -3,7 +3,7 @@
 
   {% set sql %}
     {% for node in graph.sources.values() %}
-      {% set prefix = "simple" if node.schema == "misc" else "event" %}
+      {% set prefix = node.schema if node.schema in ("misc", "baseballdatabank") else "event" %}
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';
       CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (

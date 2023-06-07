@@ -1,0 +1,143 @@
+sources:
+  - name: baseballdatabank
+    tables:
+      - name: appearances
+        columns:
+          - name: yearid
+          - name: teamid
+          - name: lgid
+          - name: playerid
+          - name: g_all
+          - name: gs
+          - name: g_batting
+          - name: g_defense
+          - name: g_p
+          - name: g_c
+          - name: g_1b
+          - name: g_2b
+          - name: g_3b
+          - name: g_ss
+          - name: g_lf
+          - name: g_cf
+          - name: g_rf
+          - name: g_of
+          - name: g_dh
+          - name: g_ph
+          - name: g_pr
+
+      - name: batting
+        columns:
+          - name: playerid
+          - name: yearid
+          - name: stint
+          - name: teamid
+          - name: lgid
+          - name: g
+          - name: ab
+          - name: r
+          - name: h
+          - name: 2b
+          - name: 3b
+          - name: hr
+          - name: rbi
+          - name: sb
+          - name: cs
+          - name: bb
+          - name: so
+          - name: ibb
+          - name: hbp
+          - name: sh
+          - name: sf
+          - name: gidp
+
+      - name: fielding
+        columns:
+          - name: playerid
+          - name: yearid
+          - name: stint
+          - name: teamid
+          - name: lgid
+          - name: pos
+          - name: g
+          - name: gs
+          - name: innouts
+          - name: po
+          - name: a
+          - name: e
+          - name: dp
+          - name: pb
+          - name: wp
+          - name: sb
+          - name: cs
+          - name: zr
+
+      - name: pitching
+        columns:
+          - name: playerid
+          - name: yearid
+          - name: stint
+          - name: teamid
+          - name: lgid
+          - name: w
+          - name: l
+          - name: g
+          - name: gs
+          - name: cg
+          - name: sho
+          - name: sv
+          - name: ipouts
+          - name: h
+          - name: er
+          - name: hr
+          - name: bb
+          - name: so
+          - name: baopp
+          - name: era
+          - name: ibb
+          - name: wp
+          - name: hbp
+          - name: bk
+          - name: bfp
+          - name: gf
+          - name: r
+          - name: sh
+          - name: sf
+          - name: gidp
+      - name: people
+        description: |
+          Biographical information on each player/umpire/manager.
+        meta:
+          primary_keys:
+            - player_id
+        columns:
+          - name: playerid
+            tests:
+              - unique
+              - not_null
+          - name: birthyear
+          - name: birthmonth
+          - name: birthday
+          - name: birthcountry
+          - name: birthstate
+          - name: birthcity
+          - name: deathyear
+          - name: deathmonth
+          - name: deathday
+          - name: deathcountry
+          - name: deathstate
+          - name: deathcity
+          - name: namefirst
+          - name: namelast
+          - name: namegiven
+          - name: weight
+          - name: height
+          - name: bats
+          - name: throws
+          - name: debut
+          - name: finalgame
+          - name: retroid
+            tests:
+              - unique
+          - name: bbrefid
+            tests:
+              - unique
