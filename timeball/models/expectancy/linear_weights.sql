@@ -46,7 +46,7 @@ agg AS (
     INNER JOIN {{ ref('event_transition_values') }} AS trans USING (event_key)
     -- Only include seasons with regular season data for now
     WHERE trans.season >= 1914
-    WINDOW 
+    WINDOW
         all_league AS (PARTITION BY trans.season, trans.league),
         result AS (PARTITION BY trans.season, trans.league, union_plays.play)
 ),
@@ -63,8 +63,3 @@ final AS (
 )
 
 SELECT * FROM final
-
-
-SELECT * FROM {{ ref('linear_weights') }}
-WHERE season = 2022
-ORDER BY play_category, play, league
