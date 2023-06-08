@@ -613,3 +613,19 @@ sources:
               - not_null:
                   config:
                     severity: warn
+
+      - name: box_score_comment
+        meta:
+          primary_keys:
+            - game_id
+            - sequence_id
+        columns:
+          - name: game_id
+            tests:
+              - not_null
+          - name: sequence_id
+            tests:
+              - not_null
+          - name: comment
+            tests:
+              - not_null
