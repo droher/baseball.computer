@@ -360,3 +360,14 @@ sources:
             data_type: VARCHAR
             tests:
               - not_null
+      - name: event_comment
+        meta:
+          primary_keys:
+            - event_key
+        columns:
+          - name: event_key
+            data_type: UINTEGER
+            tests:
+              - not_null
+          - name: comment
+            data_type: VARCHAR

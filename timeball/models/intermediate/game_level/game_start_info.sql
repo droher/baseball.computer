@@ -18,11 +18,10 @@ umps_flat AS (
         FIRST(umpire_id) FILTER (WHERE position = 'RightField') AS umpire_right_field_id,
     FROM {{ ref('stg_game_umpires') }}
     GROUP BY 1
-),
-  
-{#
-starting_lineups AS (
+), 
 
+{# starting_lineups AS (
+    -- Need to assemble first with box score combo
 ) #}
 
 game_flat AS (
