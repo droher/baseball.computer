@@ -11,9 +11,9 @@ WITH game_full AS (
     INNER JOIN {{ ref('stg_game_teams') }} AS home
         ON games.game_id = home.game_id
             AND home.side = 'Home'
-    INNER JOIN {{ ref('stg_franchises') }} AS franchises
+    INNER JOIN {{ ref('seed_franchises') }} AS franchises
         ON home.team_id = franchises.team_id
-            AND games.season BETWEEN franchises.season_start AND franchises.season_end
+            AND games.date BETWEEN franchises.date_start AND franchises.date_end
 ),
 
 final AS (

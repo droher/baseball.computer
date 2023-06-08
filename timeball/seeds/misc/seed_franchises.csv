@@ -1,0 +1,225 @@
+franchise_id,team_id,league,division,location,nickname,alternative_nicknames,date_start,date_end,city,state
+ANA,LAA,AL,,Los Angeles,Angels,,1961-04-11,1964-10-04,Los Angeles,CA
+ANA,CAL,AL,,Los Angeles,Angels,,1965-04-12,1965-09-01,Anaheim,CA
+ANA,CAL,AL,,California,Angels,,1965-09-02,1968-09-29,Anaheim,CA
+ANA,CAL,AL,W,California,Angels,,1969-04-08,1996-09-29,Anaheim,CA
+ANA,ANA,AL,W,Anaheim,Angels,,1997-04-02,2004-10-08,Anaheim,CA
+ANA,ANA,AL,W,Los Angeles,Angels,,2005-04-05,,Anaheim,CA
+ARI,ARI,NL,W,Arizona,Diamondbacks,,1998-03-31,,Phoenix,AZ
+ATL,BS1,NA,,Boston,Red Stockings,,1871-05-05,1875-10-30,Boston,MA
+ATL,BSN,NL,,Boston,Red Caps,,1876-04-22,1882-10-02,Boston,MA
+ATL,BSN,NL,,Boston,Beaneaters,,1883-05-01,1906-10-05,Boston,MA
+ATL,BSN,NL,,Boston,Doves,,1907-04-12,1910-10-12,Boston,MA
+ATL,BSN,NL,,Boston,Rustlers,Heps,1911-04-12,1911-10-09,Boston,MA
+ATL,BSN,NL,,Boston,Braves,,1912-04-11,1935-09-29,Boston,MA
+ATL,BSN,NL,,Boston,Bees,,1936-04-14,1940-09-29,Boston,MA
+ATL,BSN,NL,,Boston,Braves,,1941-04-15,1952-09-28,Boston,MA
+ATL,MLN,NL,,Milwaukee,Braves,,1953-04-13,1965-10-03,Milwaukee,WI
+ATL,ATL,NL,,Atlanta,Braves,,1966-04-12,1968-09-29,Atlanta,GA
+ATL,ATL,NL,W,Atlanta,Braves,,1969-04-07,1993-10-13,Atlanta,GA
+ATL,ATL,NL,E,Atlanta,Braves,,1994-04-04,,Atlanta,GA
+BAL,MLA,AL,,Milwaukee,Brewers,,1901-04-25,1901-09-28,Milwaukee,WI
+BAL,SLA,AL,,St. Louis,Browns,,1902-04-23,1953-09-27,St. Louis,MO
+BAL,BAL,AL,,Baltimore,Orioles,,1954-04-13,1968-09-27,Baltimore,MD
+BAL,BAL,AL,E,Baltimore,Orioles,,1969-04-08,,Baltimore,MD
+BOS,BOS,AL,,Boston,Americans,Somersets,1901-04-26,1907-10-05,Boston,MA
+BOS,BOS,AL,,Boston,Red Sox,,1908-04-14,1968-09-29,Boston,MA
+BOS,BOS,AL,E,Boston,Red Sox,,1969-04-08,,Boston,MA
+CHA,CHA,AL,,Chicago,White Sox,,1901-04-24,1968-09-29,Chicago,IL
+CHA,CHA,AL,W,Chicago,White Sox,,1969-04-08,1993-10-12,Chicago,IL
+CHA,CHA,AL,C,Chicago,White Sox,,1994-04-04,,Chicago,IL
+CHN,CH1,NA,,Chicago,White Stockings,,1871-05-08,1871-10-30,Chicago,IL
+CHN,CH2,NA,,Chicago,White Stockings,,1874-05-13,1875-10-27,Chicago,IL
+CHN,CHN,NL,,Chicago,White Stockings,,1876-04-25,1889-10-05,Chicago,IL
+CHN,CHN,NL,,Chicago,Colts,,1890-04-19,1897-10-03,Chicago,IL
+CHN,CHN,NL,,Chicago,Orphans,,1898-04-15,1902-10-05,Chicago,IL
+CHN,CHN,NL,,Chicago,Cubs,,1903-04-16,1968-09-29,Chicago,IL
+CHN,CHN,NL,E,Chicago,Cubs,,1969-04-08,1993-10-03,Chicago,IL
+CHN,CHN,NL,C,Chicago,Cubs,,1994-04-04,,Chicago,IL
+CIN,CN2,AA,,Cincinnati,Red Stockings,,1882-05-02,1889-10-15,Cincinnati,OH
+CIN,CIN,NL,,Cincinnati,Reds,,1890-04-19,1953-09-27,Cincinnati,OH
+CIN,CIN,NL,,Cincinnati,Redlegs,,1954-04-13,1959-09-27,Cincinnati,OH
+CIN,CIN,NL,,Cincinnati,Reds,,1960-04-12,1968-09-29,Cincinnati,OH
+CIN,CIN,NL,W,Cincinnati,Reds,,1969-04-07,1993-10-03,Cincinnati,OH
+CIN,CIN,NL,C,Cincinnati,Reds,,1994-04-03,,Cincinnati,OH
+CLE,CLE,AL,,Cleveland,Blues,,1901-04-24,1901-09-28,Cleveland,OH
+CLE,CLE,AL,,Cleveland,Broncos,,1902-04-23,1902-09-27,Cleveland,OH
+CLE,CLE,AL,,Cleveland,Naps,,1903-04-22,1914-10-04,Cleveland,OH
+CLE,CLE,AL,,Cleveland,Indians,,1915-04-14,1968-09-27,Cleveland,OH
+CLE,CLE,AL,E,Cleveland,Indians,,1969-04-08,1993-10-03,Cleveland,OH
+CLE,CLE,AL,C,Cleveland,Indians,,1994-04-04,,Cleveland,OH
+COL,COL,NL,W,Colorado,Rockies,,1993-04-05,,Denver,CO
+DET,DET,AL,,Detroit,Tigers,,1901-04-25,1968-10-10,Detroit,MI
+DET,DET,AL,E,Detroit,Tigers,,1969-04-08,1997-09-28,Detroit,MI
+DET,DET,AL,C,Detroit,Tigers,,1998-03-31,,Detroit,MI
+HOU,HOU,NL,,Houston,Colt .45's,,1962-04-10,1964-10-04,Houston,TX
+HOU,HOU,NL,,Houston,Astros,,1965-04-12,1968-09-29,Houston,TX
+HOU,HOU,NL,W,Houston,Astros,,1969-04-08,1993-10-03,Houston,TX
+HOU,HOU,NL,C,Houston,Astros,,1994-04-04,2012-10-03,Houston,TX
+HOU,HOU,AL,W,Houston,Astros,,2013-03-31,,Houston,TX
+KCA,KCA,AL,W,Kansas City,Royals,,1969-04-08,1993-10-03,Kansas City,MO
+KCA,KCA,AL,C,Kansas City,Royals,,1994-04-04,,Kansas City,MO
+LAN,BR3,AA,,Brooklyn,Atlantics,Trolley Dodgers,1884-05-01,1884-10-15,Brooklyn,NY
+LAN,BR3,AA,,Brooklyn,Grays,Trolley Dodgers,1885-04-20,1887-10-10,Brooklyn,NY
+LAN,BR3,AA,,Brooklyn,Bridegrooms,,1888-04-08,1889-10-14,Brooklyn,NY
+LAN,BRO,NL,,Brooklyn,Bridegrooms,Grooms,1890-04-19,1898-10-15,Brooklyn,NY
+LAN,BRO,NL,,Brooklyn,Superbas,,1899-04-15,1910-10-12,Brooklyn,NY
+LAN,BRO,NL,,Brooklyn,Dodgers,Superbas,1911-04-12,1912-10-05,Brooklyn,NY
+LAN,BRO,NL,,Brooklyn,Superbas,,1913-04-09,1913-10-03,Brooklyn,NY
+LAN,BRO,NL,,Brooklyn,Robins,,1914-04-14,1931-09-27,Brooklyn,NY
+LAN,BRO,NL,,Brooklyn,Dodgers,,1932-04-12,1957-09-29,Brooklyn,NY
+LAN,LAN,NL,,Los Angeles,Dodgers,,1958-04-15,1968-09-29,Los Angeles,CA
+LAN,LAN,NL,W,Los Angeles,Dodgers,,1969-04-07,,Los Angeles,CA
+MIA,FLO,NL,E,Florida,Marlins,,1993-04-05,2011-09-28,Miami,FL
+MIA,MIA,NL,E,Miami,Marlins,,2012-04-04,,Miami,FL
+MIL,SE1,AL,W,Seattle,Pilots,,1969-04-08,1969-10-02,Seattle,WA
+MIL,MIL,AL,W,Milwaukee,Brewers,,1970-04-07,1971-09-30,Milwaukee,WI
+MIL,MIL,AL,E,Milwaukee,Brewers,,1972-04-15,1993-10-03,Milwaukee,WI
+MIL,MIL,AL,C,Milwaukee,Brewers,,1994-04-05,1997-09-28,Milwaukee,WI
+MIL,MIL,NL,C,Milwaukee,Brewers,,1998-03-31,,Milwaukee,WI
+MIN,WS1,AL,,Washington,Senators,Nationals,1901-04-26,1960-10-02,Washington,DC
+MIN,MIN,AL,,Minnesota,Twins,,1961-04-11,1968-09-29,Bloomington,MN
+MIN,MIN,AL,W,Minnesota,Twins,,1969-04-08,1981-10-04,Bloomington,MN
+MIN,MIN,AL,W,Minnesota,Twins,,1982-04-06,1993-10-03,Minneapolis,MN
+MIN,MIN,AL,C,Minnesota,Twins,,1994-04-05,,Minneapolis,MN
+NYA,BLA,AL,,Baltimore,Orioles,,1901-04-26,1902-09-29,Baltimore,MD
+NYA,NYA,AL,,New York,Highlanders,Hilltoppers;Greater New Yorks,1903-04-22,1912-10-05,New York,NY
+NYA,NYA,AL,,New York,Yankees,,1913-04-10,1968-09-29,New York,NY
+NYA,NYA,AL,E,New York,Yankees,,1969-04-07,,New York,NY
+NYN,NYN,NL,,New York,Mets,,1962-04-11,1968-09-29,New York,NY
+NYN,NYN,NL,E,New York,Mets,,1969-04-08,,New York,NY
+OAK,PHA,AL,,Philadelphia,Athletics,A's,1901-04-26,1954-09-26,Philadelphia,PA
+OAK,KC1,AL,,Kansas City,Athletics,A's,1955-04-12,1967-10-01,Kansas City,MO
+OAK,OAK,AL,,Oakland,Athletics,A's,1968-04-10,1968-09-29,Oakland,CA
+OAK,OAK,AL,W,Oakland,Athletics,A's,1969-04-08,,Oakland,CA
+PHI,PHI,NL,,Philadelphia,Quakers,,1883-05-01,1889-10-05,Philadelphia,PA
+PHI,PHI,NL,,Philadelphia,Phillies,,1890-04-19,1942-09-27,Philadelphia,PA
+PHI,PHI,NL,,Philadelphia,Blue Jays,,1943-04-24,1944-10-01,Philadelphia,PA
+PHI,PHI,NL,,Philadelphia,Phillies,,1945-04-17,1968-09-29,Philadelphia,PA
+PHI,PHI,NL,E,Philadelphia,Phillies,,1969-04-08,,Philadelphia,PA
+PIT,PT1,AA,,Allegheny Club,(none),,1882-05-02,1884-10-15,Pittsburg,PA
+PIT,PT1,AA,,Pittsburgh,Alleghenys,,1885-04-18,1886-10-12,Pittsburg,PA
+PIT,PIT,NL,,Pittsburgh,Alleghenys,Innocents (1890),1887-04-30,1890-10-03,Pittsburg,PA
+PIT,PIT,NL,,Pittsburgh,Pirates,,1891-04-22,1968-09-29,Pittsburgh,PA
+PIT,PIT,NL,E,Pittsburgh,Pirates,,1969-04-08,1993-10-03,Pittsburgh,PA
+PIT,PIT,NL,C,Pittsburgh,Pirates,,1994-04-04,,Pittsburgh,PA
+SDN,SDN,NL,W,San Diego,Padres,,1969-04-08,,San Diego,CA
+SEA,SEA,AL,W,Seattle,Mariners,,1977-04-06,,Seattle,WA
+SFN,NY1,NL,,New York,Gothams,,1883-05-01,1884-10-14,New York,NY
+SFN,NY1,NL,,New York,Giants,,1885-05-02,1957-09-29,New York,NY
+SFN,SFN,NL,,San Francisco,Giants,,1958-04-15,1968-09-29,San Francisco,CA
+SFN,SFN,NL,W,San Francisco,Giants,,1969-04-07,,San Francisco,CA
+SLN,SL4,AA,,St. Louis,Browns,Brown Stockings,1882-05-02,1891-10-04,St. Louis,MO
+SLN,SLN,NL,,St. Louis,Browns,,1892-04-12,1898-10-09,St. Louis,MO
+SLN,SLN,NL,,St. Louis,Perfectos,,1899-04-15,1899-10-15,St. Louis,MO
+SLN,SLN,NL,,St. Louis,Cardinals,,1900-04-19,1968-10-10,St. Louis,MO
+SLN,SLN,NL,E,St. Louis,Cardinals,,1969-04-08,1993-10-03,St. Louis,MO
+SLN,SLN,NL,C,St. Louis,Cardinals,,1994-04-03,,St. Louis,MO
+TBA,TBA,AL,E,Tampa Bay,Devil Rays,,1998-03-31,2007-09-30,St. Petersburg,FL
+TBA,TBA,AL,E,Tampa Bay,Rays,,2008-03-31,,St. Petersburg,FL
+TEX,WS2,AL,,Washington,Senators,,1961-04-10,1968-09-29,Washington,DC
+TEX,WS2,AL,E,Washington,Senators,,1969-04-07,1971-09-30,Washington,DC
+TEX,TEX,AL,W,Texas,Rangers,,1972-04-15,,Arlington,TX
+TOR,TOR,AL,E,Toronto,Blue Jays,,1977-04-07,,Toronto,ON
+WAS,MON,NL,E,Montreal,Expos,,1969-04-08,2004-10-03,Montreal,QC
+WAS,WAS,NL,E,Washington,Nationals,,2005-04-04,,Washington,DC
+CL1,CL1,NA,,Cleveland,Forest Citys,,1871-05-04,1872-10-31,Cleveland,OH
+FW1,FW1,NA,,Ft. Wayne,Kekiongas,,1871-05-04,1871-10-30,Ft. Wayne,IN
+NY3,NY2,NA,,New York,Mutuals,,1871-05-04,1875-10-30,New York,NY
+NY3,NY3,NL,,New York,Mutuals,,1876-04-22,1876-10-21,New York,NY
+PHN,PH1,NA,,Philadelphia,Athletics,,1871-05-04,1875-10-30,Philadelphia,PA
+PHN,PHN,NL,,Philadelphia,Athletics,,1876-04-22,1876-10-21,Philadelphia,PA
+RC1,RC1,NA,,Rockford,Forest Citys,,1871-05-04,1871-10-30,Rockford,IL
+TRO,TRO,NA,,Troy,Haymakers,Trojans,1871-05-04,1872-10-31,Troy,NY
+WS3,WS3,NA,,Washington,Olympics,,1871-05-04,1872-10-31,Washington,DC
+BL1,BL1,NA,,Baltimore,Lord Baltimores,Canaries;Yellow Stockings,1872-04-18,1874-10-30,Baltimore,MD
+BR1,BR1,NA,,Brooklyn,Eckfords,,1872-04-18,1872-10-31,Brooklyn,NY
+BR2,BR2,NA,,Brooklyn,Atlantics,,1872-04-18,1875-10-30,Brooklyn,NY
+MID,MID,NA,,Middletown,Mansfields,,1872-04-18,1872-10-31,Middletown,CT
+WS4,WS4,NA,,Washington,Nationals,,1872-04-18,1872-10-31,Washington,DC
+BL4,BL4,NA,,Baltimore,Maylands,,1873-04-14,1873-11-01,Baltimore,MD
+ELI,ELI,NA,,Elizabeth,Resolutes,,1873-04-14,1873-11-01,Elizabeth,NJ
+PH2,PH2,NA,,Philadelphia,White Stockings,,1873-04-14,1875-10-30,Philadelphia,PA
+WS5,WS5,NA,,Washington,Blue Legs,Nationals,1873-04-14,1873-11-01,Washington,DC
+HAR,HR1,NA,,Hartford,Dark Blues,,1874-04-16,1875-10-30,Hartford,CT
+HAR,HAR,NL,,Hartford,Dark Blues,,1876-04-22,1877-10-06,Hartford,CT
+KEO,KEO,NA,,Keokuk,Westerns,,1875-04-19,1875-10-30,Keokuk,IA
+NH1,NH1,NA,,New Haven,Elm Citys,New Havens,1875-04-19,1875-10-30,New Haven,CT
+PH3,PH3,NA,,Philadelphia,Centennials,,1875-04-19,1875-10-30,Philadelphia,PA
+SL1,SL1,NA,,St. Louis,Red Stockings,,1875-04-19,1875-10-30,St. Louis,MO
+SL3,SL2,NA,,St. Louis,Brown Stockings,,1875-04-19,1875-10-30,St. Louis,MO
+SL3,SL3,NL,,St. Louis,Brown Stockings,,1876-04-22,1877-10-06,St. Louis,MO
+WS6,WS6,NA,,Washington,Nationals,,1875-04-19,1875-10-30,Washington,DC
+CN1,CN1,NL,,Cincinnati,Reds,,1876-04-22,1879-09-30,Cincinnati,OH
+LS1,LS1,NL,,Louisville,Grays,,1876-04-22,1877-10-06,Louisville,KY
+IN1,IN1,NL,,Indianapolis,Blues,,1878-05-01,1878-09-30,Indianapolis,IN
+ML2,ML2,NL,,Milwaukee,Grays,,1878-05-01,1878-09-30,Milwaukee,WI
+PRO,PRO,NL,,Providence,Grays,,1878-05-01,1885-10-10,Providence,RI
+BFN,BFN,NL,,Buffalo,Bisons,,1879-05-01,1885-10-10,Buffalo,NY
+CL2,CL2,NL,,Cleveland,Blues,,1879-05-01,1884-10-19,Cleveland,OH
+SR1,SR1,NL,,Syracuse,Stars,,1879-05-01,1879-09-30,Syracuse,NY
+TRN,TRN,NL,,Troy,Trojans,,1879-05-01,1882-10-02,Troy,NY
+CN4,CN4,NL,,Cincinnati,Stars,,1880-05-01,1880-10-01,Cincinnati,OH
+WOR,WOR,NL,,Worcester,Worcesters,Ruby Legs;Brown Stockings,1880-05-01,1882-10-02,Worcester,MA
+DTN,DTN,NL,,Detroit,Wolverines,,1881-04-30,1888-10-17,Detroit,MI
+BLN,BL5,AA,,Baltimore,Orioles,,1882-05-01,1882-10-02,Baltimore,MD
+LS3,LS2,AA,,Louisville,Colonels,Eclipse,1882-05-01,1891-10-06,Louisville,KY
+LS3,LS3,NL,,Louisville,Colonels,,1892-04-12,1899-10-15,Louisville,KY
+PH4,PH4,AA,,Philadelphia,Athletics,,1882-05-01,1890-10-15,Philadelphia,PA
+PHP,PH4,AA,,Philadelphia,Athletics,,1891-04-08,1891-10-06,Philadelphia,PA
+BLN,BL2,AA,,Baltimore,Orioles,,1883-05-01,1889-10-15,Baltimore,MD
+CL5,CL5,AA,,Columbus,Buckeyes,,1883-05-01,1884-10-19,Columbus,OH
+NY4,NY4,AA,,New York,Metropolitans,,1883-05-01,1887-10-10,New York,NY
+IN3,SLU,UA,,St. Louis,Maroons,,1884-04-17,1884-10-19,St. Louis,MO
+IN3,SL5,NL,,St. Louis,Maroons,,1885-04-18,1886-10-15,St. Louis,MO
+IN3,IN3,NL,,Indianapolis,Hoosiers,,1887-04-16,1889-10-15,Indianapolis,IN
+ALT,ALT,UA,,Altoona,Mountain Citys,,1884-04-17,1884-10-19,Altoona,PA
+BLU,BLU,UA,,Baltimore,Monumentals,,1884-04-17,1884-10-19,Baltimore,MD
+BSU,BSU,UA,,Boston,Reds,,1884-04-17,1884-10-19,Boston,MA
+CHU,CHU,UA,,Chicago,Browns,,1884-04-17,1884-08-22,Chicago,IL
+CHU,CHU,UA,,Pittsburgh,Stogies,,1884-08-23,1884-10-19,Pittsburgh,PA
+CNU,CNU,UA,,Cincinnati,Outlaws,,1884-04-17,1884-10-19,Cincinnati,OH
+IN2,IN2,AA,,Indianapolis,Hoosiers,,1884-04-17,1884-10-19,Indianapolis,IN
+KCU,KCU,UA,,Kansas City,Cowboys,,1884-04-17,1884-10-19,Kansas City,MO
+MLU,MLU,UA,,Milwaukee,Brewers,,1884-04-17,1884-10-19,Milwaukee,WI
+PHU,PHU,UA,,Philadelphia,Keystones,,1884-04-17,1884-10-19,Philadelphia,PA
+SPU,SPU,UA,,St. Paul,Saints,,1884-04-17,1884-10-19,St. Paul,MN
+RIC,RIC,AA,,Richmond,Virginians,,1884-04-17,1884-10-19,Richmond,VA
+TL1,TL1,AA,,Toledo,Blue Stockings,,1884-04-17,1884-10-19,Toledo,OH
+WIL,WIL,UA,,Wilmington,Quicksteps,,1884-04-17,1884-10-19,Wilmington,DE
+WS7,WS7,AA,,Washington,Nationals,Statesmen,1884-04-17,1884-10-19,Washington,DC
+WSU,WSU,UA,,Washington,Nationals,,1884-04-17,1884-10-19,Washington,DC
+KCN,KCN,NL,,Kansas City,Cowboys,,1886-04-17,1886-10-15,Kansas City,MO
+WS8,WS8,NL,,Washington,Nationals,,1886-04-17,1889-10-15,Washington,DC
+CL4,CL3,AA,,Cleveland,Spiders,Blues,1887-04-16,1888-10-17,Cleveland,OH
+CL4,CL4,NL,,Cleveland,Spiders,,1889-04-17,1899-10-15,Cleveland,OH
+KC2,KC2,AA,,Kansas City,Cowboys,,1888-04-17,1889-10-15,Kansas City,MO
+CL6,CL6,AA,,Columbus,Solons,,1889-04-17,1891-10-06,Columbus,OH
+BFP,BFP,PL,,Buffalo,Bisons,,1890-04-17,1890-10-15,Buffalo,NY
+BLN,BL3,AA,,Baltimore,Orioles,,1890-04-17,1891-10-06,Baltimore,MD
+BR4,BR4,AA,,Brooklyn,Gladiators,,1890-04-17,1890-10-15,Brooklyn,NY
+BRP,BRP,PL,,Brooklyn,Ward's Wonders,Wonders,1890-04-17,1890-10-15,Brooklyn,NY
+BS2,BSP,PL,,Boston,Reds,,1890-04-17,1890-10-15,Boston,MA
+CHP,CHP,PL,,Chicago,Pirates,,1890-04-17,1890-10-15,Chicago,IL
+CLP,CLP,PL,,Cleveland,Infants,,1890-04-17,1890-10-15,Cleveland,OH
+NYP,NYP,PL,,New York,Giants,,1890-04-17,1890-10-15,New York,NY
+PHP,PHP,PL,,Philadelphia,Quakers,Athletics,1890-04-17,1890-10-15,Philadelphia,PA
+PTP,PTP,PL,,Pittsburgh,Burghers,,1890-04-17,1890-10-15,Pittsburgh,PA
+RC2,RC2,AA,,Rochester,Broncos,,1890-04-17,1890-10-15,Rochester,NY
+SR2,SR2,AA,,Syracuse,Stars,,1890-04-17,1890-10-15,Syracuse,NY
+TL2,TL2,AA,,Toledo,Maumees,,1890-04-17,1890-10-15,Toledo,OH
+BS2,BS2,AA,,Boston,Reds,,1891-04-08,1891-10-06,Boston,MA
+CN3,CN3,AA,,Cincinnati,Kelly's Killers,,1891-04-08,1891-10-06,Cincinnati,OH
+ML3,ML3,AA,,Milwaukee,Brewers,,1891-04-08,1891-10-06,Milwaukee,WI
+WSN,WS9,AA,,Washington,Senators,,1891-04-08,1891-10-06,Washington,DC
+WSN,WSN,NL,,Washington,Senators,Statesmen;Nationals,1892-04-12,1899-10-15,Washington,DC
+BLN,BLN,NL,,Baltimore,Orioles,,1892-04-12,1899-10-15,Baltimore,MD
+BLF,BLF,FL,,Baltimore,Terrapins,,1914-04-13,1915-10-13,Baltimore,MD
+BRF,BRF,FL,,Brooklyn,Tip-Tops,,1914-04-13,1915-10-13,Brooklyn,NY
+BUF,BUF,FL,,Buffalo,Blues,,1914-04-13,1915-10-13,Buffalo,NY
+CHF,CHF,FL,,Chicago,Whales,,1914-04-13,1915-10-13,Chicago,IL
+NEW,IND,FL,,Indianapolis,Hoosiers,,1914-04-13,1914-10-13,Indianapolis,IN
+NEW,NEW,FL,,Newark,Peppers,,1915-04-10,1915-10-13,Newark,NJ
+KCF,KCF,FL,,Kansas City,Packers,,1914-04-13,1915-10-13,Kansas City,MO
+PTF,PTF,FL,,Pittsburgh,Rebels,,1914-04-13,1915-10-13,Pittsburgh,PA
+SLF,SLF,FL,,St. Louis,Terriers,,1914-04-13,1915-10-13,St. Louis,MO

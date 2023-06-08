@@ -14,8 +14,8 @@ renamed AS (
     SELECT
         game_id,
         team_id,
-        side
-
+        side,
+        SUBSTRING(game_id, 4, 4)::UINT16 AS season,
     FROM unioned
 )
 
