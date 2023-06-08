@@ -1,5 +1,19 @@
-WITH source AS (
-    SELECT * FROM {{ source('game', 'game') }}
+WITH from_box_scores AS (
+    SELECT *
+    FROM {{ source('box_score', 'box_score_game') }}
+    WHERE game_id NOT IN (SELECT game_id FROM {{ source('game', 'game') }})
+),
+
+unioned AS (
+    SELECT
+        *,
+        'Event' AS source_type
+    FROM {{ source('game', 'game') }}
+    UNION ALL
+    SELECT
+        *,
+        'BoxScore' AS source_type
+    FROM from_box_scores
 ),
 
 renamed AS (
@@ -34,8 +48,9 @@ renamed AS (
         translator,
         date_inputted,
         date_edited,
-        EXTRACT(YEAR FROM date) AS season
-    FROM source
+        source_type,
+        EXTRACT(YEAR FROM date) AS season,
+    FROM unioned
 )
 
 SELECT * FROM renamed

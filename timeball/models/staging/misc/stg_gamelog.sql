@@ -35,8 +35,4 @@ renamed AS (
     FROM source
 )
 
-SELECT date, visiting_team, home_team, visitor_manager_id, home_manager_id
-FROM source
-WHERE visiting_team = 'FW1' OR home_team = 'FW1'
-AND EXTRACT(year FROM date) = 1871
-ORDER BY date
+SELECT * FROM renamed
