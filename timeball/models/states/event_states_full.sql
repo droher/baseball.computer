@@ -1,22 +1,4 @@
-WITH game_full AS (
-    SELECT
-        games.*,
-        franchises.league,
-        away.team_id AS away_team_id,
-        home.team_id AS home_team_id,
-    FROM {{ ref('stg_games') }} AS games
-    INNER JOIN {{ ref('stg_game_teams') }} AS away
-        ON games.game_id = away.game_id
-            AND away.side = 'Away'
-    INNER JOIN {{ ref('stg_game_teams') }} AS home
-        ON games.game_id = home.game_id
-            AND home.side = 'Home'
-    INNER JOIN {{ ref('seed_franchises') }} AS franchises
-        ON home.team_id = franchises.team_id
-            AND games.date BETWEEN franchises.date_start AND franchises.date_end
-),
-
-final AS (
+WITH final AS (
     SELECT
         -- IDs
         game_id,
@@ -24,7 +6,7 @@ final AS (
         e.event_key,
         -- Basic state
         g.season,
-        g.league,
+        g.home_league AS league,
         g.game_type,
         g.date,
         g.park_id,
@@ -73,7 +55,7 @@ final AS (
         base_out.truncated_frame_flag,
         base_out.game_end_flag
     FROM {{ ref('stg_events') }} AS e
-    INNER JOIN game_full AS g USING (game_id)
+    INNER JOIN {{ ref('game_start_info') }} AS g USING (game_id)
     INNER JOIN {{ ref('event_base_out_states') }} AS base_out USING (event_key)
     INNER JOIN {{ ref('event_score_states') }} AS runs USING (event_key)
     INNER JOIN {{ ref('event_states_batter_pitcher') }} AS add_bio USING (event_key)

@@ -1,6 +1,7 @@
 WITH final AS (
     SELECT
         e.game_id,
+        e.event_id,
         e.event_key,
         t.team_id,
         t.side AS batting_side,

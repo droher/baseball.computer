@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH teams_flat AS (
     SELECT
         game_id,
@@ -18,11 +23,7 @@ umps_flat AS (
         FIRST(umpire_id) FILTER (WHERE position = 'RightField') AS umpire_right_field_id,
     FROM {{ ref('stg_game_umpires') }}
     GROUP BY 1
-), 
-
-{# starting_lineups AS (
-    -- Need to assemble first with box score combo
-) #}
+),
 
 game_flat AS (
     SELECT
@@ -88,7 +89,7 @@ add_gamelog AS (
     FROM {{ ref('stg_gamelog') }}
 ),
 
-add_franchises AS (
+add_rest AS (
     SELECT
         add_gamelog.*,
         franchise_a.franchise_id AS away_franchise_id,
@@ -100,6 +101,12 @@ add_franchises AS (
         franchise_a.location || ' ' || franchise_a.nickname AS away_name,
         franchise_h.location || ' ' || franchise_h.nickname AS home_name,
         franchise_a.league != franchise_h.league AS is_interleague,
+        lineups.fielding_map_away[1][1] AS away_starting_pitcher_id,
+        lineups.fielding_map_home[1][1] AS home_starting_pitcher_id,
+        lineups.lineup_map_away,
+        lineups.lineup_map_home,
+        lineups.fielding_map_away,
+        lineups.fielding_map_home,
     FROM add_gamelog
     -- It's an extra join, but we need to join after denormalizing
     -- in order to get the gamelog-only games
@@ -111,7 +118,7 @@ add_franchises AS (
         ON add_gamelog.home_team_id = franchise_h.team_id
             AND add_gamelog.date BETWEEN
             franchise_h.date_start AND COALESCE(franchise_h.date_end, '9999-12-31')
+    LEFT JOIN {{ ref('game_starting_lineups') }} AS lineups USING (game_id)
 )
 
-SELECT *
-FROM add_franchises
+SELECT * FROM add_rest
