@@ -54,7 +54,7 @@ game_flat AS (
         umps_flat.umpire_third_id,
         umps_flat.umpire_left_field_id,
         umps_flat.umpire_right_field_id
-    FROM {{ ref('stg_games') }} g
+    FROM {{ ref('stg_games') }} AS g
     LEFT JOIN teams_flat USING (game_id)
     LEFT JOIN umps_flat USING (game_id)
 ),
@@ -92,14 +92,16 @@ add_gamelog AS (
 add_rest AS (
     SELECT
         add_gamelog.*,
+        game_types.is_regular_season,
+        game_types.is_postseason,
         franchise_a.franchise_id AS away_franchise_id,
         franchise_h.franchise_id AS home_franchise_id,
         franchise_a.league AS away_league,
         franchise_h.league AS home_league,
         franchise_a.division AS away_division,
         franchise_h.division AS home_division,
-        franchise_a.location || ' ' || franchise_a.nickname AS away_name,
-        franchise_h.location || ' ' || franchise_h.nickname AS home_name,
+        franchise_a.location || ' ' || franchise_a.nickname AS away_team_name,
+        franchise_h.location || ' ' || franchise_h.nickname AS home_team_name,
         franchise_a.league != franchise_h.league AS is_interleague,
         lineups.fielding_map_away[1][1] AS away_starting_pitcher_id,
         lineups.fielding_map_home[1][1] AS home_starting_pitcher_id,
@@ -119,6 +121,7 @@ add_rest AS (
             AND add_gamelog.date BETWEEN
             franchise_h.date_start AND COALESCE(franchise_h.date_end, '9999-12-31')
     LEFT JOIN {{ ref('game_starting_lineups') }} AS lineups USING (game_id)
+    INNER JOIN {{ ref('seed_game_types') }} AS game_types USING (game_type)
 )
 
 SELECT * FROM add_rest

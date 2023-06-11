@@ -1,0 +1,8 @@
+game_type,is_regular_season,is_postseason
+RegularSeason,true,false
+WildCardSeries,falase,true
+DivisionSeries,false,true
+LeagueChampionshipSeries,false,true
+WorldSeries,false,true
+AllStarGame,false,false
+NegroLeagues,false,false
