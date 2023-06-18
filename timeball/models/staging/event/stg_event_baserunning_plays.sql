@@ -8,8 +8,6 @@ renamed AS (
         sequence_id,
         baserunning_play_type,
         baserunner,
-        event_key || '-' || sequence_id AS sequence_key,
-        event_key || '-' || baserunner AS baserunner_key
 
     FROM source
 )

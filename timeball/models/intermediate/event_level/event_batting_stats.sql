@@ -7,7 +7,7 @@ WITH rbi AS (
     SELECT
         event_key,
         COUNT(*) AS runs_batted_in
-    FROM {{ ref('stg_event_baserunning_advance_attempts') }}
+    FROM {{ ref('stg_event_runs') }}
     WHERE rbi_flag
     GROUP BY 1
 ),

@@ -7,7 +7,6 @@ renamed AS (
         event_key,
         sequence_id,
         baserunner_out,
-        event_key || '-' || sequence_id AS sequence_key
 
     FROM source
 )

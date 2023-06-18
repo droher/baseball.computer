@@ -11,10 +11,6 @@ renamed AS (
         is_successful,
         advanced_on_error_flag,
         explicit_out_flag,
-        rbi_flag,
-        team_unearned_flag,
-        event_key || '-' || sequence_id AS sequence_key,
-        event_key || '-' || baserunner AS baserunner_key
 
     FROM source
 )

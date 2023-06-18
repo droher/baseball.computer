@@ -8,11 +8,11 @@ authors = ["David Roher <davidroher@davids-air.home>"]
 python = "^3.11.0"
 dbt-core = "^1.5.0"
 dbt-duckdb = "^1.5.1"
-duckdb = "^0.8.0"
+duckdb = "^0.8.1"
 
 [tool.poetry.dev-dependencies]
-sqlfluff = "2.1.0"
-sqlfluff-templater-dbt = "2.1.0"
+sqlfluff = "^2.1.0"
+sqlfluff-templater-dbt = "^2.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

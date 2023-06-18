@@ -32,9 +32,6 @@ WITH final AS (
         add_bio.batter_id,
         add_bio.pitcher_id,
         base_out.base_state_start,
-        base_out.first_base_runner_id_start,
-        base_out.second_base_runner_id_start,
-        base_out.third_base_runner_id_start,
         base_out.frame_start_flag,
         -- Future state
         -- TODO: Enforce clearer separation

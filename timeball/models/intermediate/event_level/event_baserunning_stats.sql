@@ -3,7 +3,8 @@ WITH states_full AS (
         event_key,
         baserunner,
         runner_lineup_position
-    FROM {{ ref('stg_event_starting_base_states') }}
+    FROM {{ ref('stg_event_base_states') }}
+    WHERE base_state_type = 'Starting'
     UNION ALL
     SELECT
         event_key,

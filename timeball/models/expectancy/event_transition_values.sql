@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 SELECT
     states.event_key,
     states.season,

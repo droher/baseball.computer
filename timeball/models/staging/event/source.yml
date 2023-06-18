@@ -92,16 +92,6 @@ sources:
             data_type: BOOLEAN
             tests:
               - not_null
-          - name: rbi_flag
-            description: ""
-            data_type: BOOLEAN
-            tests:
-              - not_null
-          - name: team_unearned_flag
-            description: ""
-            data_type: BOOLEAN
-            tests:
-              - not_null
 
       - name: event_baserunning_play
         description: ""
@@ -334,7 +324,7 @@ sources:
             tests:
               - not_null
 
-      - name: event_starting_base_state
+      - name: event_base_state
         description: ""
         meta:
           primary_keys:
@@ -343,6 +333,11 @@ sources:
           - name: event_key
             description: ""
             data_type: UINTEGER
+            tests:
+              - not_null
+          - name: base_state_type
+            description: ""
+            data_type: VARCHAR
             tests:
               - not_null
           - name: baserunner
@@ -355,11 +350,8 @@ sources:
             data_type: UTINYINT
             tests:
               - not_null
-          - name: charged_to_pitcher_id
-            description: ""
-            data_type: VARCHAR
-            tests:
-              - not_null
+
+
       - name: event_comment
         meta:
           primary_keys:
@@ -371,3 +363,5 @@ sources:
               - not_null
           - name: comment
             data_type: VARCHAR
+
+      - name: event_run
