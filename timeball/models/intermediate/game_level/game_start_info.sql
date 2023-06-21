@@ -48,12 +48,13 @@ game_flat AS (
         g.use_dh,
         g.scorer,
         g.scoring_method,
+        g.source_type,
         umps_flat.umpire_home_id,
         umps_flat.umpire_first_id,
         umps_flat.umpire_second_id,
         umps_flat.umpire_third_id,
         umps_flat.umpire_left_field_id,
-        umps_flat.umpire_right_field_id
+        umps_flat.umpire_right_field_id,
     FROM {{ ref('stg_games') }} AS g
     LEFT JOIN teams_flat USING (game_id)
     LEFT JOIN umps_flat USING (game_id)
@@ -82,6 +83,7 @@ add_gamelog AS (
         umpire_first_id,
         umpire_second_id,
         umpire_third_id,
+        source_type,
         'Unknown' AS sky,
         'Unknown' AS field_condition,
         'Unknown' AS precipitation,

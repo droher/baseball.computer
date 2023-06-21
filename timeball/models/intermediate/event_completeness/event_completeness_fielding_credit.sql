@@ -2,16 +2,16 @@ WITH fielding_play_agg AS (
     SELECT
         event_key,
         NOT BOOL_OR(
-            fielding_position = 'Unknown' AND fielding_play = 'Putout'
+            fielding_position = 0 AND fielding_play = 'Putout'
         ) AS has_fielder_putouts,
         NOT BOOL_OR(
             -- Some assists are explicitly recorded as Unknown, but if the putout is unknown
             -- then assists are usually missing entirely
-            fielding_position = 'Unknown' AND fielding_play IN ('Putout', 'Assist')
+            fielding_position = 0 AND fielding_play IN ('Putout', 'Assist')
         ) AS has_fielder_assists,
         -- As of now we always have the fielder for an error, but just in case
         NOT BOOL_OR(
-            fielding_position = 'Unknown' AND fielding_play = 'Error'
+            fielding_position = 0 AND fielding_play = 'Error'
         ) AS has_fielder_errors
     FROM {{ ref('stg_event_fielding_plays') }}
     GROUP BY 1

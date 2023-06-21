@@ -6,7 +6,7 @@
 WITH base_state AS (
     SELECT
         event_key,
-        BIT_XOR(baserunner_bit) AS base_state,
+        BIT_OR(baserunner_bit) AS base_state,
     FROM {{ ref('stg_event_base_states') }}
     WHERE base_state_type = 'Starting'
     GROUP BY 1

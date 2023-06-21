@@ -30,15 +30,15 @@ renamed AS (
         (EXTRACT(year from date) >= 1973 AND home_team_league = 'AL') AS use_dh,
         'RegularSeason' AS game_type,
         -- Everything below is post-game knowledge
-        duration AS time_of_game_minutes,
+        duration AS duration_minutes,
         -- TODO: Fix spelling in original
         vistor_line_score AS away_line_score,
         home_line_score,
         -- TODO: Fix spelling in original
-        visitor_runs_scored AS away_runs_scored,
-        home_runs_score AS home_runs_scored,
+        visitor_runs_scored AS runs_scored_away,
+        home_runs_score AS runs_scored_home,
         forfeit_info,
-
+        'GameLog' AS source_type
     FROM source
 )
 

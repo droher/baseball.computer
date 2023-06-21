@@ -1,9 +1,9 @@
 WITH source_event AS (
     SELECT
         event_key,
-        REGEXP_EXTRACT(com, 'Forfeit=(.*)', 1) AS forfeit_info
-    FROM {{ ref('stg_event_comments') }}, UNNEST(STRING_SPLIT(comment, '$')) AS t (com)
-    WHERE com ILIKE '%Forfeit=%'
+        REGEXP_EXTRACT(comment, 'Forfeit=(.*)', 1) AS forfeit_info
+    FROM {{ ref('stg_event_comments') }}
+    WHERE comment ILIKE '%Forfeit=%'
 ),
 
 event_joined AS (
@@ -24,6 +24,16 @@ source_box AS (
         AND game_id NOT IN (SELECT game_id FROM event_joined)
 ),
 
+source_gamelog AS (
+    SELECT
+        game_id,
+        forfeit_info
+    FROM {{ ref('stg_gamelog') }}
+    WHERE forfeit_info IS NOT NULL
+        AND game_id NOT IN (SELECT game_id FROM event_joined)
+        AND game_id NOT IN (SELECT game_id FROM source_box)
+)
+
 unioned AS (
     SELECT
         game_id,
@@ -36,6 +46,12 @@ unioned AS (
         NULL AS event_key_at_forfeit,
         forfeit_info
     FROM source_box
+    UNION ALL
+    SELECT
+        game_id,
+        NULL AS event_key_at_forfeit,
+        forfeit_info
+    FROM source_gamelog
 )
 
 SELECT

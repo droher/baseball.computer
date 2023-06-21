@@ -1,10 +1,9 @@
 WITH source_event AS (
     SELECT
         event_key,
-        STRING_SPLIT(REPLACE(com, 'Suspend=', ''), ',') AS suspension_info
-    FROM {{ ref('stg_event_comments') }},
-        UNNEST(STRING_SPLIT(comment, '$')) AS t (com)
-    WHERE com ILIKE '%Suspend=%'
+        STRING_SPLIT(REPLACE(comment, 'Suspend=', ''), ',') AS suspension_info
+    FROM {{ ref('stg_event_comments') }}
+    WHERE comment ILIKE '%Suspend=%'
 ),
 
 event_joined AS (

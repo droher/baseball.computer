@@ -12,19 +12,14 @@ WITH counts AS (
     LEFT JOIN {{ ref('stg_event_plate_appearances') }} AS pa USING (event_key)
 ),
 
-pitch_sequences AS (
-    SELECT * FROM {{ ref('stg_event_pitch_sequences') }}
-),
-
 pitch_agg AS (
     SELECT
         ps.event_key,
-        BOOL_OR(spt.is_pitch) AS has_pitches,
-        BOOL_AND(spt.category != 'Unknown') AS has_pitch_calls,
+        BOOL_AND(spt.category != 'Unknown') AS has_pitch_results,
         BOOL_AND(
             spt.category != 'Unknown' AND spt.sequence_item != 'StrikeUnknownType'
         ) AS has_strike_types
-    FROM pitch_sequences AS ps
+    FROM {{ ref('stg_event_pitch_sequences') }} AS ps
     INNER JOIN {{ ref('seed_pitch_types') }} AS spt USING (sequence_item)
     WHERE spt.is_pitch
     GROUP BY 1
@@ -36,8 +31,8 @@ final AS (
         counts.has_count_balls,
         counts.has_count_strikes,
         counts.has_count,
-        COALESCE(pitch_agg.has_pitches, FALSE) AS has_pitches,
-        COALESCE(pitch_agg.has_pitch_calls, FALSE) AS has_pitch_calls,
+        COALESCE(pitch_agg.event_key IS NOT NULL) AS has_pitches,
+        COALESCE(pitch_agg.has_pitch_results, FALSE) AS has_pitch_results,
         COALESCE(pitch_agg.has_strike_types, FALSE) AS has_strike_types
     FROM counts
     LEFT JOIN pitch_agg USING (event_key)

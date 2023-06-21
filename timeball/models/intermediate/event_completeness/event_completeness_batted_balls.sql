@@ -1,8 +1,8 @@
 WITH final AS (
     SELECT
         event_key,
-        COALESCE(bbi.contact != 'Unknown', FALSE) AS has_contact,
-        bbi.general_location IS NOT NULL AS has_general_location,
+        COALESCE(bbi.contact != 'Unknown', FALSE) AS has_contact_type,
+        COALESCE(bbi.general_location != 'Unknown', FALSE) AS has_general_location,
         -- To avoid false negatives, we'll say that a fielder is present regardless
         -- if it's a ground-rule double or home run where there is location info
         COALESCE(
