@@ -5,9 +5,15 @@ WITH from_box_scores AS (
 ),
 
 unioned AS (
-    SELECT * FROM {{ source('game', 'game_team') }}
+    SELECT
+        *,
+        'Event' AS source_type
+    FROM {{ source('game', 'game_team') }}
     UNION ALL
-    SELECT * FROM from_box_scores
+    SELECT
+        *,
+        'BoxScore' AS source_type
+    FROM from_box_scores
 ),
 
 renamed AS (
@@ -16,6 +22,7 @@ renamed AS (
         team_id,
         side,
         SUBSTRING(game_id, 4, 4)::UINT16 AS season,
+        source_type
     FROM unioned
 )
 

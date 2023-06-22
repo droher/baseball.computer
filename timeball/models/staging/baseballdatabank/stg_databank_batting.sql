@@ -17,7 +17,7 @@ renamed AS (
         "2B" AS doubles, -- noqa: RF06
         "3B" AS triples, -- noqa: RF06
         hr AS home_runs,
-        rbi,
+        rbi AS runs_batted_in,
         sb AS stolen_bases,
         cs AS caught_stealing,
         bb AS walks,
@@ -26,7 +26,16 @@ renamed AS (
         hbp AS hit_by_pitches,
         sh AS sacrifice_hits,
         sf AS sacrifice_flies,
-        gidp AS grounded_into_double_plays
+        gidp AS grounded_into_double_plays,
+        hits - home_runs - triples - doubles AS singles,
+        singles + doubles * 2 + triples * 3 + home_runs * 4 AS total_bases,
+        at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
+        + COALESCE(sacrifice_hits, 0)
+        AS plate_appearances,
+        at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
+        AS on_base_opportunities,
+        hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) AS on_base_successes,
+        at_bats - hits + COALESCE(grounded_into_double_plays, 0) AS batting_outs,
     FROM source
 
 )

@@ -51,7 +51,7 @@ final AS (
         COALESCE(double_plays.is_triple_play::INT, 0) AS triple_plays,
         -- The extra out from GIDPs is attributed to the batter,
         -- but for other types of double plays, the other out
-        -- is considered to be a baserunning out.
+        -- is considered to be a baserunning out (for now)
         result_types.is_batting_out::INT + grounded_into_double_plays AS batting_outs
 
     FROM {{ ref('stg_event_plate_appearances') }} AS pa

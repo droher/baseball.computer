@@ -32,7 +32,7 @@ source_gamelog AS (
     WHERE forfeit_info IS NOT NULL
         AND game_id NOT IN (SELECT game_id FROM event_joined)
         AND game_id NOT IN (SELECT game_id FROM source_box)
-)
+),
 
 unioned AS (
     SELECT
@@ -62,5 +62,5 @@ SELECT
         WHEN 'V' THEN 'Away'
         WHEN 'T' THEN 'Tie'
     END AS winning_side,
-    CASE WHEN game_id = 'CLE197406040' THEN .10 END AS price_of_beer
+    CASE WHEN game_id = 'CLE197406040' THEN .10 END AS price_of_beer_dollars
 FROM unioned

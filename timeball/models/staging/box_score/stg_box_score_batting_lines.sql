@@ -15,18 +15,29 @@ renamed AS (
         doubles,
         triples,
         home_runs,
-        rbi,
+        -- TODO: Change in source
+        rbi AS runs_batted_in,
         sacrifice_hits,
         sacrifice_flies,
-        hit_by_pitch,
+        -- TODO: Change in source
+        hit_by_pitch AS hit_by_pitches,
         walks,
         intentional_walks,
         strikeouts,
         stolen_bases,
         caught_stealing,
         grounded_into_double_plays,
-        reached_on_interference
-
+        -- TODO: Change in source
+        reached_on_interference AS reached_on_interferences,
+        hits - home_runs - triples - doubles AS singles,
+        singles + doubles * 2 + triples * 3 + home_runs * 4 AS total_bases,
+        at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
+        + COALESCE(sacrifice_hits, 0) + COALESCE(reached_on_interferences, 0)
+        AS plate_appearances,
+        at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
+        AS on_base_opportunities,
+        hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) AS on_base_successes,
+        at_bats - hits + COALESCE(grounded_into_double_plays, 0) AS batting_outs,
     FROM source
 )
 

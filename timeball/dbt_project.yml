@@ -32,3 +32,71 @@ models:
 seeds:
   timeball:
     +schema: seeds
+
+vars:
+  offense_stats:
+    - plate_appearances
+    - at_bats
+    - hits
+    - singles
+    - doubles
+    - triples
+    - home_runs
+    - total_bases
+    - strikeouts
+    - walks
+    - intentional_walks
+    - hit_by_pitches
+    - sacrifice_hits
+    - sacrifice_flies
+    - reached_on_errors
+    - reached_on_interferences
+    - on_base_opportunities
+    - on_base_successes
+    - runs_batted_in
+    - grounded_into_double_plays
+    - double_plays
+    - triple_plays
+    - batting_outs
+    - balls_in_play
+    - batted_type_fly_ball
+    - batted_type_ground_ball
+    - batted_type_line_drive
+    - batted_type_unknown
+    - batted_broad_type_air_ball
+    - batted_broad_type_ground_ball
+    - batted_broad_type_unknown
+    - batted_subtype_pop_fly
+    - batted_subtype_non_pop_fly
+    - bunts
+    - batted_distance_home_plate
+    - batted_distance_infield
+    - batted_distance_outfield
+    - batted_distance_unknown
+    - batted_angle_left
+    - batted_angle_right
+    - batted_angle_middle
+    - batted_angle_unknown
+    - batted_down_foul_line
+    - fielder_derived_location
+    - runs
+    - stolen_bases
+    - caught_stealing
+    - pickoffs
+    - outs_on_basepaths
+    - advances_on_wild_pitches
+    - advances_on_passed_balls
+    - advances_on_balks
+    - advances_on_unspecified_plays
+    - advances_on_defensive_indifference
+    - advances_on_errors
+    - plate_appearances_while_on_base
+    - balls_in_play_while_running
+    - balls_in_play_while_on_base
+    - batter_total_bases_while_running
+    - batter_total_bases_while_on_base
+    - extra_base_advance_attempts
+    - bases_advanced
+    - bases_advanced_on_balls_in_play
+    - surplus_bases_advanced_on_balls_in_play
+    - outs_on_extra_base_advance_attempts
