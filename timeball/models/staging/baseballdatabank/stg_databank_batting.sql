@@ -6,7 +6,7 @@ renamed AS (
 
     SELECT
         playerid AS databank_player_id,
-        yearid AS year_id,
+        yearid AS season,
         stint,
         teamid AS team_id,
         lgid AS league_id,
