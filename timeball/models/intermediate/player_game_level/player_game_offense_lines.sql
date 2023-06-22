@@ -4,7 +4,8 @@
     )
 }}
 WITH box_score AS (
-    SELECT teams.team_id,
+    SELECT 
+        teams.team_id,
         lines.*
     FROM {{ ref('stg_box_score_batting_lines') }} AS lines
     INNER JOIN {{ ref('stg_game_teams') }} AS teams USING (game_id, side)

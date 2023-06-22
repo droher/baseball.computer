@@ -29,6 +29,9 @@ WITH databank AS (
         SUM(bat.batting_outs) AS batting_outs,
     FROM {{ ref('stg_databank_batting') }} AS bat
     INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
+    -- We'd need to do something different for partial coverage seasons but
+    -- currently box scores are all or nothing for a given year
+    WHERE bat.season NOT IN (SELECT DISTINCT season FROM {{ ref('stg_games') }})
     GROUP BY 1, 2, 3
 ),
 
@@ -37,14 +40,14 @@ retrosheet AS (
         games.season,
         stats.team_id,
         stats.player_id,
-        'RegularSeason' AS game_type,
+        games.game_type,
         COUNT(*) AS games,
         {% for stat in var('offense_stats') -%}
             SUM({{ stat }}) AS {{ stat }},
         {% endfor %}
     FROM {{ ref('stg_games') }} AS games
     INNER JOIN {{ ref('player_game_offense_lines') }} AS stats USING (game_id)
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4
 )
 
 SELECT * FROM retrosheet

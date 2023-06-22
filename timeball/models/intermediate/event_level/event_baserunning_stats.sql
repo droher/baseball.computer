@@ -22,7 +22,7 @@ WITH states_full AS (
             SELECT event_key
             FROM {{ ref('stg_event_baserunning_advance_attempts') }}
             WHERE baserunner = 'Batter'
-    )
+        )
 ),
 
 -- When baserunner is NULL, it means the play is generic and applies to all
