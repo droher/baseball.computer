@@ -25,12 +25,12 @@ final AS (
         ids.game_id,
         pa.event_key,
         CASE WHEN result_types.plate_appearance_result = 'StrikeOut'
-            THEN COALESCE(ids.strikeout_responsible_batter_id, ids.batter_id)
+                THEN COALESCE(ids.strikeout_responsible_batter_id, ids.batter_id)
             ELSE ids.batter_id
         END AS batter_id,
         CASE WHEN result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk')
-            THEN COALESCE(ids.walk_responsible_pitcher_id, ids.pitcher_id)
-            ELSE pitcher_id
+                THEN COALESCE(ids.walk_responsible_pitcher_id, ids.pitcher_id)
+            ELSE ids.pitcher_id
         END AS pitcher_id,
         ids.batting_team_id,
         ids.fielding_team_id,

@@ -5,14 +5,14 @@ description = ""
 authors = ["David Roher <davidroher@davids-air.home>"]
 
 [tool.poetry.dependencies]
-python = "^3.11.0"
-dbt-core = "^1.5.2"
-dbt-duckdb = "^1.5.2"
-duckdb = "0.8.1"
+python = "~3.11.0"
+dbt-core = "~1.6.0"
+dbt-duckdb = "~1.6.0"
+duckdb = "~0.8.1"
 
 [tool.poetry.dev-dependencies]
-sqlfluff = "^2.1.0"
-sqlfluff-templater-dbt = "^2.1.0"
+sqlfluff = "^2.2.1"
+sqlfluff-templater-dbt = "^2.2.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

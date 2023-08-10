@@ -1,9 +1,9 @@
 [sqlfluff]
 templater = dbt
 dialect = duckdb
-exclude_rules = aliasing.forbid, structure.using, convention.select_trailing_comma
-warnings = layout.long_lines, structure.column_order
-max_line_length = 100
+exclude_rules = aliasing.forbid, structure.using, convention.select_trailing_comma, structure.column_order
+warnings = layout.long_lines
+max_line_length = 120
 
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = upper

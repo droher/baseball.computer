@@ -4,7 +4,7 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        EXTRACT(year from date) AS season,
+        EXTRACT(YEAR FROM date) AS season,
         date::DATE AS date, -- noqa: RF04
         CASE double_header
             WHEN 0 THEN 'SingleGame'

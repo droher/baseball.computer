@@ -26,7 +26,7 @@ game_agg AS (
             WHEN runs >= 10
                 THEN CONCAT('(', runs, ')')
             ELSE runs::STRING
-        END , '') AS line_score,
+        END, '') AS line_score,
         LIST(runs ORDER BY inning) AS line_score_list
     FROM unioned
     GROUP BY 1, 2

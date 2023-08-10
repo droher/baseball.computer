@@ -25,7 +25,10 @@ WITH final AS (
         runs.score_home_start,
         runs.score_away_start,
         runs.score_home_start::INT - runs.score_away_start AS home_margin_start,
-        CASE WHEN e.batting_side = 'Home' THEN home_margin_start ELSE -home_margin_start END AS batting_team_margin_start,
+        CASE WHEN e.batting_side = 'Home'
+                THEN home_margin_start
+            ELSE -home_margin_start
+        END AS batting_team_margin_start,
         -- Perform upstream for consistency
         GREATEST(LEAST(home_margin_start, 10), -10) AS truncated_home_margin_start,
         add_bio.batter_lineup_position,
@@ -54,7 +57,10 @@ WITH final AS (
         runs.score_home_end,
         runs.score_away_end,
         runs.score_home_end::INT - runs.score_away_end AS home_margin_end,
-        CASE WHEN e.batting_side = 'Home' THEN home_margin_end ELSE -home_margin_end END AS batting_team_margin_end,
+        CASE WHEN e.batting_side = 'Home'
+                THEN home_margin_end
+            ELSE -home_margin_end
+        END AS batting_team_margin_end,
         -- Perform upstream for consistency
         GREATEST(LEAST(home_margin_end, 10), -10) AS truncated_home_margin_end,
         base_out.frame_end_flag,

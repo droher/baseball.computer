@@ -4,7 +4,7 @@
     )
 }}
 WITH box_score AS (
-    SELECT 
+    SELECT
         teams.team_id,
         lines.*
     FROM {{ ref('stg_box_score_batting_lines') }} AS lines

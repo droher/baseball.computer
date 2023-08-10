@@ -65,7 +65,7 @@ joined AS (
         add_ids.batting_team_id,
         add_ids.reached_on_event_id,
         baserunner != 'Batter' AS is_on_base,
-        a.event_key IS NOT NULL as is_advance_attempt,
+        a.event_key IS NOT NULL AS is_advance_attempt,
         part.plate_appearance_result IS NOT NULL AS is_plate_appearance,
         COALESCE(a.is_successful, FALSE) AS is_successful,
         COALESCE(a.advanced_on_error_flag, FALSE) AS advanced_on_error_flag,

@@ -5,7 +5,7 @@ WITH lineups_flat AS (
         FIRST(team_id) AS batting_team_id,
         FIRST(batting_side) AS batting_side,
         {%- for i in range(1, 10) %}
-        FIRST(player_id) FILTER (WHERE lineup_position = {{ i }}) AS lineup_{{ i }}_id,
+            FIRST(player_id) FILTER (WHERE lineup_position = {{ i }}) AS lineup_{{ i }}_id,
         {%- endfor %}
         FIRST(lineup_position) FILTER (WHERE is_at_bat) AS batter_lineup_position,
         FIRST(player_id) FILTER (WHERE is_at_bat) AS batter_id,
@@ -20,7 +20,7 @@ defenses_flat AS (
         FIRST(team_id) AS fielding_team_id,
         FIRST(fielding_side) AS fielding_side,
         {%- for i in range(1, 11) %}
-        FIRST(player_id) FILTER (WHERE fielding_position = {{ i }}) AS defense_{{ i }}_id,
+            FIRST(player_id) FILTER (WHERE fielding_position = {{ i }}) AS defense_{{ i }}_id,
         {%- endfor %}
     FROM {{ ref('event_fielding_states') }}
     GROUP BY 1
