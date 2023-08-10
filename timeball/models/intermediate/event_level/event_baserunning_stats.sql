@@ -8,35 +8,25 @@ WITH states_full AS (
         event_key,
         baserunner,
         runner_lineup_position,
-        reached_on_event_id,
-        charge_event_id
+        reached_on_event_key,
+        charge_event_key,
+        explicit_charged_pitcher_id
     FROM {{ ref('stg_event_base_states') }}
     WHERE base_state_type = 'Starting'
-    UNION ALL
+    UNION ALL BY NAME
     SELECT
         event_key,
         'Batter' AS baserunner,
         at_bat AS runner_lineup_position,
-        NULL AS reached_on_event_id,
-        event_id AS charge_event_id
+        NULL AS reached_on_event_key,
+        event_key AS charge_event_key,
+        NULL AS explicit_charged_pitcher_id
     FROM {{ ref('stg_events') }}
     WHERE event_key IN (
             SELECT event_key
             FROM {{ ref('stg_event_baserunning_advance_attempts') }}
             WHERE baserunner = 'Batter'
         )
-),
-
-add_ids AS (
-    SELECT
-        states_full.*,
-        lineup.game_id,
-        lineup.team_id AS batting_team_id,
-        lineup.player_id AS baserunner_id,
-    FROM states_full
-    INNER JOIN {{ ref('event_lineup_states') }} AS lineup
-        ON lineup.event_key = states_full.event_key
-            AND lineup.lineup_position = states_full.runner_lineup_position
 ),
 
 -- When baserunner is NULL, it means the play is generic and applies to all
@@ -58,12 +48,11 @@ runner_generic_plays AS (
 joined AS (
     SELECT
         event_key,
-        add_ids.game_id,
-        add_ids.baserunner,
-        add_ids.baserunner_id,
-        add_ids.runner_lineup_position,
-        add_ids.batting_team_id,
-        add_ids.reached_on_event_id,
+        baserunner,
+        states_full.runner_lineup_position,
+        states_full.reached_on_event_key,
+        states_full.charge_event_key,
+        states_full.explicit_charged_pitcher_id,
         baserunner != 'Batter' AS is_on_base,
         a.event_key IS NOT NULL AS is_advance_attempt,
         part.plate_appearance_result IS NOT NULL AS is_plate_appearance,
@@ -77,7 +66,7 @@ joined AS (
             rsp.baserunning_play_type, rgp.baserunning_play_type, 'None'
         ) AS baserunning_play_type,
         COALESCE(part.total_bases, 0) AS batter_total_bases
-    FROM add_ids
+    FROM states_full
     LEFT JOIN {{ ref('stg_event_baserunning_advance_attempts') }} AS a USING (event_key, baserunner)
     LEFT JOIN runner_specific_plays AS rsp USING (event_key, baserunner)
     LEFT JOIN runner_generic_plays AS rgp USING (event_key)
@@ -95,7 +84,9 @@ final AS (
         event_key,
         baserunner,
         runner_lineup_position,
-        reached_on_event_id,
+        reached_on_event_key,
+        charge_event_key,
+        explicit_charged_pitcher_id,
         (is_successful AND number_base_to = 4)::INT AS runs,
         (baserunning_play_type = 'StolenBase')::INT AS stolen_bases,
         (baserunning_play_type LIKE '%CaughtStealing')::INT AS caught_stealing,

@@ -1,4 +1,4 @@
-general_location,depth,distance_min,distance_max
+general_location,depth,distance_bucket
 Catcher,Default,1
 CatcherFirst,Default,2
 CatcherThird,Default,2

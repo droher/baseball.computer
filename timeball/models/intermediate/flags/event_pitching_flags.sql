@@ -7,11 +7,17 @@ WITH init_flags AS (
         pitcher_id,
         batting_team_margin_start,
         inning_in_outs_start,
+        runners_count_start,
         LAG(pitcher_id) OVER game_side AS previous_pitcher_id,
         COALESCE(previous_pitcher_id != pitcher_id, TRUE) AS new_pitcher_flag,
         -- This specifically excludes finishing pitchers
         COALESCE(LEAD(pitcher_id) OVER game_side != pitcher_id, FALSE) AS pitcher_exit_flag,
         LEAD(pitcher_id) OVER game_side IS NULL AS pitcher_finish_flag,
+
+        CASE WHEN new_pitcher_flag
+                THEN runners_count_start
+            ELSE 0
+        END AS inherited_runners_count,
 
         -- A new relief pitcher can enter the game as the first pitcher in rare cases
         new_pitcher_flag
@@ -124,7 +130,9 @@ final AS (
         game_id,
         event_key,
         event_id,
+        previous_pitcher_id,
         pitcher_id,
+        inherited_runners_count,
         new_relief_pitcher_flag,
         pitcher_exit_flag,
         pitcher_finish_flag,
@@ -137,3 +145,4 @@ final AS (
 )
 
 SELECT * FROM final
+WHERE game_id = 'ANA200007280'

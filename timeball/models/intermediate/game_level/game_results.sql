@@ -37,7 +37,7 @@ unioned AS (
     FROM event_and_box_results
 ),
 
-final_scores AS (
+final AS (
     SELECT
         game_id,
         COALESCE(suspensions.date_resumed, unioned.date) AS game_finish_date,
@@ -97,25 +97,24 @@ final_scores AS (
 )
 
 SELECT
-    game_id,
-    game_finish_date,
-    winning_team_id,
-    losing_team_id,
-    final_scores.home_runs_scored,
-    final_scores.away_runs_scored,
-    winning_team_score,
-    losing_team_score,
-    winning_side,
-    forfeit_flag,
-    suspension_flag,
-    tie_flag,
-    winning_pitcher_id,
-    losing_pitcher_id,
-    save_pitcher_id,
-    game_winning_rbi_player_id,
-    away_line_score,
-    home_line_score,
-    duration_outs,
-    duration_minutes
-FROM {{ ref('game_start_info') }} AS games
-LEFT JOIN final_scores USING (game_id)
+    final.game_id,
+    final.game_finish_date,
+    final.winning_team_id,
+    final.losing_team_id,
+    final.home_runs_scored,
+    final.away_runs_scored,
+    final.winning_team_score,
+    final.losing_team_score,
+    final.winning_side,
+    final.forfeit_flag,
+    final.suspension_flag,
+    final.tie_flag,
+    final.winning_pitcher_id,
+    final.losing_pitcher_id,
+    final.save_pitcher_id,
+    final.game_winning_rbi_player_id,
+    final.away_line_score,
+    final.home_line_score,
+    final.duration_outs,
+    final.duration_minutes
+FROM final
