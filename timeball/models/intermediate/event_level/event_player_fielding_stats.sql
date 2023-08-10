@@ -21,6 +21,12 @@ outs_agg AS (
     GROUP BY 1
 ),
 
+passed_balls AS (
+    SELECT DISTINCT event_key
+    FROM {{ ref('stg_event_baserunning_plays') }}
+    WHERE baserunning_play_type = 'PassedBall'
+),
+
 -- Join these together before the end to avoid an
 -- unnecessary fanout
 event_level_agg AS (
@@ -55,6 +61,7 @@ final AS (
         COALESCE(fp.assists, 0) AS assists,
         COALESCE(fp.errors, 0) AS errors,
         COALESCE(fp.fielders_choices, 0) AS fielders_choices,
+        (passed_balls.event_key IS NOT NULL AND fp.fielding_position = 2) AS passed_balls,
         -- Only count double plays for the fielder who made a putout
         -- or assist on the play
         CASE WHEN e.is_double_play AND fp.putouts + fp.assists > 0
@@ -72,6 +79,7 @@ final AS (
     FROM {{ ref('event_fielding_states') }} AS s
     LEFT JOIN event_level_agg AS e USING (event_key)
     LEFT JOIN fielding_plays_agg AS fp USING (event_key, fielding_position)
+    LEFT JOIN passed_balls USING (event_key)
 )
 
 SELECT * FROM final

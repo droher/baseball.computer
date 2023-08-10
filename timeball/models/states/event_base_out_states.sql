@@ -31,7 +31,7 @@ add_outs AS (
         events.outs AS outs_start,
         COALESCE(outs_agg.outs, 0) AS outs_on_play,
         events.outs + COALESCE(outs_agg.outs, 0) AS outs_end,
-        base_state.base_state,
+        COALESCE(base_state.base_state, 0) AS base_state,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN base_state USING (event_key)
     LEFT JOIN outs_agg USING (event_key)
@@ -45,11 +45,16 @@ final AS (
         LEAD(inning) OVER wide AS inning_end,
         frame AS frame_start,
         LEAD(frame) OVER wide AS frame_end,
+        (inning - 1) * 3 + outs_start AS inning_in_outs_start,
+        -- TODO: Add inning_in_outs_end
+        -- (tricky since not sure whether it should be +1 or +4 or null)
         outs_start,
         outs_end,
         outs_on_play,
         base_state AS base_state_start,
+        BIT_COUNT(base_state) AS runners_count_start,
         LEAD(base_state) OVER narrow AS base_state_end,
+        BIT_COUNT(LEAD(base_state) OVER narrow) AS runners_count_end,
         LAG(event_key) OVER narrow IS NULL AS frame_start_flag,
         LEAD(event_key) OVER narrow IS NULL AS frame_end_flag,
         LEAD(event_key) OVER narrow IS NULL AND outs_end != 3 AS truncated_frame_flag,

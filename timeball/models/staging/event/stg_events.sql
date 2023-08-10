@@ -16,8 +16,8 @@ renamed AS (
         count_strikes,
         LEFT(specified_batter_hand, 1) AS specified_batter_hand,
         LEFT(specified_pitcher_hand, 1) AS specified_pitcher_hand,
-        strikeout_responsible_batter,
-        walk_responsible_pitcher
+        strikeout_responsible_batter AS strikeout_responsible_batter_id,
+        walk_responsible_pitcher AS walk_responsible_pitcher_id,
     FROM source
 )
 

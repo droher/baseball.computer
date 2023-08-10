@@ -35,8 +35,8 @@ renamed AS (
         vistor_line_score AS away_line_score,
         home_line_score,
         -- TODO: Fix spelling in original
-        visitor_runs_scored AS runs_scored_away,
-        home_runs_score AS runs_scored_home,
+        visitor_runs_scored AS away_runs_scored,
+        home_runs_score AS home_runs_scored,
         forfeit_info,
         'GameLog' AS source_type
     FROM source

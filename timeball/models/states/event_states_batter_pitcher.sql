@@ -2,16 +2,20 @@
     materialized = 'table',
     )
 }}
-WITH hand_overrides AS (
+WITH overrides AS (
     -- This subquery isn't semantically necessary,
     -- but the WHERE clause makes the join much faster
     SELECT
         event_key,
         specified_batter_hand AS bats,
-        specified_pitcher_hand AS throws
+        specified_pitcher_hand AS throws,
+        strikeout_responsible_batter_id,
+        walk_responsible_pitcher_id
     FROM {{ ref('stg_events') }}
     WHERE specified_batter_hand IS NOT NULL
         OR specified_pitcher_hand IS NOT NULL
+        OR strikeout_responsible_batter_id IS NOT NULL
+        OR walk_responsible_pitcher_id IS NOT NULL
 )
 SELECT
     lineup.game_id,
@@ -26,21 +30,23 @@ SELECT
     -- TODO: Update "weird state" section to get overrides,
     -- and get handedness from chadwick register as fallback
     CASE
-        WHEN hand_overrides.bats IS NOT NULL THEN hand_overrides.bats
+        WHEN overrides.bats IS NOT NULL THEN overrides.bats
         WHEN batters.bats = 'B' AND pitchers.throws = 'L' THEN 'R'
         WHEN batters.bats = 'B' AND pitchers.throws = 'R' THEN 'L'
         ELSE NULLIF(batters.bats, 'B')
     END AS batter_hand,
     CASE
-        WHEN hand_overrides.throws IS NOT NULL THEN hand_overrides.throws
+        WHEN overrides.throws IS NOT NULL THEN overrides.throws
         WHEN pitchers.throws = 'B' AND batter_hand = 'L' THEN 'R'
         WHEN pitchers.throws = 'B' AND batter_hand = 'R' THEN 'L'
         ELSE NULLIF(pitchers.throws, 'B')
     END AS pitcher_hand,
+    overrides.strikeout_responsible_batter_id,
+    overrides.walk_responsible_pitcher_id,
 FROM {{ ref('stg_games') }} AS games
 INNER JOIN {{ ref('event_lineup_states') }} AS lineup USING (game_id)
 INNER JOIN {{ ref('event_fielding_states') }} AS fielding USING (event_key)
-LEFT JOIN hand_overrides USING (event_key)
+LEFT JOIN overrides USING (event_key)
 LEFT JOIN {{ ref('stg_rosters') }} AS batters
     ON lineup.player_id = batters.player_id
         AND games.season = batters.year

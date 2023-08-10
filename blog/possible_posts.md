@@ -1,0 +1,6 @@
+-  Explaining computing concepts
+   - Practial use of bitwise operations with base states
+   - Concurrently generating u32 event ids
+   - Making illegal states unrepresentable
+- Oddities
+   - Blown three-inning saves

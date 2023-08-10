@@ -6,9 +6,9 @@ authors = ["David Roher <davidroher@davids-air.home>"]
 
 [tool.poetry.dependencies]
 python = "^3.11.0"
-dbt-core = "^1.5.0"
-dbt-duckdb = "^1.5.1"
-duckdb = "^0.8.1"
+dbt-core = "^1.5.2"
+dbt-duckdb = "^1.5.2"
+duckdb = "0.8.1"
 
 [tool.poetry.dev-dependencies]
 sqlfluff = "^2.1.0"

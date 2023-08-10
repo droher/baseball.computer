@@ -629,3 +629,6 @@ sources:
           - name: comment
             tests:
               - not_null
+
+      - name: box_score_line_score
+  

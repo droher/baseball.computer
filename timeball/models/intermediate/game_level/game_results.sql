@@ -19,12 +19,12 @@ event_and_box_results AS (
         games.losing_pitcher_id,
         games.save_pitcher_id,
         games.game_winning_rbi_player_id,
-        line_scores.total_runs_home AS home_runs_scored,
-        line_scores.total_runs_away AS away_runs_scored,
+        line_scores.home_runs_scored,
+        line_scores.away_runs_scored,
         line_scores.home_line_score,
         line_scores.away_line_score,
     FROM {{ ref('stg_games') }} AS games
-    LEFT JOIN game_line_scores AS line_scores USING (game_id)
+    LEFT JOIN {{ ref('game_line_scores') }} AS line_scores USING (game_id)
 
 
 ),
@@ -37,7 +37,7 @@ unioned AS (
     FROM event_and_box_results
 ),
 
-do_stuff AS (
+final_scores AS (
     SELECT
         game_id,
         COALESCE(suspensions.date_resumed, unioned.date) AS game_finish_date,
@@ -48,9 +48,9 @@ do_stuff AS (
                 THEN start_info.home_team_id
             WHEN forfeits.winning_side = 'Away'
                 THEN start_info.away_team_id
-            WHEN unioned.home_team_runs > unioned.away_team_runs
+            WHEN unioned.home_runs_scored > unioned.away_runs_scored
                 THEN start_info.home_team_id
-            WHEN unioned.home_team_runs < unioned.away_team_runs
+            WHEN unioned.home_runs_scored < unioned.away_runs_scored
                 THEN start_info.away_team_id
         END AS winning_team_id,
         CASE
@@ -84,6 +84,8 @@ do_stuff AS (
         unioned.losing_pitcher_id,
         unioned.save_pitcher_id,
         unioned.game_winning_rbi_player_id,
+        unioned.home_runs_scored,
+        unioned.away_runs_scored,
         unioned.away_line_score,
         unioned.home_line_score,
 
@@ -96,7 +98,7 @@ do_stuff AS (
 
 SELECT
     game_id,
-    COALESCE(supspensions.date_resumed, games.date) AS game_finish_date,
+    game_finish_date,
     winning_team_id,
     losing_team_id,
     final_scores.home_runs_scored,
@@ -110,7 +112,7 @@ SELECT
     winning_pitcher_id,
     losing_pitcher_id,
     save_pitcher_id,
-    game_winning_rbi_batter_id,
+    game_winning_rbi_player_id,
     away_line_score,
     home_line_score,
     duration_outs,

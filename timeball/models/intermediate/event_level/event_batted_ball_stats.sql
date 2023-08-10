@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH joined AS (
     SELECT
         batted_ball.event_key,
