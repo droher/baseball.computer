@@ -88,6 +88,8 @@ final AS (
         charge_event_key,
         explicit_charged_pitcher_id,
         (is_successful AND number_base_to = 4)::INT AS runs,
+        -- Note that this is different from OBP - it includes fielders choices, errors, etc.
+        (is_successful AND baserunner = 'Batter')::INT AS times_reached_base,
         (baserunning_play_type = 'StolenBase')::INT AS stolen_bases,
         (baserunning_play_type LIKE '%CaughtStealing')::INT AS caught_stealing,
         (baserunning_play_type LIKE 'PickedOff%')::INT AS picked_off,

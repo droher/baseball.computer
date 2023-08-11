@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH init_flags AS (
     SELECT
         game_id,
@@ -8,6 +13,7 @@ WITH init_flags AS (
         batting_team_margin_start,
         inning_in_outs_start,
         runners_count_start,
+        pitching_team_starting_pitcher_id = pitcher_id AS starting_pitcher_flag,
         LAG(pitcher_id) OVER game_side AS previous_pitcher_id,
         COALESCE(previous_pitcher_id != pitcher_id, TRUE) AS new_pitcher_flag,
         -- This specifically excludes finishing pitchers
@@ -17,7 +23,12 @@ WITH init_flags AS (
         CASE WHEN new_pitcher_flag
                 THEN runners_count_start
             ELSE 0
-        END AS inherited_runners_count,
+        END AS inherited_runners,
+
+        CASE WHEN pitcher_exit_flag
+                THEN LEAD(runners_count_start) OVER game_side
+            ELSE 0
+        END AS bequeathed_runners,
 
         -- A new relief pitcher can enter the game as the first pitcher in rare cases
         new_pitcher_flag
@@ -60,9 +71,9 @@ WITH init_flags AS (
         -- makes the pitcher eligible for a save if he finishes the game.
         -- The main difference is that a pitcher qualfiies for a hold in the first two,
         -- but not in the third.
-        save_situation_base
-        AND inning_in_outs_start <= 18
-        AS long_save_eligible_start_flag,
+        CASE WHEN save_situation_base
+                THEN inning_in_outs_start <= 18
+        END AS long_save_eligible_start_flag,
 
         -- This is non-null only on the first event for each new pitcher,
         -- which allows LAG to work properly in the subsequent query
@@ -116,7 +127,13 @@ save_flags AS (
                 AND NOT LAG(conditional_blown_save_flag) OVER pitcher_appearance
                 THEN conditional_blown_save_flag
             ELSE FALSE
-        END AS blown_save_flag
+        END AS blown_save_flag,
+        CASE WHEN LAG(long_save_eligible_start_flag IGNORE NULLS) OVER pitcher_appearance
+                AND NOT LAG(save_situation_start_flag IGNORE NULLS) OVER pitcher_appearance
+                AND NOT LAG(conditional_blown_save_flag) OVER pitcher_appearance
+                THEN conditional_blown_save_flag
+            ELSE FALSE
+        END AS blown_long_save_flag,
     FROM init_flags
     WINDOW
         pitcher_appearance AS (
@@ -132,17 +149,20 @@ final AS (
         event_id,
         previous_pitcher_id,
         pitcher_id,
-        inherited_runners_count,
+        starting_pitcher_flag,
+        bequeathed_runners,
+        inherited_runners,
         new_relief_pitcher_flag,
         pitcher_exit_flag,
         pitcher_finish_flag,
         starting_pitcher_exit_flag,
         starting_pitcher_early_exit_flag,
+        save_situation_start_flag,
         hold_flag,
         save_flag,
-        blown_save_flag
+        blown_save_flag,
+        blown_long_save_flag,
     FROM save_flags
 )
 
 SELECT * FROM final
-WHERE game_id = 'ANA200007280'

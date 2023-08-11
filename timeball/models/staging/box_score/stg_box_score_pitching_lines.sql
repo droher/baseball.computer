@@ -20,7 +20,8 @@ renamed AS (
         walks,
         intentional_walks,
         strikeouts,
-        hit_batsmen,
+        -- TODO: Change in original
+        hit_batsmen AS hit_by_pitch,
         wild_pitches,
         balks,
         sacrifice_hits,

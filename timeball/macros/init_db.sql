@@ -31,7 +31,7 @@
       CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (
         SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet'
         {% if node.schema == "event" %}
-          WHERE HASH(event_key // 256) % 10 = 0
+          WHERE HASH(event_key // 255) % 10 = 0
         {% endif %}
       );
       {% for col_name, col_data in node.columns.items() if col_data.get("data_type") %}

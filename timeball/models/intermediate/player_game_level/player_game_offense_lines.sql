@@ -14,9 +14,9 @@ WITH box_score AS (
 
 SELECT
     game_id,
-    batting_team_id AS team_id,
+    team_id,
     player_id,
-    {% for stat in offense_stats() -%}
+    {% for stat in event_level_offense_stats() -%}
         SUM({{ stat }}) AS {{ stat }},
     {% endfor %}
 FROM {{ ref('event_offense_stats') }}

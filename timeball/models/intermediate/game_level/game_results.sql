@@ -26,7 +26,6 @@ event_and_box_results AS (
     FROM {{ ref('stg_games') }} AS games
     LEFT JOIN {{ ref('game_line_scores') }} AS line_scores USING (game_id)
 
-
 ),
 
 unioned AS (

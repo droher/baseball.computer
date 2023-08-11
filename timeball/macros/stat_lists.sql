@@ -1,4 +1,4 @@
-{% macro offense_stats() %}
+{% macro event_level_offense_stats() %}
     {{ return([
         "plate_appearances",
         "at_bats",
@@ -45,6 +45,7 @@
         "batted_down_foul_line",
         "fielder_derived_location",
         "runs",
+        "times_reached_base",
         "stolen_bases",
         "caught_stealing",
         "picked_off",
@@ -92,7 +93,7 @@
     ]) }}
 {% endmacro %}
 
-{% macro pitching_stats() %}
+{% macro event_level_pitching_stats() %}
     {% set non_pitching_stats = [
         "plate_appearances",
         "runs_batted_in",
@@ -109,7 +110,7 @@
         "bequeathed_runners_scored",
     ] %}
 
-    {{ return(extra_pitching_stats + remove_items(offense_stats(), non_pitching_stats)) }}
+    {{ return(extra_pitching_stats + remove_items(event_level_offense_stats(), non_pitching_stats)) }}
 {% endmacro %}
 
 

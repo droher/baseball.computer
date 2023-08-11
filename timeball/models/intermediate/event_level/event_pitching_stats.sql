@@ -1,51 +1,3 @@
--- SELECT game_id,
---     pitcher_id,
---     team_id,
---     opponent_id,
---     wins,
---     losses,
---     --games,
---     games_started,
---     games_finished,
---     complete_games,
---     shutouts,
---     saves,
---     innings_pitched,
---     --hits,
---     runs,
---     earned_runs,
---     --home_runs,
---     --walks,
---     --intentional_walks,
---     --strikeouts,
---     --hit_by_pitch,
---     balks,
---     wild_pitches,
---     batters_faced,
---     wins_in_games_started,
---     losses_in_games_started,
---     team_wins_in_games_started,
---     team_losses_in_games_started,
---     no_decisions,
---     quality_starts,
---     cheap_wins,
---     tough_losses,
---     losses_in_save_situations,
---     game_score,
---     bequeathed_runners,
---     bequeathed_runners_scored,
---     days_rest,
---     run_support,
-
---     games_relieved,
---     wins_in_games_relieved,
---     losses_in_games_relieved,
---     save_opportunities,
---     blown_saves,
---     save_situations,
---     holds,
---     inherited_runners,
---     inherited_runners_scored
 {{
   config(
     materialized = 'table',
@@ -56,7 +8,7 @@ WITH baserunning_agg AS (
     -- Runs are populated separately to charge to the right pitcher
     SELECT
         event_key,
-        {% for col in baserunning_stats_cols if col in pitching_stats() -%}
+        {% for col in baserunning_stats_cols if col in event_level_pitching_stats() -%}
             SUM({{ col }}) AS {{ col }},
         {% endfor %}
     FROM {{ ref('event_baserunning_stats') }}
@@ -129,26 +81,10 @@ final AS (
         event_key,
         team_id,
         player_id,
-        {% for stat in pitching_stats() -%}
-            COALESCE({{ stat }}, 0) AS {{ stat }},
+        {% for stat in event_level_pitching_stats() -%}
+            COALESCE({{ stat }}, 0)::INT2 AS {{ stat }},
         {% endfor %}
     FROM unioned
 )
 
-SELECT
-    SUM(outs_recorded) AS outs_recorded,
-    SUM(runs) AS runs,
-    SUM(hits) AS hits,
-    SUM(walks) AS walks,
-    SUM(intentional_walks) AS intentional_walks,
-    SUM(strikeouts) AS strikeouts,
-    SUM(home_runs) AS home_runs,
-    SUM(batters_faced) AS batters_faced,
-    SUM(batted_broad_type_ground_ball) AS batted_type_ground_ball,
-    SUM(batted_type_fly_ball) AS batted_type_fly_ball,
-    SUM(batted_type_line_drive) AS batted_type_line_drive,
-    SUM(batted_subtype_pop_fly) AS batted_subtype_pop_fly,
-    SUM(batted_type_unknown) AS batted_type_unknown,
-FROM final
-WHERE game_id = 'SLN197107210'
-AND team_id = 'SLN'
+SELECT * FROM final

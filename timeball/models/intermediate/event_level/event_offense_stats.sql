@@ -51,8 +51,8 @@ final AS (
         team_id,
         baserunner,
         player_id,
-        {% for stat in offense_stats() -%}
-            COALESCE({{ stat }}, 0) AS {{ stat }},
+        {% for stat in event_level_offense_stats() -%}
+            COALESCE({{ stat }}, 0)::INT2 AS {{ stat }},
         {% endfor %}
     FROM unioned
 )
