@@ -90,7 +90,8 @@ final AS (
         (is_successful AND number_base_to = 4)::INT AS runs,
         (baserunning_play_type = 'StolenBase')::INT AS stolen_bases,
         (baserunning_play_type LIKE '%CaughtStealing')::INT AS caught_stealing,
-        (baserunning_play_type LIKE 'PickedOff%')::INT AS pickoffs,
+        (baserunning_play_type LIKE 'PickedOff%')::INT AS picked_off,
+        (baserunning_play_type = 'PickedOffCaughtStealing')::INT AS picked_off_caught_stealing,
         explicit_out_flag::INT AS outs_on_basepaths,
 
         (baserunning_play_type = 'WildPitch' AND is_successful)::INT AS advances_on_wild_pitches,

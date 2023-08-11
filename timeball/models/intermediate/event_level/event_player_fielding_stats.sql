@@ -16,7 +16,7 @@ WITH fielding_plays_agg AS (
 outs_agg AS (
     SELECT
         event_key,
-        ROUND(COUNT(*) / 3::NUMERIC, 2) AS innings_played,
+        COUNT(*) AS outs_played
     FROM {{ ref('stg_event_outs') }}
     GROUP BY 1
 ),
@@ -32,7 +32,7 @@ passed_balls AS (
 event_level_agg AS (
     SELECT
         event_key,
-        oa.innings_played,
+        oa.outs_played,
         (pa.event_key IS NOT NULL)::INT AS plate_appearances_in_field,
         bbi.hit_to_fielder,
         dp.is_double_play,
@@ -52,7 +52,7 @@ final AS (
         s.player_id AS fielder_id,
         s.team_id AS fielding_team_id,
         fp.fielding_position,
-        e.innings_played,
+        e.outs_played,
         e.plate_appearances_in_field,
         e.plate_appearances_in_field_with_ball_in_play,
         CASE WHEN e.hit_to_fielder = fp.fielding_position THEN 1 ELSE 0 END AS balls_fielded,

@@ -42,7 +42,7 @@ retrosheet AS (
         stats.player_id,
         games.game_type,
         COUNT(*) AS games,
-        {% for stat in var('offense_stats') -%}
+        {% for stat in offense_stats() -%}
             SUM({{ stat }}) AS {{ stat }},
         {% endfor %}
     FROM {{ ref('stg_games') }} AS games

@@ -12,9 +12,10 @@ WITH batter_baserunning AS (
 batter_stats AS (
     SELECT
         hit.batter_id AS player_id,
+        hit.batting_team_id AS team_id,
         event_key,
         'Batter' AS baserunner,
-        hit.* EXCLUDE (event_key, batter_id),
+        hit.* EXCLUDE (event_key),
         bat.* EXCLUDE (event_key),
         batter_baserunning.* EXCLUDE (event_key, baserunner),
         pitch.* EXCLUDE (event_key),
@@ -28,7 +29,7 @@ non_batter_baserunning AS (
     SELECT
         baserunning.*,
         lineup.game_id,
-        lineup.team_id AS batting_team_id,
+        lineup.team_id,
         lineup.player_id AS baserunner_id,
     FROM {{ ref('event_baserunning_stats') }} AS baserunning
     INNER JOIN {{ ref('event_lineup_states') }} AS lineup
@@ -41,15 +42,19 @@ unioned AS (
     SELECT * FROM batter_stats
     UNION ALL BY NAME
     SELECT * FROM non_batter_baserunning
+),
+
+final AS (
+    SELECT
+        game_id,
+        event_key,
+        team_id,
+        baserunner,
+        player_id,
+        {% for stat in offense_stats() -%}
+            COALESCE({{ stat }}, 0) AS {{ stat }},
+        {% endfor %}
+    FROM unioned
 )
 
-SELECT
-    game_id,
-    event_key,
-    batting_team_id,
-    baserunner,
-    player_id,
-    {% for stat in var('offense_stats') -%}
-        COALESCE({{ stat }}, 0) AS {{ stat }},
-    {% endfor %}
-FROM unioned
+SELECT * FROM final
