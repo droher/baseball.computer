@@ -1,51 +1,3 @@
--- SELECT game_id,
---     pitcher_id,
---     team_id,
---     opponent_id,
---     wins,
---     losses,
---     --games,
---     games_started,
---     games_finished,
---     complete_games,
---     shutouts,
---     saves,
---     innings_pitched,
---     --hits,
---     runs,
---     earned_runs,
---     --home_runs,
---     --walks,
---     --intentional_walks,
---     --strikeouts,
---     --hit_by_pitch,
---     balks,
---     wild_pitches,
---     batters_faced,
---     wins_in_games_started,
---     losses_in_games_started,
---     team_wins_in_games_started,
---     team_losses_in_games_started,
---     no_decisions,
---     quality_starts,
---     cheap_wins,
---     tough_losses,
---     losses_in_save_situations,
---     game_score,
---     bequeathed_runners,
---     bequeathed_runners_scored,
---     days_rest,
---     run_support,
-
---     games_relieved,
---     wins_in_games_relieved,
---     losses_in_games_relieved,
---     save_opportunities,
---     blown_saves,
---     save_situations,
---     holds,
---     inherited_runners,
---     inherited_runners_scored
 WITH event_agg AS (
     SELECT
         game_id,
@@ -56,6 +8,45 @@ WITH event_agg AS (
         {% endfor %}
     FROM {{ ref('event_pitching_stats') }}
     GROUP BY 1, 2
+),
+
+box_agg AS (
+    SELECT
+        game_id,
+        stats.pitcher_id AS player_id,
+        ANY_VALUE(teams.team_id) AS team_id,
+        SUM(stats.outs_recorded) AS outs_recorded,
+        SUM(stats.batters_faced) AS batters_faced,
+        SUM(stats.hits) AS hits,
+        SUM(stats.doubles) AS doubles,
+        SUM(stats.triples) AS triples,
+        SUM(stats.home_runs) AS home_runs,
+        SUM(stats.runs) AS runs,
+        SUM(stats.earned_runs) AS earned_runs,
+        SUM(stats.walks) AS walks,
+        SUM(stats.intentional_walks) AS intentional_walks,
+        SUM(stats.strikeouts) AS strikeouts,
+        SUM(stats.hit_by_pitches) AS hit_by_pitches,
+        SUM(stats.wild_pitches) AS wild_pitches,
+        SUM(stats.balks) AS balks,
+        SUM(stats.sacrifice_hits) AS sacrifice_hits,
+        SUM(stats.sacrifice_flies) AS sacrifice_flies,
+        SUM(stats.singles) AS singles,
+        SUM(stats.total_bases) AS total_bases,
+        SUM(stats.on_base_opportunities) AS on_base_opportunities,
+        SUM(stats.on_base_successes) AS on_base_successes,
+    FROM {{ ref('stg_box_score_pitching_lines') }} AS stats
+    -- This join ensures that we only get the box score lines for games that
+    -- do not have an event file.
+    INNER JOIN {{ ref('stg_game_teams') }} AS teams USING (game_id, side)
+    WHERE teams.source_type = 'BoxScore'
+    GROUP BY 1, 2
+),
+
+unioned AS (
+    SELECT * FROM event_agg
+    UNION ALL BY NAME
+    SELECT * FROM box_agg
 ),
 
 flag_agg AS (
@@ -88,22 +79,23 @@ joined AS (
     SELECT
         game_id,
         player_id,
-        event_agg.team_id,
-        ROUND(event_agg.outs_recorded / 3, 4) AS innings_pitched,
+        unioned.team_id,
+        ROUND(unioned.outs_recorded / 3, 4) AS innings_pitched,
         CASE WHEN player_id = games.winning_pitcher_id THEN 1 ELSE 0 END AS wins,
         CASE WHEN player_id = games.losing_pitcher_id THEN 1 ELSE 0 END AS losses,
         CASE WHEN player_id = games.save_pitcher_id THEN 1 ELSE 0 END AS saves,
-        earned_runs.earned_runs,
-        event_agg.* EXCLUDE (game_id, player_id, team_id),
+        -- Box score will have ER directly, but event data will need the join
+        COALESCE(earned_runs.earned_runs, unioned.earned_runs) AS earned_runs,
+        unioned.* EXCLUDE (game_id, player_id, team_id, earned_runs),
         flag_agg.* EXCLUDE (game_id, player_id),
         saves + flag_agg.blown_saves AS save_opportunities,
-    FROM event_agg
+    FROM unioned
     LEFT JOIN flag_agg USING (game_id, player_id)
     LEFT JOIN {{ ref('stg_games') }} AS games USING (game_id)
     LEFT JOIN {{ ref('stg_game_earned_runs') }} AS earned_runs USING (game_id, player_id)
 ),
 
-add_special_calcs AS (
+final AS (
     SELECT
         *,
         CASE WHEN COUNT(*) OVER team_game = 1
@@ -141,9 +133,9 @@ add_special_calcs AS (
         CASE WHEN quality_starts = 1 AND losses = 1 THEN 1 ELSE 0 END AS tough_losses,
         CASE WHEN games_started = 1 AND wins + losses = 0 THEN 1 ELSE 0 END AS no_decisions,
         CASE WHEN complete_games = 1 AND hits = 0 AND outs_recorded >= 27 THEN 1 ELSE 0 END AS no_hitters,
-        CASE WHEN no_hitters = 1 AND times_reached_base = 0 THEN 1 ELSE 0 END AS perfect_games,
+        -- Perfect games can be calculated for non-box-score games but we need other info for older ones
     FROM joined
     WINDOW team_game AS (PARTITION BY team_id, game_id)
 )
 
-SELECT * FROM add_special_calcs
+SELECT * FROM final

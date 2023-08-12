@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH fielding_plays_agg AS (
     SELECT
         event_key,
@@ -55,7 +60,7 @@ final AS (
         e.outs_played,
         e.plate_appearances_in_field,
         e.plate_appearances_in_field_with_ball_in_play,
-        CASE WHEN e.hit_to_fielder = fp.fielding_position THEN 1 ELSE 0 END AS balls_fielded,
+        CASE WHEN e.hit_to_fielder = fp.fielding_position THEN 1 ELSE 0 END AS balls_hit_to,
         COALESCE(fp.fielding_plays, 0) AS fielding_plays,
         COALESCE(fp.putouts, 0) AS putouts,
         COALESCE(fp.assists, 0) AS assists,

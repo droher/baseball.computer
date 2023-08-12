@@ -17,7 +17,7 @@ renamed AS (
         rbi,
         sacrifice_hits,
         sacrifice_flies,
-        hit_by_pitch,
+        hit_by_pitch AS hit_by_pitches,
         walks,
         intentional_walks,
         strikeouts,
