@@ -16,7 +16,7 @@ renamed AS (
         cg AS complete_games,
         sho AS shutouts,
         sv AS saves,
-        ipouts AS outs_pitched,
+        ipouts AS outs_recorded,
         h AS hits,
         er AS earned_runs,
         hr AS home_runs,

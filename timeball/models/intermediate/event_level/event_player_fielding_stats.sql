@@ -54,8 +54,9 @@ event_level_agg AS (
 final AS (
     SELECT
         event_key,
-        s.player_id AS fielder_id,
-        s.team_id AS fielding_team_id,
+        s.game_id,
+        s.player_id,
+        s.team_id,
         fp.fielding_position,
         e.outs_played,
         e.plate_appearances_in_field,
@@ -66,7 +67,7 @@ final AS (
         COALESCE(fp.assists, 0) AS assists,
         COALESCE(fp.errors, 0) AS errors,
         COALESCE(fp.fielders_choices, 0) AS fielders_choices,
-        (passed_balls.event_key IS NOT NULL AND fp.fielding_position = 2) AS passed_balls,
+        (passed_balls.event_key IS NOT NULL AND fp.fielding_position = 2)::INT AS passed_balls,
         -- Only count double plays for the fielder who made a putout
         -- or assist on the play
         CASE WHEN e.is_double_play AND fp.putouts + fp.assists > 0
