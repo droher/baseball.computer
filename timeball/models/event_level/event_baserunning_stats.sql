@@ -29,6 +29,20 @@ WITH states_full AS (
         )
 ),
 
+add_ids AS (
+    SELECT
+        lineup.game_id,
+        lineup.batting_team_id AS team_id,
+        lineup.player_id,
+        states_full.*,
+    FROM states_full
+    INNER JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
+    INNER JOIN {{ ref('personnel_lineup_states') }} AS lineup
+        ON lookup.personnel_lineup_key = lineup.personnel_lineup_key
+            AND states_full.runner_lineup_position = lineup.lineup_position
+
+),
+
 -- When baserunner is NULL, it means the play is generic and applies to all
 -- baserunners. When it is not NULL, it means the play is specific to that
 -- baserunner. This means that the join keys are different for each of these
@@ -49,10 +63,13 @@ joined AS (
     SELECT
         event_key,
         baserunner,
-        states_full.runner_lineup_position,
-        states_full.reached_on_event_key,
-        states_full.charge_event_key,
-        states_full.explicit_charged_pitcher_id,
+        add_ids.game_id,
+        add_ids.team_id,
+        add_ids.player_id,
+        add_ids.runner_lineup_position,
+        add_ids.reached_on_event_key,
+        add_ids.charge_event_key,
+        add_ids.explicit_charged_pitcher_id,
         baserunner != 'Batter' AS is_on_base,
         a.event_key IS NOT NULL AS is_advance_attempt,
         part.plate_appearance_result IS NOT NULL AS is_plate_appearance,
@@ -66,7 +83,7 @@ joined AS (
             rsp.baserunning_play_type, rgp.baserunning_play_type, 'None'
         ) AS baserunning_play_type,
         COALESCE(part.total_bases, 0) AS batter_total_bases
-    FROM states_full
+    FROM add_ids
     LEFT JOIN {{ ref('stg_event_baserunning_advance_attempts') }} AS a USING (event_key, baserunner)
     LEFT JOIN runner_specific_plays AS rsp USING (event_key, baserunner)
     LEFT JOIN runner_generic_plays AS rgp USING (event_key)
@@ -82,6 +99,9 @@ joined AS (
 final AS (
     SELECT
         event_key,
+        game_id,
+        team_id,
+        player_id,
         baserunner,
         runner_lineup_position,
         reached_on_event_key,

@@ -25,23 +25,11 @@ batter_stats AS (
     FULL OUTER JOIN batter_baserunning USING (event_key)
 ),
 
-non_batter_baserunning AS (
-    SELECT
-        baserunning.*,
-        lineup.game_id,
-        lineup.team_id,
-        lineup.player_id AS baserunner_id,
-    FROM {{ ref('event_baserunning_stats') }} AS baserunning
-    INNER JOIN {{ ref('event_lineup_states') }} AS lineup
-        ON lineup.event_key = baserunning.event_key
-            AND lineup.lineup_position = baserunning.runner_lineup_position
-    WHERE baserunning.baserunner != 'Batter'
-),
-
 unioned AS (
     SELECT * FROM batter_stats
     UNION ALL BY NAME
-    SELECT * FROM non_batter_baserunning
+    SELECT * FROM {{ ref('event_baserunning_stats') }}
+    WHERE baserunner != 'Batter'
 ),
 
 final AS (

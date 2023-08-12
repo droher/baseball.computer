@@ -20,8 +20,8 @@ WITH overrides AS (
 SELECT
     lineup.game_id,
     event_key,
-    lineup.team_id AS batting_team_id,
-    fielding.team_id AS fielding_team_id,
+    lineup.batting_team_id,
+    fielding.fielding_team_id,
     lineup.batting_side,
     fielding.fielding_side,
     lineup.player_id AS batter_id,
@@ -43,17 +43,21 @@ SELECT
     END AS pitcher_hand,
     overrides.strikeout_responsible_batter_id,
     overrides.walk_responsible_pitcher_id,
-FROM {{ ref('stg_games') }} AS games
-INNER JOIN {{ ref('event_lineup_states') }} AS lineup USING (game_id)
-INNER JOIN {{ ref('event_fielding_states') }} AS fielding USING (event_key)
+FROM {{ ref('stg_events') }} AS events
+INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
+INNER JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
+INNER JOIN {{ ref('personnel_fielding_states') }} AS fielding
+    ON lookup.personnel_fielding_key = fielding.personnel_fielding_key
+        AND fielding.fielding_position = 1
+INNER JOIN {{ ref('personnel_lineup_states') }} AS lineup
+    ON lookup.personnel_lineup_key = lineup.personnel_lineup_key
+        AND lineup.lineup_position = events.at_bat
 LEFT JOIN overrides USING (event_key)
 LEFT JOIN {{ ref('stg_rosters') }} AS batters
     ON lineup.player_id = batters.player_id
         AND games.season = batters.year
-        AND lineup.team_id = batters.team_id
+        AND lineup.batting_team_id = batters.team_id
 LEFT JOIN {{ ref('stg_rosters') }} AS pitchers
     ON fielding.player_id = pitchers.player_id
         AND games.season = pitchers.year
-        AND fielding.team_id = pitchers.team_id
-WHERE lineup.is_at_bat
-    AND fielding.fielding_position = 1
+        AND fielding.fielding_team_id = pitchers.team_id
