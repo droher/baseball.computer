@@ -1,10 +1,10 @@
 hit_to_fielder,category_depth,category_side
-1,Plate,All
-2,Plate,All
+1,Battery,All
+2,Battery,All
 3,Infield,Right
 4,Infield,Middle
 5,Infield,Left
 6,Infield,Middle
-7,Outfield,Middle
-8,Outfield,Left
+7,Outfield,Left
+8,Outfield,Middle
 9,Outfield,Right

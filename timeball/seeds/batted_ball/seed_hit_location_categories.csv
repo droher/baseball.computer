@@ -1,7 +1,7 @@
 general_location,category_depth,category_side,category_edge,is_mid_position
-Catcher,Plate,All,All,false
-CatcherFirst,Plate,Right,Corner,true
-CatcherThird,Plate,Left,Corner,true
+Catcher,Battery,All,All,false
+CatcherFirst,Battery,Right,Corner,true
+CatcherThird,Battery,Left,Corner,true
 Pitcher,Infield,Middle,Middle,false
 PitcherFirst,Infield,Right,Middle,true
 PitcherThird,Infield,Left,Middle,true
