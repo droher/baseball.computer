@@ -78,10 +78,11 @@ final AS (
         contact_info.broad_classification AS contact_broad_classification,
         contact_info.is_bunt,
         inference.recorded_location,
+        fielder.category_side,
         CASE
             WHEN inference.category_depth IS NOT NULL THEN inference.category_depth
-            WHEN contact = 'GroundBall' AND hit_to_fielder BETWEEN 7 AND 9 THEN 'Infield'
-            WHEN hit_to_fielder BETWEEN 7 AND 9 THEN 'Unknown'
+            WHEN inference.contact = 'GroundBall' AND inference.hit_to_fielder BETWEEN 7 AND 9 THEN 'Infield'
+            WHEN inference.contact = 'Unknown' AND inference.hit_to_fielder BETWEEN 7 AND 9 THEN 'Unknown'
             WHEN fielder.category_depth IS NOT NULL THEN fielder.category_depth
             ELSE 'Unknown'
         END AS location_depth,

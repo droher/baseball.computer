@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH box_score AS (
     SELECT
         teams.team_id,

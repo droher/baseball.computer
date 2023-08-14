@@ -29,6 +29,10 @@ WITH final AS (
         CASE
             WHEN COALESCE(location_depth, 'Unknown') = 'Unknown' THEN 1 ELSE 0
         END AS batted_distance_unknown,
+        CASE WHEN hit_to_fielder BETWEEN 1 AND 2 THEN 1 ELSE 0 END AS fielded_in_battery,
+        CASE WHEN hit_to_fielder BETWEEN 3 AND 6 THEN 1 ELSE 0 END AS fielded_in_infield,
+        CASE WHEN hit_to_fielder BETWEEN 7 AND 9 THEN 1 ELSE 0 END AS fielded_in_outfield,
+        CASE WHEN hit_to_fielder = 0 THEN 1 ELSE 0 END AS fielded_in_unknown,
         CASE WHEN location_side = 'Left' THEN 1 ELSE 0 END AS batted_angle_left,
         CASE WHEN location_side = 'Right' THEN 1 ELSE 0 END AS batted_angle_right,
         CASE WHEN location_side = 'Middle' THEN 1 ELSE 0 END AS batted_angle_middle,
