@@ -20,6 +20,7 @@ WITH final AS (
         base_out.frame_start,
         base_out.outs_start,
         base_out.inning_in_outs_start,
+        base_out.is_gidp_eligible,
         add_bio.batting_side,
         add_bio.fielding_side,
         runs.score_home_start,

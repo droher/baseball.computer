@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH batter_baserunning AS (
     SELECT *
     FROM {{ ref('event_baserunning_stats') }}

@@ -5,10 +5,11 @@ description = ""
 authors = ["David Roher <davidroher@davids-air.home>"]
 
 [tool.poetry.dependencies]
-python = "~3.11.0"
+python = "^3.10.0,<3.11"
 dbt-core = "~1.6.0"
 dbt-duckdb = "~1.6.0"
-duckdb = "~0.8.1"
+dbt-coves = "~1.6.0"
+duckdb = "0.8.1"
 
 [tool.poetry.dev-dependencies]
 sqlfluff = "^2.2.1"

@@ -32,10 +32,11 @@ add_outs AS (
         COALESCE(outs_agg.outs, 0) AS outs_on_play,
         events.outs + COALESCE(outs_agg.outs, 0) AS outs_end,
         COALESCE(base_state.base_state, 0) AS base_state,
+        info.is_force_on_second AND outs_start < 2 AS is_gidp_eligible,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN base_state USING (event_key)
     LEFT JOIN outs_agg USING (event_key)
-    WHERE events.event_key NOT IN (SELECT event_key FROM {{ ref('event_no_plays') }})
+    LEFT JOIN {{ ref('seed_base_state_info') }} AS info USING (base_state)
 ),
 
 final AS (
@@ -51,6 +52,7 @@ final AS (
         outs_start,
         outs_end,
         outs_on_play,
+        is_gidp_eligible,
         base_state AS base_state_start,
         BIT_COUNT(base_state) AS runners_count_start,
         LEAD(base_state) OVER narrow AS base_state_end,
