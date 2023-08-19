@@ -7,7 +7,7 @@
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';
       CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (
-        SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.name }}.parquet'
+        SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.identifier }}.parquet'
         {% if node.schema == "event" and sample_factor > 1 %}
           WHERE HASH(event_key // 255) % {{ sample_factor }} = {{ seed }}
         {% endif %}

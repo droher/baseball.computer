@@ -63,6 +63,7 @@ event_level_agg AS (
     LEFT JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
 ),
 
+-- TODO: Add SB/CS here or create a separate catcher fielding table
 final AS (
     SELECT
         e.event_key,
@@ -70,6 +71,9 @@ final AS (
         personnel.game_id,
         personnel.player_id,
         personnel.fielding_team_id AS team_id,
+        -- DHs are in this table, which makes the nomenclature for the 3 cols below
+        -- a little ambigious, but keeping for now because it's useful to keep track of
+        -- for them.
         e.outs_played,
         e.plate_appearances_in_field,
         e.plate_appearances_in_field_with_ball_in_play,
@@ -95,9 +99,11 @@ final AS (
             ELSE 0
         END AS ground_ball_double_plays,
         CASE WHEN e.is_double_play AND fp.plays_started > 0
+                THEN 1
             ELSE 0
         END AS double_plays_started,
         CASE WHEN e.is_ground_ball_double_play AND fp.plays_started > 0
+                THEN 1
             ELSE 0
         END AS ground_ball_double_plays_started,
     FROM event_level_agg AS e

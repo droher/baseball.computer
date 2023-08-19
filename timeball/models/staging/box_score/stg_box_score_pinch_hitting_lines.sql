@@ -30,3 +30,5 @@ renamed AS (
 )
 
 SELECT * FROM renamed
+-- TODO: Eliminate 20 dupes in source
+QUALIFY ROW_NUMBER() OVER (PARTITION BY game_id, side, pinch_hitter_id ORDER BY inning) = 1

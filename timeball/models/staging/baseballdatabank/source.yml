@@ -141,3 +141,16 @@ sources:
           - name: bbrefid
             tests:
               - unique
+      - name: fieldingof
+        description: |
+          LF-CF-RF game splits
+        meta:
+          primary_keys:
+            - player_id
+        columns:
+          - name: playerid
+          - name: yearid
+          - name: stint
+          - name: glf
+          - name: gcf
+          - name: grf

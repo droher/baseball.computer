@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH box_agg AS (
     SELECT
         game_id,
@@ -46,6 +51,12 @@ final AS (
         player_id,
         fielding_position,
         COALESCE(event_agg.team_id, box_agg.team_id) AS team_id,
+        CASE
+            WHEN appearances.first_fielding_position = fielding_position
+                OR games_ohtani_rule = 1 AND fielding_position IN (1, 10)
+                THEN appearances.games_started
+            ELSE 0
+        END AS games_started,
         COALESCE(event_agg.outs_played, box_agg.outs_played) AS outs_played,
         event_agg.plate_appearances_in_field,
         event_agg.plate_appearances_in_field_with_ball_in_play,
@@ -60,6 +71,7 @@ final AS (
         event_agg.balls_hit_to
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
+    LEFT JOIN {{ ref('player_game_appearances') }} AS appearances USING (game_id, player_id)
 )
 
 SELECT * FROM final
