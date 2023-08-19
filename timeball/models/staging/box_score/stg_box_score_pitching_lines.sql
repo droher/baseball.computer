@@ -33,6 +33,12 @@ renamed AS (
         -- if not non-existent in box-score only games.
         batters_faced - COALESCE(sacrifice_hits, 0) AS on_base_opportunities,
         hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) AS on_base_successes,
+        CASE WHEN nth_pitcher = 1 THEN 1 ELSE 0 END AS games_started,
+        CASE WHEN nth_pitcher != 1 THEN 1 ELSE 0 END AS games_relieved,
+        CASE WHEN nth_pitcher = MAX(nth_pitcher) OVER (PARTITION BY game_id, side)
+                THEN 1 
+            ELSE 0 
+        END AS games_finished,
     FROM source
 )
 

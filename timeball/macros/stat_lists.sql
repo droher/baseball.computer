@@ -116,6 +116,31 @@
 {% endmacro %}
 
 
+{% macro game_level_pitching_stats() %}
+    {{ return([
+        "games_started",
+        "inherited_runners",
+        "bequeathed_runners",
+        "games_relieved",
+        "games_finished",
+        "save_situations_entered",
+        "holds",
+        "blown_saves",
+        "saves_by_rule",
+        "wins",
+        "losses",
+        "saves",
+        "earned_runs",
+        "complete_games",
+        "shutouts",
+        "quality_starts",
+        "cheap_wins",
+        "tough_losses",
+        "no_decisions",
+        "no_hitters"
+    ]) }}
+{% endmacro %}
+
 {% macro remove_items(my_list, values_to_remove) %}
   {% set new_list = [] %}
   {% for item in my_list if item not in values_to_remove %}

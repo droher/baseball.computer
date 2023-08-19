@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH event_agg AS (
     SELECT
         game_id,
@@ -8,6 +13,40 @@ WITH event_agg AS (
         {% endfor %}
     FROM {{ ref('event_pitching_stats') }}
     GROUP BY 1, 2
+),
+
+flag_agg AS (
+  SELECT
+        game_id,
+        pitcher_id AS player_id,
+        -- Some of these are SUM/COUNT because a pitcher could record separate appearances during the game
+        -- so, theoretically, a pitcher could blow multiple saves in the same game
+        BOOL_OR(starting_pitcher_flag)::INT AS games_started,
+        SUM(inherited_runners) AS inherited_runners,
+        -- TODO: A bequeathed runner appears to be defined as the number of runners left on base
+        -- when a pitcher leaves the game, regardless of whether those runners were inherited
+        -- from a previous pitcher. This causes a double-counting issue, which we'll have to
+        -- address either by applying bequeathed runner scoring to multiple pitchers
+        -- or a bequeathal to a single pitcher.
+        SUM(bequeathed_runners) AS bequeathed_runners,
+        BOOL_OR(new_relief_pitcher_flag)::INT AS games_relieved,
+        BOOL_OR(pitcher_finish_flag)::INT AS games_finished,
+        COUNT_IF(save_situation_start_flag) AS save_situations_entered,
+        COUNT_IF(hold_flag) AS holds,
+        COUNT_IF(blown_save_flag) AS blown_saves,
+        -- This could differ from save info in the game-level table if e.g.
+        -- the scorekeeper decided to award a win by judgement
+        BOOL_OR(save_flag)::INT AS saves_by_rule,
+    FROM {{ ref('event_pitching_flags') }}
+    GROUP BY 1, 2  
+),
+
+events_with_flags AS (
+    SELECT
+        event_agg.*,
+        flag_agg.* EXCLUDE (game_id, player_id),
+    FROM event_agg
+    LEFT JOIN flag_agg USING (game_id, player_id)
 ),
 
 box_agg AS (
@@ -35,6 +74,9 @@ box_agg AS (
         SUM(stats.total_bases) AS total_bases,
         SUM(stats.on_base_opportunities) AS on_base_opportunities,
         SUM(stats.on_base_successes) AS on_base_successes,
+        SUM(stats.games_started) AS games_started,
+        SUM(stats.games_relieved) AS games_relieved,
+        SUM(stats.games_finished) AS games_finished,
     FROM {{ ref('stg_box_score_pitching_lines') }} AS stats
     -- This join ensures that we only get the box score lines for games that
     -- do not have an event file.
@@ -44,38 +86,12 @@ box_agg AS (
 ),
 
 unioned AS (
-    SELECT * FROM event_agg
+    SELECT * FROM events_with_flags
     UNION ALL BY NAME
     SELECT * FROM box_agg
 ),
 
-flag_agg AS (
-    SELECT
-        game_id,
-        pitcher_id AS player_id,
-        -- Some of these are SUM/COUNT because a pitcher could record separate appearances during the game
-        -- so, theoretically, a pitcher could blow multiple saves in the same game
-        BOOL_OR(starting_pitcher_flag)::INT AS games_started,
-        SUM(inherited_runners) AS inherited_runners,
-        -- TODO: A bequeathed runner appears to be defined as the number of runners left on base
-        -- when a pitcher leaves the game, regardless of whether those runners were inherited
-        -- from a previous pitcher. This causes a double-counting issue, which we'll have to
-        -- address either by applying bequeathed runner scoring to multiple pitchers
-        -- or a bequeathal to a single pitcher.
-        SUM(bequeathed_runners) AS bequeathed_runners,
-        BOOL_OR(new_relief_pitcher_flag)::INT AS games_relieved,
-        BOOL_OR(pitcher_finish_flag)::INT AS games_finished,
-        COUNT_IF(save_situation_start_flag) AS save_situations_entered,
-        COUNT_IF(hold_flag) AS holds,
-        COUNT_IF(blown_save_flag) AS blown_saves,
-        -- This could differ from save info in the game-level table if e.g.
-        -- the scorekeeper decided to award a win by judgement
-        BOOL_OR(save_flag)::INT AS saves_by_rule,
-    FROM {{ ref('event_pitching_flags') }}
-    GROUP BY 1, 2
-),
-
-joined AS (
+with_game_info AS (
     SELECT
         game_id,
         player_id,
@@ -87,10 +103,8 @@ joined AS (
         -- Box score will have ER directly, but event data will need the join
         COALESCE(earned_runs.earned_runs, unioned.earned_runs) AS earned_runs,
         unioned.* EXCLUDE (game_id, player_id, team_id, earned_runs),
-        flag_agg.* EXCLUDE (game_id, player_id),
-        saves + flag_agg.blown_saves AS save_opportunities,
+        saves + unioned.blown_saves AS save_opportunities,
     FROM unioned
-    LEFT JOIN flag_agg USING (game_id, player_id)
     LEFT JOIN {{ ref('stg_games') }} AS games USING (game_id)
     LEFT JOIN {{ ref('stg_game_earned_runs') }} AS earned_runs USING (game_id, player_id)
 ),
@@ -134,7 +148,7 @@ final AS (
         CASE WHEN games_started = 1 AND wins + losses = 0 THEN 1 ELSE 0 END AS no_decisions,
         CASE WHEN complete_games = 1 AND hits = 0 AND outs_recorded >= 27 THEN 1 ELSE 0 END AS no_hitters,
         -- Perfect games can be calculated for non-box-score games but we need other info for older ones
-    FROM joined
+    FROM with_game_info
     WINDOW team_game AS (PARTITION BY team_id, game_id)
 )
 

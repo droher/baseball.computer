@@ -22,6 +22,8 @@ renamed AS (
         hr AS home_runs,
         bb AS walks,
         so AS strikeouts,
+        -- OAV could be used in theory to back into at-bats against,
+        -- but isn't populatd for the years we source from this data
         baopp AS opponent_batting_average,
         era AS earned_run_average,
         ibb AS intentional_walks,
@@ -33,8 +35,8 @@ renamed AS (
         r AS runs,
         sh AS sacrifice_hits,
         sf AS sacrifice_flies,
-        gidp AS ground_into_double_plays
+        gidp AS grounded_into_double_plays
     FROM source
 )
 
-SELECT * FROM renamed
+SELECT * from renamed
