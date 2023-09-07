@@ -123,7 +123,7 @@ add_rest AS (
             AND add_gamelog.date BETWEEN
             franchise_h.date_start AND COALESCE(franchise_h.date_end, '9999-12-31')
     LEFT JOIN {{ ref('game_starting_lineups') }} AS lineups USING (game_id)
-    INNER JOIN {{ ref('seed_game_types') }} AS game_types USING (game_type)
+    LEFT JOIN {{ ref('seed_game_types') }} AS game_types USING (game_type)
 )
 
 SELECT * FROM add_rest

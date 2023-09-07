@@ -12,6 +12,7 @@ unioned AS (
     SELECT *
     FROM event_lines
     UNION ALL BY NAME
+    
     SELECT *
     FROM {{ ref('stg_box_score_line_scores') }}
     WHERE game_id NOT IN (SELECT DISTINCT game_id FROM event_lines)
@@ -53,6 +54,6 @@ SELECT * REPLACE (
     CASE WHEN LENGTH(away_line_score) > LENGTH(home_line_score)
         THEN home_line_score || 'x'
         ELSE home_line_score
-    END AS home_line_score,
+    END AS home_line_score,    
 )
 FROM side_agg

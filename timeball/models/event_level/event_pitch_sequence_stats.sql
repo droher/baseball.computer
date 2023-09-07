@@ -42,7 +42,7 @@ grouped_sequence AS (
         COUNT(*) FILTER (WHERE is_in_play) AS strikes_in_play,
         COUNT(*) FILTER (WHERE sequence_item = 'StrikeUnknownType') AS strikes_unknown,
 
-        COUNT(*) FILTER (WHERE is_pitch AND NOT is_strike) AS balls,
+        COUNT(*) FILTER (WHERE category = 'Ball') AS balls,
         COUNT(*) FILTER (WHERE sequence_item = 'Ball') AS balls_called,
         COUNT(*) FILTER (WHERE sequence_item = 'IntentionalBall') AS balls_intentional,
         COUNT(*) FILTER (WHERE sequence_item = 'AutomaticBall') AS balls_automatic,

@@ -9,6 +9,7 @@ WITH databank AS (
         field.team_id,
         people.retrosheet_player_id AS player_id,
         field.fielding_position,
+        ANY_VALUE('RegularSeason') AS game_type,
         ANY_VALUE(field.fielding_position_category) AS fielding_position_category,
         SUM(field.games) AS games,
         SUM(field.games_started) AS games_started,
@@ -38,11 +39,13 @@ game_agg AS (
         stats.team_id,
         stats.player_id,
         stats.fielding_position,
+        games.game_type,
         ANY_VALUE(CASE
             WHEN fielding_position = 1 THEN 'P'
             WHEN fielding_position = 2 THEN 'C'
             WHEN fielding_position BETWEEN 3 AND 6 THEN 'IF'
             WHEN fielding_position BETWEEN 7 AND 9 THEN 'OF'
+            WHEN fielding_position = 10 THEN 'DH'
         END) AS fielding_position_category,
         COUNT(*) AS games,
         SUM(stats.games_started) AS games_started,
@@ -63,7 +66,7 @@ game_agg AS (
         COUNT_IF(fielding_position = 9) AS games_right_field,
     FROM {{ ref('stg_games') }} AS games
     INNER JOIN {{ ref('player_position_game_fielding_lines') }} AS stats USING (game_id)
-    GROUP BY 1, 2, 3, 4
+    GROUP BY 1, 2, 3, 4, 5
 ),
 
 final AS (

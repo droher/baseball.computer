@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH event_offense AS (
     SELECT
         game_id,
@@ -44,6 +49,8 @@ box_fielding AS (
     -- just the first position played by any player,
     -- starter or sub.
     WHERE nth_position_played_by_player = 1
+    -- TODO: Remove deduper after resolution of PH5194105241
+    QUALIFY COUNT(*) OVER (PARTITION BY game_id, side, fielding_position) = 1
 ),
 
 event_joined AS (
@@ -67,7 +74,7 @@ box_joined AS (
         box_offense.lineup_position,
         box_fielding.fielding_position
     FROM box_offense
-    LEFT JOIN box_fielding
+    INNER JOIN box_fielding
         ON box_offense.game_id = box_fielding.game_id
             AND box_offense.batter_id = box_fielding.fielder_id
             AND box_offense.side = box_fielding.side
