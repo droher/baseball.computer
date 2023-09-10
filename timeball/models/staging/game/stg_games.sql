@@ -7,7 +7,7 @@ WITH from_box_scores AS (
 unioned AS (
     SELECT
         *,
-        'Event' AS source_type
+        'PlayByPlay' AS source_type
     FROM {{ source('game', 'game') }}
     UNION ALL
     SELECT
@@ -49,6 +49,7 @@ renamed AS (
         translator,
         date_inputted,
         date_edited,
+        account_type,
         source_type,
         EXTRACT(YEAR FROM date) AS season,
     FROM unioned

@@ -38,7 +38,7 @@ pitches AS (
 joined AS (
     SELECT
         game_id,
-        game_start_info.source_type = 'Event' AS has_play_by_play,
+        game_start_info.source_type = 'PlayByPlay' AS has_play_by_play,
         game_start_info.source_type IN ('Event', 'BoxScore') AS has_box_score,
         COALESCE(batted_balls.has_contact_type, FALSE) AS has_contact_type,
         COALESCE(batted_balls.has_general_location, FALSE) AS has_general_location,

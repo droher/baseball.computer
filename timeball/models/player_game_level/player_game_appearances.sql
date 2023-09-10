@@ -6,7 +6,7 @@
 WITH event_based AS (
     SELECT game_id
     FROM {{ ref('stg_games') }}
-    WHERE source_type = 'Event'
+    WHERE source_type = 'PlayByPlay'
 ),
 
 box_offense AS (
