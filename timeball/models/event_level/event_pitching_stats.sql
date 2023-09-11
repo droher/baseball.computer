@@ -8,6 +8,9 @@ WITH baserunning_agg AS (
     -- Runs are populated separately to charge to the right pitcher
     SELECT
         event_key,
+        ANY_VALUE(game_id) AS game_id,
+        ANY_VALUE(current_pitcher_id) AS player_id,
+        ANY_VALUE(fielding_team_id) AS team_id,
         {% for col in baserunning_stats_cols if col in event_level_pitching_stats() -%}
             SUM({{ col }}) AS {{ col }},
         {% endfor %}
@@ -18,22 +21,20 @@ WITH baserunning_agg AS (
 joined_stats AS (
     SELECT
         event_key,
-        events.pitcher_id AS player_id,
-        events.game_id,
-        CASE WHEN events.batting_side = 'Home' THEN games.away_team_id ELSE games.home_team_id END AS team_id,
+        COALESCE(baserunning_agg.game_id, hit.game_id) AS game_id,
+        COALESCE(baserunning_agg.player_id, hit.pitcher_id) AS player_id,
+        COALESCE(baserunning_agg.team_id, hit.fielding_team_id) AS team_id,
         hit.* EXCLUDE (event_key),
         bat.* EXCLUDE (event_key),
         -- Populate runs with the CTE below
         baserunning_agg.* EXCLUDE (event_key, runs),
         pitch.* EXCLUDE (event_key),
         hit.plate_appearances AS batters_faced,
-        events.outs_on_play AS outs_recorded,
-    FROM {{ ref('stg_events') }} AS events
-    LEFT JOIN {{ ref('stg_games') }} AS games USING (game_id)
-    LEFT JOIN {{ ref('event_batting_stats') }} AS hit USING (event_key)
+        hit.outs_on_play AS outs_recorded,
+    FROM {{ ref('event_batting_stats') }} AS hit
+    FULL OUTER JOIN baserunning_agg USING (event_key)
     LEFT JOIN {{ ref('event_batted_ball_stats') }} AS bat USING (event_key)
     LEFT JOIN {{ ref('event_pitch_sequence_stats') }} AS pitch USING (event_key)
-    LEFT JOIN baserunning_agg USING (event_key)
 ),
 
 add_current_pitcher_runs AS (
@@ -42,7 +43,7 @@ add_current_pitcher_runs AS (
         runs.runs,
         runs.inherited_runners_scored,
     FROM joined_stats
-    LEFT JOIN {{ ref('event_run_assignment_stats') }} AS runs
+LEFT JOIN {{ ref('event_run_assignment_stats') }} AS runs
         ON joined_stats.event_key = runs.event_key
             AND joined_stats.player_id = runs.pitcher_id
 ),

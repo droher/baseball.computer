@@ -8,8 +8,10 @@ WITH joined AS (
         event_key,
         b.baserunner,
         b.game_id,
-        CASE WHEN e.batting_side = 'Home' THEN g.home_team_id ELSE g.away_team_id END AS team_id,
-        b.runner_id AS player_id,
+        e.batting_team_id,
+        e.fielding_team_id,
+        b.runner_id,
+        e.pitcher_id AS current_pitcher_id,
         b.runner_lineup_position,
         b.reached_on_event_key,
         b.charge_event_key,
@@ -27,7 +29,6 @@ WITH joined AS (
         COALESCE(b.baserunning_play_type, 'None') AS baserunning_play_type,
         COALESCE(part.total_bases, 0) AS batter_total_bases
     FROM {{ ref('stg_event_baserunners') }} b
-    LEFT JOIN {{ ref('stg_games') }} g USING (game_id)
     LEFT JOIN {{ ref('stg_events') }} e USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS part
         USING (plate_appearance_result)
@@ -41,8 +42,10 @@ final AS (
     SELECT
         event_key,
         game_id,
-        team_id,
-        player_id,
+        batting_team_id,
+        fielding_team_id,
+        runner_id,
+        current_pitcher_id,
         baserunner,
         runner_lineup_position,
         reached_on_event_key,

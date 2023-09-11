@@ -4,6 +4,8 @@ WITH source AS (
 
 renamed AS (
     SELECT
+        game_id,
+        event_id,
         event_key,
         sequence_id,
         sequence_item,

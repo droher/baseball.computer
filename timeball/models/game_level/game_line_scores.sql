@@ -4,6 +4,7 @@ WITH event_lines AS (
         batting_side AS side,
         inning_start AS inning,
         SUM(runs_on_play) AS runs,
+        SUM(outs_on_play) AS outs,
     FROM {{ ref('event_states_full') }}
     GROUP BY 1, 2, 3
 ),
@@ -28,21 +29,33 @@ game_agg AS (
                 THEN CONCAT('(', runs, ')')
             ELSE runs::STRING
         END, '') AS line_score,
+        SUM(outs) AS duration_outs,
         LIST(runs ORDER BY inning) AS line_score_list
     FROM unioned
+    GROUP BY 1, 2
+),
+
+box_outs AS (
+    SELECT
+        game_id,
+        side,
+        SUM(outs_recorded) AS duration_outs
+    FROM {{ ref('stg_box_score_pitching_lines') }}
     GROUP BY 1, 2
 ),
 
 side_agg AS (
     SELECT
         game_id,
-        FIRST(total_runs) FILTER (WHERE side = 'Home') AS home_runs_scored,
-        FIRST(total_runs) FILTER (WHERE side = 'Away') AS away_runs_scored,
-        FIRST(line_score) FILTER (WHERE side = 'Home') AS home_line_score,
-        FIRST(line_score) FILTER (WHERE side = 'Away') AS away_line_score,
-        FIRST(line_score_list) FILTER (WHERE side = 'Home') AS home_line_score_list,
-        FIRST(line_score_list) FILTER (WHERE side = 'Away') AS away_line_score_list
-    FROM game_agg
+        FIRST(g.total_runs) FILTER (WHERE side = 'Home') AS home_runs_scored,
+        FIRST(g.total_runs) FILTER (WHERE side = 'Away') AS away_runs_scored,
+        FIRST(g.line_score) FILTER (WHERE side = 'Home') AS home_line_score,
+        FIRST(g.line_score) FILTER (WHERE side = 'Away') AS away_line_score,
+        FIRST(g.line_score_list) FILTER (WHERE side = 'Home') AS home_line_score_list,
+        FIRST(g.line_score_list) FILTER (WHERE side = 'Away') AS away_line_score_list,
+        SUM(COALESCE(g.duration_outs, box_outs.duration_outs)) AS duration_outs,
+    FROM game_agg AS g
+    LEFT JOIN box_outs USING (game_id, side)
     GROUP BY 1
 )
 

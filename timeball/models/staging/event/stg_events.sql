@@ -13,6 +13,8 @@ renamed AS (
         batter_lineup_position,
         batter_id,
         pitcher_id,
+        batting_team_id,
+        fielding_team_id,
         outs,
         count_balls,
         count_strikes,

@@ -6,6 +6,8 @@ renamed AS (
     SELECT
         game_id,
         side AS batting_side,
+        inning,
+        runs
     FROM source
 )
 

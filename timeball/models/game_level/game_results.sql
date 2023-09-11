@@ -23,6 +23,7 @@ event_and_box_results AS (
         line_scores.away_runs_scored,
         line_scores.home_line_score,
         line_scores.away_line_score,
+        line_scores.duration_outs,
     FROM {{ ref('stg_games') }} AS games
     LEFT JOIN {{ ref('game_line_scores') }} AS line_scores USING (game_id)
 
@@ -36,7 +37,7 @@ unioned AS (
     FROM event_and_box_results
 ),
 
-final AS (
+joined AS (
     SELECT
         game_id,
         COALESCE(suspensions.date_resumed, unioned.date) AS game_finish_date,
@@ -78,7 +79,7 @@ final AS (
         END AS winning_side,
         forfeits.game_id IS NOT NULL AS forfeit_flag,
         suspensions.game_id IS NOT NULL AS suspension_flag,
-        winning_side IS NULL AS tie_flag,
+        winning_team_id IS NULL AS tie_flag,
         unioned.winning_pitcher_id,
         unioned.losing_pitcher_id,
         unioned.save_pitcher_id,
@@ -87,33 +88,38 @@ final AS (
         unioned.away_runs_scored,
         unioned.away_line_score,
         unioned.home_line_score,
-
+        unioned.duration_minutes,
+        unioned.duration_outs
     FROM unioned
     INNER JOIN {{ ref('game_start_info') }} AS start_info USING (game_id)
     LEFT JOIN {{ ref('game_suspensions') }} AS suspensions USING (game_id)
     LEFT JOIN {{ ref('game_forfeits') }} AS forfeits USING (game_id)
 
+),
+
+final AS (
+    SELECT
+        game_id,
+        game_finish_date,
+        winning_team_id,
+        losing_team_id,
+        home_runs_scored,
+        away_runs_scored,
+        winning_team_score,
+        losing_team_score,
+        winning_side,
+        forfeit_flag,
+        suspension_flag,
+        tie_flag,
+        winning_pitcher_id,
+        losing_pitcher_id,
+        save_pitcher_id,
+        game_winning_rbi_player_id,
+        away_line_score,
+        home_line_score,
+        duration_outs,
+        duration_minutes
+    FROM joined
 )
 
-SELECT
-    final.game_id,
-    final.game_finish_date,
-    final.winning_team_id,
-    final.losing_team_id,
-    final.home_runs_scored,
-    final.away_runs_scored,
-    final.winning_team_score,
-    final.losing_team_score,
-    final.winning_side,
-    final.forfeit_flag,
-    final.suspension_flag,
-    final.tie_flag,
-    final.winning_pitcher_id,
-    final.losing_pitcher_id,
-    final.save_pitcher_id,
-    final.game_winning_rbi_player_id,
-    final.away_line_score,
-    final.home_line_score,
-    final.duration_outs,
-    final.duration_minutes
-FROM final
+SELECT * FROM final

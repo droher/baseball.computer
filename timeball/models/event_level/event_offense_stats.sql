@@ -11,8 +11,8 @@ WITH batter_baserunning AS (
 
 batter_stats AS (
     SELECT
-        hit.batter_id AS player_id,
-        hit.batting_team_id AS team_id,
+        COALESCE(hit.batter_id, batter_baserunning.runner_id) AS player_id,
+        COALESCE(hit.batting_team_id, batter_baserunning.batting_team_id) AS team_id,
         event_key,
         'Batter' AS baserunner,
         hit.* EXCLUDE (event_key),

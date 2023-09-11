@@ -22,8 +22,8 @@ SELECT
     event_key,
     events.batting_side,
     CASE WHEN events.batting_side = 'Home' THEN 'Away' ELSE 'Home' END AS fielding_side,
-    CASE WHEN events.batting_side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS batting_team_id,
-    CASE WHEN events.batting_side = 'Home' THEN games.away_team_id ELSE games.home_team_id END AS fielding_team_id,
+    events.batting_team_id,
+    events.fielding_team_id,
     events.batter_id,
     events.batter_lineup_position,
     events.pitcher_id,
@@ -49,8 +49,8 @@ LEFT JOIN overrides USING (event_key)
 LEFT JOIN {{ ref('stg_rosters') }} AS batters
     ON events.batter_id = batters.player_id
         AND games.season = batters.year
-        AND CASE WHEN events.batting_side = 'Home' THEN games.home_team_id ELSE games.away_team_id END = batters.team_id
+        AND events.batting_team_id = batters.team_id
 LEFT JOIN {{ ref('stg_rosters') }} AS pitchers
     ON events.pitcher_id = pitchers.player_id
         AND games.season = pitchers.year
-        AND CASE WHEN events.batting_side = 'Home' THEN games.away_team_id ELSE games.home_team_id END = pitchers.team_id
+        AND events.fielding_team_id = pitchers.team_id

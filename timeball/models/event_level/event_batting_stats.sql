@@ -12,19 +12,19 @@ WITH sacs AS (
 
 final AS (
     SELECT
-        ids.game_id,
+        pa.game_id,
         pa.event_key,
         CASE WHEN result_types.plate_appearance_result = 'StrikeOut'
-                THEN COALESCE(ids.strikeout_responsible_batter_id, ids.batter_id)
-            ELSE ids.batter_id
+                THEN COALESCE(pa.strikeout_responsible_batter_id, pa.batter_id)
+            ELSE pa.batter_id
         END AS batter_id,
         CASE WHEN result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk')
-                THEN COALESCE(ids.walk_responsible_pitcher_id, ids.pitcher_id)
-            ELSE ids.pitcher_id
+                THEN COALESCE(pa.walk_responsible_pitcher_id, pa.pitcher_id)
+            ELSE pa.pitcher_id
         END AS pitcher_id,
-        ids.batting_team_id,
-        ids.fielding_team_id,
-        ids.batter_lineup_position,
+        pa.batting_team_id,
+        pa.fielding_team_id,
+        pa.batter_lineup_position,
         1 AS plate_appearances,
         (result_types.is_at_bat AND sacs.event_key IS NULL)::INT AS at_bats,
         result_types.is_hit::INT AS hits,
@@ -54,13 +54,13 @@ final AS (
         -- The extra out from GIDPs is attributed to the batter,
         -- but for other types of double plays, the other out
         -- is considered to be a baserunning out (for now)
-        result_types.is_batting_out::INT + grounded_into_double_plays AS batting_outs
+        result_types.is_batting_out::INT + grounded_into_double_plays AS batting_outs,
+        pa.outs_on_play
 
     FROM {{ ref('stg_events') }} AS pa
     INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS result_types
         USING (plate_appearance_result)
     LEFT JOIN {{ ref('event_double_plays') }} AS double_plays USING (event_key)
-    LEFT JOIN {{ ref('event_states_batter_pitcher') }} AS ids USING (event_key)
     LEFT JOIN sacs USING (event_key)
     WHERE pa.plate_appearance_result IS NOT NULL
 )
