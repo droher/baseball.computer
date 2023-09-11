@@ -3,36 +3,14 @@
     materialized = 'table',
     )
 }}
-WITH teams_flat AS (
-    SELECT
-        game_id,
-        FIRST(team_id) FILTER (WHERE side = 'Home') AS home_team_id,
-        FIRST(team_id) FILTER (WHERE side = 'Away') AS away_team_id
-    FROM {{ ref('stg_game_teams') }}
-    GROUP BY 1
-),
-
-umps_flat AS (
-    SELECT
-        game_id,
-        FIRST(umpire_id) FILTER (WHERE position = 'Home') AS umpire_home_id,
-        FIRST(umpire_id) FILTER (WHERE position = 'First') AS umpire_first_id,
-        FIRST(umpire_id) FILTER (WHERE position = 'Second') AS umpire_second_id,
-        FIRST(umpire_id) FILTER (WHERE position = 'Third') AS umpire_third_id,
-        FIRST(umpire_id) FILTER (WHERE position = 'LeftField') AS umpire_left_field_id,
-        FIRST(umpire_id) FILTER (WHERE position = 'RightField') AS umpire_right_field_id,
-    FROM {{ ref('stg_game_umpires') }}
-    GROUP BY 1
-),
-
-game_flat AS (
+WITH games AS (
     SELECT
         g.game_id,
         g.date,
         g.start_time,
         g.season,
-        teams_flat.home_team_id,
-        teams_flat.away_team_id,
+        g.home_team_id,
+        g.away_team_id,
         g.doubleheader_status,
         g.time_of_day,
         g.game_type,
@@ -49,20 +27,18 @@ game_flat AS (
         g.scorer,
         g.scoring_method,
         g.source_type,
-        umps_flat.umpire_home_id,
-        umps_flat.umpire_first_id,
-        umps_flat.umpire_second_id,
-        umps_flat.umpire_third_id,
-        umps_flat.umpire_left_field_id,
-        umps_flat.umpire_right_field_id,
+        g.umpire_home_id,
+        g.umpire_first_id,
+        g.umpire_second_id,
+        g.umpire_third_id,
+        g.umpire_left_id,
+        g.umpire_right_id,
     FROM {{ ref('stg_games') }} AS g
-    LEFT JOIN teams_flat USING (game_id)
-    LEFT JOIN umps_flat USING (game_id)
 ),
 
 add_gamelog AS (
     SELECT *
-    FROM game_flat
+    FROM games
     UNION ALL BY NAME
     -- Gamelogs from non-acquired games
     -- have a small subset of info

@@ -1,32 +1,32 @@
 WITH final AS (
     SELECT
         event_key,
-        COALESCE(bbi.contact != 'Unknown', FALSE) AS has_contact_type,
-        COALESCE(bbi.general_location != 'Unknown', FALSE) AS has_general_location,
+        COALESCE(e.batted_contact_type != 'Unknown', FALSE) AS has_contact_type,
+        COALESCE(e.batted_location_general != 'Unknown', FALSE) AS has_general_location,
         -- To avoid false negatives, we'll say that a fielder is present regardless
         -- if it's a ground-rule double or home run where there is location info
         COALESCE(
-            bbi.hit_to_fielder != 0 OR (NOT rt.is_fielded AND has_general_location),
+            e.batted_to_fielder != 0 OR (NOT rt.is_fielded AND has_general_location),
             FALSE
-        ) AS has_hit_to_fielder,
-        has_hit_to_fielder OR has_general_location AS has_any_location,
+        ) AS has_batted_to_fielder,
+        has_batted_to_fielder OR has_general_location AS has_any_location,
         -- Coverage of the fields below can't be determined at an event granularity, so
         -- the false negative issue above isn't a concern. Coverage should be inferred
         -- by having at least ~1 predicate-satisfying event over the course of
         -- a game or another appropriate sample.
-        COALESCE(bbi.depth != 'Default', FALSE) AS has_depth,
-        COALESCE(bbi.depth = 'ExtraDeep', FALSE) AS has_extra_deep_depth,
-        COALESCE(bbi.angle != 'Default', FALSE) AS has_angle,
-        COALESCE(bbi.angle = 'Foul', FALSE) AS has_foul_angle,
+        COALESCE(e.batted_location_depth != 'Default', FALSE) AS has_depth,
+        COALESCE(e.batted_location_depth = 'ExtraDeep', FALSE) AS has_extra_deep_depth,
+        COALESCE(e.batted_location_angle != 'Default', FALSE) AS has_angle,
+        COALESCE(e.batted_location_angle = 'Foul', FALSE) AS has_foul_angle,
 
-        COALESCE(bbi.strength != 'Default', FALSE) AS has_strength,
+        COALESCE(e.batted_location_strength != 'Default', FALSE) AS has_strength,
         COALESCE(lt.is_mid_position, FALSE) AS has_mid_position,
         COALESCE(
-            ct.broad_classification = 'GroundBall' AND bbi.general_location IS NOT NULL,
+            ct.broad_classification = 'GroundBall' AND e.batted_location_general IS NOT NULL,
             FALSE
         ) AS has_general_location_groundball,
         COALESCE(
-            ct.broad_classification = 'AirBall' AND bbi.general_location IS NOT NULL,
+            ct.broad_classification = 'AirBall' AND e.batted_location_general IS NOT NULL,
             FALSE
         ) AS has_general_location_airball,
         COALESCE(
@@ -38,43 +38,42 @@ WITH final AS (
             FALSE
         ) AS has_mid_position_airball,
         COALESCE(
-            ct.broad_classification = 'GroundBall' AND bbi.depth != 'Default',
+            ct.broad_classification = 'GroundBall' AND e.batted_location_depth != 'Default',
             FALSE
         ) AS has_depth_groundball,
         COALESCE(
-            ct.broad_classification = 'AirBall' AND bbi.depth != 'Default',
+            ct.broad_classification = 'AirBall' AND e.batted_location_depth != 'Default',
             FALSE
         ) AS has_depth_airball,
         COALESCE(
-            ct.broad_classification = 'GroundBall' AND bbi.angle != 'Default',
+            ct.broad_classification = 'GroundBall' AND e.batted_location_angle != 'Default',
             FALSE
         ) AS has_angle_groundball,
         COALESCE(
-            ct.broad_classification = 'AirBall' AND bbi.angle != 'Default',
+            ct.broad_classification = 'AirBall' AND e.batted_location_angle != 'Default',
             FALSE
         ) AS has_angle_airball,
         COALESCE(
-            ct.broad_classification = 'GroundBall' AND bbi.strength != 'Default',
+            ct.broad_classification = 'GroundBall' AND e.batted_location_strength != 'Default',
             FALSE
         ) AS has_strength_groundball,
         COALESCE(
-            ct.broad_classification = 'AirBall' AND bbi.strength != 'Default',
+            ct.broad_classification = 'AirBall' AND e.batted_location_strength != 'Default',
             FALSE
         ) AS has_strength_airball,
         -- Based on the location diagram, any outside-the-park home run
         -- from left-center to right-center should be Deep or ExtraDeep in almost any park.
-        -- A default (or shallow) depth is a strong indicator
-        -- that the depth info is partially or entirely missing from the sample.
+        -- A default (or shallow) batted_location_depth is a strong indicator
+        -- that the batted_location_depth info is partially or entirely missing from the sample.
         (
             plate_appearance_result = 'HomeRun'
             AND lt.category_edge = 'Middle'
-            AND bbi.depth NOT LIKE '%Deep'
+            AND e.batted_location_depth NOT LIKE '%Deep'
         ) AS has_misclassified_home_run_distance,
-    FROM {{ ref('stg_event_plate_appearances') }}
+    FROM {{ ref('stg_events') }} e
     INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
-    INNER JOIN {{ ref('stg_event_batted_ball_info') }} AS bbi USING (event_key)
-    LEFT JOIN {{ ref('seed_hit_location_categories') }} AS lt USING (general_location)
-    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS ct USING (contact)
+    LEFT JOIN {{ ref('seed_hit_location_categories') }} AS lt USING (batted_location_general)
+    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS ct USING (batted_contact_type)
 )
 
 SELECT * FROM final

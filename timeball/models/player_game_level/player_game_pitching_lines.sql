@@ -53,7 +53,7 @@ box_agg AS (
     SELECT
         game_id,
         stats.pitcher_id AS player_id,
-        ANY_VALUE(teams.team_id) AS team_id,
+        ANY_VALUE(CASE WHEN stats.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END) AS team_id,
         SUM(stats.outs_recorded) AS outs_recorded,
         SUM(stats.batters_faced) AS batters_faced,
         SUM(stats.hits) AS hits,
@@ -80,8 +80,8 @@ box_agg AS (
     FROM {{ ref('stg_box_score_pitching_lines') }} AS stats
     -- This join ensures that we only get the box score lines for games that
     -- do not have an event file.
-    INNER JOIN {{ ref('stg_game_teams') }} AS teams USING (game_id, side)
-    WHERE teams.source_type = 'BoxScore'
+    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
+    WHERE games.source_type = 'BoxScore'
     GROUP BY 1, 2
 ),
 

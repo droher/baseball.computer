@@ -1,4 +1,4 @@
-general_location,category_depth,category_side,category_edge,is_mid_position
+batted_location_general,category_depth,category_side,category_edge,is_mid_position
 Catcher,Battery,All,All,false
 CatcherFirst,Battery,Right,Right,true
 CatcherThird,Battery,Left,Left,true

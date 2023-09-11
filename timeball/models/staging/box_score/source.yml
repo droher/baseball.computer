@@ -161,7 +161,7 @@ sources:
           - name: passed_balls
             description: ""
 
-      - name: box_score_game
+      - name: box_score_games
         description: ""
         meta:
           primary_keys:
@@ -448,26 +448,6 @@ sources:
           - name: inning
             description: ""
 
-      - name: box_score_team
-        description: ""
-        meta:
-          primary_keys:
-            - game_id
-            - side
-        columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: team_id
-            description: ""
-            tests:
-              - not_null
-          - name: side
-            description: ""
-            tests:
-              - not_null
-
       - name: box_score_team_batting_lines
         description: ""
         meta:
@@ -594,27 +574,7 @@ sources:
           - name: fielders
             description: ""
 
-      - name: box_score_umpire
-        description: ""
-        meta:
-          primary_keys:
-            - game_id
-            - position
-        columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: position
-            description: ""
-          - name: umpire_id
-            description: ""
-            tests:
-              - not_null:
-                  config:
-                    severity: warn
-
-      - name: box_score_comment
+      - name: box_score_comments
         meta:
           primary_keys:
             - game_id
@@ -630,5 +590,5 @@ sources:
             tests:
               - not_null
 
-      - name: box_score_line_score
+      - name: box_score_line_scores
   

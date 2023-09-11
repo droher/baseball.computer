@@ -3,7 +3,7 @@ WITH batted_balls AS (
         events.game_id,
         BOOL_AND(bb.has_contact_type) AS has_contact_type,
         BOOL_AND(bb.has_general_location) AS has_general_location,
-        BOOL_AND(bb.has_hit_to_fielder) AS has_hit_to_fielder,
+        BOOL_AND(bb.has_batted_to_fielder) AS has_batted_to_fielder,
         BOOL_AND(bb.has_any_location) AS has_any_location,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN {{ ref('event_completeness_batted_balls') }} AS bb USING (event_key)
@@ -42,7 +42,7 @@ joined AS (
         game_start_info.source_type IN ('Event', 'BoxScore') AS has_box_score,
         COALESCE(batted_balls.has_contact_type, FALSE) AS has_contact_type,
         COALESCE(batted_balls.has_general_location, FALSE) AS has_general_location,
-        COALESCE(batted_balls.has_hit_to_fielder, FALSE) AS has_hit_to_fielder,
+        COALESCE(batted_balls.has_batted_to_fielder, FALSE) AS has_batted_to_fielder,
         COALESCE(batted_balls.has_any_location, FALSE) AS has_any_location,
         COALESCE(fielding_credit.has_fielder_putouts, FALSE) AS has_fielder_putouts,
         COALESCE(fielding_credit.has_fielder_assists, FALSE) AS has_fielder_assists,

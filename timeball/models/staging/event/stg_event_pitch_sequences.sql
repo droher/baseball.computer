@@ -1,5 +1,5 @@
 WITH source AS (
-    SELECT * FROM {{ source('event', 'event_pitch') }}
+    SELECT * FROM {{ source('event', 'event_pitch_sequences') }}
 ),
 
 renamed AS (

@@ -17,10 +17,10 @@ WITH add_meta AS (
 other_events AS (
     SELECT
         event_key,
-        COUNT(*) FILTER (WHERE baserunning_play_type = 'PassedBall') AS passed_balls,
-        COUNT(*) FILTER (WHERE baserunning_play_type = 'WildPitch') AS wild_pitches,
-        COUNT(*) FILTER (WHERE baserunning_play_type = 'Balk') AS balks,
-    FROM {{ ref('stg_event_baserunning_plays') }}
+        BOOL_OR(baserunning_play_type = 'PassedBall')::INT1 AS passed_balls,
+        BOOL_OR(baserunning_play_type = 'WildPitch')::INT1 AS wild_pitches,
+        BOOL_OR(baserunning_play_type = 'Balk')::INT1 AS balks,
+    FROM {{ ref('stg_event_baserunners') }}
     GROUP BY 1
 ),
 

@@ -26,7 +26,8 @@ final AS (
         COALESCE(fpa.has_fielder_assists, TRUE) AS has_fielder_assists,
         COALESCE(fpa.has_fielder_errors, TRUE) AS has_fielder_errors
     FROM fielding_play_agg AS fpa
-    FULL OUTER JOIN {{ ref('stg_event_plate_appearances') }} USING (event_key)
+    FULL OUTER JOIN {{ ref('stg_events') }} USING (event_key)
+    WHERE plate_appearance_result IS NOT NULL
 )
 
 SELECT * FROM final

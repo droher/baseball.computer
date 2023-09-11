@@ -1,5 +1,5 @@
 WITH source AS (
-    SELECT * FROM {{ source('game', 'game_lineup_appearance') }}
+    SELECT * FROM {{ source('game', 'game_lineup_appearances') }}
 ),
 
 renamed AS (

@@ -2,7 +2,7 @@ sources:
   - name: game
     description: ""
     tables:
-      - name: game
+      - name: games
         description: ""
         meta:
           primary_keys:
@@ -120,7 +120,7 @@ sources:
             tests:
               - not_null
 
-      - name: game_fielding_appearance
+      - name: game_fielding_appearances
         description: ""
         meta:
           primary_keys:
@@ -157,7 +157,7 @@ sources:
             tests:
               - not_null
 
-      - name: game_lineup_appearance
+      - name: game_lineup_appearances
         description: ""
         meta:
           primary_keys:
@@ -194,45 +194,5 @@ sources:
           - name: end_event_id
             description: ""
             data_type: UINTEGER
-            tests:
-              - not_null
-
-      - name: game_team
-        description: ""
-        meta:
-          primary_keys:
-            - game_id
-            - side
-        columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: team_id
-            description: ""
-            tests:
-              - not_null
-          - name: side
-            description: ""
-            tests:
-              - not_null
-
-      - name: game_umpire
-        description: ""
-        meta:
-          primary_keys:
-            - game_id
-            - position
-        columns:
-          - name: game_id
-            description: ""
-            tests:
-              - not_null
-          - name: position
-            description: ""
-            tests:
-              - not_null
-          - name: umpire_id
-            description: ""
             tests:
               - not_null

@@ -1,14 +1,14 @@
 WITH from_box_scores AS (
     SELECT *
-    FROM {{ source('box_score', 'box_score_game') }}
-    WHERE game_id NOT IN (SELECT game_id FROM {{ source('game', 'game') }})
+    FROM {{ source('box_score', 'box_score_games') }}
+    WHERE game_id NOT IN (SELECT game_id FROM {{ source('game', 'games') }})
 ),
 
 unioned AS (
     SELECT
         *,
         'PlayByPlay' AS source_type
-    FROM {{ source('game', 'game') }}
+    FROM {{ source('game', 'games') }}
     UNION ALL
     SELECT
         *,
@@ -51,6 +51,14 @@ renamed AS (
         date_edited,
         account_type,
         source_type,
+        away_team_id,
+        home_team_id,
+        umpire_home_id,
+        umpire_first_id,
+        umpire_second_id,
+        umpire_third_id,
+        umpire_left_id,
+        umpire_right_id,
         EXTRACT(YEAR FROM date) AS season,
     FROM unioned
 )

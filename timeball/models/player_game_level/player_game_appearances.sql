@@ -84,7 +84,7 @@ offense_agg AS (
         BOOL_OR(entered_game_as = 'PinchRunner')::INT1 AS games_pinch_run,
         BOOL_OR(entered_game_as = 'DefensiveSubstitution')::INT1 AS games_defensive_sub,
         -- Just choose first sub location - We can track courtesy runner situations somewhere else
-        LIST(lineup_position ORDER BY position_order)[1] AS lineup_position
+        FIRST(lineup_position) AS lineup_position
     -- Ignore pitcher in DH lineups
     FROM offense_union
     WHERE lineup_position > 0

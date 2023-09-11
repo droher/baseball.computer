@@ -1,5 +1,5 @@
 WITH source AS (
-    SELECT * FROM {{ source('box_score', 'box_score_comment') }}
+    SELECT * FROM {{ source('box_score', 'box_score_comments') }}
 ),
 
 renamed AS (

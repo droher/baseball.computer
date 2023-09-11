@@ -15,8 +15,9 @@ WITH union_plays AS (
         event_key,
         plate_appearance_result AS play,
         'BATTING' AS play_category,
-    FROM {{ ref('stg_event_plate_appearances') }}
-    WHERE event_key NOT IN (SELECT event_key FROM {{ ref('stg_event_baserunning_plays') }})
+    FROM {{ ref('stg_events') }}
+    WHERE plate_appearance_result IS NOT NULL
+        AND event_key NOT IN (SELECT event_key FROM {{ ref('stg_event_baserunners') }} WHERE baserunning_play_type IS NOT NULL)
     UNION ALL BY NAME
     -- Only consider baserunning plays with a single event for now.
     -- We can still handle these cases downstream by assigning the value
@@ -26,8 +27,8 @@ WITH union_plays AS (
         event_key,
         FIRST(baserunning_play_type) AS play,
         FIRST('BASERUNNING') AS play_category,
-    FROM {{ ref('stg_event_baserunning_plays') }}
-    WHERE event_key NOT IN (SELECT event_key FROM {{ ref('stg_event_plate_appearances') }})
+    FROM {{ ref('stg_event_baserunners') }}
+    WHERE event_key NOT IN (SELECT event_key FROM {{ ref('stg_events') }} WHERE plate_appearance_result IS NOT NULL)
     GROUP BY 1
     HAVING COUNT(*) = 1
 ),

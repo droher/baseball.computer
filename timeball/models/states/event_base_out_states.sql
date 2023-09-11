@@ -7,16 +7,7 @@ WITH base_state AS (
     SELECT
         event_key,
         BIT_OR(baserunner_bit) AS base_state,
-    FROM {{ ref('stg_event_base_states') }}
-    WHERE base_state_type = 'Starting'
-    GROUP BY 1
-),
-
-outs_agg AS (
-    SELECT
-        event_key,
-        COUNT(*) AS outs
-    FROM {{ ref('stg_event_outs') }}
+    FROM {{ ref('stg_event_baserunners') }}
     GROUP BY 1
 ),
 
@@ -29,13 +20,12 @@ add_outs AS (
         event_key // 255 AS game_key,
         CASE events.frame WHEN 'Top' THEN 0 ELSE 1 END AS frame_key,
         events.outs AS outs_start,
-        COALESCE(outs_agg.outs, 0) AS outs_on_play,
-        events.outs + COALESCE(outs_agg.outs, 0) AS outs_end,
+        events.outs_on_play AS outs_on_play,
+        events.outs + events.outs_on_play AS outs_end,
         COALESCE(base_state.base_state, 0) AS base_state,
         info.is_force_on_second AND outs_start < 2 AS is_gidp_eligible,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN base_state USING (event_key)
-    LEFT JOIN outs_agg USING (event_key)
     LEFT JOIN {{ ref('seed_base_state_info') }} AS info USING (base_state)
 ),
 

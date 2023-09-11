@@ -8,7 +8,7 @@ WITH box_agg AS (
         game_id,
         stats.fielder_id AS player_id,
         stats.fielding_position,
-        ANY_VALUE(teams.team_id) AS team_id,
+        ANY_VALUE(CASE WHEN stats.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END) AS team_id,
         SUM(stats.outs_played) AS outs_played,
         SUM(stats.putouts) AS putouts,
         SUM(stats.assists) AS assists,
@@ -17,7 +17,7 @@ WITH box_agg AS (
         SUM(stats.triple_plays) AS triple_plays,
         SUM(stats.passed_balls) AS passed_balls
     FROM {{ ref('stg_box_score_fielding_lines') }} AS stats
-    INNER JOIN {{ ref('stg_game_teams') }} AS teams USING (game_id, side)
+    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
     GROUP BY 1, 2, 3
 ),
 

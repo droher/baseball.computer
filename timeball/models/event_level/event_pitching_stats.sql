@@ -15,33 +15,25 @@ WITH baserunning_agg AS (
     GROUP BY 1
 ),
 
-outs_agg AS (
-    SELECT
-        event_key,
-        COUNT(*) AS outs_recorded,
-    FROM {{ ref('stg_event_outs') }}
-    GROUP BY 1
-),
-
 joined_stats AS (
     SELECT
         event_key,
-        states.pitcher_id AS player_id,
-        states.game_id,
-        states.fielding_team_id AS team_id,
+        events.pitcher_id AS player_id,
+        events.game_id,
+        CASE WHEN events.batting_side = 'Home' THEN games.away_team_id ELSE games.home_team_id END AS team_id,
         hit.* EXCLUDE (event_key),
         bat.* EXCLUDE (event_key),
         -- Populate runs with the CTE below
         baserunning_agg.* EXCLUDE (event_key, runs),
         pitch.* EXCLUDE (event_key),
         hit.plate_appearances AS batters_faced,
-        outs_agg.outs_recorded
-    FROM {{ ref('event_states_batter_pitcher') }} AS states
+        events.outs_on_play AS outs_recorded,
+    FROM {{ ref('stg_events') }} AS events
+    LEFT JOIN {{ ref('stg_games') }} AS games USING (game_id)
     LEFT JOIN {{ ref('event_batting_stats') }} AS hit USING (event_key)
     LEFT JOIN {{ ref('event_batted_ball_stats') }} AS bat USING (event_key)
     LEFT JOIN {{ ref('event_pitch_sequence_stats') }} AS pitch USING (event_key)
     LEFT JOIN baserunning_agg USING (event_key)
-    LEFT JOIN outs_agg USING (event_key)
 ),
 
 add_current_pitcher_runs AS (

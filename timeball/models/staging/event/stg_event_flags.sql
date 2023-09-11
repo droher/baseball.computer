@@ -1,5 +1,5 @@
 WITH source AS (
-    SELECT * FROM {{ source('event', 'event_flag') }}
+    SELECT * FROM {{ source('event', 'event_flags') }}
 ),
 
 renamed AS (

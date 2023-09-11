@@ -1,4 +1,4 @@
-contact,broad_classification,is_bunt
+batted_contact_type,broad_classification,is_bunt
 Fly,AirBall,false
 Unknown,Unknown,false
 PopFly,AirBall,false

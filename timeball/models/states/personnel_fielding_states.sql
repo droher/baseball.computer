@@ -27,16 +27,15 @@ WITH ranges AS (
 final AS (
     SELECT
         appearances.game_id,
-        teams.team_id AS fielding_team_id,
-        side AS fielding_side,
-        (games.game_key + ranges.start_event_id) * CASE WHEN side = 'Home' THEN 1 ELSE -1 END
+        CASE WHEN appearances.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS fielding_team_id,
+        appearances.side AS fielding_side,
+        (games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END
         AS personnel_fielding_key,
         ranges.start_event_id,
         ranges.end_event_id,
         appearances.player_id,
         appearances.fielding_position,
     FROM {{ ref('stg_game_fielding_appearances') }} AS appearances
-    INNER JOIN {{ ref('stg_game_teams') }} AS teams USING (game_id, side)
     INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
     INNER JOIN ranges
         ON ranges.game_id = appearances.game_id

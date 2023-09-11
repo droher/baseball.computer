@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: event
+    tables:
+      - name: event_comments
+        description: ""
+      - name: event_audit
+        description: ""
+      - name: event_pitch_sequences
+        description: ""
+      - name: event_flags
+        description: ""
+      - name: event_fielding_play
+        description: ""
+      - name: event_baserunners
+        description: ""
+      - name: events
+        description: ""

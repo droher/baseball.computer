@@ -18,15 +18,15 @@ WITH overrides AS (
         OR walk_responsible_pitcher_id IS NOT NULL
 )
 SELECT
-    lineup.game_id,
+    events.game_id,
     event_key,
-    lineup.batting_team_id,
-    fielding.fielding_team_id,
-    lineup.batting_side,
-    fielding.fielding_side,
-    lineup.player_id AS batter_id,
-    lineup.lineup_position AS batter_lineup_position,
-    fielding.player_id AS pitcher_id,
+    events.batting_side,
+    CASE WHEN events.batting_side = 'Home' THEN 'Away' ELSE 'Home' END AS fielding_side,
+    CASE WHEN events.batting_side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS batting_team_id,
+    CASE WHEN events.batting_side = 'Home' THEN games.away_team_id ELSE games.home_team_id END AS fielding_team_id,
+    events.batter_id,
+    events.batter_lineup_position,
+    events.pitcher_id,
     -- TODO: Update "weird state" section to get overrides,
     -- and get handedness from chadwick register as fallback
     CASE
@@ -45,19 +45,12 @@ SELECT
     overrides.walk_responsible_pitcher_id,
 FROM {{ ref('stg_events') }} AS events
 INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
-INNER JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
-INNER JOIN {{ ref('personnel_fielding_states') }} AS fielding
-    ON lookup.personnel_fielding_key = fielding.personnel_fielding_key
-        AND fielding.fielding_position = 1
-INNER JOIN {{ ref('personnel_lineup_states') }} AS lineup
-    ON lookup.personnel_lineup_key = lineup.personnel_lineup_key
-        AND lineup.lineup_position = events.at_bat
 LEFT JOIN overrides USING (event_key)
 LEFT JOIN {{ ref('stg_rosters') }} AS batters
-    ON lineup.player_id = batters.player_id
+    ON events.batter_id = batters.player_id
         AND games.season = batters.year
-        AND lineup.batting_team_id = batters.team_id
+        AND CASE WHEN events.batting_side = 'Home' THEN games.home_team_id ELSE games.away_team_id END = batters.team_id
 LEFT JOIN {{ ref('stg_rosters') }} AS pitchers
-    ON fielding.player_id = pitchers.player_id
+    ON events.pitcher_id = pitchers.player_id
         AND games.season = pitchers.year
-        AND fielding.fielding_team_id = pitchers.team_id
+        AND CASE WHEN events.batting_side = 'Home' THEN games.away_team_id ELSE games.home_team_id END = pitchers.team_id

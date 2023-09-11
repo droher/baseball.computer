@@ -3,17 +3,7 @@
     materialized = 'table',
     )
 }}
-WITH rbi AS (
-    SELECT
-        event_key,
-        COUNT(*) AS runs_batted_in
-    FROM {{ ref('stg_event_runs') }}
-    WHERE rbi_flag
-    GROUP BY 1
-),
-
--- Need this to properly count at bats in the event of a ROE on a sac
-sacs AS (
+WITH sacs AS (
     -- No need for distinct, max one sac per event
     SELECT event_key
     FROM {{ ref('stg_event_flags') }}
@@ -56,7 +46,7 @@ final AS (
         result_types.is_on_base_opportunity::INT AS on_base_opportunities,
 
         result_types.is_on_base_success::INT AS on_base_successes,
-        COALESCE(rbi.runs_batted_in, 0) AS runs_batted_in,
+        COALESCE(pa.runs_batted_in, 0) AS runs_batted_in,
         COALESCE(double_plays.is_ground_ball_double_play::INT, 0) AS grounded_into_double_plays,
 
         COALESCE(double_plays.is_double_play::INT, 0) AS double_plays,
@@ -66,13 +56,13 @@ final AS (
         -- is considered to be a baserunning out (for now)
         result_types.is_batting_out::INT + grounded_into_double_plays AS batting_outs
 
-    FROM {{ ref('stg_event_plate_appearances') }} AS pa
+    FROM {{ ref('stg_events') }} AS pa
     INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS result_types
         USING (plate_appearance_result)
     LEFT JOIN {{ ref('event_double_plays') }} AS double_plays USING (event_key)
     LEFT JOIN {{ ref('event_states_batter_pitcher') }} AS ids USING (event_key)
-    LEFT JOIN rbi USING (event_key)
     LEFT JOIN sacs USING (event_key)
+    WHERE pa.plate_appearance_result IS NOT NULL
 )
 
 SELECT * FROM final

@@ -23,17 +23,9 @@ WITH fielding_plays_agg AS (
     GROUP BY 1, 2
 ),
 
-outs_agg AS (
-    SELECT
-        event_key,
-        COUNT(*) AS outs_played
-    FROM {{ ref('stg_event_outs') }}
-    GROUP BY 1
-),
-
 passed_balls AS (
     SELECT DISTINCT event_key
-    FROM {{ ref('stg_event_baserunning_plays') }}
+    FROM {{ ref('stg_event_baserunners') }}
     WHERE baserunning_play_type = 'PassedBall'
 ),
 
@@ -45,21 +37,18 @@ event_level_agg AS (
         events.event_id,
         lookup.personnel_fielding_key,
         events.batting_side,
-        COALESCE(oa.outs_played, 0) AS outs_played,
-        (pa.event_key IS NOT NULL)::INT AS plate_appearances_in_field,
-        bbi.hit_to_fielder,
+        events.outs_on_play AS outs_played,
+        (events.plate_appearance_result IS NOT NULL)::INT AS plate_appearances_in_field,
+        events.batted_to_fielder,
         dp.is_double_play,
         dp.is_triple_play,
         dp.is_ground_ball_double_play,
        (passed_balls.event_key IS NOT NULL)::TINYINT AS passed_balls,
         CASE WHEN prt.is_in_play THEN 1 ELSE 0 END AS plate_appearances_in_field_with_ball_in_play
     FROM {{ ref('stg_events') }} AS events
-    LEFT JOIN outs_agg AS oa USING (event_key)
     LEFT JOIN passed_balls USING (event_key)
-    LEFT JOIN {{ ref('stg_event_plate_appearances') }} AS pa USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS prt USING (plate_appearance_result)
     LEFT JOIN {{ ref('event_double_plays') }} AS dp USING (event_key)
-    LEFT JOIN {{ ref('stg_event_batted_ball_info') }} AS bbi USING (event_key)
     LEFT JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
 ),
 
@@ -77,7 +66,7 @@ final AS (
         e.outs_played,
         e.plate_appearances_in_field,
         e.plate_appearances_in_field_with_ball_in_play,
-        CASE WHEN e.hit_to_fielder = personnel.fielding_position THEN 1 ELSE 0 END AS balls_hit_to,
+        CASE WHEN e.batted_to_fielder = personnel.fielding_position THEN 1 ELSE 0 END AS balls_hit_to,
         COALESCE(fp.fielding_plays, 0) AS fielding_plays,
         COALESCE(fp.putouts, 0) AS putouts,
         COALESCE(fp.assists, 0) AS assists,
