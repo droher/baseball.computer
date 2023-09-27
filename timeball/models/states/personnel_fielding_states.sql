@@ -14,7 +14,7 @@ WITH ranges AS (
         COALESCE(
             MIN(start_event_id - 1) OVER w,
             end_event_id
-        ) AS end_event_id
+        )::UINTEGER AS end_event_id
     FROM {{ ref('stg_game_fielding_appearances') }}
     -- The MIN over this window is the next-largest value
     WINDOW w AS (

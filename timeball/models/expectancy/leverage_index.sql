@@ -5,12 +5,12 @@
 }}
 WITH trans AS (
     SELECT
-        LEAST(9, inning_start) AS inning_start,
+        LEAST(10, inning_start) AS inning_start,
         frame_start,
         truncated_home_margin_start,
         base_state_start,
         outs_start,
-        LEAST(9, inning_end) AS inning_end,
+        LEAST(10, inning_end) AS inning_end,
         frame_end,
         truncated_home_margin_end,
         base_state_end,

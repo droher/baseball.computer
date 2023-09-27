@@ -3,7 +3,7 @@ WITH base AS (
         game_id,
         home_team_id AS team_id,
         away_team_id AS opponent_id,
-        'Home' AS team_side,
+        'Home'::SIDE AS team_side,
         * EXCLUDE (game_id, home_team_id, away_team_id) -- noqa,
     FROM {{ ref('game_start_info') }}
     UNION ALL
@@ -11,7 +11,7 @@ WITH base AS (
         game_id,
         away_team_id AS team_id,
         home_team_id AS opponent_id,
-        'Away' AS team_side,
+        'Away'::SIDE AS team_side,
         * EXCLUDE (game_id, home_team_id, away_team_id) -- noqa
     FROM {{ ref('game_start_info') }}
 ),

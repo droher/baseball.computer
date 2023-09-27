@@ -59,7 +59,7 @@ renamed AS (
         umpire_third_id,
         umpire_left_id,
         umpire_right_id,
-        EXTRACT(YEAR FROM date) AS season,
+        EXTRACT(YEAR FROM date)::INT2 AS season,
     FROM unioned
 )
 

@@ -31,7 +31,9 @@ WITH unassisted_putouts AS (
 
 inference AS (
     SELECT
+        batted_ball.game_id,
         batted_ball.event_key,
+        batted_ball.plate_appearance_result,
         -- Null out batted_to_fielder on homers to distinguish between "no fielder" and "unknown fielder"
         -- TODO: Handle upstream
         CASE WHEN plate_appearance_result != 'HomeRun'
@@ -62,7 +64,9 @@ inference AS (
 
 final AS (
     SELECT
+        inference.game_id,
         inference.event_key,
+        inference.plate_appearance_result,
         inference.batted_to_fielder,
         inference.batted_contact_type AS contact,
         inference.recorded_contact,
@@ -70,15 +74,14 @@ final AS (
         contact_info.broad_classification AS contact_broad_classification,
         contact_info.is_bunt,
         inference.recorded_location,
-        fielder.category_side,
         CASE
-            WHEN inference.category_depth IS NOT NULL THEN inference.category_depth
             WHEN inference.batted_contact_type = 'GroundBall' AND inference.batted_to_fielder BETWEEN 7 AND 9 THEN 'Infield'
             WHEN inference.batted_contact_type = 'Unknown' AND inference.batted_to_fielder BETWEEN 7 AND 9 THEN 'Unknown'
             WHEN fielder.category_depth IS NOT NULL THEN fielder.category_depth
+            WHEN inference.category_depth IS NOT NULL THEN inference.category_depth
             ELSE 'Unknown'
         END AS location_depth,
-        COALESCE(inference.category_side, fielder.category_side, 'Unknown') AS location_side,
+        COALESCE(fielder.category_side, inference.category_side, 'Unknown') AS location_side,
         COALESCE(inference.category_edge, 'Unknown') AS location_edge,
     FROM inference
     LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS contact_info USING (batted_contact_type)

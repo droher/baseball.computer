@@ -138,6 +138,7 @@ sources:
           - name: retroid
             tests:
               - unique
+            data_type: PLAYER_ID
           - name: bbrefid
             tests:
               - unique

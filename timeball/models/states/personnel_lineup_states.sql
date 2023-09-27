@@ -17,7 +17,7 @@ WITH ranges AS (
             -- except for the fun edge case where the final substitution
             -- of the game is a move that moves the DH into the field
             MAX(end_event_id) OVER full_game
-        ) AS end_event_id
+        )::UINTEGER AS end_event_id
     FROM {{ ref('stg_game_lineup_appearances') }}
     -- The MIN over this window is the next-largest value
     WINDOW
@@ -36,7 +36,7 @@ final AS (
         appearances.game_id,
         CASE WHEN ranges.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS batting_team_id,
         appearances.side AS batting_side,
-        (games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END
+        (games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END::INT
         AS personnel_lineup_key,
         ranges.start_event_id,
         ranges.end_event_id,

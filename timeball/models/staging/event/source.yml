@@ -1,0 +1,170 @@
+version: 2
+
+sources:
+  - name: event
+    tables:
+      - name: event_audit
+        columns:
+          - name: game_id
+          - name: event_id
+            data_type: UINTEGER
+          - name: event_key
+            data_type: UINTEGER
+          - name: filename
+            data_type: varchar
+          - name: line_number
+            data_type: UINTEGER
+
+      - name: event_baserunners
+        columns:
+          - name: game_id
+            data_type: varchar
+          - name: event_id
+            data_type: UINTEGER
+          - name: event_key
+            data_type: UINTEGER
+          - name: baserunner
+            data_type: BASERUNNER
+          - name: runner_lineup_position
+            data_type: UTINYINT
+          - name: runner_id
+            data_type: PLAYER_ID
+          - name: charge_event_id
+            data_type: UINTEGER
+          - name: reached_on_event_id
+            data_type: UINTEGER
+          - name: explicit_charged_pitcher_id
+            data_type: PLAYER_ID
+          - name: attempted_advance_to_base
+            data_type: BASE
+          - name: baserunning_play_type
+            data_type: varchar
+          - name: is_out
+            data_type: boolean
+          - name: base_end
+            data_type: BASE
+          - name: advanced_on_error_flag
+            data_type: boolean
+          - name: explicit_out_flag
+            data_type: boolean
+          - name: run_scored_flag
+            data_type: boolean
+          - name: rbi_flag
+            data_type: boolean
+
+      - name: event_comments
+        columns:
+          - name: game_id
+            data_type: varchar
+          - name: event_id
+            data_type: UINTEGER
+          - name: event_key
+            data_type: UINTEGER
+          - name: sequence_id
+            data_type: UTINYINT
+          - name: comment
+            data_type: varchar
+
+      - name: event_fielding_play
+        columns:
+          - name: game_id
+            data_type: varchar
+          - name: event_id
+            data_type: UINTEGER
+          - name: event_key
+            data_type: UINTEGER
+          - name: sequence_id
+            data_type: UTINYINT
+          - name: fielding_position
+            data_type: UTINYINT
+          - name: fielding_play
+            data_type: varchar
+
+      - name: event_flags
+        columns:
+          - name: event_key
+            data_type: UINTEGER
+          - name: sequence_id
+            data_type: UTINYINT
+          - name: flag
+            data_type: varchar
+
+      - name: event_pitch_sequences
+        columns:
+          - name: game_id
+            data_type: varchar
+          - name: event_id
+            data_type: UINTEGER
+          - name: event_key
+            data_type: UINTEGER
+          - name: sequence_id
+            data_type: UTINYINT
+          - name: sequence_item
+            data_type: PITCH_SEQUENCE_ITEM
+          - name: runners_going_flag
+            data_type: boolean
+          - name: blocked_by_catcher_flag
+            data_type: boolean
+          - name: catcher_pickoff_attempt_at_base
+            data_type: BASE
+
+      - name: events
+        columns:
+          - name: game_id
+            data_type: varchar
+          - name: event_id
+            data_type: UINTEGER
+          - name: event_key
+            data_type: UINTEGER
+          - name: batting_side
+            data_type: SIDE
+          - name: inning
+            data_type: UTINYINT
+          - name: frame
+            data_type: FRAME
+          - name: batter_lineup_position
+            data_type: UTINYINT
+          - name: batter_id
+            data_type: PLAYER_ID
+          - name: pitcher_id
+            data_type: PLAYER_ID
+          - name: batting_team_id
+            data_type: TEAM_ID
+          - name: fielding_team_id
+            data_type: TEAM_ID
+          - name: outs
+            data_type: UTINYINT
+          - name: base_state
+            data_type: UTINYINT
+          - name: count_balls
+            data_type: UTINYINT
+          - name: count_strikes
+            data_type: UTINYINT
+          - name: specified_batter_hand
+            data_type: HAND
+          - name: specified_pitcher_hand
+            data_type: HAND
+          - name: strikeout_responsible_batter_id
+            data_type: PLAYER_ID
+          - name: walk_responsible_pitcher_id
+            data_type: PLAYER_ID
+          - name: plate_appearance_result
+            data_type: varchar
+          - name: batted_contact_type
+            data_type: varchar
+          - name: batted_to_fielder
+            data_type: UTINYINT
+          - name: batted_location_general
+            data_type: varchar
+          - name: batted_location_depth
+            data_type: varchar
+          - name: batted_location_angle
+            data_type: varchar
+          - name: batted_location_strength
+            data_type: varchar
+          - name: outs_on_play
+            data_type: UTINYINT
+          - name: runs_on_play
+            data_type: UTINYINT
+          - name: runs_batted_in
+            data_type: UTINYINT

@@ -1,12 +1,12 @@
 WITH batted_balls AS (
     SELECT
         events.game_id,
-        BOOL_AND(bb.has_contact_type) AS has_contact_type,
-        BOOL_AND(bb.has_general_location) AS has_general_location,
-        BOOL_AND(bb.has_batted_to_fielder) AS has_batted_to_fielder,
-        BOOL_AND(bb.has_any_location) AS has_any_location,
+        BOOL_AND(bb.contact != 'Unknown') AS has_contact_type,
+        BOOL_AND(bb.location_side != 'Unknown') AS has_location,
+        BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_fielded) AS has_batted_to_fielder,
     FROM {{ ref('stg_events') }} AS events
-    LEFT JOIN {{ ref('event_completeness_batted_balls') }} AS bb USING (event_key)
+    INNER JOIN {{ ref('calc_batted_ball_type') }} AS bb USING (event_key)
+    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
     GROUP BY 1
 ),
 
@@ -38,12 +38,14 @@ pitches AS (
 joined AS (
     SELECT
         game_id,
+        game_start_info.season,
+        game_start_info.date,
+        game_start_info.home_league AS league,
         game_start_info.source_type = 'PlayByPlay' AS has_play_by_play,
         game_start_info.source_type IN ('Event', 'BoxScore') AS has_box_score,
         COALESCE(batted_balls.has_contact_type, FALSE) AS has_contact_type,
-        COALESCE(batted_balls.has_general_location, FALSE) AS has_general_location,
+        COALESCE(batted_balls.has_location, FALSE) AS has_location,
         COALESCE(batted_balls.has_batted_to_fielder, FALSE) AS has_batted_to_fielder,
-        COALESCE(batted_balls.has_any_location, FALSE) AS has_any_location,
         COALESCE(fielding_credit.has_fielder_putouts, FALSE) AS has_fielder_putouts,
         COALESCE(fielding_credit.has_fielder_assists, FALSE) AS has_fielder_assists,
         COALESCE(fielding_credit.has_fielder_errors, FALSE) AS has_fielder_errors,

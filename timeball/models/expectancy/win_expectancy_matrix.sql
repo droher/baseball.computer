@@ -7,7 +7,7 @@ WITH states AS (
     SELECT
         -- Treat 9th and later as the same to increase sample size
         -- TODO: Put add upstream `truncated_inning` col
-        LEAST(inning_start, 9) AS inning,
+        LEAST(inning_start, 10) AS inning,
         frame_start AS frame,
         truncated_home_margin_start AS truncated_home_margin,
         base_state_start AS base_state,

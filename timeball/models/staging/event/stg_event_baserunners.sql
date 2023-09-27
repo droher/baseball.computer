@@ -1,6 +1,7 @@
 WITH source AS (
     SELECT * FROM {{ source('event', 'event_baserunners') }}
 ),
+
 renamed AS (
     SELECT
         game_id,

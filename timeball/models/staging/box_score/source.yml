@@ -33,54 +33,75 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: PLAYER_ID
           - name: side
             description: ""
             tests:
               - not_null
+            data_type: SIDE
           - name: lineup_position
             description: ""
             tests:
               - not_null
+            data_type: UTINYINT
           - name: nth_player_at_position
             description: ""
             tests:
               - not_null
+            data_type: UTINYINT
           - name: at_bats
             description: ""
             tests:
               - not_null
+            data_type: UTINYINT
           - name: runs
             description: ""
+            data_type: UTINYINT
           - name: hits
             description: ""
+            data_type: UTINYINT
           - name: doubles
             description: ""
+            data_type: UTINYINT
           - name: triples
             description: ""
+            data_type: UTINYINT
           - name: home_runs
             description: ""
+            data_type: UTINYINT
           - name: rbi
             description: ""
+            data_type: UTINYINT
           - name: sacrifice_hits
             description: ""
+            data_type: UTINYINT
           - name: sacrifice_flies
             description: ""
+            data_type: UTINYINT
           - name: hit_by_pitch
             description: ""
+            data_type: UTINYINT
           - name: walks
             description: ""
+            data_type: UTINYINT
           - name: intentional_walks
             description: ""
+            data_type: UTINYINT
           - name: strikeouts
             description: ""
+            data_type: UTINYINT
           - name: stolen_bases
             description: ""
+            data_type: UTINYINT
           - name: caught_stealing
             description: ""
+            data_type: UTINYINT
           - name: grounded_into_double_plays
             description: ""
+            data_type: UTINYINT
           - name: reached_on_interference
             description: ""
+            data_type: UTINYINT
 
       - name: box_score_caught_stealing
         description: ""
@@ -134,32 +155,43 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: PLAYER_ID
           - name: side
             description: ""
             tests:
               - not_null
+            data_type: SIDE
           - name: fielding_position
             description: ""
             tests:
               - not_null
+            data_type: UTINYINT
           - name: nth_position_played_by_player
             description: ""
             tests:
               - not_null
+            data_type: UTINYINT
           - name: outs_played
             description: ""
+            data_type: UTINYINT
           - name: putouts
             description: ""
+            data_type: UTINYINT
           - name: assists
             description: ""
+            data_type: UTINYINT
           - name: errors
             description: ""
+            data_type: UTINYINT
           - name: double_plays
             description: ""
+            data_type: UTINYINT
           - name: triple_plays
             description: ""
+            data_type: UTINYINT
           - name: passed_balls
             description: ""
+            data_type: UTINYINT
 
       - name: box_score_games
         description: ""
@@ -170,7 +202,14 @@ sources:
           - name: game_id
             description: ""
             tests:
+              - unique
               - not_null
+          - name: game_key
+            description: ""
+            data_type: UINTEGER
+            tests:
+              - not_null
+              - unique
           - name: date
             description: ""
             tests:
@@ -181,57 +220,72 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: DOUBLEHEADER_STATUS
           - name: time_of_day
             description: ""
+            tests:
+              - not_null
+            data_type: TIME_OF_DAY
           - name: game_type
             description: ""
             tests:
               - not_null
+            data_type: GAME_TYPE
           - name: bat_first_side
             description: ""
             tests:
               - not_null
+            data_type: SIDE
           - name: sky
             description: ""
             tests:
               - not_null
+            data_type: SKY
           - name: field_condition
             description: ""
             tests:
               - not_null
+            data_type: FIELD_CONDITION
           - name: precipitation
             description: ""
             tests:
               - not_null
+            data_type: PRECIPITATION
           - name: wind_direction
             description: ""
             tests:
               - not_null
+            data_type: WIND_DIRECTION
           - name: park_id
             description: ""
             tests:
-              - not_null:
-                  config:
-                    severity: warn
-                    where: "game_type != 'NegroLeagues'"
+              - not_null
+            data_type: PARK_ID
           - name: temperature_fahrenheit
             description: ""
+            data_type: INT1
           - name: attendance
             description: ""
+            data_type: INT
           - name: wind_speed_mph
             description: ""
+            data_type: INT1
           - name: use_dh
             description: ""
             tests:
               - not_null
           - name: winning_pitcher
             description: ""
+            data_type: PLAYER_ID
           - name: losing_pitcher
             description: ""
+            data_type: PLAYER_ID
           - name: save_pitcher
             description: ""
+            data_type: PLAYER_ID
           - name: game_winning_rbi
             description: ""
+            data_type: PLAYER_ID
           - name: time_of_game_minutes
             description: ""
           - name: protest_info
@@ -252,7 +306,32 @@ sources:
             description: ""
           - name: date_edited
             description: ""
-          - name: game_key
+          - name: account_type
+            description: ""
+            tests:
+              - not_null
+            data_type: ACCOUNT_TYPE
+          - name: away_team_id
+            description: ""
+            tests:
+              - not_null
+            data_type: TEAM_ID
+          - name: home_team_id
+            description: ""
+            tests:
+              - not_null
+            data_type: TEAM_ID
+          - name: umpire_home_id
+            description: ""
+          - name: umpire_first_id
+            description: ""
+          - name: umpire_second_id
+            description: ""
+          - name: umpire_third_id
+            description: ""
+          - name: umpire_left_id
+            description: ""
+          - name: umpire_right_id
             description: ""
 
       - name: box_score_hit_by_pitches
@@ -387,44 +466,64 @@ sources:
             description: ""
           - name: pitcher_id
             description: ""
+            data_type: PLAYER_ID
           - name: side
             description: ""
+            data_type: SIDE
           - name: nth_pitcher
             description: ""
+            data_type: UTINYINT
           - name: outs_recorded
             description: ""
+            data_type: UTINYINT
           - name: no_out_batters
             description: ""
+            data_type: UTINYINT
           - name: batters_faced
             description: ""
+            data_type: UTINYINT
           - name: hits
             description: ""
+            data_type: UTINYINT
           - name: doubles
             description: ""
+            data_type: UTINYINT
           - name: triples
             description: ""
+            data_type: UTINYINT
           - name: home_runs
             description: ""
+            data_type: UTINYINT
           - name: runs
             description: ""
+            data_type: UTINYINT
           - name: earned_runs
             description: ""
+            data_type: UTINYINT
           - name: walks
             description: ""
+            data_type: UTINYINT
           - name: intentional_walks
             description: ""
+            data_type: UTINYINT
           - name: strikeouts
             description: ""
+            data_type: UTINYINT
           - name: hit_batsmen
             description: ""
+            data_type: UTINYINT
           - name: wild_pitches
             description: ""
+            data_type: UTINYINT
           - name: balks
             description: ""
+            data_type: UTINYINT
           - name: sacrifice_hits
             description: ""
+            data_type: UTINYINT
           - name: sacrifice_flies
             description: ""
+            data_type: UTINYINT
 
       - name: box_score_stolen_bases
         description: ""

@@ -4,49 +4,6 @@ sources:
       Datasets from a hodgepodge of sources. To maintain a single source of truth,
       all data is sourced from Retrosheet play-by-play as much as possible.
     tables:
-      - name: franchise
-        description: |
-          Provides franchise attributes for a given time period,
-          such as location and division. This allows us to construct/track the
-          standings and league structure for all years.
-        meta:
-          primary_keys:
-            - current_franchise_id
-            - date_start
-        columns:
-          - name: current_franchise_id
-            description: ""
-            tests:
-              - not_null
-          - name: team_id
-            description: ""
-            tests:
-              - not_null
-          - name: league
-            description: ""
-          - name: division
-            description: ""
-          - name: location
-            description: ""
-          - name: nickname
-            description: ""
-          - name: alternate_nicknames
-            description: ""
-          - name: date_start
-            description: ""
-            tests:
-              - not_null
-          - name: date_end
-            description: ""
-          - name: city
-            description: ""
-            tests:
-              - not_null
-          - name: state
-            description: ""
-            tests:
-              - not_null
-
       - name: gamelog
         description: |
           A truncated version of Retrosheet's gamelog file. It includes only
@@ -391,6 +348,7 @@ sources:
             tests:
               - not_null
               - unique
+            data_type: PARK_ID
           - name: name
             description: ""
             tests:
@@ -433,6 +391,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: PLAYER_ID
           - name: last_name
             description: ""
             tests:
@@ -441,12 +400,15 @@ sources:
             description: ""
           - name: bats
             description: ""
+            data_type: HAND
           - name: throws
             description: ""
+            data_type: HAND
           - name: team_id
             description: ""
             tests:
               - not_null
+            data_type: TEAM_ID
           - name: position
             description: ""
             tests:

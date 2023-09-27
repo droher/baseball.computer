@@ -27,7 +27,8 @@ renamed AS (
         bats,
         throws,
         debut,
-        finalgame AS final_game
+        finalgame AS final_game,
+        ROW_NUMBER() OVER (order by playerid) AS internal_id
     FROM source
 )
 

@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH final AS (
     SELECT
         -- IDs
@@ -5,14 +10,15 @@ WITH final AS (
         e.event_id,
         e.event_key,
         -- Basic state
-        g.season,
+        g.season::SMALLINT AS season,
         g.home_league AS league,
         g.game_type,
         g.date,
         g.park_id,
         g.bat_first_side,
+        g.time_of_day,
         -- Useful for determining save situations
-        CASE WHEN e.batting_side = 'Home'
+        CASE WHEN e.batting_side = 'Home'::SIDE
                 THEN g.away_starting_pitcher_id
             ELSE g.home_starting_pitcher_id
         END AS pitching_team_starting_pitcher_id,
@@ -21,30 +27,43 @@ WITH final AS (
         base_out.outs_start,
         base_out.inning_in_outs_start,
         base_out.is_gidp_eligible,
-        add_bio.batting_side,
-        add_bio.fielding_side,
-        runs.score_home_start,
-        runs.score_away_start,
-        runs.score_home_start::INT - runs.score_away_start AS home_margin_start,
+        players.batting_side,
+        players.fielding_side,
+        base_out.score_home_start,
+        base_out.score_away_start,
+        (base_out.score_home_start::INT - base_out.score_away_start)::INT1 AS home_margin_start,
         CASE WHEN e.batting_side = 'Home'
                 THEN home_margin_start
             ELSE -home_margin_start
-        END AS batting_team_margin_start,
+        END::INT1 AS batting_team_margin_start,
         -- Perform upstream for consistency
-        GREATEST(LEAST(home_margin_start, 10), -10) AS truncated_home_margin_start,
-        add_bio.batter_lineup_position,
+        GREATEST(LEAST(home_margin_start, 10), -10)::INT1 AS truncated_home_margin_start,
+        players.batter_lineup_position,
         -- Player/Team IDs and info
-        add_bio.batter_hand,
-        add_bio.pitcher_hand,
+        players.batter_hand,
+        players.pitcher_hand,
         g.away_team_id,
         g.home_team_id,
-        add_bio.batting_team_id,
-        add_bio.fielding_team_id,
-        add_bio.batter_id,
-        add_bio.pitcher_id,
+        players.batting_team_id,
+        players.fielding_team_id,
+        players.batter_id,
+        players.pitcher_id,
+        players.catcher_id,
+        -- These are too memory-intensive to include
+        -- at the moment - can put them back in later
+        players.first_base_id,
+        players.second_base_id,
+        players.third_base_id,
+        players.shortstop_id,
+        players.left_field_id,
+        players.center_field_id,
+        players.right_field_id,
         base_out.base_state_start,
         base_out.runners_count_start,
         base_out.frame_start_flag,
+        base_out.runner_first_id_start,
+        base_out.runner_second_id_start,
+        base_out.runner_third_id_start,
         -- Future state
         -- TODO: Enforce clearer separation
         e.count_balls,
@@ -54,24 +73,24 @@ WITH final AS (
         base_out.outs_on_play,
         base_out.outs_end,
         base_out.base_state_end,
-        runs.runs_on_play,
-        runs.score_home_end,
-        runs.score_away_end,
-        runs.score_home_end::INT - runs.score_away_end AS home_margin_end,
-        CASE WHEN e.batting_side = 'Home'
+        base_out.runs_on_play,
+        base_out.score_home_end,
+        base_out.score_away_end,
+        (base_out.score_home_end::INT1 - base_out.score_away_end)::INT1 AS home_margin_end,
+        CASE WHEN e.batting_side = 'Home'::SIDE
                 THEN home_margin_end
             ELSE -home_margin_end
-        END AS batting_team_margin_end,
+        END::INT1 AS batting_team_margin_end,
         -- Perform upstream for consistency
-        GREATEST(LEAST(home_margin_end, 10), -10) AS truncated_home_margin_end,
+        GREATEST(LEAST(home_margin_end, 10), -10)::INT1 AS truncated_home_margin_end,
         base_out.frame_end_flag,
         base_out.truncated_frame_flag,
         base_out.game_end_flag
     FROM {{ ref('stg_events') }} AS e
     INNER JOIN {{ ref('game_start_info') }} AS g USING (game_id)
+    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS players USING (event_key)
     INNER JOIN {{ ref('event_base_out_states') }} AS base_out USING (event_key)
-    INNER JOIN {{ ref('event_score_states') }} AS runs USING (event_key)
-    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS add_bio USING (event_key)
+
 )
 
 SELECT * FROM final

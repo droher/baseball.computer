@@ -12,9 +12,6 @@
           WHERE HASH(event_key // 255) % {{ sample_factor }} = {{ seed }}
         {% endif %}
       );
-      {% for col_name, col_data in node.columns.items() if col_data.get("data_type") %}
-        ALTER TABLE {{ node.schema }}.{{ node.name }} ALTER COLUMN {{ col_name }} TYPE {{ col_data.data_type }};
-      {% endfor %}
     {% endfor %}
   {% endset %}
 
@@ -23,19 +20,89 @@
 
 {% endmacro %}
 
-{% macro init_db_csv_rust() %}
-  {% set csv_dir = "/Users/davidroher/Repos/boxball-rs/data" %}
-
+{% macro create_enums() %}
   {% set sql %}
-    {% for node in graph.sources.values() if node.schema != 'misc' %}
-      CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
-      SET SCHEMA = '{{ node.schema }}';
-      CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (
-        SELECT * FROM read_csv('{{ csv_dir }}/{{ node.name }}.csv', header=True, auto_detect=True)
-      );
-    {% endfor %}
-  {% endset %}
+    DROP TYPE IF EXISTS base;
+    DROP TYPE IF EXISTS baserunner;
+    DROP TYPE IF EXISTS frame;
+    DROP TYPE IF EXISTS side;
+    DROP TYPE IF EXISTS hand;
+    DROP TYPE IF EXISTS game_type;
+    DROP TYPE IF EXISTS account_type;
+    DROP TYPE IF EXISTS doubleheader_status;
+    DROP TYPE IF EXISTS time_of_day;
+    DROP TYPE IF EXISTS sky;
+    DROP TYPE IF EXISTS field_condition;
+    DROP TYPE IF EXISTS precipitation;
+    DROP TYPE IF EXISTS wind_direction;
+    DROP TYPE IF EXISTS plate_appearance_result;
+    DROP TYPE IF EXISTS pitch_sequence_item;
+    DROP TYPE IF EXISTS park_id;
+    DROP TYPE IF EXISTS team_id;
+    DROP TYPE IF EXISTS player_id;
+  
+    CREATE TYPE base AS ENUM ('Home', 'First', 'Second', 'Third');
+    CREATE TYPE baserunner AS ENUM ('Batter', 'First', 'Second', 'Third');
+    CREATE TYPE frame AS ENUM ('Top', 'Bottom');
+    CREATE TYPE side AS ENUM ('Home', 'Away');
+    -- TODO: Standardize
+    CREATE TYPE hand AS ENUM ('L', 'R', 'B', '?', 'Left', 'Right');
 
-{% do log(sql, info=True)%}
-{% do run_query(sql) %}
+    CREATE TYPE game_type AS ENUM (SELECT DISTINCT game_type FROM game.games);
+    CREATE TYPE doubleheader_status AS ENUM (SELECT DISTINCT doubleheader_status FROM game.games);
+    CREATE TYPE time_of_day AS ENUM (SELECT DISTINCT time_of_day FROM game.games);
+    CREATE TYPE sky AS ENUM (SELECT DISTINCT sky FROM game.games);
+    CREATE TYPE field_condition AS ENUM (SELECT DISTINCT field_condition FROM game.games);
+    CREATE TYPE precipitation AS ENUM (SELECT DISTINCT precipitation FROM game.games);
+    CREATE TYPE wind_direction AS ENUM (SELECT DISTINCT wind_direction FROM game.games);
+    CREATE TYPE plate_appearance_result AS ENUM (SELECT DISTINCT plate_appearance_result FROM event.events WHERE plate_appearance_result IS NOT NULL);
+    CREATE TYPE pitch_sequence_item AS ENUM (SELECT DISTINCT sequence_item FROM event.event_pitch_sequences);
+    
+    CREATE TYPE account_type AS ENUM (
+      SELECT DISTINCT account_type FROM game.games
+      UNION
+      SELECT DISTINCT account_type FROM box_score.box_score_games
+    );
+
+    CREATE TYPE park_id AS ENUM (
+      SELECT DISTINCT park_id FROM misc.park
+      UNION
+      -- TODO: Add missing NLB parks
+      SELECT DISTINCT park_id FROM box_score.box_score_games WHERE park_id IS NOT NULL
+      UNION
+      SELECT DISTINCT park_id FROM game.games WHERE park_id IS NOT NULL
+    );
+    
+    CREATE TYPE team_id AS ENUM (
+      SELECT DISTINCT team_id FROM misc.roster
+      UNION
+      SELECT DISTINCT visiting_team FROM misc.gamelog
+      UNION
+      SELECT DISTINCT home_team FROM misc.gamelog
+    );
+    
+    CREATE TYPE player_id AS ENUM (
+      SELECT retroid FROM baseballdatabank.people WHERE retroid IS NOT NULL
+      UNION
+      SELECT DISTINCT player_id FROM misc.roster
+      UNION
+      SELECT DISTINCT batter_id FROM box_score.box_score_batting_lines
+      UNION
+      SELECT DISTINCT fielder_id FROM box_score.box_score_fielding_lines
+    );
+  {% endset %}
+  {% do log(sql, info=True)%}
+  {% do run_query(sql) %}
+{% endmacro %}
+
+{% macro alter_types() %}
+    {% for node in graph.sources.values() -%}
+        {% set sql %}
+      {% for col_name, col_data in node.columns.items() if col_data.get("data_type") -%}
+          ALTER TABLE {{ node.schema }}.{{ node.name }} ALTER COLUMN {{ col_name }} TYPE {{ col_data.data_type }};
+      {% endfor %}
+        {% endset %}
+        {% do log(sql, info=True)%}
+        {% do run_query(sql) %}
+    {% endfor %}
 {% endmacro %}

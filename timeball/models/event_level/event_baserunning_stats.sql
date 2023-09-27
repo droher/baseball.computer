@@ -10,6 +10,7 @@ WITH joined AS (
         b.game_id,
         e.batting_team_id,
         e.fielding_team_id,
+        e.base_state,
         b.runner_id,
         e.pitcher_id AS current_pitcher_id,
         b.runner_lineup_position,
@@ -27,7 +28,30 @@ WITH joined AS (
         bases_meta.numeric_value AS number_base_to,
         COALESCE(part.is_in_play, FALSE) AS is_in_play,
         COALESCE(b.baserunning_play_type, 'None') AS baserunning_play_type,
-        COALESCE(part.total_bases, 0) AS batter_total_bases
+        COALESCE(part.total_bases, 0) AS batter_total_bases,
+        CASE WHEN b.baserunner = 'Batter'
+                THEN e.base_state & 1 = 0 
+            WHEN b.baserunner = 'First'
+                THEN e.base_state >> 1 & 1 = 0
+            WHEN b.baserunner = 'Second'
+                THEN e.base_state >> 2 & 1 = 0
+            ELSE FALSE
+        END AS is_next_base_empty,
+        CASE WHEN b.baserunner = 'Batter'
+                -- By convention we say that the batter is never the lead runner
+                THEN FALSE
+            WHEN b.baserunner = 'First'
+                THEN e.base_state = 1
+            WHEN b.baserunner = 'Second'
+                THEN e.base_state < 4
+            ELSE TRUE
+        END AS is_lead_runner,
+        CASE WHEN b.baserunner = 'Second'
+                THEN e.base_state & 1 = 1
+            WHEN b.baserunner = 'Third'
+                THEN e.base_state = 7
+            ELSE TRUE
+        END AS is_force_on_runner,
     FROM {{ ref('stg_event_baserunners') }} b
     LEFT JOIN {{ ref('stg_events') }} e USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS part
@@ -54,9 +78,25 @@ final AS (
         (is_successful AND number_base_to = 4)::INT AS runs,
         -- Note that this is different from OBP - it includes fielders choices, errors, etc.
         (is_successful AND baserunner = 'Batter')::INT AS times_reached_base,
+        (is_lead_runner)::INT AS times_lead_runner,
+        (is_force_on_runner)::INT AS times_force_on_runner,
+        (is_next_base_empty)::INT AS times_next_base_empty,
+        (is_next_base_empty AND is_on_base)::INT AS stolen_base_opportunities,
+        (is_next_base_empty AND baserunner = 'First')::INT AS stolen_base_opportunities_second,
+        (is_next_base_empty AND baserunner = 'Second')::INT AS stolen_base_opportunities_third,
+        (is_next_base_empty AND baserunner = 'Third')::INT AS stolen_base_opportunities_home,
         (baserunning_play_type = 'StolenBase')::INT AS stolen_bases,
+        (baserunning_play_type = 'StolenBase' AND baserunner = 'First')::INT AS stolen_bases_second,
+        (baserunning_play_type = 'StolenBase' AND baserunner = 'Second')::INT AS stolen_bases_third,
+        (baserunning_play_type = 'StolenBase' AND baserunner = 'Third')::INT AS stolen_bases_home,
         (baserunning_play_type LIKE '%CaughtStealing')::INT AS caught_stealing,
+        (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'First')::INT AS caught_stealing_second,
+        (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'Second')::INT AS caught_stealing_third,
+        (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'Third')::INT AS caught_stealing_home,
         (baserunning_play_type LIKE 'PickedOff%')::INT AS picked_off,
+        (baserunning_play_type = 'PickedOff' AND baserunner = 'First')::INT AS picked_off_first,
+        (baserunning_play_type = 'PickedOff' AND baserunner = 'Second')::INT AS picked_off_second,
+        (baserunning_play_type = 'PickedOff' AND baserunner = 'Third')::INT AS picked_off_third,
         (baserunning_play_type = 'PickedOffCaughtStealing')::INT AS picked_off_caught_stealing,
         explicit_out_flag::INT AS outs_on_basepaths,
 

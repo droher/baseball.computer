@@ -18,8 +18,9 @@ renamed AS (
         outs,
         count_balls,
         count_strikes,
-        LEFT(specified_batter_hand, 1) AS specified_batter_hand,
-        LEFT(specified_pitcher_hand, 1) AS specified_pitcher_hand,
+        base_state,
+        LEFT(specified_batter_hand, 1)::HAND AS specified_batter_hand,
+        LEFT(specified_pitcher_hand, 1)::HAND AS specified_pitcher_hand,
         strikeout_responsible_batter_id,
         walk_responsible_pitcher_id,
         plate_appearance_result,
@@ -31,8 +32,10 @@ renamed AS (
         batted_location_strength,
         outs_on_play,
         runs_on_play,
-        runs_batted_in
-
+        runs_batted_in,
+        STRPTIME(SUBSTRING(game_id, 4, 8), '%Y%m%d')::DATE AS date,
+        SUBSTRING(game_id, 4, 4)::INT2 AS season,
     from source
 )
+
 SELECT * from renamed
