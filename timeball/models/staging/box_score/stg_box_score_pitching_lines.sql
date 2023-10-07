@@ -26,7 +26,10 @@ renamed AS (
         balks,
         sacrifice_hits,
         sacrifice_flies,
-        hits - doubles - triples - home_runs AS singles,
+        -- TODO: Fix rows where XBH > H
+        CASE WHEN hits::INT - (home_runs + triples + doubles) < 0 THEN NULL
+            ELSE hits - (home_runs + triples + doubles)
+        END AS singles,
         singles + doubles * 2 + triples * 3 + home_runs * 4 AS total_bases,
         -- This is a different formula vs batting lines because we don't have at bats.
         -- The one missing piece is catcher's interferfence, which is extremely rare 
@@ -36,8 +39,8 @@ renamed AS (
         CASE WHEN nth_pitcher = 1 THEN 1 ELSE 0 END AS games_started,
         CASE WHEN nth_pitcher != 1 THEN 1 ELSE 0 END AS games_relieved,
         CASE WHEN nth_pitcher = MAX(nth_pitcher) OVER (PARTITION BY game_id, side)
-                THEN 1 
-            ELSE 0 
+                THEN 1
+            ELSE 0
         END AS games_finished,
     FROM source
 )

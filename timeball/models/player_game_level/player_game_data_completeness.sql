@@ -19,14 +19,15 @@ batted_balls AS (
     SELECT
         events.game_id,
         events.player_type,
-        CASE WHEN player_type = 'BATTING' THEN batter_id ELSE pitcher_id END AS player_id,
-        ANY_VALUE(CASE WHEN player_type = 'BATTING' THEN batting_team_id ELSE fielding_team_id END) AS team_id,
+        CASE WHEN events.player_type = 'BATTING' THEN batter_id ELSE pitcher_id END AS player_id,
+        ANY_VALUE(CASE WHEN events.player_type = 'BATTING' THEN batting_team_id ELSE fielding_team_id END) AS team_id,
         COALESCE(BOOL_AND(bb.contact != 'Unknown'), TRUE) AS has_contact_type,
         COALESCE(BOOL_AND(bb.location_side != 'Unknown'), TRUE) AS has_location,
         COALESCE(BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_fielded), TRUE) AS has_batted_to_fielder,
     FROM events
     LEFT JOIN {{ ref('calc_batted_ball_type') }} AS bb USING (event_key)
-    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
+    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt
+        ON rt.plate_appearance_result = events.plate_appearance_result
     GROUP BY 1, 2, 3
 ),
 

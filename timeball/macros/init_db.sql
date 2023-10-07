@@ -39,7 +39,15 @@
     DROP TYPE IF EXISTS pitch_sequence_item;
     DROP TYPE IF EXISTS park_id;
     DROP TYPE IF EXISTS team_id;
+    DROP TYPE IF EXISTS game_id;
     DROP TYPE IF EXISTS player_id;
+    DROP TYPE IF EXISTS contact;
+    DROP TYPE IF EXISTS location_general;
+    DROP TYPE IF EXISTS location_depth;
+    DROP TYPE IF EXISTS location_angle;
+    DROP TYPE IF EXISTS baserunning_play;
+    DROP TYPE IF EXISTS fielding_play;
+    
   
     CREATE TYPE base AS ENUM ('Home', 'First', 'Second', 'Third');
     CREATE TYPE baserunner AS ENUM ('Batter', 'First', 'Second', 'Third');
@@ -57,6 +65,12 @@
     CREATE TYPE wind_direction AS ENUM (SELECT DISTINCT wind_direction FROM game.games);
     CREATE TYPE plate_appearance_result AS ENUM (SELECT DISTINCT plate_appearance_result FROM event.events WHERE plate_appearance_result IS NOT NULL);
     CREATE TYPE pitch_sequence_item AS ENUM (SELECT DISTINCT sequence_item FROM event.event_pitch_sequences);
+    CREATE TYPE contact AS ENUM (SELECT DISTINCT batted_contact_type FROM event.events WHERE batted_contact_type IS NOT NULL);
+    CREATE TYPE location_general AS ENUM (SELECT DISTINCT batted_location_general FROM event.events WHERE batted_location_general IS NOT NULL);
+    CREATE TYPE location_depth AS ENUM (SELECT DISTINCT batted_location_depth FROM event.events WHERE batted_location_depth IS NOT NULL);
+    CREATE TYPE location_angle AS ENUM (SELECT DISTINCT batted_location_angle FROM event.events WHERE batted_location_angle IS NOT NULL);
+    CREATE TYPE baserunning_play AS ENUM (SELECT DISTINCT baserunning_play_type FROM event.event_baserunners WHERE baserunning_play_type IS NOT NULL);
+    CREATE TYPE fielding_play AS ENUM (SELECT DISTINCT fielding_play FROM event.event_fielding_play);
     
     CREATE TYPE account_type AS ENUM (
       SELECT DISTINCT account_type FROM game.games
@@ -89,6 +103,14 @@
       SELECT DISTINCT batter_id FROM box_score.box_score_batting_lines
       UNION
       SELECT DISTINCT fielder_id FROM box_score.box_score_fielding_lines
+    );
+
+    CREATE TYPE game_id AS ENUM (
+      SELECT game_id FROM game.games
+      UNION
+      SELECT game_id FROM box_score.box_score_games
+      UNION
+      SELECT home_team || STRFTIME(date, '%Y%m%d') || double_header FROM misc.gamelog
     );
   {% endset %}
   {% do log(sql, info=True)%}

@@ -6,8 +6,9 @@ sources:
       - name: event_audit
         columns:
           - name: game_id
+            data_type: GAME_ID
           - name: event_id
-            data_type: UINTEGER
+            data_type: UTINYINT
           - name: event_key
             data_type: UINTEGER
           - name: filename
@@ -18,9 +19,9 @@ sources:
       - name: event_baserunners
         columns:
           - name: game_id
-            data_type: varchar
+            data_type: GAME_ID
           - name: event_id
-            data_type: UINTEGER
+            data_type: UTINYINT
           - name: event_key
             data_type: UINTEGER
           - name: baserunner
@@ -38,7 +39,7 @@ sources:
           - name: attempted_advance_to_base
             data_type: BASE
           - name: baserunning_play_type
-            data_type: varchar
+            data_type: BASERUNNING_PLAY
           - name: is_out
             data_type: boolean
           - name: base_end
@@ -55,9 +56,9 @@ sources:
       - name: event_comments
         columns:
           - name: game_id
-            data_type: varchar
+            data_type: GAME_ID
           - name: event_id
-            data_type: UINTEGER
+            data_type: UTINYINT
           - name: event_key
             data_type: UINTEGER
           - name: sequence_id
@@ -68,9 +69,9 @@ sources:
       - name: event_fielding_play
         columns:
           - name: game_id
-            data_type: varchar
+            data_type: GAME_ID
           - name: event_id
-            data_type: UINTEGER
+            data_type: UTINYINT
           - name: event_key
             data_type: UINTEGER
           - name: sequence_id
@@ -92,9 +93,9 @@ sources:
       - name: event_pitch_sequences
         columns:
           - name: game_id
-            data_type: varchar
+            data_type: GAME_ID
           - name: event_id
-            data_type: UINTEGER
+            data_type: UTINYINT
           - name: event_key
             data_type: UINTEGER
           - name: sequence_id
@@ -111,9 +112,9 @@ sources:
       - name: events
         columns:
           - name: game_id
-            data_type: varchar
+            data_type: GAME_ID
           - name: event_id
-            data_type: UINTEGER
+            data_type: UTINYINT
           - name: event_key
             data_type: UINTEGER
           - name: batting_side
@@ -149,17 +150,17 @@ sources:
           - name: walk_responsible_pitcher_id
             data_type: PLAYER_ID
           - name: plate_appearance_result
-            data_type: varchar
+            data_type: PLATE_APPEARANCE_RESULT
           - name: batted_contact_type
-            data_type: varchar
+            data_type: CONTACT
           - name: batted_to_fielder
             data_type: UTINYINT
           - name: batted_location_general
-            data_type: varchar
+            data_type: LOCATION_GENERAL
           - name: batted_location_depth
-            data_type: varchar
+            data_type: LOCATION_DEPTH
           - name: batted_location_angle
-            data_type: varchar
+            data_type: LOCATION_ANGLE
           - name: batted_location_strength
             data_type: varchar
           - name: outs_on_play

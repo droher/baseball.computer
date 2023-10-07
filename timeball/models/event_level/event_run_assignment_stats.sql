@@ -55,8 +55,8 @@ final AS (
     SELECT
         event_key,
         pitcher_id,
-        ANY_VALUE(game_id) AS game_id,
-        ANY_VALUE(team_id) AS team_id,
+        MIN(game_id) AS game_id,
+        MIN(team_id) AS team_id,
         SUM(runs) AS runs,
         SUM(inherited_runners_scored) AS inherited_runners_scored,
         SUM(bequeathed_runners_scored) AS bequeathed_runners_scored

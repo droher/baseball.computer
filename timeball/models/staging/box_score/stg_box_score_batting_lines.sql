@@ -29,7 +29,10 @@ renamed AS (
         grounded_into_double_plays,
         -- TODO: Change in source
         reached_on_interference AS reached_on_interferences,
-        hits - home_runs - triples - doubles AS singles,
+        -- TODO: Fix rows with 0 hits but 1+ XBH and where hits > AB
+        CASE WHEN hits = 0 AND doubles + triples + home_runs > 0 THEN NULL 
+            ELSE hits - home_runs - triples - doubles
+        END AS singles,
         singles + doubles * 2 + triples * 3 + home_runs * 4 AS total_bases,
         at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
         + COALESCE(sacrifice_hits, 0) + COALESCE(reached_on_interferences, 0)
@@ -37,7 +40,9 @@ renamed AS (
         at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
         AS on_base_opportunities,
         hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) AS on_base_successes,
-        at_bats - hits + COALESCE(grounded_into_double_plays, 0) AS batting_outs,
+        CASE WHEN hits > at_bats THEN NULL
+            ELSE at_bats - hits + COALESCE(grounded_into_double_plays, 0)
+        END AS batting_outs,
     FROM source
 )
 

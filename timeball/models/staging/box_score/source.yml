@@ -29,6 +29,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: GAME_ID
           - name: batter_id
             description: ""
             tests:
@@ -151,6 +152,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: GAME_ID
           - name: fielder_id
             description: ""
             tests:
@@ -204,6 +206,7 @@ sources:
             tests:
               - unique
               - not_null
+            data_type: GAME_ID
           - name: game_key
             description: ""
             data_type: UINTEGER
@@ -464,6 +467,7 @@ sources:
         columns:
           - name: game_id
             description: ""
+            data_type: GAME_ID
           - name: pitcher_id
             description: ""
             data_type: PLAYER_ID
@@ -682,6 +686,7 @@ sources:
           - name: game_id
             tests:
               - not_null
+            data_type: GAME_ID
           - name: sequence_id
             tests:
               - not_null

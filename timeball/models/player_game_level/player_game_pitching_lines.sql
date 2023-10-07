@@ -7,7 +7,7 @@ WITH event_agg AS (
     SELECT
         game_id,
         player_id,
-        ANY_VALUE(team_id) AS team_id,
+        MIN(team_id) AS team_id,
         {% for stat in event_level_pitching_stats() -%}
             SUM({{ stat }}) AS {{ stat }},
         {% endfor %}

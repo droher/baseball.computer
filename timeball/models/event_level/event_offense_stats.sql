@@ -14,7 +14,7 @@ batter_stats AS (
         COALESCE(hit.batter_id, batter_baserunning.runner_id) AS player_id,
         COALESCE(hit.batting_team_id, batter_baserunning.batting_team_id) AS team_id,
         event_key,
-        'Batter' AS baserunner,
+        'Batter'::BASERUNNER AS baserunner,
         hit.* EXCLUDE (event_key),
         bat.* EXCLUDE (event_key),
         batter_baserunning.* EXCLUDE (event_key, baserunner),
@@ -40,7 +40,7 @@ final AS (
         baserunner,
         player_id,
         {% for stat in event_level_offense_stats() -%}
-            COALESCE({{ stat }}, 0)::INT2 AS {{ stat }},
+            COALESCE({{ stat }}, 0)::INT1 AS {{ stat }},
         {% endfor %}
     FROM unioned
 )

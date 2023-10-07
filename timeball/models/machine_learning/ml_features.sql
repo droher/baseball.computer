@@ -21,34 +21,38 @@ WITH final AS (
         o.location_sample_weight,
         o.baserunning_play_sample_weight,
         o.win_sample_weight,
-        e.season AS season_num,
-        DATE_PART('dayofyear', e.date) AS day_of_year_num,
-        LEAST(e.inning_start, 10) AS inning_num,
-        CASE WHEN e.frame_start = 'Top' THEN 0 ELSE 1 END AS frame_num,
-        CASE WHEN e.time_of_day = 'Night' THEN 1 ELSE 0 END AS is_night_game_num,
+        e.season::FLOAT AS season_num,
+        DATE_PART('dayofyear', e.date)::FLOAT AS day_of_year_num,
+        LEAST(e.inning_start, 10)::FLOAT AS inning_num,
+        CASE WHEN e.frame_start = 'Top' THEN 0 ELSE 1 END::FLOAT AS frame_num,
+        CASE WHEN e.time_of_day = 'Night' THEN 1 ELSE 0 END::FLOAT AS is_night_game_num,
         CASE
             WHEN e.batting_side = 'Home'
                 THEN e.score_home_start
             ELSE e.score_away_start
-        END AS score_batting_team_num,
+        END::FLOAT AS score_batting_team_num,
         CASE
             WHEN e.batting_side = 'Home'
                 THEN e.score_away_start
             ELSE e.score_home_start
-        END AS score_fielding_team_num,
+        END::FLOAT AS score_fielding_team_num,
         e.park_id AS park_cat,
         e.game_type AS game_type_cat,
         COALESCE(e.league, 'None') AS league_cat,
-        e.batting_team_id AS batting_team_cat,
-        e.fielding_team_id AS fielding_team_cat,
         e.base_state_start::VARCHAR AS base_state_cat,
-        e.batter_lineup_position::VARCHAR AS batter_lineup_position_cat,
         e.batter_id AS batter_player,
-        COALESCE(e.runner_first_id_start, 'N/A') AS runner_first_player,
-        COALESCE(e.runner_second_id_start, 'N/A') AS runner_second_player,
-        COALESCE(e.runner_third_id_start, 'N/A') AS runner_third_player,
+        e.runner_first_id_start AS runner_first_player,
+        e.runner_second_id_start AS runner_second_player,
+        e.runner_third_id_start AS runner_third_player,
         e.pitcher_id AS pitcher_player,
         e.catcher_id AS catcher_player,
+        e.first_base_id AS first_base_player,
+        e.second_base_id AS second_base_player,
+        e.third_base_id AS third_base_player,
+        e.shortstop_id AS shortstop_player,
+        e.left_field_id AS left_field_player,
+        e.center_field_id AS center_field_player,
+        e.right_field_id AS right_field_player,
         CASE
             WHEN HASH(e.game_id)::HUGEINT % 100 BETWEEN 0 AND 97 THEN 'TRAIN'
             ELSE 'TEST'

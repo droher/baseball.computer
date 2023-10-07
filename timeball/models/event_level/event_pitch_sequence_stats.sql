@@ -17,9 +17,9 @@ WITH add_meta AS (
 other_events AS (
     SELECT
         event_key,
-        BOOL_OR(baserunning_play_type = 'PassedBall')::INT1 AS passed_balls,
-        BOOL_OR(baserunning_play_type = 'WildPitch')::INT1 AS wild_pitches,
-        BOOL_OR(baserunning_play_type = 'Balk')::INT1 AS balks,
+        BOOL_OR(baserunning_play_type = 'PassedBall')::UTINYINT AS passed_balls,
+        BOOL_OR(baserunning_play_type = 'WildPitch')::UTINYINT AS wild_pitches,
+        BOOL_OR(baserunning_play_type = 'Balk')::UTINYINT AS balks,
     FROM {{ ref('stg_event_baserunners') }}
     GROUP BY 1
 ),
@@ -27,35 +27,35 @@ other_events AS (
 grouped_sequence AS (
     SELECT
         event_key,
-        COUNT(*) FILTER (WHERE is_pitch) AS pitches,
+        COUNT(*) FILTER (WHERE is_pitch)::UTINYINT AS pitches,
 
-        COUNT(*) FILTER (WHERE is_swing) AS swings,
-        COUNT(*) FILTER (WHERE is_contact) AS swings_with_contact,
+        COUNT(*) FILTER (WHERE is_swing)::UTINYINT AS swings,
+        COUNT(*) FILTER (WHERE is_contact)::UTINYINT AS swings_with_contact,
 
-        COUNT(*) FILTER (WHERE is_strike) AS strikes,
-        COUNT(*) FILTER (WHERE is_strike AND NOT is_swing) AS strikes_called,
-        COUNT(*) FILTER (WHERE is_swing AND NOT is_contact) AS strikes_swinging,
+        COUNT(*) FILTER (WHERE is_strike)::UTINYINT AS strikes,
+        COUNT(*) FILTER (WHERE is_strike AND NOT is_swing)::UTINYINT AS strikes_called,
+        COUNT(*) FILTER (WHERE is_swing AND NOT is_contact)::UTINYINT AS strikes_swinging,
         COUNT(*) FILTER (
             WHERE is_swing AND is_contact AND NOT is_in_play AND NOT can_be_strike_three
-        ) AS strikes_foul,
-        COUNT(*) FILTER (WHERE sequence_item LIKE 'FoulTip%') AS strikes_foul_tip,
-        COUNT(*) FILTER (WHERE is_in_play) AS strikes_in_play,
-        COUNT(*) FILTER (WHERE sequence_item = 'StrikeUnknownType') AS strikes_unknown,
+        )::UTINYINT AS strikes_foul,
+        COUNT(*) FILTER (WHERE sequence_item LIKE 'FoulTip%')::UTINYINT AS strikes_foul_tip,
+        COUNT(*) FILTER (WHERE is_in_play)::UTINYINT AS strikes_in_play,
+        COUNT(*) FILTER (WHERE sequence_item = 'StrikeUnknownType')::UTINYINT AS strikes_unknown,
 
-        COUNT(*) FILTER (WHERE category = 'Ball') AS balls,
-        COUNT(*) FILTER (WHERE sequence_item = 'Ball') AS balls_called,
-        COUNT(*) FILTER (WHERE sequence_item = 'IntentionalBall') AS balls_intentional,
-        COUNT(*) FILTER (WHERE sequence_item = 'AutomaticBall') AS balls_automatic,
+        COUNT(*) FILTER (WHERE category = 'Ball')::UTINYINT AS balls,
+        COUNT(*) FILTER (WHERE sequence_item = 'Ball')::UTINYINT AS balls_called,
+        COUNT(*) FILTER (WHERE sequence_item = 'IntentionalBall')::UTINYINT AS balls_intentional,
+        COUNT(*) FILTER (WHERE sequence_item = 'AutomaticBall')::UTINYINT AS balls_automatic,
 
-        COUNT(*) FILTER (WHERE category = 'Unknown') AS unknown_pitches,
+        COUNT(*) FILTER (WHERE category = 'Unknown')::UTINYINT AS unknown_pitches,
 
-        COUNT(*) FILTER (WHERE sequence_item LIKE '%Pitchout') AS pitchouts,
-        COUNT(*) FILTER (WHERE sequence_item LIKE 'Pickoff%') AS pitcher_pickoff_attempts,
+        COUNT(*) FILTER (WHERE sequence_item LIKE '%Pitchout')::UTINYINT AS pitchouts,
+        COUNT(*) FILTER (WHERE sequence_item LIKE 'Pickoff%')::UTINYINT AS pitcher_pickoff_attempts,
         COUNT(*) FILTER (
             WHERE catcher_pickoff_attempt_at_base IS NOT NULL
-        ) AS catcher_pickoff_attempts,
-        COUNT(*) FILTER (WHERE blocked_by_catcher_flag) AS pitches_blocked_by_catcher,
-        COUNT(*) FILTER (WHERE is_pitch AND runners_going_flag) AS pitches_with_runners_going,
+        )::UTINYINT AS catcher_pickoff_attempts,
+        COUNT(*) FILTER (WHERE blocked_by_catcher_flag)::UTINYINT AS pitches_blocked_by_catcher,
+        COUNT(*) FILTER (WHERE is_pitch AND runners_going_flag)::UTINYINT AS pitches_with_runners_going,
     FROM add_meta
     GROUP BY 1
 ),

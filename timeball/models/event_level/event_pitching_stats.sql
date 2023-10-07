@@ -8,11 +8,11 @@ WITH baserunning_agg AS (
     -- Runs are populated separately to charge to the right pitcher
     SELECT
         event_key,
-        ANY_VALUE(game_id) AS game_id,
-        ANY_VALUE(current_pitcher_id) AS player_id,
-        ANY_VALUE(fielding_team_id) AS team_id,
+        MIN(game_id) AS game_id,
+        MIN(current_pitcher_id) AS player_id,
+        MIN(fielding_team_id) AS team_id,
         {% for col in baserunning_stats_cols if col in event_level_pitching_stats() -%}
-            SUM({{ col }}) AS {{ col }},
+            SUM({{ col }})::TINYINT AS {{ col }},
         {% endfor %}
     FROM {{ ref('event_baserunning_stats') }}
     GROUP BY 1
@@ -75,7 +75,7 @@ final AS (
         team_id,
         player_id,
         {% for stat in event_level_pitching_stats() -%}
-            COALESCE({{ stat }}, 0)::INT2 AS {{ stat }},
+            COALESCE({{ stat }}, 0)::INT1 AS {{ stat }},
         {% endfor %}
     FROM unioned
 )

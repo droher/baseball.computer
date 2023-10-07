@@ -13,6 +13,7 @@ sources:
             tests:
               - unique
               - not_null
+            data_type: GAME_ID
           - name: game_key
             description: ""
             data_type: UINTEGER
@@ -75,10 +76,10 @@ sources:
             data_type: INT1
           - name: attendance
             description: ""
-            data_type: INT
+            data_type: UINTEGER
           - name: wind_speed_mph
             description: ""
-            data_type: INT1
+            data_type: UTINYINT
           - name: use_dh
             description: ""
             tests:
@@ -97,6 +98,7 @@ sources:
             data_type: PLAYER_ID
           - name: time_of_game_minutes
             description: ""
+            data_type: USMALLINT
           - name: protest_info
             description: ""
           - name: completion_info
@@ -119,6 +121,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: ACCOUNT_TYPE
           - name: away_team_id
             description: ""
             tests:
@@ -153,6 +156,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: GAME_ID
           - name: player_id
             description: ""
             tests:
@@ -162,7 +166,7 @@ sources:
             description: ""
             tests:
               - not_null
-            data_type: INT1
+            data_type: UTINYINT
 
       - name: game_fielding_appearances
         description: ""
@@ -177,6 +181,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: GAME_ID
           - name: player_id
             description: ""
             tests:
@@ -194,12 +199,12 @@ sources:
               - not_null
           - name: start_event_id
             description: ""
-            data_type: UINTEGER
+            data_type: UTINYINT
             tests:
               - not_null
           - name: end_event_id
             description: ""
-            data_type: UINTEGER
+            data_type: UTINYINT
             tests:
               - not_null
 
@@ -215,6 +220,7 @@ sources:
             description: ""
             tests:
               - not_null
+            data_type: GAME_ID
           - name: player_id
             description: ""
             tests:
@@ -236,11 +242,11 @@ sources:
               - not_null
           - name: start_event_id
             description: ""
-            data_type: UINTEGER
+            data_type: UTINYINT
             tests:
               - not_null
           - name: end_event_id
             description: ""
-            data_type: UINTEGER
+            data_type: UTINYINT
             tests:
               - not_null
