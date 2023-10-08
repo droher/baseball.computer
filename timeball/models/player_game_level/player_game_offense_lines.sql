@@ -20,7 +20,8 @@ final AS (
         team_id,
         player_id,
         {% for stat in event_level_offense_stats() -%}
-            SUM({{ stat }}) AS {{ stat }},
+            {% set dtype = "INT1" if stat.startswith("surplus") else "UTINYINT" %}
+            SUM({{ stat }})::{{ dtype }} AS {{ stat }},
         {% endfor %}
     FROM {{ ref('event_offense_stats') }}
     GROUP BY 1, 2, 3

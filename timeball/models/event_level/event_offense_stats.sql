@@ -34,11 +34,11 @@ unioned AS (
 
 final AS (
     SELECT
-        game_id,
+        game_id::GAME_ID AS game_id,
         event_key,
-        team_id,
+        COALESCE(team_id, batting_team_id)::TEAM_ID AS team_id,
+        COALESCE(player_id, runner_id)::PLAYER_ID AS player_id,
         baserunner,
-        player_id,
         {% for stat in event_level_offense_stats() -%}
             COALESCE({{ stat }}, 0)::INT1 AS {{ stat }},
         {% endfor %}
