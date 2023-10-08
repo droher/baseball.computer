@@ -7,11 +7,12 @@ WITH states AS (
     SELECT
         -- Treat 9th and later as the same to increase sample size
         -- TODO: Put add upstream `truncated_inning` col
-        LEAST(inning_start, 10) AS inning,
-        frame_start AS frame,
+        win_expectancy_start_key AS win_expectancy_key,
+        inning_group AS inning,
         truncated_home_margin_start AS truncated_home_margin,
-        base_state_start AS base_state,
+        frame_start AS frame,
         outs_start AS outs,
+        base_state_start AS base_state,
         -- Buckets for merging low-sample-size states, see next query for integration
         ROUND(CASE
             WHEN home_margin_start = 0 THEN 0
@@ -41,19 +42,20 @@ WITH states AS (
 ),
 
 agg AS (
-    SELECT DISTINCT ON (inning, frame, truncated_home_margin, base_state, outs)
+    SELECT DISTINCT ON (win_expectancy_key)
+        win_expectancy_key,
         inning,
         frame,
         truncated_home_margin,
-        base_state,
         outs,
+        base_state,
         SUM(home_team_win::NUMERIC) OVER narrow AS home_team_wins_narrow,
         COUNT(*) OVER narrow AS sample_size_narrow,
         SUM(home_team_win::NUMERIC) OVER broad / COUNT(*) OVER broad AS win_rate_broad,
     FROM states
     WINDOW
         narrow AS (
-            PARTITION BY inning, frame, truncated_home_margin, base_state, outs
+            PARTITION BY win_expectancy_key
         ),
         broad AS (
             PARTITION BY inning, frame, home_margin_bucket, any_runners_on
@@ -62,16 +64,18 @@ agg AS (
 
 final AS (
     SELECT
+        win_expectancy_key,
         inning,
         frame,
         truncated_home_margin,
-        base_state,
         outs,
+        base_state,
         -- Use the "broad" category as a prior to smooth out rare states
         ROUND(
             (home_team_wins_narrow + win_rate_broad * 10) / (sample_size_narrow + 10), 3
-        )::DECIMAL AS home_win_rate,
+        )::DECIMAL(4, 3) AS home_win_rate,
     FROM agg
 )
 
 SELECT * FROM final
+ORDER BY home_win_rate DESC

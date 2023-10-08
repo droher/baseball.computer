@@ -1,8 +1,3 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH final AS (
     SELECT
         -- IDs
@@ -36,8 +31,6 @@ WITH final AS (
                 THEN home_margin_start
             ELSE -home_margin_start
         END::INT1 AS batting_team_margin_start,
-        -- Perform upstream for consistency
-        GREATEST(LEAST(home_margin_start, 10), -10)::INT1 AS truncated_home_margin_start,
         players.batter_lineup_position,
         -- Player/Team IDs and info
         players.batter_hand,
@@ -81,11 +74,39 @@ WITH final AS (
                 THEN home_margin_end
             ELSE -home_margin_end
         END::INT1 AS batting_team_margin_end,
-        -- Perform upstream for consistency
-        GREATEST(LEAST(home_margin_end, 10), -10)::INT1 AS truncated_home_margin_end,
         base_out.frame_end_flag,
         base_out.truncated_frame_flag,
-        base_out.game_end_flag
+        base_out.game_end_flag,
+        -- IDs for calculating expectancy_values
+        CASE WHEN g.home_league NOT IN ('AL', 'NL', 'FL')
+                THEN 'Other'
+            ELSE g.home_league
+        END AS league_group,
+        GREATEST(g.season, 1914) AS season_group,
+        CASE WHEN base_out.inning_start < 10
+                THEN base_out.inning_start::VARCHAR
+            WHEN g.season >= 2020 AND g.game_type = 'RegularSeason'
+                THEN 11
+            ELSE 10
+        END AS inning_group,
+        GREATEST(LEAST(home_margin_start, 10), -10)::INT1 AS truncated_home_margin_start,
+        GREATEST(LEAST(home_margin_end, 10), -10)::INT1 AS truncated_home_margin_end,
+        CONCAT_WS(
+            '-', season_group, league_group,
+            base_out.outs_start, base_out.base_state_start
+        ) AS run_expectancy_start_key,
+        CONCAT_WS(
+            '-', season_group, league_group,
+            base_out.outs_end, COALESCE(base_out.base_state_end, 0)
+        ) AS run_expectancy_end_key,
+        CONCAT_WS(
+            '-', inning_group, base_out.frame_start, truncated_home_margin_start,
+            base_out.outs_start, base_out.base_state_start
+        ) AS win_expectancy_start_key,
+        CONCAT_WS(
+            '-', inning_group, base_out.frame_end, truncated_home_margin_end,
+            base_out.outs_end % 3, COALESCE(base_out.base_state_end, 0)
+        ) AS win_expectancy_end_key,
     FROM {{ ref('stg_events') }} AS e
     INNER JOIN {{ ref('game_start_info') }} AS g USING (game_id)
     INNER JOIN {{ ref('event_states_batter_pitcher') }} AS players USING (event_key)
