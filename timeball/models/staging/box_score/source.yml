@@ -628,16 +628,22 @@ sources:
               - not_null
           - name: putouts
             description: ""
+            data_type: UTINYINT
           - name: assists
             description: ""
+            data_type: UTINYINT
           - name: errors
             description: ""
+            data_type: UTINYINT
           - name: double_plays
             description: ""
+            data_type: UTINYINT
           - name: triple_plays
             description: ""
+            data_type: UTINYINT
           - name: passed_balls
             description: ""
+            data_type: UTINYINT
 
       - name: box_score_team_miscellaneous_lines
         description: ""

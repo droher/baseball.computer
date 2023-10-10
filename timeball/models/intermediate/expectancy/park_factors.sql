@@ -1,13 +1,21 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 {% set stats = ["plate_appearances", "singles", "doubles", "triples", 
-                "home_runs", "strikeouts", "walks", "batting_outs"] %}
+                "home_runs", "strikeouts", "walks", "batting_outs", "runs", "balls_in_play",
+                "contact_type_fly_ball", "contact_type_ground_ball", "contact_type_line_drive", "contact_type_pop_fly",
+                "contact_type_unknown", "batted_distance_infield", "batted_distance_outfield",
+                "batted_distance_unknown", "batted_angle_left", "batted_angle_right", "batted_angle_middle"] %}
 {% set rate_stats = stats[1:] %}
-{% set prior_sample_size = "10000 / COUNT(park_id) OVER (PARTITION BY season)" %}
+{% set prior_sample_size = "1000" %}
 
 WITH unique_park_seasons AS (
     SELECT DISTINCT
         park_id,
         season
-    FROM {{ ref('stg_games') }}
+    FROM {{ ref('game_start_info') }}
     WHERE game_type = 'RegularSeason'
 ),
 
@@ -18,10 +26,11 @@ with_park_info AS (
         states.batter_id,
         states.pitcher_id,
         {%- for stat in stats %}
-            batting.{{ stat }}::NUMERIC AS {{ stat }},
+            batting.{{ stat }}::FLOAT AS {{ stat }},
         {%- endfor %}
     FROM {{ ref('event_states_full') }} AS states
-    INNER JOIN {{ ref('event_batting_stats') }} AS batting USING (event_key)
+    INNER JOIN {{ ref('event_offense_stats') }} AS batting USING (event_key)
+    WHERE states.game_type = 'RegularSeason'
 ),
 
 unioned AS (

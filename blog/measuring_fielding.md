@@ -1,0 +1,14 @@
+# How to measure fielding runs/wins with season-only data
+- Calculate adjusted range factor
+  - Adjust each assist and putout to a share of an out contribution.
+    - All errors are -1 full share
+    - Outfield putouts are worth 1 full share
+    - Catcher putouts are not considered (variance will be dominated by strikeouts)
+    - Estimate team unassisted infield putout rate: (if_putouts - assists) / if_putouts
+    - Infield putouts are given that rate as their share of the out (minimum 5%, let's say)
+    - Assists are given (1 - rate) as their share.
+  - Normalize each share in proportion to the estimated total balls in play while fielding.
+    - Estimate this by getting the team's ratio of BIP to outs, and then muiltiply by that player's outs played
+  - Subtract the normalized share of league average for that year at that position
+  - This should now be the estimate of outs recorded above average for that player
+  - Then use the same out -> run and run -> win conversions as we do for batting/pitching

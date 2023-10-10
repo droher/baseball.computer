@@ -31,7 +31,6 @@ WITH databank AS (
         SUM(bat.plate_appearances) AS plate_appearances,
         SUM(bat.on_base_opportunities) AS on_base_opportunities,
         SUM(bat.on_base_successes) AS on_base_successes,
-        SUM(bat.batting_outs) AS batting_outs,
     FROM {{ ref('stg_databank_batting') }} AS bat
     INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
     -- We'd need to do something different for partial coverage seasons but

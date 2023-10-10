@@ -3,53 +3,86 @@
     materialized = 'table',
     )
 }}
--- TODO: Should these also be grouped by outs on play?
--- For example, `OtherAdvance` usually refers to a runner out on an advance attempt,
--- but sometimes the advance is successful (esp. as the result of an error),
--- which is probably about a full run's worth of difference.
--- Instead of adding a col we could always create synthetic event types for these cases,
--- specifically OtherAdvance (-> OtherAdvanceSafe + OtherAdvanceOut)
--- and InPlayOut (-> InPlayOut, DoublePlay, TriplePlay).
 WITH union_plays AS (
     SELECT
-        event_key,
-        plate_appearance_result AS play,
+        e.event_key,
+        CASE WHEN cat.result_category = 'InPlayOut' AND e.outs_on_play > 1
+                THEN 'DoublePlay'
+            ELSE cat.result_category
+        END AS play,
         'BATTING' AS play_category,
-    FROM {{ ref('stg_events') }}
-    WHERE plate_appearance_result IS NOT NULL
-        AND event_key NOT IN (SELECT event_key FROM {{ ref('stg_event_baserunners') }} WHERE baserunning_play_type IS NOT NULL)
+    FROM {{ ref('stg_events') }} AS e
+    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS cat USING (plate_appearance_result)
+    -- Only include plays that didn't have simultaneous baserunning plays,
+    -- or plays with an atypical number of outs recorded for its type (e.g. single with an out)
+    WHERE e.event_key NOT IN (
+        SELECT event_key FROM {{ ref('stg_event_baserunners') }} WHERE baserunning_play_type IS NOT NULL
+    )
     UNION ALL BY NAME
     -- Only consider baserunning plays with a single event for now.
     -- We can still handle these cases downstream by assigning the value
     -- to each item of the event, e.g. 2xSB for a double steal, which is probably
     -- wrong but not too far off.
     SELECT
-        event_key,
-        FIRST(baserunning_play_type) AS play,
+        e.event_key,
+        FIRST(CASE WHEN e.is_out THEN cat.result_category_out ELSE cat.result_category_safe END) AS play,
         FIRST('BASERUNNING') AS play_category,
-    FROM {{ ref('stg_event_baserunners') }}
-    WHERE event_key NOT IN (SELECT event_key FROM {{ ref('stg_events') }} WHERE plate_appearance_result IS NOT NULL)
+    FROM {{ ref('stg_event_baserunners') }} AS e
+    INNER JOIN {{ ref('seed_baserunning_play_types') }} AS cat USING (baserunning_play_type)
+    WHERE e.event_key NOT IN (
+            SELECT event_key FROM {{ ref('stg_events') }} WHERE plate_appearance_result IS NOT NULL
+        )
     GROUP BY 1
     HAVING COUNT(*) = 1
 ),
 
-agg AS (
-    SELECT DISTINCT ON (trans.season, trans.league, union_plays.play)
+joined AS (
+    SELECT
         trans.season,
         trans.league,
         union_plays.play,
         union_plays.play_category,
-        AVG(trans.expected_runs_change) OVER all_league AS avg_run_value_all,
-        AVG(trans.expected_runs_change) OVER result AS avg_run_value_result,
-        AVG(trans.expected_batting_win_change) OVER all_league AS avg_win_value_all,
-        AVG(trans.expected_batting_win_change) OVER result AS avg_win_value_result,
+        trans.expected_runs_change,
+        trans.expected_batting_win_change
     FROM union_plays
     INNER JOIN {{ ref('event_transition_values') }} AS trans USING (event_key)
-    -- Only include seasons with regular season data for now
-    WHERE trans.season >= 1914
+),
+
+agg_specific AS (
+    SELECT DISTINCT ON (season, league, play)
+        season,
+        league,
+        play,
+        play_category,
+        AVG(expected_runs_change) OVER all_league AS avg_run_value_all,
+        AVG(expected_runs_change) OVER result AS avg_run_value_result,
+        AVG(expected_batting_win_change) OVER all_league AS avg_win_value_all,
+        AVG(expected_batting_win_change) OVER result AS avg_win_value_result,
+    FROM joined
     WINDOW
-        all_league AS (PARTITION BY trans.season, trans.league),
-        result AS (PARTITION BY trans.season, trans.league, union_plays.play)
+        all_league AS (PARTITION BY season, league),
+        result AS (PARTITION BY season, league, play)
+    QUALIFY COUNT(*) OVER result > 100
+),
+
+add_generic AS (
+    SELECT DISTINCT ON (play)
+        NULL AS season,
+        NULL AS league,
+        play,
+        play_category,
+        AVG(expected_runs_change) OVER () AS avg_run_value_all,
+        AVG(expected_runs_change) OVER result AS avg_run_value_result,
+        AVG(expected_batting_win_change) OVER () AS avg_win_value_all,
+        AVG(expected_batting_win_change) OVER result AS avg_win_value_result,
+    FROM joined
+    WINDOW result AS (PARTITION BY play)
+),
+
+agg_unioned AS (
+    SELECT * FROM agg_specific
+    UNION ALL BY NAME
+    SELECT * FROM add_generic
 ),
 
 final AS (
@@ -60,7 +93,7 @@ final AS (
         play_category,
         ROUND(avg_run_value_result - avg_run_value_all, 3) AS avg_run_value,
         ROUND(avg_win_value_result - avg_win_value_all, 3) AS avg_win_value
-    FROM agg
+    FROM agg_unioned
 )
 
 SELECT * FROM final

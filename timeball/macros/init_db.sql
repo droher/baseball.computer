@@ -1,9 +1,9 @@
 {% macro init_db(sample_factor=1, seed=0) %}
   {% set base_url = "https://baseball.computer" %}
 
-  {% set sql %}
     {% for node in graph.sources.values() %}
       {% set prefix = node.schema if node.schema in ("misc", "baseballdatabank") else "event" %}
+      {% set sql %}
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';
       CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (
@@ -12,11 +12,10 @@
           WHERE HASH(event_key // 255) % {{ sample_factor }} = {{ seed }}
         {% endif %}
       );
+      {% endset %}
+      {% do log(sql, info=True)%}
+      {% do run_query(sql) %}
     {% endfor %}
-  {% endset %}
-
-{% do log(sql, info=True)%}
-{% do run_query(sql) %}
 
 {% endmacro %}
 

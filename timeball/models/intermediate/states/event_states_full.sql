@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH final AS (
     SELECT
         -- IDs
@@ -92,19 +97,19 @@ WITH final AS (
         GREATEST(LEAST(home_margin_start, 10), -10)::INT1 AS truncated_home_margin_start,
         GREATEST(LEAST(home_margin_end, 10), -10)::INT1 AS truncated_home_margin_end,
         CONCAT_WS(
-            '-', season_group, league_group,
+            '_', season_group, league_group,
             base_out.outs_start, base_out.base_state_start
         ) AS run_expectancy_start_key,
         CONCAT_WS(
-            '-', season_group, league_group,
+            '_', season_group, league_group,
             base_out.outs_end, COALESCE(base_out.base_state_end, 0)
         ) AS run_expectancy_end_key,
         CONCAT_WS(
-            '-', inning_group, base_out.frame_start, truncated_home_margin_start,
+            '_', inning_group, base_out.frame_start, truncated_home_margin_start,
             base_out.outs_start, base_out.base_state_start
         ) AS win_expectancy_start_key,
         CONCAT_WS(
-            '-', inning_group, base_out.frame_end, truncated_home_margin_end,
+            '_', inning_group, base_out.frame_end, truncated_home_margin_end,
             base_out.outs_end % 3, COALESCE(base_out.base_state_end, 0)
         ) AS win_expectancy_end_key,
     FROM {{ ref('stg_events') }} AS e

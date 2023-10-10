@@ -15,3 +15,4 @@ renamed AS (
 )
 
 SELECT * FROM renamed
+WHERE substring(game_id, 4,4)::INT < 1919

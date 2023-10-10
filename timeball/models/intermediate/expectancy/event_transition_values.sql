@@ -6,6 +6,10 @@
 WITH final AS (
     SELECT
         states.event_key,
+        states.run_expectancy_start_key,
+        states.run_expectancy_end_key,
+        states.win_expectancy_start_key,
+        states.win_expectancy_end_key,
         states.season,
         states.league,
         states.game_type,

@@ -20,7 +20,7 @@ add_series_start_flag AS (
     SELECT
         *,
         CASE
-            WHEN LAG(opponent_id, 1, 'N/A') OVER season_series != opponent_id
+            WHEN LAG(opponent_id::VARCHAR, 1, 'N/A') OVER season_series != opponent_id
                 THEN game_id
         END AS series_id
     FROM base

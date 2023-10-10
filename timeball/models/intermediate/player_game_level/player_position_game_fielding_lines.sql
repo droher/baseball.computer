@@ -37,6 +37,8 @@ event_agg AS (
         SUM(double_plays)::UTINYINT AS double_plays,
         SUM(triple_plays)::UTINYINT AS triple_plays,
         SUM(ground_ball_double_plays)::UTINYINT AS ground_ball_double_plays,
+        SUM(stolen_bases)::UTINYINT AS stolen_bases,
+        SUM(caught_stealing)::UTINYINT AS caught_stealing,
         SUM(passed_balls)::UTINYINT AS passed_balls,
         SUM(balls_hit_to)::UTINYINT AS balls_hit_to
     FROM {{ ref('event_player_fielding_stats') }}

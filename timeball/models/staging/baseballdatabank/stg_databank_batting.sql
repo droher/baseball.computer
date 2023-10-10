@@ -35,7 +35,6 @@ renamed AS (
         at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
         AS on_base_opportunities,
         hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) AS on_base_successes,
-        at_bats - hits + COALESCE(grounded_into_double_plays, 0) AS batting_outs,
     FROM source
 
 )
