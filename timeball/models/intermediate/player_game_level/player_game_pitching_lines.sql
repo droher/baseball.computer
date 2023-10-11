@@ -135,7 +135,15 @@ final AS (
         CASE WHEN quality_starts = 1 AND losses = 1 THEN 1 ELSE 0 END::UTINYINT AS tough_losses,
         CASE WHEN games_started = 1 AND wins + losses = 0 THEN 1 ELSE 0 END::UTINYINT AS no_decisions,
         CASE WHEN complete_games = 1 AND hits = 0 AND outs_recorded >= 27 THEN 1 ELSE 0 END::UTINYINT AS no_hitters,
-        -- Perfect games can be calculated for non-box-score games but we need other info for older ones
+        -- Easy to calculate perfect games for games with event files, but box scores don't have ROEs.
+        -- The logic here would be broken if a batter reached on an error and then was out on the bases,
+        -- but no such event happened in prior to the event data era (maybe ever?)
+        (
+        CASE 
+            WHEN no_hitters = 1 AND (times_reached_base = 0
+                OR (outs_recorded >= batters_faced AND COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) = 0) 
+                ) THEN 1 
+            ELSE 0 END)::UTINYINT AS perfect_games, 
     FROM with_game_info
     WINDOW team_game AS (PARTITION BY team_id, game_id)
 )

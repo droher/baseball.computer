@@ -94,7 +94,7 @@
       SELECT DISTINCT home_team FROM misc.gamelog
     );
     
-    CREATE TYPE player_id AS ENUM (
+    {# CREATE TYPE player_id AS ENUM (
       SELECT retroid FROM baseballdatabank.people WHERE retroid IS NOT NULL
       UNION
       SELECT DISTINCT player_id FROM misc.roster
@@ -102,15 +102,18 @@
       SELECT DISTINCT batter_id FROM box_score.box_score_batting_lines
       UNION
       SELECT DISTINCT fielder_id FROM box_score.box_score_fielding_lines
-    );
+    ); #}
+    CREATE TYPE player_id AS VARCHAR;
 
-    CREATE TYPE game_id AS ENUM (
+    {# CREATE TYPE game_id AS ENUM (
       SELECT game_id FROM game.games
       UNION
       SELECT game_id FROM box_score.box_score_games
       UNION
       SELECT home_team || STRFTIME(date, '%Y%m%d') || double_header FROM misc.gamelog
-    );
+    ); #}
+    CREATE TYPE game_id AS VARCHAR;
+
   {% endset %}
   {% do log(sql, info=True)%}
   {% do run_query(sql) %}

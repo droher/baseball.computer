@@ -35,6 +35,7 @@ renamed AS (
         runs_batted_in,
         STRPTIME(SUBSTRING(game_id, 4, 8), '%Y%m%d')::DATE AS date,
         SUBSTRING(game_id, 4, 4)::INT2 AS season,
+        BIT_COUNT(base_state) AS runners_count,
     from source
 )
 

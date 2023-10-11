@@ -45,16 +45,16 @@ final AS (
         END::HAND AS pitcher_hand,
         overrides.strikeout_responsible_batter_id,
         overrides.walk_responsible_pitcher_id,
-        fielders.catcher_id,
+        {# fielders.catcher_id,
         fielders.first_base_id,
         fielders.second_base_id,
         fielders.third_base_id,
         fielders.shortstop_id,
         fielders.left_field_id,
         fielders.center_field_id,
-        fielders.right_field_id
+        fielders.right_field_id #}
     FROM {{ ref('stg_events') }} AS events
-    INNER JOIN {{ ref('event_fielders_flat') }} AS fielders USING (event_key)
+    {# INNER JOIN {{ ref('event_fielders_flat') }} AS fielders USING (event_key) #}
     LEFT JOIN overrides USING (event_key)
     LEFT JOIN {{ ref('stg_rosters') }} AS batters
         ON events.batter_id = batters.player_id

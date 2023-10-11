@@ -9,7 +9,7 @@ WITH game_agg AS (
         team_id,
         game_type,
         COUNT(*) AS games
-    FROM {{ ref('game_team_start_info') }}
+    FROM {{ ref('team_game_start_info') }}
     GROUP BY 1, 2, 3
 ),
 
@@ -57,7 +57,7 @@ retrosheet AS (
         SUM(stats.triple_plays) AS triple_plays,
         SUM(stats.ground_ball_double_plays) AS ground_ball_double_plays
     FROM {{ ref('game_start_info') }} AS games
-    INNER JOIN {{ ref('game_team_fielding_stats') }} AS stats USING (game_id)
+    INNER JOIN {{ ref('team_game_fielding_stats') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3
 ),
 

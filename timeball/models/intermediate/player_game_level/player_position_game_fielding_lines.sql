@@ -66,11 +66,13 @@ final AS (
         COALESCE(box_agg.assists, event_agg.assists)::UTINYINT AS assists,
         COALESCE(box_agg.errors, event_agg.errors)::UTINYINT AS errors,
         event_agg.fielders_choices,
+        event_agg.balls_hit_to,
         COALESCE(box_agg.double_plays, event_agg.double_plays)::UTINYINT AS double_plays,
         COALESCE(box_agg.triple_plays, event_agg.triple_plays)::UTINYINT AS triple_plays,
         event_agg.ground_ball_double_plays,
         COALESCE(box_agg.passed_balls, event_agg.passed_balls)::UTINYINT AS passed_balls,
-        event_agg.balls_hit_to
+        event_agg.stolen_bases,
+        event_agg.caught_stealing
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
     LEFT JOIN {{ ref('player_game_appearances') }} AS appearances USING (game_id, player_id)

@@ -45,14 +45,6 @@ WITH final AS (
         e.runner_second_id_start AS runner_second_player,
         e.runner_third_id_start AS runner_third_player,
         e.pitcher_id AS pitcher_player,
-        e.catcher_id AS catcher_player,
-        e.first_base_id AS first_base_player,
-        e.second_base_id AS second_base_player,
-        e.third_base_id AS third_base_player,
-        e.shortstop_id AS shortstop_player,
-        e.left_field_id AS left_field_player,
-        e.center_field_id AS center_field_player,
-        e.right_field_id AS right_field_player,
         CASE
             WHEN HASH(e.game_id)::HUGEINT % 100 BETWEEN 0 AND 97 THEN 'TRAIN'
             ELSE 'TEST'

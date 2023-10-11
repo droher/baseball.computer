@@ -12,6 +12,7 @@ WITH final AS (
         -- Basic state
         g.season::SMALLINT AS season,
         g.home_league AS league,
+        g.is_interleague,
         g.game_type,
         g.date,
         g.park_id,
@@ -46,16 +47,16 @@ WITH final AS (
         players.fielding_team_id,
         players.batter_id,
         players.pitcher_id,
-        players.catcher_id,
         -- These are too memory-intensive to include
         -- at the moment - can put them back in later
+        {# players.catcher_id, 
         players.first_base_id,
         players.second_base_id,
         players.third_base_id,
         players.shortstop_id,
         players.left_field_id,
         players.center_field_id,
-        players.right_field_id,
+        players.right_field_id, #}
         base_out.base_state_start,
         base_out.runners_count_start,
         base_out.frame_start_flag,

@@ -55,7 +55,17 @@ final AS (
         -- but for other types of double plays, the other out
         -- is considered to be a baserunning out (for now)
         result_types.is_batting_out::UTINYINT + grounded_into_double_plays AS batting_outs,
-        pa.outs_on_play
+        pa.outs_on_play,
+        -- We're assuming that ROEs and similar plays do not count as stranding runners
+        -- Also require it to be an AB to leave out sac flies and bunts
+        CASE WHEN result_types.is_batting_out AND pa.outs_on_play > 0 AND result_types.is_at_bat
+                THEN pa.runners_count - pa.outs_on_play - pa.runs_on_play + 1
+            ELSE 0
+        END::UTINYINT AS left_on_base,
+        CASE WHEN pa.outs + pa.outs_on_play = 3
+                THEN left_on_base
+            ELSE 0
+        END::UTINYINT AS left_on_base_with_two_outs,
 
     FROM {{ ref('stg_events') }} AS pa
     INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS result_types

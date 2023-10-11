@@ -1,3 +1,8 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 WITH gamelog_results AS (
     SELECT
         game_id,

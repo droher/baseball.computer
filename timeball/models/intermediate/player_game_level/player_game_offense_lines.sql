@@ -5,12 +5,12 @@
 }}
 WITH box_score AS (
     SELECT
-        CASE WHEN lines.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS team_id,
-        lines.*
-    FROM {{ ref('stg_box_score_batting_lines') }} AS lines
+        CASE WHEN bat.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS team_id,
+        bat.*
+    FROM {{ ref('stg_box_score_batting_lines') }} AS bat
     -- This join ensures that we only get the box score lines for games that
     -- do not have an event file.
-    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
+    INNER JOIN {{ ref('game_start_info') }} AS games USING (game_id)
     WHERE games.source_type = 'BoxScore'
 ),
 

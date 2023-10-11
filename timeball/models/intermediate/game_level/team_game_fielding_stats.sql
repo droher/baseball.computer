@@ -36,7 +36,7 @@ box_games AS (
         game_id,
         team_id,
         team_side AS side
-    FROM {{ ref('game_team_start_info') }}
+    FROM {{ ref('team_game_start_info') }}
     WHERE source_type = 'BoxScore'
 ),
 

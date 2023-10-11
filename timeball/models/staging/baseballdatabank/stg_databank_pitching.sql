@@ -23,7 +23,7 @@ renamed AS (
         bb AS walks,
         so AS strikeouts,
         -- OAV could be used in theory to back into at-bats against,
-        -- but isn't populatd for the years we source from this data
+        -- but isn't populated for the years we source from this data
         baopp AS opponent_batting_average,
         era AS earned_run_average,
         ibb AS intentional_walks,

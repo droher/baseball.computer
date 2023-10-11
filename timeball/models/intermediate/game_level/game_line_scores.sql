@@ -1,7 +1,7 @@
 WITH event_lines AS (
     SELECT
         game_id,
-        batting_side AS side,
+        batting_side,
         inning_start AS inning,
         SUM(runs_on_play) AS runs,
         SUM(outs_on_play) AS outs,
@@ -22,7 +22,7 @@ unioned AS (
 game_agg AS (
     SELECT
         game_id,
-        side,
+        batting_side AS side,
         SUM(runs) AS total_runs,
         STRING_AGG(CASE
             WHEN runs >= 10
@@ -57,16 +57,20 @@ side_agg AS (
     FROM game_agg AS g
     LEFT JOIN box_outs USING (game_id, side)
     GROUP BY 1
+),
+
+final AS (
+    SELECT * REPLACE (
+        CASE WHEN LENGTH(home_line_score) > LENGTH(away_line_score)
+            THEN away_line_score || 'x'
+            ELSE away_line_score
+        END AS away_line_score,
+        CASE WHEN LENGTH(away_line_score) > LENGTH(home_line_score)
+            THEN home_line_score || 'x'
+            ELSE home_line_score
+        END AS home_line_score,    
+    )
+    FROM side_agg
 )
 
-SELECT * REPLACE (
-    CASE WHEN LENGTH(home_line_score) > LENGTH(away_line_score)
-        THEN away_line_score || 'x'
-        ELSE away_line_score
-    END AS away_line_score,
-    CASE WHEN LENGTH(away_line_score) > LENGTH(home_line_score)
-        THEN home_line_score || 'x'
-        ELSE home_line_score
-    END AS home_line_score,    
-)
-FROM side_agg
+SELECT * FROM final

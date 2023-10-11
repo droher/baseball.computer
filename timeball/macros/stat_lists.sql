@@ -92,6 +92,8 @@
         "passed_balls",
         "wild_pitches",
         "balks",
+        "left_on_base",
+        "left_on_base_with_two_outs"
     ]) }}
 {% endmacro %}
 
@@ -119,6 +121,7 @@
 {% macro game_level_pitching_stats() %}
     {{ return([
         "games_started",
+        "innings_pitched",
         "inherited_runners",
         "bequeathed_runners",
         "games_relieved",
@@ -127,6 +130,7 @@
         "holds",
         "blown_saves",
         "saves_by_rule",
+        "save_opportunities",
         "wins",
         "losses",
         "saves",
@@ -137,7 +141,8 @@
         "cheap_wins",
         "tough_losses",
         "no_decisions",
-        "no_hitters"
+        "no_hitters",
+        "perfect_games",
     ]) }}
 {% endmacro %}
 
