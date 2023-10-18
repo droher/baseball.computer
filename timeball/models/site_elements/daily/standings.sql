@@ -46,46 +46,19 @@ standings_spine AS (
     WHERE d.date BETWEEN b.season_start_date AND b.season_end_date
 ),
 
-results AS (
-    SELECT
-        r.season,
-        -- Add one so that data is exclusive of the game that day
-        r.game_finish_date + 1 AS date,
-        r.team_id,
-        tsi.season_game_number,
-        r.wins,
-        r.losses,
-        r.runs_scored,
-        r.runs_allowed,
-        CASE WHEN tsi.team_side = 'Home' THEN r.wins ELSE 0 END AS home_wins,
-        CASE WHEN tsi.team_side = 'Home' THEN r.losses ELSE 0 END AS home_losses,
-        CASE WHEN tsi.team_side = 'Away' THEN r.wins ELSE 0 END AS away_wins,
-        CASE WHEN tsi.team_side = 'Away' THEN r.losses ELSE 0 END AS away_losses,
-        CASE WHEN tsi.is_interleague THEN r.wins ELSE 0 END AS interleague_wins,
-        CASE WHEN tsi.is_interleague THEN r.losses ELSE 0 END AS interleague_losses,
-        CASE WHEN NOT tsi.is_interleague AND tsi.opponent_division = 'E' THEN r.wins ELSE 0 END AS east_wins,
-        CASE WHEN NOT tsi.is_interleague AND tsi.opponent_division = 'E' THEN r.losses ELSE 0 END AS east_losses,
-        CASE WHEN NOT tsi.is_interleague AND tsi.opponent_division = 'C' THEN r.wins ELSE 0 END AS central_wins,
-        CASE WHEN NOT tsi.is_interleague AND tsi.opponent_division = 'C' THEN r.losses ELSE 0 END AS central_losses,
-        CASE WHEN NOT tsi.is_interleague AND tsi.opponent_division = 'W' THEN r.wins ELSE 0 END AS west_wins,
-        CASE WHEN NOT tsi.is_interleague AND tsi.opponent_division = 'W' THEN r.losses ELSE 0 END AS west_losses,
-        CASE WHEN ABS(r.runs_scored::INT - r.runs_allowed) = 1 THEN r.wins ELSE 0 END AS one_run_wins,
-        CASE WHEN ABS(r.runs_scored::INT - r.runs_allowed) = 1 THEN r.losses ELSE 0 END AS one_run_losses,
-    FROM {{ ref('team_game_results') }} AS r
-    INNER JOIN {{ ref('team_game_start_info') }} AS tsi USING (game_id, team_id)
-    WHERE tsi.game_type = 'RegularSeason'
-),
-
 crossed AS (
-    SELECT
+    SELECT DISTINCT ON (s.date, s.season, s.league, s.team_id)
         s.date,
         s.season,
         s.league,
         s.division,
-        team_id,
+        s.team_id,
         s.team_name,
         COALESCE(SUM(r.wins) OVER team_window, 0) AS wins,
         COALESCE(SUM(r.losses) OVER team_window, 0) AS losses,
+        -- Take the streak count from the last game of the day
+        COALESCE(LAST(r.win_streak_length IGNORE NULLS) OVER team_window, 0) AS win_streak_length,
+        COALESCE(LAST(r.loss_streak_length IGNORE NULLS) OVER team_window, 0) AS loss_streak_length,
         COALESCE(SUM(r.runs_scored) OVER team_window, 0) AS runs_scored,
         COALESCE(SUM(r.runs_allowed) OVER team_window, 0) AS runs_allowed,
         COALESCE(SUM(r.home_wins) OVER team_window, 0) AS home_wins,
@@ -105,11 +78,15 @@ crossed AS (
         COALESCE(SUM(r.wins) OVER last_10_window, 0) AS last_10_wins,
         COALESCE(SUM(r.losses) OVER last_10_window, 0) AS last_10_losses,
     FROM standings_spine AS s
-    LEFT JOIN results AS r USING (season, date, team_id)
+    LEFT JOIN {{ ref('team_game_results') }} AS r
+        ON r.season = s.season
+            AND r.team_id = s.team_id
+            AND r.game_finish_date = s.date
+            AND r.game_type = 'RegularSeason'
     WINDOW
         team_window AS (
             PARTITION BY s.season, s.team_id
-            ORDER BY s.date
+            ORDER BY s.date, r.season_game_number
         ),
         last_10_window AS (
             PARTITION BY s.season, s.team_id
@@ -136,16 +113,13 @@ final AS (
         ) AS games_behind,
         runs_scored ^ 1.85 / (runs_scored ^ 1.85 + runs_allowed ^ 1.85) AS pythagorean_win_percentage,
         (runs_scored - runs_allowed) / (wins + losses) AS average_run_differential,
-        * EXCLUDE (date, season, league, division, team_name, wins, losses)
+        * EXCLUDE (date, season, league, division, team_id, team_name, wins, losses)
     FROM crossed
-    WINDOW division_snapshot AS (
-        PARTITION BY season, league, division, date
-        ORDER BY wins - losses DESC
-    )
+    WINDOW
+        division_snapshot AS (
+            PARTITION BY season, league, division, date
+            ORDER BY wins - losses DESC
+        )
 )
 
 SELECT * FROM final
-WHERE season = 1998
-AND league = 'AL'
-AND division = 'W'
-ORDER BY date, win_percentage DESC
