@@ -41,6 +41,7 @@ add_current_pitcher_runs AS (
     SELECT
         joined_stats.*,
         runs.runs,
+        runs.team_unearned_runs,
         runs.inherited_runners_scored,
     FROM joined_stats
 LEFT JOIN {{ ref('event_run_assignment_stats') }} AS runs
@@ -56,6 +57,7 @@ insert_non_current_pitcher_runs AS (
         team_id,
         pitcher_id AS player_id,
         runs,
+        team_unearned_runs,
         bequeathed_runners_scored,
     FROM {{ ref('event_run_assignment_stats') }}
     -- Meaning they are not currently in the game

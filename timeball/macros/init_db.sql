@@ -55,21 +55,21 @@
     -- TODO: Standardize
     CREATE TYPE hand AS ENUM ('L', 'R', 'B', '?', 'Left', 'Right');
 
-    CREATE TYPE game_type AS ENUM (SELECT DISTINCT game_type FROM game.games);
-    CREATE TYPE doubleheader_status AS ENUM (SELECT DISTINCT doubleheader_status FROM game.games);
-    CREATE TYPE time_of_day AS ENUM (SELECT DISTINCT time_of_day FROM game.games);
-    CREATE TYPE sky AS ENUM (SELECT DISTINCT sky FROM game.games);
-    CREATE TYPE field_condition AS ENUM (SELECT DISTINCT field_condition FROM game.games);
-    CREATE TYPE precipitation AS ENUM (SELECT DISTINCT precipitation FROM game.games);
-    CREATE TYPE wind_direction AS ENUM (SELECT DISTINCT wind_direction FROM game.games);
-    CREATE TYPE plate_appearance_result AS ENUM (SELECT DISTINCT plate_appearance_result FROM event.events WHERE plate_appearance_result IS NOT NULL);
-    CREATE TYPE pitch_sequence_item AS ENUM (SELECT DISTINCT sequence_item FROM event.event_pitch_sequences);
-    CREATE TYPE contact AS ENUM (SELECT DISTINCT batted_contact_type FROM event.events WHERE batted_contact_type IS NOT NULL);
-    CREATE TYPE location_general AS ENUM (SELECT DISTINCT batted_location_general FROM event.events WHERE batted_location_general IS NOT NULL);
-    CREATE TYPE location_depth AS ENUM (SELECT DISTINCT batted_location_depth FROM event.events WHERE batted_location_depth IS NOT NULL);
-    CREATE TYPE location_angle AS ENUM (SELECT DISTINCT batted_location_angle FROM event.events WHERE batted_location_angle IS NOT NULL);
-    CREATE TYPE baserunning_play AS ENUM (SELECT DISTINCT baserunning_play_type FROM event.event_baserunners WHERE baserunning_play_type IS NOT NULL);
-    CREATE TYPE fielding_play AS ENUM (SELECT DISTINCT fielding_play FROM event.event_fielding_play);
+    CREATE TYPE game_type AS ENUM (SELECT DISTINCT game_type FROM game.games ORDER BY 1);
+    CREATE TYPE doubleheader_status AS ENUM (SELECT DISTINCT doubleheader_status FROM game.games ORDER BY 1);
+    CREATE TYPE time_of_day AS ENUM (SELECT DISTINCT time_of_day FROM game.games ORDER BY 1);
+    CREATE TYPE sky AS ENUM (SELECT DISTINCT sky FROM game.games ORDER BY 1);
+    CREATE TYPE field_condition AS ENUM (SELECT DISTINCT field_condition FROM game.games ORDER BY 1);
+    CREATE TYPE precipitation AS ENUM (SELECT DISTINCT precipitation FROM game.games ORDER BY 1);
+    CREATE TYPE wind_direction AS ENUM (SELECT DISTINCT wind_direction FROM game.games ORDER BY 1);
+    CREATE TYPE plate_appearance_result AS ENUM (SELECT DISTINCT plate_appearance_result FROM event.events WHERE plate_appearance_result IS NOT NULL ORDER BY 1);
+    CREATE TYPE pitch_sequence_item AS ENUM (SELECT DISTINCT sequence_item FROM event.event_pitch_sequences ORDER BY 1);
+    CREATE TYPE contact AS ENUM (SELECT DISTINCT batted_contact_type FROM event.events WHERE batted_contact_type IS NOT NULL ORDER BY 1);
+    CREATE TYPE location_general AS ENUM (SELECT DISTINCT batted_location_general FROM event.events WHERE batted_location_general IS NOT NULL ORDER BY 1);
+    CREATE TYPE location_depth AS ENUM (SELECT DISTINCT batted_location_depth FROM event.events WHERE batted_location_depth IS NOT NULL ORDER BY 1);
+    CREATE TYPE location_angle AS ENUM (SELECT DISTINCT batted_location_angle FROM event.events WHERE batted_location_angle IS NOT NULL ORDER BY 1);
+    CREATE TYPE baserunning_play AS ENUM (SELECT DISTINCT baserunning_play_type FROM event.event_baserunners WHERE baserunning_play_type IS NOT NULL ORDER BY 1));
+    CREATE TYPE fielding_play AS ENUM (SELECT DISTINCT fielding_play FROM event.event_fielding_play ORDER BY 1);
     
     CREATE TYPE account_type AS ENUM (
       SELECT DISTINCT account_type FROM game.games

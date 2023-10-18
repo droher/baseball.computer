@@ -112,6 +112,7 @@
         "outs_recorded",
         "inherited_runners_scored",
         "bequeathed_runners_scored",
+        "team_unearned_runs"
     ] %}
 
     {{ return(extra_pitching_stats + remove_items(event_level_offense_stats(), non_pitching_stats)) }}

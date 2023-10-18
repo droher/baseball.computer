@@ -1,18 +1,15 @@
-import duckdb
 import polars as pl
 import pyarrow as pa
-from pyarrow import RecordBatchReader
+
+def batcher(batch_reader: pa.RecordBatchReader):
+    for batch in batch_reader:
+        df = batch.to_pandas()
+        # Do some operations on the DF...
+        # ...then yield back a new batch
+        yield pa.RecordBatch.from_pandas(df)
 
 def model(dbt, session):
-    print("Starting")
-    o: duckdb.DuckDBPyRelation = dbt.ref("ml_features")
-    batch_reader: pa.RecordBatchReader = o.record_batch(10000)
-    def gen():
-        for batch in batch_reader:
-            print("batch")
-            df = pl.DataFrame.from_arrow(batch)
-            # Do some operations...
-            # ... then convert back to arrow
-            yield df.to_arrow() 
-    new_reader = RecordBatchReader.from_batches(batch_reader.schema, [])
-    return new_reader
+    big_model = session.cursor().sql("SELECT * FROM main_models.stg_databank_pitching")
+    batch_reader = big_model.record_batch(100_000)
+    batch_iter = batcher(batch_reader)
+    return pa.RecordBatchReader.from_batches(batch_reader.schema, batch_iter)

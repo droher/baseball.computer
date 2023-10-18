@@ -10,9 +10,11 @@ WITH event_runs AS (
         run_stats.fielding_team_id AS team_id,
         run_stats.current_pitcher_id AS current_pitcher_id,
         COALESCE(run_stats.explicit_charged_pitcher_id, charged_pitcher.pitcher_id) AS charged_pitcher_id,
-        run_stats.runs
+        run_stats.runs,
+        events.team_unearned_runs
     FROM {{ ref('event_baserunning_stats') }} AS run_stats
     INNER JOIN {{ ref('event_states_batter_pitcher') }} AS charged_pitcher USING (event_key)
+    INNER JOIN {{ ref('stg_events') }} AS events USING (event_key)
     WHERE run_stats.runs = 1
 ),
 
@@ -23,6 +25,7 @@ unioned AS (
         team_id,
         current_pitcher_id AS pitcher_id,
         runs,
+        team_unearned_runs,
         0 AS inherited_runners_scored,
         0 AS bequeathed_runners_scored
     FROM event_runs
@@ -34,6 +37,7 @@ unioned AS (
         team_id,
         charged_pitcher_id AS pitcher_id,
         runs,
+        team_unearned_runs,
         0 AS inherited_runners_scored,
         runs AS bequeathed_runners_scored
     FROM event_runs
@@ -45,6 +49,7 @@ unioned AS (
         team_id,
         current_pitcher_id AS pitcher_id,
         0 AS runs,
+        0 AS team_unearned_runs,
         runs AS inherited_runners_scored,
         0 AS bequeathed_runners_scored
     FROM event_runs
@@ -58,6 +63,7 @@ final AS (
         MIN(game_id) AS game_id,
         MIN(team_id) AS team_id,
         SUM(runs) AS runs,
+        SUM(team_unearned_runs) AS team_unearned_runs,
         SUM(inherited_runners_scored) AS inherited_runners_scored,
         SUM(bequeathed_runners_scored) AS bequeathed_runners_scored
     FROM unioned

@@ -5,6 +5,6 @@ timeball*.db*
 parquet/
 .python-version
 scratch.sql
-sratch.ipynb
+scratch.ipynb
 profile.log
 .ipynb_checkpoints/

@@ -169,3 +169,5 @@ sources:
             data_type: UTINYINT
           - name: runs_batted_in
             data_type: UTINYINT
+          - name: team_unearned_runs
+            data_type: UTINYINT

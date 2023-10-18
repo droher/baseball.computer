@@ -139,8 +139,7 @@ final AS (
         -- The logic here would be broken if a batter reached on an error and then was out on the bases,
         -- but no such event happened in prior to the event data era (maybe ever?)
         (
-        CASE 
-            WHEN no_hitters = 1 AND (times_reached_base = 0
+        CASE WHEN no_hitters = 1 AND (times_reached_base = 0
                 OR (outs_recorded >= batters_faced AND COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) = 0) 
                 ) THEN 1 
             ELSE 0 END)::UTINYINT AS perfect_games, 

@@ -51,7 +51,7 @@ add_series_start_flag AS (
     FROM base
     WINDOW season_series AS (
         PARTITION BY season, team_id, game_type, opponent_id
-        ORDER BY date, game_id
+        ORDER BY date, doubleheader_status
     )
 ),
 
@@ -64,7 +64,7 @@ assign_series_id AS (
     FROM add_series_start_flag
     WINDOW season_series AS (
         PARTITION BY season, team_id, game_type, opponent_id
-        ORDER BY date, game_id
+        ORDER BY date, doubleheader_status
     )
 ),
 
@@ -78,11 +78,11 @@ final AS (
     WINDOW
         season AS (
             PARTITION BY season, team_id, game_type
-            ORDER BY date, game_id
+            ORDER BY date, doubleheader_status
         ),
         series AS (
             PARTITION BY team_id, series_id
-            ORDER BY date, game_id
+            ORDER BY date, doubleheader_status
         )
 )
 

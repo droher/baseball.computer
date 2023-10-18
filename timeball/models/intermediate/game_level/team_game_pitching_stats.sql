@@ -19,13 +19,16 @@ WITH initial_sum AS (
 final AS (
     SELECT
         * REPLACE (
+            -- TODO: Investigate cases where team UER > team ER
+            GREATEST(0, earned_runs::INT - team_unearned_runs)::UTINYINT AS earned_runs,
             left_on_base_with_two_outs::UTINYINT AS left_on_base,
             -- Combined no-hitters and perfect games (latter hasn't happened yet)
             (hits = 0 AND outs_recorded >= 27)::UTINYINT AS no_hitters,
             (perfect_games = 1 OR outs_recorded >= 27 AND times_reached_base = 0)::UTINYINT AS perfect_games,
             -- Just to avoid weird rounding stuff
             ROUND(outs_recorded / 3, 4)::DECIMAL(6, 4) AS innings_pitched
-    )
+        ),
+        earned_runs AS individual_earned_runs
     FROM initial_sum
 
 )
