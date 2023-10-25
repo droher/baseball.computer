@@ -25,7 +25,8 @@ WITH game_event_agg AS (
         SUM(passed_balls)::UTINYINT AS passed_balls,
         SUM(double_plays)::UTINYINT AS double_plays,
         SUM(triple_plays)::UTINYINT AS triple_plays,
-        SUM(ground_ball_double_plays)::UTINYINT AS ground_ball_double_plays
+        SUM(ground_ball_double_plays)::UTINYINT AS ground_ball_double_plays,
+        SUM(reaching_errors)::UTINYINT AS reaching_errors,
     FROM {{ ref('event_fielding_stats') }}
     GROUP BY 1, 2
 ),

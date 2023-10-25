@@ -49,6 +49,7 @@ retrosheet AS (
         SUM(stats.assists) AS assists,
         SUM(stats.errors) AS errors,
         SUM(stats.fielders_choices) AS fielders_choices,
+        SUM(stats.reaching_errors) AS reaching_errors,
         SUM(stats.stolen_bases) AS stolen_bases,
         SUM(stats.caught_stealing) AS caught_stealing,
         SUM(stats.pickoffs) AS pickoffs,

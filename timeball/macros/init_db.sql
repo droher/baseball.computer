@@ -68,7 +68,7 @@
     CREATE TYPE location_general AS ENUM (SELECT DISTINCT batted_location_general FROM event.events WHERE batted_location_general IS NOT NULL ORDER BY 1);
     CREATE TYPE location_depth AS ENUM (SELECT DISTINCT batted_location_depth FROM event.events WHERE batted_location_depth IS NOT NULL ORDER BY 1);
     CREATE TYPE location_angle AS ENUM (SELECT DISTINCT batted_location_angle FROM event.events WHERE batted_location_angle IS NOT NULL ORDER BY 1);
-    CREATE TYPE baserunning_play AS ENUM (SELECT DISTINCT baserunning_play_type FROM event.event_baserunners WHERE baserunning_play_type IS NOT NULL ORDER BY 1));
+    CREATE TYPE baserunning_play AS ENUM (SELECT DISTINCT baserunning_play_type FROM event.event_baserunners WHERE baserunning_play_type IS NOT NULL ORDER BY 1);
     CREATE TYPE fielding_play AS ENUM (SELECT DISTINCT fielding_play FROM event.event_fielding_play ORDER BY 1);
     
     CREATE TYPE account_type AS ENUM (
@@ -123,7 +123,7 @@
     {% for node in graph.sources.values() -%}
         {% set sql %}
       {% for col_name, col_data in node.columns.items() if col_data.get("data_type") -%}
-          ALTER TABLE {{ node.schema }}.{{ node.name }} ALTER COLUMN {{ col_name }} TYPE {{ col_data.data_type }};
+          ALTER TABLE {{ node.schema }}.{{ node.name }} ALTER COLUMN "{{ col_name }}" TYPE {{ col_data.data_type }};
       {% endfor %}
         {% endset %}
         {% do log(sql, info=True)%}

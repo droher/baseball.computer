@@ -3,8 +3,14 @@
     materialized = 'table',
     )
 }}
--- This needs to games with the lowest possible coverage
--- (run totals for each team)
+{% set stats = ["plate_appearances", "singles", "doubles", "triples", 
+                "home_runs", "strikeouts", "walks", "batting_outs", "runs", "balls_in_play",
+                "contact_type_fly_ball", "contact_type_ground_ball", "contact_type_line_drive", "contact_type_pop_fly",
+                "contact_type_unknown", "batted_distance_infield", "batted_distance_outfield",
+                "batted_distance_unknown", "batted_angle_left", "batted_angle_right", "batted_angle_middle"] %}
+{% set rate_stats = stats[1:] %}
+{% set prior_sample_size = "1000::SMALLINT" %}
+
 WITH unique_park_seasons AS (
     SELECT
         park_id,
@@ -21,10 +27,17 @@ batting_agg AS (
         states.park_id,
         states.season,
         states.league,
-        states.
+        states.batter_id,
+        states.pitcher_id,
+        {%- for stat in stats %}
+            SUM(batting.{{ stat }})::INT AS {{ stat }},
+        {%- endfor %}
     FROM {{ ref('event_states_full') }} AS states
     INNER JOIN {{ ref('event_offense_stats') }} AS batting USING (event_key)
+    -- Restrict to parks with decent sample
+    INNER JOIN unique_park_seasons USING (season, league, park_id)
     WHERE states.game_type = 'RegularSeason'
+        AND NOT states.is_interleague
     GROUP BY 1, 2, 3, 4, 5
 ),
 
@@ -118,11 +131,11 @@ weighted_average AS (
         this_park_id AS park_id,
         season,
         league,
-        SUM(sample_size) AS sample_size,
+        SUM(sample_size) AS sqrt_sample_size,
         {%- for stat in rate_stats %}
-            SUM(this_{{ stat }}_per_pa * sample_size)
+            SUM(this_{{ stat }}_per_pa * sample_weight)
             / SUM(sample_weight) AS avg_this_{{ stat }}_per_pa,
-            SUM(other_{{ stat }}_per_pa * sample_size)
+            SUM(other_{{ stat }}_per_pa * sample_weight)
             / SUM(sample_weight) AS avg_other_{{ stat }}_per_pa,
             avg_this_{{ stat }}_per_pa
             / (1 - avg_this_{{ stat }}_per_pa) AS this_{{ stat }}_odds,
@@ -140,7 +153,7 @@ final AS (
         park_id,
         season,
         league,
-        ROUND(sample_size, 0) AS sqrt_sample_size,
+        ROUND(sqrt_sample_size, 0) AS sqrt_sample_size,
         {%- for stat in rate_stats %}
             ROUND({{ stat }}_park_factor, 2) AS {{ stat }}_park_factor,
         {%- endfor %}

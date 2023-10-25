@@ -3,7 +3,7 @@ WITH batted_balls AS (
         bb.game_id,
         BOOL_AND(bb.contact != 'Unknown') AS has_contact_type,
         BOOL_AND(bb.location_side != 'Unknown') AS has_location,
-        BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_fielded) AS has_batted_to_fielder,
+        BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_in_play) AS has_batted_to_fielder,
     FROM {{ ref('calc_batted_ball_type') }} AS bb
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
     GROUP BY 1

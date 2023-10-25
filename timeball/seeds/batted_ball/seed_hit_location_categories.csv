@@ -1,7 +1,7 @@
 batted_location_general,category_depth,category_side,category_edge,is_mid_position
-Catcher,Battery,All,All,false
-CatcherFirst,Battery,Right,Right,true
-CatcherThird,Battery,Left,Left,true
+Catcher,Plate,All,All,false
+CatcherFirst,Plate,Right,Right,true
+CatcherThird,Plate,Left,Left,true
 Pitcher,Infield,Middle,Middle,false
 PitcherFirst,Infield,Middle,Right,true
 PitcherThird,Infield,Middle,Left,true

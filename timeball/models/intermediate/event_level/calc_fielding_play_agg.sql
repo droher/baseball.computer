@@ -1,4 +1,11 @@
-WITH final AS (
+WITH ranker AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (PARTITION BY event_key, fielding_play ORDER BY sequence_id) AS sequence_rank
+    FROM {{ ref('stg_event_fielding_plays') }}
+),
+
+final AS (
     SELECT
         event_key,
         fielding_position,
@@ -8,7 +15,8 @@ WITH final AS (
         COUNT(*) FILTER (WHERE fielding_play = 'Error')::UTINYINT AS errors,
         COUNT(*) FILTER (WHERE fielding_play = 'FieldersChoice')::UTINYINT AS fielders_choices,
         COUNT(*) FILTER (WHERE sequence_id = 1 AND fielding_play != 'Error')::UTINYINT AS plays_started,
-    FROM {{ ref('stg_event_fielding_plays') }}
+        COUNT(*) FILTER (WHERE sequence_rank = 1 AND fielding_play = 'Error') AS first_errors,
+    FROM ranker
     GROUP BY 1, 2
 )
 

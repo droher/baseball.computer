@@ -33,9 +33,19 @@ WITH databank AS (
         SUM(bat.on_base_successes) AS on_base_successes,
     FROM {{ ref('stg_databank_batting') }} AS bat
     INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
-    -- We'd need to do something different for partial coverage seasons but
-    -- currently box scores are all or nothing for a given year
     WHERE bat.season NOT IN (SELECT DISTINCT season FROM {{ ref('stg_games') }})
+    GROUP BY 1, 2, 3
+),
+
+databank_running AS (
+    SELECT
+        season,
+        player_id,
+        team_id,
+        SUM(stolen_bases) AS stolen_bases,
+        SUM(caught_stealing) AS caught_stealing,
+    FROM {{ ref('stg_databank_batting') }}
+    -- TODO: Add var to indicate final databank override year
     GROUP BY 1, 2, 3
 ),
 
@@ -52,8 +62,28 @@ retrosheet AS (
     FROM {{ ref('stg_games') }} AS games
     INNER JOIN {{ ref('player_game_offense_lines') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
+),
+
+unioned AS (
+    SELECT * FROM retrosheet
+    UNION ALL BY NAME
+    SELECT * FROM databank
+),
+
+final AS (
+    SELECT
+        u.* REPLACE (
+            CASE WHEN u.game_type = 'RegularSeason'
+                    THEN COALESCE(d.stolen_bases, u.stolen_bases)
+                ELSE u.stolen_bases
+            END AS stolen_bases,
+            CASE WHEN u.game_type = 'RegularSeason'
+                    THEN COALESCE(d.caught_stealing, u.caught_stealing)
+                ELSE u.caught_stealing
+            END AS caught_stealing
+        )
+    FROM unioned AS u
+    LEFT JOIN databank_running AS d USING (season, player_id, team_id)
 )
 
-SELECT * FROM retrosheet
-UNION ALL BY NAME
-SELECT * FROM databank
+SELECT * FROM final

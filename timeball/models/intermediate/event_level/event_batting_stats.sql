@@ -4,8 +4,8 @@
     )
 }}
 WITH sacs AS (
-    -- No need for distinct, max one sac per event
-    SELECT event_key
+    -- TODO: Investigate single sac hit dedupe (BOS194606040-37)
+    SELECT DISTINCT event_key
     FROM {{ ref('stg_event_flags') }}
     WHERE flag IN ('SacrificeFly', 'SacrificeHit')
 ),
@@ -34,6 +34,8 @@ final AS (
         (result_types.total_bases = 4)::UTINYINT AS home_runs,
         result_types.total_bases::UTINYINT AS total_bases,
 
+        CASE WHEN pa.batted_to_fielder < 7 THEN hits ELSE 0 END::UTINYINT AS infield_hits,
+
         (result_types.plate_appearance_result = 'StrikeOut')::UTINYINT AS strikeouts,
         (result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk'))::UTINYINT AS walks,
         (result_types.plate_appearance_result = 'IntentionalWalk')::UTINYINT AS intentional_walks,
@@ -42,13 +44,13 @@ final AS (
         (result_types.plate_appearance_result = 'SacrificeHit')::UTINYINT AS sacrifice_hits,
         (result_types.plate_appearance_result = 'ReachedOnError')::UTINYINT AS reached_on_errors,
         (result_types.plate_appearance_result = 'Interference')::UTINYINT AS reached_on_interferences,
+        (result_types.plate_appearance_result = 'GroundRuleDouble')::UTINYINT AS ground_rule_doubles,
+        (result_types.plate_appearance_result = 'InsideTheParkHomeRun')::UTINYINT AS inside_the_park_home_runs,
 
         result_types.is_on_base_opportunity::UTINYINT AS on_base_opportunities,
-
         result_types.is_on_base_success::UTINYINT AS on_base_successes,
         COALESCE(pa.runs_batted_in, 0)::UTINYINT AS runs_batted_in,
         COALESCE(double_plays.is_ground_ball_double_play, 0)::UTINYINT AS grounded_into_double_plays,
-
         COALESCE(double_plays.is_double_play, 0)::UTINYINT AS double_plays,
         COALESCE(double_plays.is_triple_play, 0)::UTINYINT AS triple_plays,
         -- The extra out from GIDPs is attributed to the batter,

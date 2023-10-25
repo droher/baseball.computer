@@ -1,5 +1,10 @@
+{{
+  config(
+    materialized = 'table',
+    )
+}}
 -- Contact type inference rules (only valid for batted balls without contact type)
--- 1. Putouts by outfielders are fly balls
+-- 1. Putouts by outfielders are fly balls unless explcitly marked as shallow territory
 -- 2. Putouts by infielders are pop flies (unassisted GB putouts should already be explicit grounders)
 -- 2. Non-inside-the-park home runs are fly balls
 -- 3. Balls fielded by infielders where there is anything other than
@@ -16,6 +21,11 @@
 -- 1. Ground balls fielded by outfielders have infield depth
 -- 2. All other depth/side cases are dictated by the fielder's position
 --    via the `seed_batted_to_fielder_categories` table
+-- 3. If there is no fielder, we go by the explicit location
+-- (which is rarely available, especially when there is no fielder).
+-- The explicit location data is better than the fielder data in a vacuum,
+-- but fielder-based location is far more consistently available.
+-- Choosing it as the default makes the data more precise (in the sense of self-consistent).
 WITH unassisted_putouts AS (
     SELECT
         event_key,
@@ -36,18 +46,20 @@ inference AS (
         batted_ball.plate_appearance_result,
         -- Null out batted_to_fielder on homers to distinguish between "no fielder" and "unknown fielder"
         -- TODO: Handle upstream
-        CASE WHEN plate_appearance_result != 'HomeRun'
+        CASE WHEN batted_ball.plate_appearance_result NOT IN ('HomeRun', 'GroundRuleDouble')
                 THEN batted_ball.batted_to_fielder
         END AS batted_to_fielder,
         batted_ball.batted_contact_type AS recorded_contact,
         batted_ball.batted_location_general AS recorded_location,
+        batted_ball.batted_location_depth AS recorded_location_depth,
+        batted_ball.batted_location_angle AS recorded_location_angle,
         location_info.category_depth,
         location_info.category_side,
         location_info.category_edge,
         CASE
             WHEN unassisted_putouts.fielding_position BETWEEN 7 AND 9 THEN 'Fly'
             WHEN unassisted_putouts.fielding_position BETWEEN 1 AND 6 THEN 'PopFly'
-            WHEN plate_appearance_result = 'HomeRun' THEN 'Fly'
+            WHEN batted_ball.plate_appearance_result = 'HomeRun' THEN 'Fly'
             WHEN location_info.category_depth = 'Outfield' AND batted_ball.batted_location_depth = 'Shallow' THEN 'PopFly'
             WHEN location_info.category_depth = 'Outfield' THEN 'Fly'
             WHEN batted_ball.batted_to_fielder BETWEEN 1 AND 6 THEN 'GroundBall'
@@ -72,8 +84,9 @@ final AS (
         inference.recorded_contact,
         inference.batted_contact_type != inference.recorded_contact AS is_contact_inferred,
         contact_info.broad_classification AS contact_broad_classification,
-        contact_info.is_bunt,
         inference.recorded_location,
+        inference.recorded_location_depth,
+        inference.recorded_location_angle,
         CASE
             WHEN inference.batted_contact_type = 'GroundBall' AND inference.batted_to_fielder BETWEEN 7 AND 9 THEN 'Infield'
             WHEN inference.batted_contact_type = 'Unknown' AND inference.batted_to_fielder BETWEEN 7 AND 9 THEN 'Unknown'

@@ -1,47 +1,34 @@
-
 WITH t AS (
-    SELECT 
-    bats,
-    substring(game_id, 4, 4)::INT AS year,
-    COUNT(*) AS n,
-    ROUND( SUM(hits * batted_angle_left) / SUM(hits) * 100) AS batted_angle_left_hit_pct,
-    ROUND( SUM((1 - hits) * batted_angle_left) / SUM(1 - hits) * 100) AS batted_angle_left_out_pct,
-    ROUND( SUM(hits * batted_angle_right) / SUM(hits) * 100) AS batted_angle_right_hit_pct,
-    ROUND( SUM((1 - hits) * batted_angle_right) / SUM(1 - hits) * 100) AS batted_angle_right_out_pct,
-    ROUND( SUM(hits * batted_angle_middle) / SUM(hits) * 100) AS batted_angle_middle_hit_pct,
-    ROUND( SUM((1 - hits) * batted_angle_middle) / SUM(1 - hits) * 100) AS batted_angle_middle_out_pct,
-    (batted_angle_left_hit_pct / (100 - batted_angle_left_hit_pct)) / (batted_angle_left_out_pct / (100 - batted_angle_left_out_pct)) AS left_ratio,
-    (batted_angle_right_hit_pct / (100 - batted_angle_right_hit_pct)) / (batted_angle_right_out_pct / (100 - batted_angle_right_out_pct)) AS right_ratio,
-    (batted_angle_middle_hit_pct / (100 - batted_angle_middle_hit_pct)) / (batted_angle_middle_out_pct / (100 - batted_angle_middle_out_pct)) AS middle_ratio,
-    batted_angle_left_hit_pct - batted_angle_left_out_pct AS batted_angle_left_diff,
-    batted_angle_right_hit_pct - batted_angle_right_out_pct AS batted_angle_right_diff,
-    batted_angle_middle_hit_pct - batted_angle_middle_out_pct AS batted_angle_middle_diff
+SELECT
+    p.batter_hand,
+    c.recorded_location,
+    --c.recorded_location_angle,
+    COUNT(*) AS at_bats,
+    SUM(hits) AS hits,
+    SUM(1 - hits) AS outs,
+    SUM(hits) / COUNT(*) AS avg,
+FROM {{ ref('player_game_data_completeness') }} AS g
+INNER JOIN {{ ref('event_offense_stats') }} AS e USING (game_id, player_id)
+INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (game_id, event_key)
+INNER JOIN {{ ref('event_states_full') }} p USING (game_id, event_key)
+WHERE g.player_type = 'BATTING'
+    AND g.has_scoresheet_location AND g.has_batted_to_fielder AND g.has_contact_type
+    AND g.season BETWEEN 1993 AND 1999
+    --AND g.season >= 2020
+    AND recorded_location_angle != 'Foul'
+    AND contact_type_known
+    AND bunts = 0
+    AND balls_in_play = 1
 
-FROM {{ ref('event_offense_stats') }}
-JOIN {{ ref('stg_people') }} p ON player_id = retrosheet_player_id
-WHERE balls_in_play = 1
-AND home_runs = 0
-AND batted_angle_unknown = 0
-AND contact_type_ground_ball = 1
-AND bats = 'L'
-AND year > 1920
 GROUP BY 1, 2
 )
-SELECT 
-    bats,
-    year,
-    n,
-    batted_angle_left_out_pct,
-    batted_angle_right_out_pct,
-    batted_angle_middle_out_pct,
-    batted_angle_left_diff,
-    batted_angle_right_diff,
-    batted_angle_middle_diff,
-    ROUND(left_ratio, 2) AS left_ratio,
-    ROUND(right_ratio, 2) AS right_ratio,
-    ROUND(middle_ratio, 2) AS middle_ratio,
-    AVG(left_ratio) OVER (PARTITION BY bats ORDER BY year ROWS BETWEEN 10 PRECEDING AND CURRENT ROW) AS left_ratio_3yr_avg,
-    AVG(right_ratio) OVER (PARTITION BY bats ORDER BY year ROWS BETWEEN 10 PRECEDING AND CURRENT ROW) AS right_ratio_3yr_avg,
-    AVG(middle_ratio) OVER (PARTITION BY bats ORDER BY year ROWS BETWEEN 10 PRECEDING AND CURRENT ROW) AS middle_ratio_3yr_avg,
 
- FROM t ORDER BY 1, 2
+SELECT
+    batter_hand,
+    recorded_location,
+    at_bats,
+    avg,
+    hits / SUM(hits) OVER (PARTITION BY batter_hand) AS hit_share,
+    outs / SUM(outs) OVER (PARTITION BY batter_hand) AS out_share,
+FROM t
+ORDER BY SUM(at_bats) OVER (PARTITION BY recorded_location) DESC, batter_hand

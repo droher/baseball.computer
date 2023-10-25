@@ -1,4 +1,4 @@
-plate_appearance_result,result_category,is_at_bat,is_on_base_opportunity,is_on_base_success,is_batting_out,is_in_play,is_hit,is_fielded,total_bases
+plate_appearance_result,result_category,is_at_bat,is_on_base_opportunity,is_on_base_success,is_batting_out,is_batted,is_hit,is_in_play,total_bases
 InPlayOut,InPlayOut,true,true,false,true,true,false,true,0
 StrikeOut,StrikeOut,true,true,false,true,false,false,false,0
 ReachedOnError,ReachedOnError,true,true,false,true,true,false,true,0
@@ -11,7 +11,7 @@ IntentionalWalk,IntentionalWalk,false,true,true,false,false,false,false,0
 Interference,ReachedOnError,false,false,false,false,false,false,false,0
 Single,Single,true,true,true,false,true,true,true,1
 Double,Double,true,true,true,false,true,true,true,2
-GroundRuleDouble,Double,true,true,true,false,true,true,false,2
+GroundRuleDouble,Double,true,true,true,false,true,true,true,2
 Triple,Triple,true,true,true,false,true,true,true,3
 HomeRun,HomeRun,true,true,true,false,true,true,false,4
 InsideTheParkHomeRun,HomeRun,true,true,true,false,true,true,true,4

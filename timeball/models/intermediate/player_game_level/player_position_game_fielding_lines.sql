@@ -40,7 +40,8 @@ event_agg AS (
         SUM(stolen_bases)::UTINYINT AS stolen_bases,
         SUM(caught_stealing)::UTINYINT AS caught_stealing,
         SUM(passed_balls)::UTINYINT AS passed_balls,
-        SUM(balls_hit_to)::UTINYINT AS balls_hit_to
+        SUM(balls_hit_to)::UTINYINT AS balls_hit_to,
+        SUM(reaching_errors)::UTINYINT AS reaching_errors
     FROM {{ ref('event_player_fielding_stats') }}
     GROUP BY 1, 2, 3
 ),
@@ -65,6 +66,7 @@ final AS (
         COALESCE(box_agg.putouts, event_agg.putouts)::UTINYINT AS putouts,
         COALESCE(box_agg.assists, event_agg.assists)::UTINYINT AS assists,
         COALESCE(box_agg.errors, event_agg.errors)::UTINYINT AS errors,
+        event_agg.reaching_errors,
         event_agg.fielders_choices,
         event_agg.balls_hit_to,
         COALESCE(box_agg.double_plays, event_agg.double_plays)::UTINYINT AS double_plays,
@@ -72,7 +74,8 @@ final AS (
         event_agg.ground_ball_double_plays,
         COALESCE(box_agg.passed_balls, event_agg.passed_balls)::UTINYINT AS passed_balls,
         event_agg.stolen_bases,
-        event_agg.caught_stealing
+        event_agg.caught_stealing,
+
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
     LEFT JOIN {{ ref('player_game_appearances') }} AS appearances USING (game_id, player_id)

@@ -38,6 +38,7 @@ WITH final AS (
             ELSE -home_margin_start
         END::INT1 AS batting_team_margin_start,
         players.batter_lineup_position,
+        players.batter_fielding_position,
         -- Player/Team IDs and info
         players.batter_hand,
         players.pitcher_hand,

@@ -22,8 +22,9 @@ batted_balls AS (
         CASE WHEN events.player_type = 'BATTING' THEN batter_id ELSE pitcher_id END AS player_id,
         ANY_VALUE(CASE WHEN events.player_type = 'BATTING' THEN batting_team_id ELSE fielding_team_id END) AS team_id,
         COALESCE(BOOL_AND(bb.contact != 'Unknown'), TRUE) AS has_contact_type,
+        COALESCE(BOOL_AND(bb.recorded_location != 'Unknown'), TRUE) AS has_scoresheet_location,
         COALESCE(BOOL_AND(bb.location_side != 'Unknown'), TRUE) AS has_location,
-        COALESCE(BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_fielded), TRUE) AS has_batted_to_fielder,
+        COALESCE(BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_in_play), TRUE) AS has_batted_to_fielder,
     FROM events
     LEFT JOIN {{ ref('calc_batted_ball_type') }} AS bb USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt
@@ -58,6 +59,7 @@ joined AS (
         game_start_info.date,
         game_start_info.home_league AS league,
         COALESCE(batted_balls.has_contact_type, FALSE) AS has_contact_type,
+        COALESCE(batted_balls.has_scoresheet_location, FALSE) AS has_scoresheet_location,
         COALESCE(batted_balls.has_location, FALSE) AS has_location,
         COALESCE(batted_balls.has_batted_to_fielder, FALSE) AS has_batted_to_fielder,
         COALESCE(pitches.has_count_balls, FALSE) AS has_count_balls,

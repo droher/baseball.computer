@@ -41,11 +41,11 @@ game_agg AS (
         stats.fielding_position,
         games.game_type,
         ANY_VALUE(CASE
-            WHEN fielding_position = 1 THEN 'P'
-            WHEN fielding_position = 2 THEN 'C'
-            WHEN fielding_position BETWEEN 3 AND 6 THEN 'IF'
-            WHEN fielding_position BETWEEN 7 AND 9 THEN 'OF'
-            WHEN fielding_position = 10 THEN 'DH'
+            WHEN stats.fielding_position = 1 THEN 'P'
+            WHEN stats.fielding_position = 2 THEN 'C'
+            WHEN stats.fielding_position BETWEEN 3 AND 6 THEN 'IF'
+            WHEN stats.fielding_position BETWEEN 7 AND 9 THEN 'OF'
+            WHEN stats.fielding_position = 10 THEN 'DH'
         END) AS fielding_position_category,
         COUNT(*) AS games,
         SUM(stats.games_started) AS games_started,
@@ -56,14 +56,17 @@ game_agg AS (
         SUM(stats.assists) AS assists,
         SUM(stats.errors) AS errors,
         SUM(stats.fielders_choices) AS fielders_choices,
+        SUM(stats.reaching_errors) AS reaching_errors,
         SUM(stats.double_plays) AS double_plays,
         SUM(stats.triple_plays) AS triple_plays,
         SUM(stats.ground_ball_double_plays) AS ground_ball_double_plays,
         SUM(stats.passed_balls) AS passed_balls,
         SUM(stats.balls_hit_to) AS balls_hit_to,
-        COUNT_IF(fielding_position = 7) AS games_left_field,
-        COUNT_IF(fielding_position = 8) AS games_center_field,
-        COUNT_IF(fielding_position = 9) AS games_right_field,
+        SUM(stats.stolen_bases) AS stolen_bases,
+        SUM(stats.caught_stealing) AS caught_stealing,
+        COUNT_IF(stats.fielding_position = 7) AS games_left_field,
+        COUNT_IF(stats.fielding_position = 8) AS games_center_field,
+        COUNT_IF(stats.fielding_position = 9) AS games_right_field,
     FROM {{ ref('stg_games') }} AS games
     INNER JOIN {{ ref('player_position_game_fielding_lines') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4, 5

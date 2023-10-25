@@ -3,7 +3,14 @@
     materialized = 'table',
     )
 }}
-WITH union_plays AS (
+WITH valid_leagues AS (
+    SELECT DISTINCT
+        season,
+        league
+    FROM {{ ref('team_game_start_info') }}
+),
+
+union_plays AS (
     SELECT
         e.event_key,
         CASE WHEN cat.result_category = 'InPlayOut' AND e.outs_on_play > 1
@@ -54,10 +61,11 @@ agg_specific AS (
         league,
         play,
         play_category,
-        AVG(expected_runs_change) OVER all_league AS avg_run_value_all,
-        AVG(expected_runs_change) OVER result AS avg_run_value_result,
-        AVG(expected_batting_win_change) OVER all_league AS avg_win_value_all,
-        AVG(expected_batting_win_change) OVER result AS avg_win_value_result,
+        AVG(expected_runs_change) OVER all_league AS average_run_value_all,
+        AVG(expected_runs_change) OVER result AS average_run_value_result,
+        AVG(expected_batting_win_change) OVER all_league AS average_win_value_all,
+        AVG(expected_batting_win_change) OVER result AS average_win_value_result,
+        FALSE AS is_imputed
     FROM joined
     WINDOW
         all_league AS (PARTITION BY season, league),
@@ -65,24 +73,33 @@ agg_specific AS (
     QUALIFY COUNT(*) OVER result > 100
 ),
 
-add_generic AS (
+generic_values AS (
     SELECT DISTINCT ON (play)
-        NULL AS season,
-        NULL AS league,
         play,
         play_category,
-        AVG(expected_runs_change) OVER () AS avg_run_value_all,
-        AVG(expected_runs_change) OVER result AS avg_run_value_result,
-        AVG(expected_batting_win_change) OVER () AS avg_win_value_all,
-        AVG(expected_batting_win_change) OVER result AS avg_win_value_result,
+        AVG(expected_runs_change) OVER () AS average_run_value_all,
+        AVG(expected_runs_change) OVER result AS average_run_value_result,
+        AVG(expected_batting_win_change) OVER () AS average_win_value_all,
+        AVG(expected_batting_win_change) OVER result AS average_win_value_result,
     FROM joined
     WINDOW result AS (PARTITION BY play)
 ),
 
-agg_unioned AS (
+imputed AS (
+    SELECT
+        valid_leagues.*,
+        generic_values.*,
+        TRUE AS is_imputed
+    FROM generic_values
+    CROSS JOIN valid_leagues
+    LEFT JOIN agg_specific USING (season, league, play)
+    WHERE agg_specific.season IS NULL
+),
+
+unioned AS (
     SELECT * FROM agg_specific
     UNION ALL BY NAME
-    SELECT * FROM add_generic
+    SELECT * FROM imputed
 ),
 
 final AS (
@@ -91,9 +108,13 @@ final AS (
         league,
         play,
         play_category,
-        ROUND(avg_run_value_result - avg_run_value_all, 3) AS avg_run_value,
-        ROUND(avg_win_value_result - avg_win_value_all, 3) AS avg_win_value
-    FROM agg_unioned
+        ROUND(average_run_value_result - average_run_value_all, 3) AS average_run_value,
+        ROUND(average_win_value_result - average_win_value_all, 3) AS average_win_value,
+        average_run_value_result
+            - FIRST(CASE WHEN play = 'InPlayOut' THEN average_run_value_result END IGNORE NULLS) OVER w
+        AS relative_run_value
+    FROM unioned
+    WINDOW w AS (PARTITION BY season, league)
 )
 
 SELECT * FROM final

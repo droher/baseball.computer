@@ -49,7 +49,8 @@ final AS (
         COALESCE(baserunning.caught_stealing, 0)::UTINYINT AS caught_stealing,
         COALESCE(baserunning.pickoffs, 0)::UTINYINT AS pickoffs,
         COALESCE(baserunning.passed_balls, 0)::UTINYINT AS passed_balls,
-        CASE WHEN prt.is_in_play THEN 1 ELSE 0 END::UTINYINT AS plate_appearances_in_field_with_ball_in_play
+        CASE WHEN prt.is_in_play THEN 1 ELSE 0 END::UTINYINT AS plate_appearances_in_field_with_ball_in_play,
+        CASE WHEN events.plate_appearance_result = 'ReachedOnError' THEN 1 ELSE 0 END::UTINYINT AS reaching_errors,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN baserunning USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS prt USING (plate_appearance_result)

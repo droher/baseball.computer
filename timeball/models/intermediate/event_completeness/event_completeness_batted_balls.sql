@@ -6,7 +6,7 @@ WITH final AS (
         -- To avoid false negatives, we'll say that a fielder is present regardless
         -- if it's a ground-rule double or home run where there is location info
         COALESCE(
-            e.batted_to_fielder != 0 OR (NOT rt.is_fielded AND has_general_location),
+            e.batted_to_fielder != 0 OR (NOT rt.is_in_play AND has_general_location),
             FALSE
         ) AS has_batted_to_fielder,
         has_batted_to_fielder OR has_general_location AS has_any_location,
