@@ -1,37 +1,54 @@
 WITH t AS (
     SELECT
         p.batter_hand,
+        p.season > 2010 AS is_shift_era,
+        p.base_state_start AS base_state,
+        p.outs_start < 2 AS under_two_outs,
         c.recorded_location,
         c.recorded_location_angle,
         c.recorded_location_depth,
-        e.hits::BOOL AS is_hit,
-        c.contact_broad_classification = 'AirBall' AS is_air_ball,
+        c.contact,
+        c.batted_to_fielder,
+        ANY_VALUE(contact_broad_classification) AS contact_broad_classification,
         COUNT(*) AS at_bats,
-        COUNT_IF(e.fielded_by_known) AS known_fielder,
-        COUNT_IF(c.batted_to_fielder = 1)/known_fielder AS to_p,
-        COUNT_IF(c.batted_to_fielder = 2)/known_fielder AS to_c,
-        COUNT_IF(c.batted_to_fielder = 3)/known_fielder AS to_1b,
-        COUNT_IF(c.batted_to_fielder = 4)/known_fielder AS to_2b,
-        COUNT_IF(c.batted_to_fielder = 5)/known_fielder AS to_3b,
-        COUNT_IF(c.batted_to_fielder = 6)/known_fielder AS to_ss,
-        COUNT_IF(c.batted_to_fielder = 7)/known_fielder AS to_lf,
-        COUNT_IF(c.batted_to_fielder = 8)/known_fielder AS to_cf,
-        COUNT_IF(c.batted_to_fielder = 9)/known_fielder AS to_rf,
-        COUNT_IF(c.batted_to_fielder = 0)/COUNT(*) AS to_unknown,
+        COUNT_IF(e.hits = 1) AS hits,
     FROM {{ ref('event_offense_stats') }} AS e
     INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (event_key, game_id)
     INNER JOIN {{ ref('event_states_full') }} p USING (event_key, game_id)
-    INNER JOIN {{ ref('game_data_completeness') }} AS g USING (game_id)
-    INNER JOIN {{ ref('seed_hit_location_categories') }} loc ON loc.batted_location_general = c.recorded_location
-    WHERE g.has_location
-        AND c.batted_to_fielder IS NOT NULL
+    WHERE c.batted_to_fielder > 0
+        AND c.recorded_location != 'Unknown'
         AND p.batter_hand IS NOT NULL
-        AND g.season BETWEEN 1988 AND 1999
-        AND contact_type_known
-        -- Exclude cases where ball is often fielded in a different place than the hit location
-        AND NOT (loc.category_depth != 'Outfield' AND fielded_by_outfielder = 1)
-        GROUP BY 1, 2, 3, 4, 5, 6
+        AND (p.season BETWEEN 1989 AND 1999 OR p.season >= 2000)
+        AND e.contact_type_known = 1
+        AND e.sacrifice_hits = 0
+        AND p.batter_fielding_position != 1
+        GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+), 
+
+t2 AS (
+    SELECT DISTINCT ON (batter_hand, is_shift_era, base_state, under_two_outs, recorded_location, recorded_location_angle, recorded_location_depth, batted_to_fielder, contact)
+        batter_hand,
+        is_shift_era,
+        base_state,
+        under_two_outs
+        recorded_location,
+        recorded_location_angle,
+        recorded_location_depth,
+        batted_to_fielder,
+        contact,
+        contact_broad_classification,
+        SUM(at_bats) AS at_bats,
+        SUM(hits)/SUM(at_bats) AS batting_average,
+    FROM t
+    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+    WINDOW
+        s1 AS (PARTITION BY batter_hand, is_shift_era, base_state, under_two_outs, recorded_location, recorded_location_angle, recorded_location_depth, batted_to_fielder, contact),
+        s2 AS (PARTITION BY batter_hand, recorded_location, recorded_location_angle, recorded_location_depth, batted_to_fielder, contact),
+        s3 AS (PARTITION BY batter_hand, recorded_location, recorded_location_angle, recorded_location_depth, batted_to_fielder),
+        s4 AS (PARTITION BY batter_hand, recorded_location, recorded_location_angle, recorded_location_depth),
+        s5 AS (PARTITION BY batter_hand, recorded_location, recorded_location_angle),
+        s6 AS (PARTITION BY batter_hand, recorded_location)
 )
 
-SELECT * FROM t
-ORDER BY VARIANCE(to_ss) OVER (PARTITION BY recorded_location, recorded_location_angle, recorded_location_depth, batter_hand, is_air_ball) DESC, recorded_location, recorded_location_angle, recorded_location_depth, batter_hand, is_hit
+SELECT * FROM t2
+ORDER BY at_bats DESC

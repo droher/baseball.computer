@@ -50,7 +50,7 @@ box_sb AS (
     GROUP BY 1, 2
 ),
 
-box_cs AS(
+box_cs AS (
     SELECT
         game_id,
         CASE WHEN running_side = 'Away' THEN 'Home' ELSE 'Away' END AS side,

@@ -4,10 +4,12 @@
     )
 }}
 WITH valid_leagues AS (
-    SELECT DISTINCT
+    SELECT
         season,
-        league
-    FROM {{ ref('team_game_start_info') }}
+        league,
+        AVG(runs_scored) AS average_runs_scored,
+    FROM {{ ref('team_game_results') }}
+    GROUP BY 1, 2
 ),
 
 union_plays AS (
@@ -63,8 +65,10 @@ agg_specific AS (
         play_category,
         AVG(expected_runs_change) OVER all_league AS average_run_value_all,
         AVG(expected_runs_change) OVER result AS average_run_value_result,
+        STDDEV_SAMP(expected_runs_change) OVER result AS std_dev_run_value_result,
         AVG(expected_batting_win_change) OVER all_league AS average_win_value_all,
         AVG(expected_batting_win_change) OVER result AS average_win_value_result,
+        STDDEV_SAMP(expected_batting_win_change) OVER result AS std_dev_win_value_result,
         FALSE AS is_imputed
     FROM joined
     WINDOW
@@ -79,8 +83,10 @@ generic_values AS (
         play_category,
         AVG(expected_runs_change) OVER () AS average_run_value_all,
         AVG(expected_runs_change) OVER result AS average_run_value_result,
+        STDDEV_SAMP(expected_runs_change) OVER result AS std_dev_run_value_result,
         AVG(expected_batting_win_change) OVER () AS average_win_value_all,
         AVG(expected_batting_win_change) OVER result AS average_win_value_result,
+        STDDEV_SAMP(expected_batting_win_change) OVER result AS std_dev_win_value_result,
     FROM joined
     WINDOW result AS (PARTITION BY play)
 ),
@@ -105,14 +111,17 @@ unioned AS (
 final AS (
     SELECT
         season,
-        league,
+        COALESCE(league, 'N/A') AS league,
         play,
         play_category,
         ROUND(average_run_value_result - average_run_value_all, 3) AS average_run_value,
         ROUND(average_win_value_result - average_win_value_all, 3) AS average_win_value,
         average_run_value_result
             - FIRST(CASE WHEN play = 'InPlayOut' THEN average_run_value_result END IGNORE NULLS) OVER w
-        AS relative_run_value
+        AS relative_run_value,
+        ROUND(std_dev_run_value_result, 3) AS std_dev_run_value,
+        ROUND(std_dev_win_value_result, 3) AS std_dev_win_value,
+        is_imputed
     FROM unioned
     WINDOW w AS (PARTITION BY season, league)
 )

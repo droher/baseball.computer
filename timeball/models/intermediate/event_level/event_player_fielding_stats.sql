@@ -26,6 +26,14 @@ WITH final AS (
         COALESCE(fp.assists, 0)::UTINYINT AS assists,
         COALESCE(fp.errors, 0)::UTINYINT AS errors,
         COALESCE(fp.fielders_choices, 0)::UTINYINT AS fielders_choices,
+        CASE WHEN e.plate_appearances_in_field_with_ball_in_play > 0
+                THEN COALESCE(fp.putouts, 0)
+            ELSE 0
+        END::UTINYINT AS in_play_putouts,
+        CASE WHEN e.plate_appearances_in_field_with_ball_in_play > 0
+                THEN COALESCE(fp.assists, 0)
+            ELSE 0
+        END::UTINYINT AS in_play_assists,
         CASE WHEN fp.first_errors = 1 THEN e.reaching_errors ELSE 0 END::UTINYINT AS reaching_errors,
         CASE WHEN p.fielding_position IN (1, 2) THEN e.stolen_bases ELSE 0 END::UTINYINT AS stolen_bases,
         CASE WHEN p.fielding_position IN (1, 2) THEN e.caught_stealing ELSE 0 END::UTINYINT AS caught_stealing,

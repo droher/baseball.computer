@@ -17,8 +17,9 @@ tensorflow-macos = { version = "~2.14.0", platform = "darwin", markers = "platfo
 
 numpy = "~1.26.1"
 pandas = "~2.1.1"
-polars = "^0.19.9"
+polars = "^0.19.11"
 pyarrow = "^13.0.0"
+statsmodels = "^0.14.0"
 
 [tool.poetry.dev-dependencies]
 sqlfluff = "^2.3.4"

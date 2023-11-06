@@ -41,9 +41,9 @@ WITH final AS (
         COALESCE(e.league, 'None') AS league_cat,
         e.base_state_start::VARCHAR AS base_state_cat,
         e.batter_id AS batter_player,
-        e.runner_first_id_start AS runner_first_player,
-        e.runner_second_id_start AS runner_second_player,
-        e.runner_third_id_start AS runner_third_player,
+        COALESCE(e.runner_first_id_start, 'N/A') AS runner_first_player,
+        COALESCE(e.runner_second_id_start, 'N/A') AS runner_second_player,
+        COALESCE(e.runner_third_id_start, 'N/A') AS runner_third_player,
         e.pitcher_id AS pitcher_player,
         CASE
             WHEN HASH(e.game_id)::HUGEINT % 100 BETWEEN 0 AND 97 THEN 'TRAIN'

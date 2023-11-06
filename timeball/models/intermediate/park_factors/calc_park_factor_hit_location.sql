@@ -4,12 +4,12 @@
     )
 }}
 {% set rate_stats = [
-        "batted_distance_battery",
+        "batted_distance_plate",
         "batted_distance_infield",
         "batted_distance_outfield",
-        "fielded_in_battery",
-        "fielded_in_infield",
-        "fielded_in_outfield",
+        "fielded_by_battery",
+        "fielded_by_infielder",
+        "fielded_by_outfielder",
         "batted_angle_left",
         "batted_angle_right",
         "batted_angle_middle",

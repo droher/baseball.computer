@@ -1,74 +1,108 @@
-WITH t AS (
-SELECT
-    p.batter_hand,
-    c.recorded_location,
-    c.recorded_location_angle,
-    --c.recorded_location_angle,
-    COUNT(*) AS at_bats,
-    COUNT_IF(batted_to_fielder BETWEEN 1 AND 6) AS to_infield,
-    COUNT_IF(batted_to_fielder BETWEEN 7 AND 9) AS to_outfield,
-    COUNT_IF(c.batted_to_fielder = 1)/to_infield AS to_p,
-    COUNT_IF(c.batted_to_fielder = 3)/to_infield AS to_1b,
-    COUNT_IF(c.batted_to_fielder = 4)/to_infield AS to_2b,
-    COUNT_IF(c.batted_to_fielder = 5)/to_infield AS to_3b,
-    COUNT_IF(c.batted_to_fielder = 6)/to_infield AS to_ss,
-    COUNT_IF(c.batted_to_fielder = 7)/to_outfield AS to_lf,
-    COUNT_IF(c.batted_to_fielder = 8)/to_outfield AS to_cf,
-    COUNT_IF(c.batted_to_fielder = 9)/to_outfield AS to_rf,
-FROM {{ ref('event_offense_stats') }} AS e
-INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (event_key, game_id)
-INNER JOIN {{ ref('event_states_full') }} p USING (event_key, game_id)
-INNER JOIN {{ ref('player_game_data_completeness') }} AS g USING (game_id, player_id)
-WHERE e.contact_type_ground_ball = 1
-    AND g.player_type = 'BATTING'
-    AND g.has_scoresheet_location AND g.has_batted_to_fielder AND g.has_contact_type
-    AND g.season BETWEEN 1993 AND 1999
-    --AND g.season >= 2020
-    AND recorded_location_angle != 'Foul'
-
-GROUP BY 1, 2, 3
-)
-, shares AS (
-    SELECT
-    *,
-    (to_lf * to_outfield) / SUM(to_lf * to_outfield) OVER (PARTITION BY batter_hand) AS lf_share,
-    (to_cf * to_outfield) / SUM(to_cf * to_outfield) OVER (PARTITION BY batter_hand) AS cf_share,
-    (to_rf * to_outfield) / SUM(to_rf * to_outfield) OVER (PARTITION BY batter_hand) AS rf_share,
-    to_3b * lf_share AS weighted_3b_lf,
-    to_3b * cf_share AS weighted_3b_cf,
-    to_3b * rf_share AS weighted_3b_rf,
-    to_ss * lf_share AS weighted_ss_lf,
-    to_ss * cf_share AS weighted_ss_cf,
-    to_ss * rf_share AS weighted_ss_rf,
-    to_2b * lf_share AS weighted_2b_lf,
-    to_2b * cf_share AS weighted_2b_cf,
-    to_2b * rf_share AS weighted_2b_rf,
-    to_1b * cf_share AS weighted_1b_cf,
-    to_1b * rf_share AS weighted_1b_rf,
-    to_p * lf_share AS weighted_p_lf,
-    to_p * cf_share AS weighted_p_cf,
-    to_p * rf_share AS weighted_p_rf
-FROM t
+WITH base AS (
+    SELECT DISTINCT ON (s.batter_hand, is_shift_era, base_state, under_two_outs, c.recorded_location, c.recorded_location_angle, c.batted_to_fielder)
+        s.batter_hand,
+        s.season >= 2010 AS is_shift_era,
+        s.base_state_start AS base_state,
+        s.outs_start < 2 AS under_two_outs,
+        c.recorded_location,
+        c.recorded_location_angle,
+        c.batted_to_fielder,
+        -- Number of balls fielded by this fielder at this location
+        COUNT(*) OVER fielder_at_location AS ground_balls,
+        -- E.g 64% of the time an infielder fields a ball at ThirdShortstop, it's to the third baseman
+        ground_balls / COUNT(*) OVER fielder_group_at_location AS share_within_group,
+        -- E.g. 65% of all ground balls fielded by the left fielder come through ThirdShortstop
+        ground_balls / COUNT(*) OVER fielder_all AS share_within_fielder,
+        SUM(e.hits) OVER location_all / COUNT(*) OVER location_all AS batting_average_at_location,
+        SUM(e.hits) OVER fielder_at_location / ground_balls AS batting_average,
+        ground_balls / COUNT(*) OVER location_all AS batting_average_sample_weight,
+    FROM {{ ref('event_offense_stats') }} AS e
+    INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (event_key)
+    INNER JOIN {{ ref('event_states_full') }} AS s USING (event_key)
+    WHERE c.contact = 'GroundBall'
+        AND e.plate_appearances = 1
+        AND c.recorded_location != 'Unknown'
+        -- These are the only seasons in the current data where location/contact data
+        -- is widely available and unaffected by selection bias.
+        -- 2000-2019 coverage should improve substantially in a future Retrosheet release.
+        AND (
+            season BETWEEN 1989 AND 1999
+            OR season >= 2020
+        )
+        -- Remove balls without fielder info and balls fielded by catchers,
+        -- since a catcher would never plausibly have a chance at a ball that
+        -- would go to the outfield. 
+        AND c.batted_to_fielder NOT IN (0, 2)
+        -- Remove any shallow locations, since those balls shouldn't be fielded by outfielders
+        -- (Presence in the data is rare, and likely either
+        -- a miscode or an extremely unusual fielding configuration).
+        -- We keep 'Pitcher' (the mound) in the data, since it may include deflections
+        AND c.recorded_location_depth != 'Shallow'
+        AND c.recorded_location NOT IN ('Catcher', 'CatcherFirst', 'CatcherThird', 'PitcherFirst', 'PitcherThird')
+        -- Exclude infield hits for a couple reasons: they are disproportionately soft ground balls
+        -- that would not have reached the outfield, and the fielder picking up the ball is often not the one
+        -- who had a real chance (e.g. shortstop covering behind third baseman).
+    WINDOW
+        fielder_at_location AS (
+            PARTITION BY s.batter_hand, is_shift_era, base_state, under_two_outs,
+            c.recorded_location, c.recorded_location_angle, c.batted_to_fielder
+        ),
+        fielder_group_at_location AS (
+            PARTITION BY s.batter_hand, is_shift_era, base_state, under_two_outs,
+            c.recorded_location, c.recorded_location_angle, e.fielded_by_outfielder
+        ),
+        fielder_all AS (
+            PARTITION BY s.batter_hand, is_shift_era, base_state, under_two_outs,
+            c.batted_to_fielder
+        ),
+        location_all AS (
+            PARTITION BY s.batter_hand, is_shift_era, base_state, under_two_outs,
+            c.recorded_location, c.recorded_location_angle
+        )
 ),
 
-final_splits AS (
-    SELECT batter_hand,
-        SUM(weighted_3b_lf) AS weighted_3b_lf,
-        SUM(weighted_3b_cf) AS weighted_3b_cf,
-        SUM(weighted_3b_rf) AS weighted_3b_rf,
-        SUM(weighted_ss_lf) AS weighted_ss_lf,
-        SUM(weighted_ss_cf) AS weighted_ss_cf,
-        SUM(weighted_ss_rf) AS weighted_ss_rf,
-        SUM(weighted_2b_lf) AS weighted_2b_lf,
-        SUM(weighted_2b_cf) AS weighted_2b_cf,
-        SUM(weighted_2b_rf) AS weighted_2b_rf,
-        SUM(weighted_1b_cf) AS weighted_1b_cf,
-        SUM(weighted_1b_rf) AS weighted_1b_rf,
-        SUM(weighted_p_lf) AS weighted_p_lf,
-        SUM(weighted_p_cf) AS weighted_p_cf,
-        SUM(weighted_p_rf) AS weighted_p_rf
-    FROM shares
-    GROUP BY 1
+joined AS (
+    SELECT
+        batter_hand,
+        is_shift_era,
+        base_state,
+        under_two_outs,
+        recorded_location,
+        recorded_location_angle,
+        outfield.batting_average_sample_weight,
+        outfield.batting_average_at_location,
+        infield.batting_average AS infield_hit_rate,
+        outfield.batted_to_fielder AS outfield_position,
+        infield.batted_to_fielder AS infield_position,
+        -- If 65% of balls to the left fielder come from the ThirdShortstop location,
+        -- and 64% of infielder-fielded balls in ThirdShortstop are handled by the third baseman,
+        -- then we infer that 65 * 64 = 41.6% ground balls to the left fielder are balls
+        -- that came through ThirdShortstop that "should" have been fielded by the third baseman.
+        -- Summing up all outfield-infield-location combinations, as we do in the final subquery,
+        -- gives each outfielder a full 100%, divided among the infielders accordingly.
+        outfield.share_within_fielder * infield.share_within_group AS share,
+        -- We can use the same method to determine the share of balls lost by a given infielder
+        -- that were fielded by a given outfielder.
+        infield.share_within_fielder * outfield.share_within_group AS inverse_share,
+    FROM base AS outfield
+    INNER JOIN base AS infield USING (batter_hand, is_shift_era, base_state, under_two_outs, recorded_location, recorded_location_angle)
+    WHERE outfield.batted_to_fielder > 6
+        AND infield.batted_to_fielder BETWEEN 1 AND 6
+),
+
+final AS (
+    SELECT
+        batter_hand,
+        is_shift_era,
+        base_state,
+        under_two_outs,
+        outfield_position,
+        infield_position,
+        SUM(share) AS share,
+        SUM(inverse_share) AS inverse_share,
+        SUM(batting_average_at_location * batting_average_sample_weight) / SUM(batting_average_sample_weight) AS batting_average,
+    FROM joined
+    GROUP BY 1, 2, 3, 4, 5, 6
 )
-SELECT * FROM final_splits
---ORDER BY SUM(at_bats) OVER (PARTITION BY recorded_location) DESC, SUM(at_bats) OVER (PARTITION BY recorded_location, recorded_location_angle), batter_hand
+
+SELECT * FROM final

@@ -161,7 +161,7 @@ sources:
             data_type: LOCATION_DEPTH
           - name: batted_location_angle
             data_type: LOCATION_ANGLE
-          - name: batted_location_strength
+          - name: batted_contact_strength
             data_type: varchar
           - name: outs_on_play
             data_type: UTINYINT

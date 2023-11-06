@@ -29,7 +29,7 @@ renamed AS (
         batted_location_general,
         batted_location_depth,
         batted_location_angle,
-        batted_location_strength,
+        batted_contact_strength,
         outs_on_play,
         runs_on_play,
         runs_batted_in,

@@ -19,7 +19,7 @@ WITH final AS (
         COALESCE(e.batted_location_angle != 'Default', FALSE) AS has_angle,
         COALESCE(e.batted_location_angle = 'Foul', FALSE) AS has_foul_angle,
 
-        COALESCE(e.batted_location_strength != 'Default', FALSE) AS has_strength,
+        COALESCE(e.batted_contact_strength != 'Default', FALSE) AS has_strength,
         COALESCE(lt.is_mid_position, FALSE) AS has_mid_position,
         COALESCE(
             ct.broad_classification = 'GroundBall' AND e.batted_location_general IS NOT NULL,
@@ -54,11 +54,11 @@ WITH final AS (
             FALSE
         ) AS has_angle_airball,
         COALESCE(
-            ct.broad_classification = 'GroundBall' AND e.batted_location_strength != 'Default',
+            ct.broad_classification = 'GroundBall' AND e.batted_contact_strength != 'Default',
             FALSE
         ) AS has_strength_groundball,
         COALESCE(
-            ct.broad_classification = 'AirBall' AND e.batted_location_strength != 'Default',
+            ct.broad_classification = 'AirBall' AND e.batted_contact_strength != 'Default',
             FALSE
         ) AS has_strength_airball,
         -- Based on the location diagram, any outside-the-park home run

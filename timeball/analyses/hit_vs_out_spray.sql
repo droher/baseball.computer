@@ -2,7 +2,8 @@ WITH t AS (
 SELECT
     p.batter_hand,
     c.recorded_location,
-    --c.recorded_location_angle,
+    c.recorded_location_angle,
+    c.recorded_location_depth,
     COUNT(*) AS at_bats,
     SUM(hits) AS hits,
     SUM(1 - hits) AS outs,
@@ -15,17 +16,18 @@ WHERE g.player_type = 'BATTING'
     AND g.has_scoresheet_location AND g.has_batted_to_fielder AND g.has_contact_type
     AND g.season BETWEEN 1993 AND 1999
     --AND g.season >= 2020
-    AND recorded_location_angle != 'Foul'
     AND contact_type_known
     AND bunts = 0
     AND balls_in_play = 1
 
-GROUP BY 1, 2
+GROUP BY 1, 2, 3, 4
 )
 
 SELECT
     batter_hand,
     recorded_location,
+    recorded_location_angle,
+    recorded_location_depth,
     at_bats,
     avg,
     hits / SUM(hits) OVER (PARTITION BY batter_hand) AS hit_share,

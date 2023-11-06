@@ -10,7 +10,9 @@ WITH fielding_plays_agg AS (
         SUM(assists) AS assists,
         SUM(errors) AS errors,
         SUM(fielders_choices) AS fielders_choices,
-        COUNT(*)::UTINYINT AS fielding_plays,
+        COUNT(*) AS fielding_plays,
+        SUM(unknown_putouts) AS unknown_putouts,
+        SUM(unknown_events) AS unknown_events,
     FROM {{ ref('calc_fielding_play_agg') }}
     GROUP BY 1
 ),
@@ -51,6 +53,8 @@ final AS (
         COALESCE(baserunning.passed_balls, 0)::UTINYINT AS passed_balls,
         CASE WHEN prt.is_in_play THEN 1 ELSE 0 END::UTINYINT AS plate_appearances_in_field_with_ball_in_play,
         CASE WHEN events.plate_appearance_result = 'ReachedOnError' THEN 1 ELSE 0 END::UTINYINT AS reaching_errors,
+        COALESCE(fp.unknown_putouts, 0)::UTINYINT AS unknown_putouts,
+        COALESCE(fp.unknown_events, 0)::UTINYINT AS unknown_events,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN baserunning USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS prt USING (plate_appearance_result)

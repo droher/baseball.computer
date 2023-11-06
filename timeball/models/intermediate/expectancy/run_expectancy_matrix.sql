@@ -31,6 +31,7 @@ SELECT
     ANY_VALUE(outs_start) AS outs,
     ANY_VALUE(base_state_start) AS base_state,
     ROUND(AVG(runs_scored), 2)::DECIMAL AS avg_runs_scored,
+    ROUND(VAR_SAMP(runs_scored), 2)::DECIMAL AS variance_runs_scored,
     COUNT(*) AS sample_size
 FROM final
 GROUP BY 1
