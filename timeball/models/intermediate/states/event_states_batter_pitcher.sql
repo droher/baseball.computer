@@ -2,7 +2,7 @@
     materialized = 'table',
     )
 }}
-WITH final AS (
+WITH joined AS (
     SELECT
         events.game_id,
         events.event_key,
@@ -44,8 +44,16 @@ WITH final AS (
         ON events.pitcher_id = pitchers.player_id
     LEFT JOIN {{ ref('stg_game_fielding_appearances') }} AS batter_field
         ON events.game_id = batter_field.game_id
-        AND events.batter_id = batter_field.player_id
-        AND events.event_id BETWEEN batter_field.start_event_id AND batter_field.end_event_id
+            AND events.batter_id = batter_field.player_id
+            AND events.event_id BETWEEN batter_field.start_event_id AND batter_field.end_event_id
+),
+
+the_singular_exception_of_shohhei_ohtani AS (
+    SELECT *
+    FROM joined
+    -- Choose DH when he's both, just because
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY event_key ORDER BY batter_fielding_position DESC) = 1
 )
 
-SELECT * FROM final
+
+SELECT * FROM the_singular_exception_of_shohhei_ohtani

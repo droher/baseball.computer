@@ -10,35 +10,32 @@ WITH game_event_agg AS (
     SELECT
         team_id,
         game_id,
-        ANY_VALUE(season) AS season,
         SUM(outs_played)::UTINYINT AS outs_played,
         SUM(plate_appearances_in_field)::UTINYINT AS plate_appearances_in_field,
         SUM(plate_appearances_in_field_with_ball_in_play)::UTINYINT AS plate_appearances_in_field_with_ball_in_play,
-        SUM(fielding_plays)::UTINYINT AS fielding_plays,
         SUM(putouts)::UTINYINT AS putouts,
         SUM(assists)::UTINYINT AS assists,
         SUM(errors)::UTINYINT AS errors,
-        SUM(fielders_choices)::UTINYINT AS fielders_choices,
         SUM(stolen_bases)::UTINYINT AS stolen_bases,
         SUM(caught_stealing)::UTINYINT AS caught_stealing,
         SUM(pickoffs)::UTINYINT AS pickoffs,
-        SUM(passed_balls)::UTINYINT AS passed_balls,
         SUM(double_plays)::UTINYINT AS double_plays,
         SUM(triple_plays)::UTINYINT AS triple_plays,
         SUM(ground_ball_double_plays)::UTINYINT AS ground_ball_double_plays,
         SUM(reaching_errors)::UTINYINT AS reaching_errors,
+        SUM(unknown_putouts)::UTINYINT AS unknown_putouts,
+        SUM(incomplete_events)::UTINYINT AS incomplete_events,
     FROM {{ ref('event_fielding_stats') }}
     GROUP BY 1, 2
 ),
 
-box_games AS (
+game_info AS (
     SELECT
         season,
         game_id,
         team_id,
         team_side AS side
     FROM {{ ref('team_game_start_info') }}
-    WHERE source_type = 'BoxScore'
 ),
 
 box_sb AS (
@@ -77,53 +74,63 @@ box_tp AS (
     GROUP BY 1, 2
 ),
 
--- Only a small fraction of box scores have team fielding totals, so we need to
--- aggregate the player-level data (which is more likely to be missing data) as a backup
-box_player AS (
+players AS (
     SELECT
-        season,
         game_id,
         team_id,
-        -- Use putouts to dedupe (generally the same anyway)
+        -- outs_played can't be summed directly,
+        -- use putouts to dedupe (usually the same anyway)
         SUM(putouts) AS outs_played,
         SUM(putouts) AS putouts,
         SUM(assists) AS assists,
         SUM(errors) AS errors,
-        SUM(passed_balls) AS passed_balls
+        SUM(fielders_choices) AS fielders_choices,
+        SUM(assisted_putouts) AS assisted_putouts,
+        SUM(in_play_putouts) AS in_play_putouts,
+        SUM(in_play_assists) AS in_play_assists,
+        SUM(passed_balls) AS passed_balls,
     FROM {{ ref('player_position_game_fielding_lines') }}
-    -- Redundant with later joins, but shrinks the agg
-    WHERE game_id IN (SELECT game_id FROM box_games)
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2
 ),
 
-box_final AS (
+final AS (
     SELECT
-        box_games.season,
+        game_info.season,
         game_id,
         team_id,
-        COALESCE(t.outs_played, p.outs_played)::UTINYINT AS outs_played,
-        COALESCE(t.putouts, p.putouts)::UTINYINT AS putouts,
-        COALESCE(t.assists, p.assists)::UTINYINT AS assists,
-        COALESCE(t.errors, p.errors)::UTINYINT AS errors,
+        COALESCE(t.outs_played, g.outs_played, p.outs_played)::UTINYINT AS outs_played,
+        -- At the moment, there are some box score accounts that are less reliable
+        -- than their PBP counterparts for fielding. The largest of the options here
+        -- is the most likely to be consistent and correct.
+        -- TODO: Revisit after NLB data quality improvements
+        GREATEST(t.putouts, p.putouts, g.putouts)::UTINYINT AS putouts,
+        GREATEST(t.assists, p.assists, g.assists)::UTINYINT AS assists,
+        GREATEST(t.errors, p.errors, g.errors)::UTINYINT AS errors,
+        p.fielders_choices,
+        p.assisted_putouts,
+        p.in_play_putouts,
+        p.in_play_assists,
         COALESCE(t.passed_balls, p.passed_balls)::UTINYINT AS passed_balls,
-        COALESCE(box_sb.stolen_bases, 0)::UTINYINT AS stolen_bases,
-        COALESCE(box_cs.caught_stealing, 0)::UTINYINT AS caught_stealing,
-        COALESCE(box_dp.double_plays, 0)::UTINYINT AS double_plays,
-        COALESCE(box_tp.triple_plays, 0)::UTINYINT AS triple_plays
-    FROM box_games
-    LEFT JOIN box_player AS p USING (game_id, team_id)
+        -- We trust PBP events over box events
+        COALESCE(g.stolen_bases, box_sb.stolen_bases, 0)::UTINYINT AS stolen_bases,
+        COALESCE(g.caught_stealing, box_cs.caught_stealing, 0)::UTINYINT AS caught_stealing,
+        COALESCE(g.double_plays, box_dp.double_plays, 0)::UTINYINT AS double_plays,
+        COALESCE(g.triple_plays, box_tp.triple_plays, 0)::UTINYINT AS triple_plays,
+        g.pickoffs,
+        g.plate_appearances_in_field,
+        g.plate_appearances_in_field_with_ball_in_play,
+        g.ground_ball_double_plays,
+        g.reaching_errors,
+        g.unknown_putouts,
+        g.incomplete_events
+    FROM players AS p
+    INNER JOIN game_info USING (game_id, team_id)
+    LEFT JOIN game_event_agg AS g USING (game_id, team_id)
     LEFT JOIN {{ ref('stg_box_score_team_fielding_lines') }} AS t USING (game_id, side)
     LEFT JOIN box_sb USING (game_id, side)
     LEFT JOIN box_cs USING (game_id, side)
     LEFT JOIN box_dp USING (game_id, side)
     LEFT JOIN box_tp USING (game_id, side)
-),
-
-final AS (
-    SELECT * FROM game_event_agg
-    UNION ALL BY NAME
-    SELECT * FROM box_final
-    WHERE game_id NOT IN (SELECT game_id FROM game_event_agg)
 )
 
 SELECT * FROM final

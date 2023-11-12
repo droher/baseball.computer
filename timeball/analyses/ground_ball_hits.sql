@@ -20,5 +20,5 @@ ORDER BY 5 DESC
 -- IF/OF variance contributes roughly evenly for hitters,
 -- but pitcher variance explained much more by OF
 -- Inference: infield hit BABIP should be ignored for pitchers but not hitters
-SELECT regr_r2(hit_rate, if_hit_rate), regr_r2(hit_rate, of_hit_rate)
-FROM t
+-- SELECT regr_r2(hit_rate, if_hit_rate), regr_r2(hit_rate, of_hit_rate)
+-- FROM t #}

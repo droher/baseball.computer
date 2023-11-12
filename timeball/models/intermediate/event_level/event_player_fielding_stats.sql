@@ -26,6 +26,7 @@ WITH final AS (
         COALESCE(fp.assists, 0)::UTINYINT AS assists,
         COALESCE(fp.errors, 0)::UTINYINT AS errors,
         COALESCE(fp.fielders_choices, 0)::UTINYINT AS fielders_choices,
+        COALESCE(fp.assisted_putouts)::UTINYINT AS assisted_putouts,
         CASE WHEN e.plate_appearances_in_field_with_ball_in_play > 0
                 THEN COALESCE(fp.putouts, 0)
             ELSE 0

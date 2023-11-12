@@ -34,6 +34,9 @@ event_agg AS (
         SUM(assists)::UTINYINT AS assists,
         SUM(errors)::UTINYINT AS errors,
         SUM(fielders_choices)::UTINYINT AS fielders_choices,
+        SUM(assisted_putouts)::UTINYINT AS assisted_putouts,
+        SUM(in_play_putouts)::UTINYINT AS in_play_putouts,
+        SUM(in_play_assists)::UTINYINT AS in_play_assists,
         SUM(double_plays)::UTINYINT AS double_plays,
         SUM(triple_plays)::UTINYINT AS triple_plays,
         SUM(ground_ball_double_plays)::UTINYINT AS ground_ball_double_plays,
@@ -90,6 +93,9 @@ final AS (
         event_agg.plate_appearances_in_field_with_ball_in_play,
         event_agg.reaching_errors,
         event_agg.fielders_choices,
+        event_agg.assisted_putouts,
+        event_agg.in_play_putouts,
+        event_agg.in_play_assists,
         event_agg.balls_hit_to,
         event_agg.ground_ball_double_plays,
         COALESCE(box_agg.passed_balls, event_agg.passed_balls)::UTINYINT AS passed_balls,
@@ -98,7 +104,6 @@ final AS (
         box_agg.putouts - event_agg.putouts AS surplus_box_putouts,
         box_agg.assists - event_agg.assists AS surplus_box_assists,
         box_agg.errors - event_agg.errors AS surplus_box_errors,
-        box_agg.passed_balls - event_agg.passed_balls AS surplus_box_passed_balls,
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
     LEFT JOIN {{ ref('player_game_appearances') }} AS appearances USING (game_id, player_id)

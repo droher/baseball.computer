@@ -3,7 +3,8 @@ WITH source AS (
 ),
 
 renamed AS (
-    SELECT
+    -- TODO: Dedupe in raw data
+    SELECT DISTINCT
         game_id,
         player_id,
         earned_runs

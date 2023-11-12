@@ -11,8 +11,9 @@ WITH fielding_plays_agg AS (
         SUM(errors) AS errors,
         SUM(fielders_choices) AS fielders_choices,
         COUNT(*) AS fielding_plays,
+        SUM(assisted_putouts) AS assisted_putouts,
         SUM(unknown_putouts) AS unknown_putouts,
-        SUM(unknown_events) AS unknown_events,
+        SUM(incomplete_events) AS incomplete_events,
     FROM {{ ref('calc_fielding_play_agg') }}
     GROUP BY 1
 ),
@@ -44,6 +45,7 @@ final AS (
         COALESCE(fp.errors, 0)::UTINYINT AS errors,
         COALESCE(fp.fielders_choices, 0)::UTINYINT AS fielders_choices,
         COALESCE(fp.fielding_plays, 0)::UTINYINT AS fielding_plays,
+        COALESCE(fp.assisted_putouts, 0)::UTINYINT AS assisted_putouts,
         COALESCE(dp.is_double_play, FALSE)::UTINYINT AS double_plays,
         COALESCE(dp.is_triple_play, FALSE)::UTINYINT AS triple_plays,
         COALESCE(dp.is_ground_ball_double_play, FALSE)::UTINYINT AS ground_ball_double_plays,
@@ -52,9 +54,11 @@ final AS (
         COALESCE(baserunning.pickoffs, 0)::UTINYINT AS pickoffs,
         COALESCE(baserunning.passed_balls, 0)::UTINYINT AS passed_balls,
         CASE WHEN prt.is_in_play THEN 1 ELSE 0 END::UTINYINT AS plate_appearances_in_field_with_ball_in_play,
+        CASE WHEN prt.is_in_play THEN COALESCE(fp.putouts, 0) ELSE 0 END::UTINYINT AS in_play_putouts,
+        CASE WHEN prt.is_in_play THEN COALESCE(fp.assists, 0) ELSE 0 END::UTINYINT AS in_play_assists,
         CASE WHEN events.plate_appearance_result = 'ReachedOnError' THEN 1 ELSE 0 END::UTINYINT AS reaching_errors,
         COALESCE(fp.unknown_putouts, 0)::UTINYINT AS unknown_putouts,
-        COALESCE(fp.unknown_events, 0)::UTINYINT AS unknown_events,
+        COALESCE(fp.incomplete_events, 0)::UTINYINT AS incomplete_events,
     FROM {{ ref('stg_events') }} AS events
     LEFT JOIN baserunning USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS prt USING (plate_appearance_result)

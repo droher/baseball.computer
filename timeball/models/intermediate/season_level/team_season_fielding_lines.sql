@@ -44,7 +44,6 @@ retrosheet AS (
         SUM(stats.outs_played) AS outs_played,
         SUM(stats.plate_appearances_in_field) AS plate_appearances_in_field,
         SUM(stats.plate_appearances_in_field_with_ball_in_play) AS plate_appearances_in_field_with_ball_in_play,
-        SUM(stats.fielding_plays) AS fielding_plays,
         SUM(stats.putouts) AS putouts,
         SUM(stats.assists) AS assists,
         SUM(stats.errors) AS errors,

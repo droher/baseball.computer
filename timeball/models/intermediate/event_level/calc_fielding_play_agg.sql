@@ -27,6 +27,7 @@ final AS (
     SELECT
         event_key,
         fielding_position,
+        ANY_VALUE(game_id) AS game_id,
         COUNT(*)::UTINYINT AS fielding_plays,
         COUNT(*) FILTER (WHERE fielding_play = 'Putout')::UTINYINT AS putouts,
         -- A fielder can appear multiple times in one segment (on a rundown)
@@ -46,7 +47,7 @@ final AS (
         -- Explicitly unknown assists are extremely rare in the data. An unknown putout also implies
         -- unknown assists (0 or more). So it just makes sense to count the total number of events
         -- where an unknown assist may have occurred.
-        BOOL_OR(fielding_position = 0)::UTINYINT AS unknown_events,
+        BOOL_OR(fielding_position = 0)::UTINYINT AS incomplete_events,
     FROM assist_tracker
     GROUP BY 1, 2
 )

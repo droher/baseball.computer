@@ -27,6 +27,7 @@ WITH joined AS (
         baserunner_meta.numeric_value AS number_base_from,
         bases_meta.numeric_value AS number_base_to,
         COALESCE(part.is_in_play, FALSE) AS is_in_play,
+        COALESCE(part.is_hit, FALSE) AS is_hit,
         COALESCE(b.baserunning_play_type, 'None') AS baserunning_play_type,
         COALESCE(part.total_bases, 0)::UTINYINT AS batter_total_bases,
         CASE WHEN b.baserunner = 'Batter'
@@ -52,8 +53,8 @@ WITH joined AS (
                 THEN e.base_state = 7
             ELSE TRUE
         END AS is_force_on_runner,
-    FROM {{ ref('stg_event_baserunners') }} b
-    LEFT JOIN {{ ref('stg_events') }} e USING (event_key)
+    FROM {{ ref('stg_event_baserunners') }} AS b
+    LEFT JOIN {{ ref('stg_events') }} AS e USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS part
         USING (plate_appearance_result)
     LEFT JOIN {{ ref('seed_baserunner_info') }} AS baserunner_meta
@@ -76,6 +77,7 @@ final AS (
         charge_event_key,
         explicit_charged_pitcher_id,
         (is_successful AND number_base_to = 4)::UTINYINT AS runs,
+        is_out::UTINYINT AS outs_on_basepaths,
         -- Note that this is different from OBP - it includes fielders choices, errors, etc.
         (is_successful AND baserunner = 'Batter')::UTINYINT AS times_reached_base,
         (is_lead_runner)::UTINYINT AS times_lead_runner,
@@ -93,12 +95,12 @@ final AS (
         (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'First')::UTINYINT AS caught_stealing_second,
         (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'Second')::UTINYINT AS caught_stealing_third,
         (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'Third')::UTINYINT AS caught_stealing_home,
-        (baserunning_play_type LIKE 'PickedOff%')::UTINYINT AS picked_off,
-        (baserunning_play_type = 'PickedOff' AND baserunner = 'First')::UTINYINT AS picked_off_first,
-        (baserunning_play_type = 'PickedOff' AND baserunner = 'Second')::UTINYINT AS picked_off_second,
-        (baserunning_play_type = 'PickedOff' AND baserunner = 'Third')::UTINYINT AS picked_off_third,
+        -- Todo: verify whether pickoff errors count as pickoffs
+        (baserunning_play_type LIKE 'PickedOff%' AND is_out)::UTINYINT AS picked_off,
+        (picked_off = 1 AND baserunner = 'First')::UTINYINT AS picked_off_first,
+        (picked_off = 1 AND baserunner = 'Second')::UTINYINT AS picked_off_second,
+        (picked_off = 1 AND baserunner = 'Third')::UTINYINT AS picked_off_third,
         (baserunning_play_type = 'PickedOffCaughtStealing')::UTINYINT AS picked_off_caught_stealing,
-        explicit_out_flag::UTINYINT AS outs_on_basepaths,
 
         (baserunning_play_type = 'WildPitch' AND is_successful)::UTINYINT AS advances_on_wild_pitches,
         (baserunning_play_type = 'PassedBall' AND is_successful)::UTINYINT AS advances_on_passed_balls,
@@ -139,10 +141,22 @@ final AS (
                     - LEAST(4 - number_base_from, batter_total_bases)
             ELSE 0
         END::INT1 AS surplus_bases_advanced_on_balls_in_play,
-        CASE WHEN explicit_out_flag AND number_base_to - number_base_from > 1
-                THEN 1
-            ELSE 0
-        END::UTINYINT AS outs_on_extra_base_advance_attempts,
+        (
+            is_out AND explicit_out_flag AND number_base_to - number_base_from > 1
+        )::UTINYINT AS outs_on_extra_base_advance_attempts,
+        (explicit_out_flag AND NOT is_out)::UTINYINT AS outs_avoided_on_errors,
+        -- Tags do not count as an unforced out if they occur when a force was in play.
+        -- This will cause us to miss some cases when a runner on base is tagged out
+        -- after advancing, straying off the bag, and then failing to return.
+        (
+            is_out AND (
+                outs_on_extra_base_advance_attempts = 1
+                OR NOT is_force_on_runner
+                -- Force outs can't happen on the same plays as hits,
+                -- so runners marked out on hits are always unforced
+                OR is_hit
+            )
+        )::UTINYINT AS unforced_outs_on_basepaths,
 
     FROM joined
 )

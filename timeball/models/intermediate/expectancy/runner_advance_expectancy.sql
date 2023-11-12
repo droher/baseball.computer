@@ -9,7 +9,7 @@ WITH base_data AS (
         e.batted_to_fielder,
         COALESCE(bbt.contact_broad_classification, 'Unknown') AS contact,
         b.bases_advanced,
-        b.outs_on_basepaths,
+        b.unforced_outs_on_basepaths,
         -- We don't want to distinguish between out types
         -- because that selects on the dependent variable
         -- (e.g. a sac fly is always a successful advance)
@@ -33,7 +33,7 @@ averages AS (
         plate_appearance_result,
         contact,
         AVG(bases_advanced) AS average_bases_advanced,
-        AVG(outs_on_basepaths) AS average_outs_on_basepaths,
+        AVG(unforced_outs_on_basepaths) AS average_outs_on_basepaths,
     FROM base_data
     GROUP BY 1, 2, 3, 4, 5, 6
 ),
@@ -44,7 +44,7 @@ expectations AS (
         a.average_bases_advanced,
         a.average_outs_on_basepaths,
         bd.bases_advanced - a.average_bases_advanced AS bases_advanced_above_average,
-        bd.outs_on_basepaths - a.average_outs_on_basepaths AS outs_on_basepaths_above_average,
+        bd.unforced_outs_on_basepaths - a.average_outs_on_basepaths AS outs_on_basepaths_above_average,
         AVG(bases_advanced_above_average) OVER baseline AS season_adjustment_bases,
         AVG(outs_on_basepaths_above_average) OVER baseline AS season_adjustment_outs,
         bases_advanced_above_average - season_adjustment_bases AS adjusted_bases_advanced,

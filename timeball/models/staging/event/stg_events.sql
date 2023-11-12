@@ -7,6 +7,7 @@ renamed AS (
         game_id,
         event_id,
         event_key,
+        -- TODO: Add plate appearance id
         batting_side,
         inning,
         frame,

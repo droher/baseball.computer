@@ -7,8 +7,8 @@ authors = ["David Roher <davidroher@davids-air.home>"]
 [tool.poetry.dependencies]
 python = "^3.11.0,<3.12"
 
-dbt-core = "~1.6.6"
-dbt-duckdb = "~1.6.1"
+dbt-core = "~1.7.1"
+dbt-duckdb = "~1.7.0"
 duckdb = "~0.9.1"
 
 tensorflow = "~2.14.0"
@@ -16,14 +16,14 @@ tensorflow-metal = {version = "~1.0.1", platform = "darwin", markers = "platform
 tensorflow-macos = { version = "~2.14.0", platform = "darwin", markers = "platform_machine=='arm64'" }
 
 numpy = "~1.26.1"
-pandas = "~2.1.1"
-polars = "^0.19.11"
+pandas = "~2.1.2"
+polars = "^0.19.12"
 pyarrow = "^13.0.0"
 statsmodels = "^0.14.0"
 
 [tool.poetry.dev-dependencies]
-sqlfluff = "^2.3.4"
-sqlfluff-templater-dbt = "^2.3.4"
+sqlfluff = "^2.3.5"
+sqlfluff-templater-dbt = "^2.3.5"
 ipykernel = "^6.25.2"
 
 [build-system]

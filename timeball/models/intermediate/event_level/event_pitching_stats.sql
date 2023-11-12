@@ -30,7 +30,7 @@ joined_stats AS (
         baserunning_agg.* EXCLUDE (event_key, runs),
         pitch.* EXCLUDE (event_key),
         hit.plate_appearances AS batters_faced,
-        hit.outs_on_play AS outs_recorded,
+        COALESCE(hit.outs_on_play, baserunning_agg.outs_on_basepaths) AS outs_recorded,
     FROM {{ ref('event_batting_stats') }} AS hit
     FULL OUTER JOIN baserunning_agg USING (event_key)
     LEFT JOIN {{ ref('event_batted_ball_stats') }} AS bat USING (event_key)
@@ -44,7 +44,7 @@ add_current_pitcher_runs AS (
         runs.team_unearned_runs,
         runs.inherited_runners_scored,
     FROM joined_stats
-LEFT JOIN {{ ref('event_run_assignment_stats') }} AS runs
+    LEFT JOIN {{ ref('event_run_assignment_stats') }} AS runs
         ON joined_stats.event_key = runs.event_key
             AND joined_stats.player_id = runs.pitcher_id
 ),

@@ -71,6 +71,8 @@
         "picked_off",
         "picked_off_caught_stealing",
         "outs_on_basepaths",
+        "unforced_outs_on_basepaths",
+        "outs_avoided_on_errors",
         "advances_on_wild_pitches",
         "advances_on_passed_balls",
         "advances_on_balks",

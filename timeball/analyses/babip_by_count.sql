@@ -11,11 +11,11 @@ FROM {{ ref('event_states_full') }} s
 JOIN {{ ref('event_offense_stats') }} o USING (event_key)
 JOIN {{ ref('calc_batted_ball_type') }} b USING (event_key)
 WHERE balls_in_play = 1
-AND sacrifice_hits = 0
-AND season >= 2003
-AND o.bunts = 0
-AND count_balls + count_strikes IS NOT NULL
-AND contact = 'LineDrive'
+    AND sacrifice_hits = 0
+    AND season >= 1988
+    AND season NOT BETWEEN 2000 AND 2002
+    AND o.bunts = 0
+    AND count_balls + count_strikes IS NOT NULL
 GROUP BY 1, 2, 3, 4
 ),
 
