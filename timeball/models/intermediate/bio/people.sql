@@ -25,6 +25,7 @@ final AS (
         COALESCE(retro.last_name, databank.last_name) AS last_name,
         COALESCE(retro.bats, databank.bats, roster_files.bats) AS bats,
         COALESCE(retro.throws, databank.throws, roster_files.throws) AS throws,
+        databank.birth_year,
         retro.official_name,
         retro.birth_date,
         retro.birth_city,

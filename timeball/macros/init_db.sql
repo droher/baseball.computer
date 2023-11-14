@@ -92,6 +92,10 @@
       SELECT DISTINCT visiting_team FROM misc.gamelog
       UNION
       SELECT DISTINCT home_team FROM misc.gamelog
+      UNION
+      SELECT DISTINCT away_team_id FROM box_score.box_score_games
+      UNION
+      SELECT DISTINCT home_team_id FROM box_score.box_score_games
     );
     
     {# CREATE TYPE player_id AS ENUM (

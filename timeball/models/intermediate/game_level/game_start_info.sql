@@ -60,6 +60,8 @@ add_gamelog AS (
         umpire_second_id,
         umpire_third_id,
         source_type,
+        home_starting_pitcher_id,
+        away_starting_pitcher_id,
         'Unknown'::SKY AS sky,
         'Unknown'::FIELD_CONDITION AS field_condition,
         'Unknown'::PRECIPITATION AS precipitation,
@@ -69,7 +71,12 @@ add_gamelog AS (
 
 add_rest AS (
     SELECT
-        add_gamelog.*,
+        add_gamelog.* REPLACE (
+            COALESCE(add_gamelog.away_starting_pitcher_id, lineups.fielding_map_away[1][1])
+            AS away_starting_pitcher_id,
+            COALESCE(add_gamelog.home_starting_pitcher_id, lineups.fielding_map_home[1][1])
+            AS home_starting_pitcher_id,
+        ),
         game_types.is_regular_season,
         game_types.is_postseason,
         franchise_a.franchise_id::TEAM_ID AS away_franchise_id,
@@ -81,8 +88,6 @@ add_rest AS (
         franchise_a.location || ' ' || franchise_a.nickname AS away_team_name,
         franchise_h.location || ' ' || franchise_h.nickname AS home_team_name,
         franchise_a.league != franchise_h.league AS is_interleague,
-        lineups.fielding_map_away[1][1] AS away_starting_pitcher_id,
-        lineups.fielding_map_home[1][1] AS home_starting_pitcher_id,
         lineups.lineup_map_away,
         lineups.lineup_map_home,
         lineups.fielding_map_away,
