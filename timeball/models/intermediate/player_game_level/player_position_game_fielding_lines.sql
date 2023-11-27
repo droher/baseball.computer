@@ -63,29 +63,30 @@ final AS (
                 THEN appearances.games_started
             ELSE 0
         END::UTINYINT AS games_started,
-        -- Outs played data is more authoritative from events, unlike other fielding data
+        -- Outs played data is always more authoritative from events, unlike other fielding data
         COALESCE(event_agg.outs_played, box_agg.outs_played)::UTINYINT AS outs_played,
         -- The rules for combining box and event fielding data are:
-        -- If there is a box score account, use it
+        -- If there is an event account with no unknown plays while the fielder was playing, use it
+        -- Otherwise, if there is there is a box score account with data for that field, use it
         -- If the box score account exists but is missing data for that particular field, leave it empty
         -- If there is an event account but no box score account, use events
-        CASE WHEN box_agg.game_id IS NULL
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
                 THEN event_agg.putouts
             ELSE box_agg.putouts
         END::UTINYINT AS putouts,
-        CASE WHEN box_agg.game_id IS NULL
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
                 THEN event_agg.assists
             ELSE box_agg.assists
         END::UTINYINT AS assists,
-        CASE WHEN box_agg.game_id IS NULL
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
                 THEN event_agg.errors
             ELSE box_agg.errors
         END::UTINYINT AS errors,
-        CASE WHEN box_agg.game_id IS NULL
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
                 THEN event_agg.double_plays
             ELSE box_agg.double_plays
         END::UTINYINT AS double_plays,
-        CASE WHEN box_agg.game_id IS NULL
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
                 THEN event_agg.triple_plays
             ELSE box_agg.triple_plays
         END::UTINYINT AS triple_plays,

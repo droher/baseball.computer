@@ -1,0 +1,21 @@
+scorer,team_id,normalized_scorer
+stl,sla,browns
+stl,sln,cardinals
+ny,nya,yankees
+ny,nyn,mets
+nym,nya,103
+nym,nym,mets
+chicago,cha,white sox
+chicago,chn,cubs
+chi,cha,white sox
+chi,chn,cubs
+sox,cha,white sox
+sox,bos,red sox
+seattle,sea,mariners
+seattle,se1,pilots
+sea,sea,mariners
+sea,se1,pilots
+boston,bos,red sox
+boston,bs1,braves
+mil,mil,brewers
+mil,mln,braves

@@ -21,6 +21,7 @@ final AS (
             roster_files.player_id,
             box_files.player_id
         ) AS player_id,
+        databank.baseball_reference_player_id,
         COALESCE(retro.first_name, databank.first_name) AS first_name,
         COALESCE(retro.last_name, databank.last_name) AS last_name,
         COALESCE(retro.bats, databank.bats, roster_files.bats) AS bats,

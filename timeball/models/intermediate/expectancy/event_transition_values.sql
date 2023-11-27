@@ -56,7 +56,7 @@ WITH final AS (
         ON wins_start.win_expectancy_key = states.win_expectancy_start_key
     LEFT JOIN {{ ref('win_expectancy_matrix' ) }} AS wins_end
         ON wins_end.win_expectancy_key = states.win_expectancy_end_key
+    WHERE states.game_type = 'RegularSeason'
 )
 
 SELECT * FROM final
-WHERE game_type = 'RegularSeason'

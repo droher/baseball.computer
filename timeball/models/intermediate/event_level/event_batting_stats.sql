@@ -34,7 +34,7 @@ final AS (
         (result_types.total_bases = 4)::UTINYINT AS home_runs,
         result_types.total_bases::UTINYINT AS total_bases,
 
-        CASE WHEN pa.batted_to_fielder < 7 THEN hits ELSE 0 END::UTINYINT AS infield_hits,
+        CASE WHEN pa.batted_to_fielder BETWEEN 1 AND 6 THEN hits ELSE 0 END::UTINYINT AS infield_hits,
 
         (result_types.plate_appearance_result = 'StrikeOut')::UTINYINT AS strikeouts,
         (result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk'))::UTINYINT AS walks,

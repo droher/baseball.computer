@@ -37,6 +37,7 @@
         "contact_broad_type_air_ball",
         "contact_broad_type_ground_ball",
         "contact_broad_type_unknown",
+        "contact_broad_type_known",
         "bunts",
         "batted_distance_plate",
         "batted_distance_infield",

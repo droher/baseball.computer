@@ -23,6 +23,7 @@ WITH batted_ball AS (
         CASE
             WHEN COALESCE(contact_broad_classification, 'Unknown') = 'Unknown' THEN 1 ELSE 0
         END::UTINYINT AS contact_broad_type_unknown,
+        (1 - contact_broad_type_unknown)::UTINYINT AS contact_broad_type_known,
         CASE WHEN contact_broad_classification = 'Bunt' THEN 1 ELSE 0 END::UTINYINT AS bunts,
         -- Distances,
         CASE WHEN location_depth = 'Plate' THEN 1 ELSE 0 END::UTINYINT AS batted_distance_plate,
