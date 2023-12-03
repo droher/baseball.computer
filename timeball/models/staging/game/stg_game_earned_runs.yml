@@ -6,17 +6,21 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [game_id, player_id]
 
     columns:
       - name: game_id
         description: ""
+        tests:
+          - relationships:
+              to: ref('stg_games')
+              field: game_id
         data_type: varchar
       - name: player_id
         description: ""
@@ -24,3 +28,5 @@ models:
       - name: earned_runs
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null

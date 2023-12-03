@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [game_id, player_id, fielding_position, start_event_id]
 
     columns:
       - name: game_id
@@ -23,7 +23,9 @@ models:
         data_type: varchar
       - name: side
         description: ""
-        data_type: enum('home', 'away')
+        data_type: side
+        constraints:
+          - type: not_null
       - name: fielding_position
         description: ""
         data_type: utinyint
@@ -33,3 +35,5 @@ models:
       - name: end_event_id
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
