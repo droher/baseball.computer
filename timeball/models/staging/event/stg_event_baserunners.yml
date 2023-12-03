@@ -1,0 +1,82 @@
+version: 2
+
+
+models:
+  - name: stg_event_baserunners
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: event_id
+        description: ""
+        data_type: utinyint
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: baserunner
+        description: ""
+        data_type: enum('batter', 'first', 'second', 'third')
+      - name: runner_lineup_position
+        description: ""
+        data_type: utinyint
+      - name: runner_id
+        description: ""
+        data_type: varchar
+      - name: charge_event_id
+        description: ""
+        data_type: uinteger
+      - name: reached_on_event_id
+        description: ""
+        data_type: uinteger
+      - name: explicit_charged_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: attempted_advance_to_base
+        description: ""
+        data_type: enum('home', 'first', 'second', 'third')
+      - name: baserunning_play_type
+        description: ""
+        data_type: enum('advancedonerror', 'balk', 'caughtstealing', 'defensiveindifference',
+          'otheradvance', 'passedball', 'pickedoff', 'pickedoffcaughtstealing', 'stolenbase',
+          'wildpitch')
+      - name: is_out
+        description: ""
+        data_type: boolean
+      - name: base_end
+        description: ""
+        data_type: enum('home', 'first', 'second', 'third')
+      - name: advanced_on_error_flag
+        description: ""
+        data_type: boolean
+      - name: explicit_out_flag
+        description: ""
+        data_type: boolean
+      - name: run_scored_flag
+        description: ""
+        data_type: boolean
+      - name: rbi_flag
+        description: ""
+        data_type: boolean
+      - name: reached_on_event_key
+        description: ""
+        data_type: uinteger
+      - name: charge_event_key
+        description: ""
+        data_type: uinteger
+      - name: baserunner_bit
+        description: ""
+        data_type: integer
+      - name: is_advance_attempt
+        description: ""
+        data_type: boolean

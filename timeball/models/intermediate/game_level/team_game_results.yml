@@ -1,0 +1,347 @@
+version: 2
+
+
+models:
+  - name: team_game_results
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: season
+        description: ""
+        data_type: smallint
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: game_finish_date
+        description: ""
+        data_type: date
+      - name: team_id
+        description: ""
+        data_type: enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag',
+          'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1',
+          'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2',
+          'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8',
+          'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9',
+          'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php',
+          'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has',
+          'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1',
+          'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg',
+          'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4',
+          'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa',
+          'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1',
+          'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn',
+          'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue',
+          'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu',
+          'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was',
+          'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5',
+          'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3',
+          'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7',
+          'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir',
+          'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg',
+          'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt',
+          'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase',
+          'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas',
+          'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu',
+          'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1',
+          'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')
+      - name: game_type
+        description: ""
+        data_type: enum('allstargame', 'divisionseries', 'exhibition', 'leaguechampionshipseries',
+          'otherchampionship', 'regularseason', 'tiebreakerplayoff', 'wildcardseries',
+          'worldseries')
+      - name: team_side
+        description: ""
+        data_type: enum('home', 'away')
+      - name: league
+        description: ""
+        data_type: varchar
+      - name: division
+        description: ""
+        data_type: varchar
+      - name: opponent_league
+        description: ""
+        data_type: varchar
+      - name: opponent_division
+        description: ""
+        data_type: varchar
+      - name: season_game_number
+        description: ""
+        data_type: bigint
+      - name: is_interleague
+        description: ""
+        data_type: boolean
+      - name: wins
+        description: ""
+        data_type: integer
+      - name: losses
+        description: ""
+        data_type: integer
+      - name: runs_scored
+        description: ""
+        data_type: hugeint
+      - name: runs_allowed
+        description: ""
+        data_type: hugeint
+      - name: hits
+        description: ""
+        data_type: usmallint
+      - name: errors
+        description: ""
+        data_type: utinyint
+      - name: left_on_base
+        description: ""
+        data_type: usmallint
+      - name: at_bats
+        description: ""
+        data_type: usmallint
+      - name: doubles
+        description: ""
+        data_type: usmallint
+      - name: triples
+        description: ""
+        data_type: usmallint
+      - name: home_runs
+        description: ""
+        data_type: usmallint
+      - name: runs_batted_in
+        description: ""
+        data_type: usmallint
+      - name: sacrifice_hits
+        description: ""
+        data_type: usmallint
+      - name: sacrifice_flies
+        description: ""
+        data_type: usmallint
+      - name: hit_by_pitches
+        description: ""
+        data_type: usmallint
+      - name: walks
+        description: ""
+        data_type: usmallint
+      - name: intentional_walks
+        description: ""
+        data_type: usmallint
+      - name: strikeouts
+        description: ""
+        data_type: usmallint
+      - name: stolen_bases
+        description: ""
+        data_type: usmallint
+      - name: caught_stealing
+        description: ""
+        data_type: usmallint
+      - name: grounded_into_double_plays
+        description: ""
+        data_type: usmallint
+      - name: reached_on_interferences
+        description: ""
+        data_type: usmallint
+      - name: innings_pitched
+        description: ""
+        data_type: decimal(6,4)
+      - name: individual_earned_runs_allowed
+        description: ""
+        data_type: usmallint
+      - name: earned_runs_allowed
+        description: ""
+        data_type: utinyint
+      - name: wild_pitches
+        description: ""
+        data_type: usmallint
+      - name: balks
+        description: ""
+        data_type: usmallint
+      - name: putouts
+        description: ""
+        data_type: utinyint
+      - name: assists
+        description: ""
+        data_type: utinyint
+      - name: passed_balls
+        description: ""
+        data_type: utinyint
+      - name: double_plays_turned
+        description: ""
+        data_type: utinyint
+      - name: triple_plays_turned
+        description: ""
+        data_type: utinyint
+      - name: opponent_team_id
+        description: ""
+        data_type: enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag',
+          'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1',
+          'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2',
+          'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8',
+          'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9',
+          'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php',
+          'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has',
+          'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1',
+          'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg',
+          'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4',
+          'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa',
+          'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1',
+          'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn',
+          'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue',
+          'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu',
+          'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was',
+          'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5',
+          'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3',
+          'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7',
+          'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir',
+          'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg',
+          'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt',
+          'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase',
+          'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas',
+          'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu',
+          'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1',
+          'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')
+      - name: opponent_runs
+        description: ""
+        data_type: usmallint
+      - name: opponent_hits
+        description: ""
+        data_type: usmallint
+      - name: opponent_errors
+        description: ""
+        data_type: utinyint
+      - name: opponent_left_on_base
+        description: ""
+        data_type: usmallint
+      - name: opponent_at_bats
+        description: ""
+        data_type: usmallint
+      - name: opponent_doubles
+        description: ""
+        data_type: usmallint
+      - name: opponent_triples
+        description: ""
+        data_type: usmallint
+      - name: opponent_home_runs
+        description: ""
+        data_type: usmallint
+      - name: opponent_runs_batted_in
+        description: ""
+        data_type: usmallint
+      - name: opponent_sacrifice_hits
+        description: ""
+        data_type: usmallint
+      - name: opponent_sacrifice_flies
+        description: ""
+        data_type: usmallint
+      - name: opponent_hit_by_pitches
+        description: ""
+        data_type: usmallint
+      - name: opponent_walks
+        description: ""
+        data_type: usmallint
+      - name: opponent_intentional_walks
+        description: ""
+        data_type: usmallint
+      - name: opponent_strikeouts
+        description: ""
+        data_type: usmallint
+      - name: opponent_stolen_bases
+        description: ""
+        data_type: usmallint
+      - name: opponent_caught_stealing
+        description: ""
+        data_type: usmallint
+      - name: opponent_grounded_into_double_plays
+        description: ""
+        data_type: usmallint
+      - name: opponent_reached_on_interferences
+        description: ""
+        data_type: usmallint
+      - name: opponent_innings_pitched
+        description: ""
+        data_type: decimal(6,4)
+      - name: opponent_individual_earned_runs_allowed
+        description: ""
+        data_type: usmallint
+      - name: opponent_earned_runs_allowed
+        description: ""
+        data_type: utinyint
+      - name: opponent_wild_pitches
+        description: ""
+        data_type: usmallint
+      - name: opponent_balks
+        description: ""
+        data_type: usmallint
+      - name: opponent_putouts
+        description: ""
+        data_type: utinyint
+      - name: opponent_assists
+        description: ""
+        data_type: utinyint
+      - name: opponent_passed_balls
+        description: ""
+        data_type: utinyint
+      - name: opponent_double_plays
+        description: ""
+        data_type: utinyint
+      - name: opponent_triple_plays
+        description: ""
+        data_type: utinyint
+      - name: home_wins
+        description: ""
+        data_type: integer
+      - name: home_losses
+        description: ""
+        data_type: integer
+      - name: away_wins
+        description: ""
+        data_type: integer
+      - name: away_losses
+        description: ""
+        data_type: integer
+      - name: interleague_wins
+        description: ""
+        data_type: integer
+      - name: interleague_losses
+        description: ""
+        data_type: integer
+      - name: east_wins
+        description: ""
+        data_type: integer
+      - name: east_losses
+        description: ""
+        data_type: integer
+      - name: central_wins
+        description: ""
+        data_type: integer
+      - name: central_losses
+        description: ""
+        data_type: integer
+      - name: west_wins
+        description: ""
+        data_type: integer
+      - name: west_losses
+        description: ""
+        data_type: integer
+      - name: one_run_wins
+        description: ""
+        data_type: integer
+      - name: one_run_losses
+        description: ""
+        data_type: integer
+      - name: win_streak_id
+        description: ""
+        data_type: bigint
+      - name: loss_streak_id
+        description: ""
+        data_type: bigint
+      - name: win_streak_length
+        description: ""
+        data_type: bigint
+      - name: loss_streak_length
+        description: ""
+        data_type: bigint

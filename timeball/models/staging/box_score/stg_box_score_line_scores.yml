@@ -1,0 +1,29 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_line_scores
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: batting_side
+        description: ""
+        data_type: varchar
+      - name: inning
+        description: ""
+        data_type: bigint
+      - name: runs
+        description: ""
+        data_type: bigint

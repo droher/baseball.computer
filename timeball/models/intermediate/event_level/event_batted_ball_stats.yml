@@ -1,0 +1,137 @@
+version: 2
+
+
+models:
+  - name: event_batted_ball_stats
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: balls_batted
+        description: ""
+        data_type: utinyint
+      - name: balls_in_play
+        description: ""
+        data_type: utinyint
+      - name: contact_type_fly_ball
+        description: ""
+        data_type: utinyint
+      - name: contact_type_ground_ball
+        description: ""
+        data_type: utinyint
+      - name: contact_type_line_drive
+        description: ""
+        data_type: utinyint
+      - name: contact_type_pop_fly
+        description: ""
+        data_type: utinyint
+      - name: contact_type_unknown
+        description: ""
+        data_type: utinyint
+      - name: contact_type_known
+        description: ""
+        data_type: utinyint
+      - name: contact_broad_type_air_ball
+        description: ""
+        data_type: utinyint
+      - name: contact_broad_type_ground_ball
+        description: ""
+        data_type: utinyint
+      - name: contact_broad_type_unknown
+        description: ""
+        data_type: utinyint
+      - name: contact_broad_type_known
+        description: ""
+        data_type: utinyint
+      - name: bunts
+        description: ""
+        data_type: utinyint
+      - name: batted_distance_plate
+        description: ""
+        data_type: utinyint
+      - name: batted_distance_infield
+        description: ""
+        data_type: utinyint
+      - name: batted_distance_outfield
+        description: ""
+        data_type: utinyint
+      - name: batted_distance_unknown
+        description: ""
+        data_type: utinyint
+      - name: batted_distance_known
+        description: ""
+        data_type: utinyint
+      - name: fielded_by_battery
+        description: ""
+        data_type: utinyint
+      - name: fielded_by_infielder
+        description: ""
+        data_type: utinyint
+      - name: fielded_by_outfielder
+        description: ""
+        data_type: utinyint
+      - name: fielded_by_unknown
+        description: ""
+        data_type: utinyint
+      - name: fielded_by_known
+        description: ""
+        data_type: utinyint
+      - name: batted_angle_left
+        description: ""
+        data_type: utinyint
+      - name: batted_angle_right
+        description: ""
+        data_type: utinyint
+      - name: batted_angle_middle
+        description: ""
+        data_type: utinyint
+      - name: batted_angle_unknown
+        description: ""
+        data_type: utinyint
+      - name: batted_angle_known
+        description: ""
+        data_type: utinyint
+      - name: batted_location_plate
+        description: ""
+        data_type: utinyint
+      - name: batted_location_right_infield
+        description: ""
+        data_type: utinyint
+      - name: batted_location_left_infield
+        description: ""
+        data_type: utinyint
+      - name: batted_location_middle_infield
+        description: ""
+        data_type: utinyint
+      - name: batted_location_left_field
+        description: ""
+        data_type: utinyint
+      - name: batted_location_center_field
+        description: ""
+        data_type: utinyint
+      - name: batted_location_right_field
+        description: ""
+        data_type: utinyint
+      - name: batted_location_unknown
+        description: ""
+        data_type: utinyint
+      - name: batted_location_known
+        description: ""
+        data_type: utinyint
+      - name: batted_balls_pulled
+        description: ""
+        data_type: integer
+      - name: batted_balls_opposite_field
+        description: ""
+        data_type: integer

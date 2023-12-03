@@ -1,0 +1,80 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_pinch_hitting_lines
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: pinch_hitter_id
+        description: ""
+        data_type: varchar
+      - name: inning
+        description: ""
+        data_type: bigint
+      - name: side
+        description: ""
+        data_type: varchar
+      - name: at_bats
+        description: ""
+        data_type: bigint
+      - name: runs
+        description: ""
+        data_type: bigint
+      - name: hits
+        description: ""
+        data_type: bigint
+      - name: doubles
+        description: ""
+        data_type: bigint
+      - name: triples
+        description: ""
+        data_type: bigint
+      - name: home_runs
+        description: ""
+        data_type: bigint
+      - name: rbi
+        description: ""
+        data_type: bigint
+      - name: sacrifice_hits
+        description: ""
+        data_type: bigint
+      - name: sacrifice_flies
+        description: ""
+        data_type: bigint
+      - name: hit_by_pitches
+        description: ""
+        data_type: bigint
+      - name: walks
+        description: ""
+        data_type: bigint
+      - name: intentional_walks
+        description: ""
+        data_type: bigint
+      - name: strikeouts
+        description: ""
+        data_type: bigint
+      - name: stolen_bases
+        description: ""
+        data_type: bigint
+      - name: caught_stealing
+        description: ""
+        data_type: bigint
+      - name: grounded_into_double_plays
+        description: ""
+        data_type: bigint
+      - name: reached_on_interference
+        description: ""
+        data_type: bigint

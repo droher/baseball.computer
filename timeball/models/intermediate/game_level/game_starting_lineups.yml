@@ -1,0 +1,32 @@
+version: 2
+
+
+models:
+  - name: game_starting_lineups
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: lineup_map_away
+        description: ""
+        data_type: map(integer, varchar)
+      - name: fielding_map_away
+        description: ""
+        data_type: map(utinyint, varchar)
+      - name: lineup_map_home
+        description: ""
+        data_type: map(integer, varchar)
+      - name: fielding_map_home
+        description: ""
+        data_type: map(utinyint, varchar)

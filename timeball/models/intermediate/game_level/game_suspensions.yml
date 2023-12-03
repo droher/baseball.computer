@@ -1,0 +1,38 @@
+version: 2
+
+
+models:
+  - name: game_suspensions
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: event_key_at_suspension
+        description: ""
+        data_type: uinteger
+      - name: date_resumed
+        description: ""
+        data_type: date
+      - name: new_park_id
+        description: ""
+        data_type: varchar
+      - name: away_score_at_suspension
+        description: ""
+        data_type: integer
+      - name: home_score_at_suspension
+        description: ""
+        data_type: integer
+      - name: game_outs_recorded_at_suspension
+        description: ""
+        data_type: integer

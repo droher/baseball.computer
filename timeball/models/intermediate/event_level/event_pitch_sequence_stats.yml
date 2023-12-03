@@ -1,0 +1,89 @@
+version: 2
+
+
+models:
+  - name: event_pitch_sequence_stats
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: pitches
+        description: ""
+        data_type: utinyint
+      - name: swings
+        description: ""
+        data_type: utinyint
+      - name: swings_with_contact
+        description: ""
+        data_type: utinyint
+      - name: strikes
+        description: ""
+        data_type: utinyint
+      - name: strikes_called
+        description: ""
+        data_type: utinyint
+      - name: strikes_swinging
+        description: ""
+        data_type: utinyint
+      - name: strikes_foul
+        description: ""
+        data_type: utinyint
+      - name: strikes_foul_tip
+        description: ""
+        data_type: utinyint
+      - name: strikes_in_play
+        description: ""
+        data_type: utinyint
+      - name: strikes_unknown
+        description: ""
+        data_type: utinyint
+      - name: balls
+        description: ""
+        data_type: utinyint
+      - name: balls_called
+        description: ""
+        data_type: utinyint
+      - name: balls_intentional
+        description: ""
+        data_type: utinyint
+      - name: balls_automatic
+        description: ""
+        data_type: utinyint
+      - name: unknown_pitches
+        description: ""
+        data_type: utinyint
+      - name: pitchouts
+        description: ""
+        data_type: utinyint
+      - name: pitcher_pickoff_attempts
+        description: ""
+        data_type: utinyint
+      - name: catcher_pickoff_attempts
+        description: ""
+        data_type: utinyint
+      - name: pitches_blocked_by_catcher
+        description: ""
+        data_type: utinyint
+      - name: pitches_with_runners_going
+        description: ""
+        data_type: utinyint
+      - name: passed_balls
+        description: ""
+        data_type: utinyint
+      - name: wild_pitches
+        description: ""
+        data_type: utinyint
+      - name: balks
+        description: ""
+        data_type: utinyint

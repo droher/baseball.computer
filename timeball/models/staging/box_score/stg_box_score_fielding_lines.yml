@@ -1,0 +1,53 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_fielding_lines
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: fielder_id
+        description: ""
+        data_type: varchar
+      - name: side
+        description: ""
+        data_type: enum('home', 'away')
+      - name: fielding_position
+        description: ""
+        data_type: utinyint
+      - name: nth_position_played_by_player
+        description: ""
+        data_type: utinyint
+      - name: outs_played
+        description: ""
+        data_type: utinyint
+      - name: putouts
+        description: ""
+        data_type: utinyint
+      - name: assists
+        description: ""
+        data_type: utinyint
+      - name: errors
+        description: ""
+        data_type: utinyint
+      - name: double_plays
+        description: ""
+        data_type: utinyint
+      - name: triple_plays
+        description: ""
+        data_type: utinyint
+      - name: passed_balls
+        description: ""
+        data_type: utinyint

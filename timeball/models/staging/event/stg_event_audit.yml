@@ -1,0 +1,32 @@
+version: 2
+
+
+models:
+  - name: stg_event_audit
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: event_id
+        description: ""
+        data_type: utinyint
+      - name: filename
+        description: ""
+        data_type: varchar
+      - name: line_number
+        description: ""
+        data_type: uinteger
+      - name: event_key
+        description: ""
+        data_type: uinteger

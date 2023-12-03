@@ -5,19 +5,19 @@ models:
   - name: {{ model.lower() }}
     description: ""
     
-    config:
-      contract:
-        enforced: true
-    
-    constraints:
-      - type: primary_key
-        columns: []
-      - type: foreign_key
-        expression: ""
-    
+{{"""
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+"""
+    }}
     columns:
 {%- for col in columns %}
       - name: {{ col['id'] }}
-        description: ""
-      {%- endif %}
+        description: "{{ col['description'] }}"
+        data_type: {{ col['type'] }}
 {%- endfor %}

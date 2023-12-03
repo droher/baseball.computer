@@ -1,0 +1,65 @@
+version: 2
+
+
+models:
+  - name: ml_event_outcomes
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: outcome_has_batting_bin
+        description: ""
+        data_type: utinyint
+      - name: outcome_is_in_play_bin
+        description: ""
+        data_type: utinyint
+      - name: outcome_batted_contact_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_batted_location_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_plate_appearance_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_baserunning_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_runs_following_num
+        description: ""
+        data_type: float
+      - name: outcome_is_win_bin
+        description: ""
+        data_type: utinyint
+      - name: generic_sample_weight
+        description: ""
+        data_type: float
+      - name: plate_appearance_sample_weight
+        description: ""
+        data_type: float
+      - name: in_play_sample_weight
+        description: ""
+        data_type: float
+      - name: contact_sample_weight
+        description: ""
+        data_type: float
+      - name: location_sample_weight
+        description: ""
+        data_type: float
+      - name: baserunning_play_sample_weight
+        description: ""
+        data_type: float
+      - name: win_sample_weight
+        description: ""
+        data_type: float

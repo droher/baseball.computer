@@ -1,0 +1,74 @@
+version: 2
+
+
+models:
+  - name: team_season_fielding_lines
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: season
+        description: ""
+        data_type: smallint
+      - name: team_id
+        description: ""
+        data_type: varchar
+      - name: game_type
+        description: ""
+        data_type: varchar
+      - name: games
+        description: ""
+        data_type: bigint
+      - name: outs_played
+        description: ""
+        data_type: hugeint
+      - name: putouts
+        description: ""
+        data_type: hugeint
+      - name: assists
+        description: ""
+        data_type: hugeint
+      - name: errors
+        description: ""
+        data_type: hugeint
+      - name: passed_balls
+        description: ""
+        data_type: hugeint
+      - name: stolen_bases
+        description: ""
+        data_type: hugeint
+      - name: caught_stealing
+        description: ""
+        data_type: hugeint
+      - name: plate_appearances_in_field
+        description: ""
+        data_type: hugeint
+      - name: plate_appearances_in_field_with_ball_in_play
+        description: ""
+        data_type: hugeint
+      - name: fielders_choices
+        description: ""
+        data_type: hugeint
+      - name: reaching_errors
+        description: ""
+        data_type: hugeint
+      - name: pickoffs
+        description: ""
+        data_type: hugeint
+      - name: double_plays
+        description: ""
+        data_type: hugeint
+      - name: triple_plays
+        description: ""
+        data_type: hugeint
+      - name: ground_ball_double_plays
+        description: ""
+        data_type: hugeint

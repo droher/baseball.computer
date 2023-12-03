@@ -1,0 +1,273 @@
+version: 2
+
+
+models:
+  - name: stg_games
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: game_key
+        description: ""
+        data_type: uinteger
+      - name: date
+        description: ""
+        data_type: date
+      - name: start_time
+        description: ""
+        data_type: timestamp
+      - name: doubleheader_status
+        description: ""
+        data_type: enum('doubleheadergame1', 'doubleheadergame2', 'doubleheadergame3',
+          'singlegame')
+      - name: time_of_day
+        description: ""
+        data_type: enum('day', 'night', 'unknown')
+      - name: game_type
+        description: ""
+        data_type: enum('allstargame', 'divisionseries', 'exhibition', 'leaguechampionshipseries',
+          'otherchampionship', 'regularseason', 'tiebreakerplayoff', 'wildcardseries',
+          'worldseries')
+      - name: bat_first_side
+        description: ""
+        data_type: enum('home', 'away')
+      - name: sky
+        description: ""
+        data_type: enum('cloudy', 'dome', 'night', 'overcast', 'sunny', 'unknown')
+      - name: field_condition
+        description: ""
+        data_type: enum('damp', 'dry', 'soaked', 'unknown', 'wet')
+      - name: precipitation
+        description: ""
+        data_type: enum('drizzle', 'none', 'rain', 'showers', 'snow', 'unknown')
+      - name: wind_direction
+        description: ""
+        data_type: enum('fromcf', 'fromlf', 'fromrf', 'lefttoright', 'righttoleft',
+          'tocf', 'tolf', 'torf', 'unknown')
+      - name: park_id
+        description: ""
+        data_type: enum('pit08', 'stl12', 'bal10', 'nyc16', 'nyc20', 'pit06', 'gri01',
+          'mnt01', 'nwk04', 'min03', 'mex02', 'stl05', 'ftb01', 'den01', 'mon02',
+          'kok01', 'alt02', 'cle02', 'dca01', 'dot01', 'lou02', 'new03', 'cin03',
+          'cla01', 'col02', 'ind02', 'lud01', 'mth01', 'phi02', 'pit09', 'win01',
+          'bri01', 'buf03', 'can03', 'gar01', 'man01', 'arn01', 'lrk02', 'mck01',
+          'col04', 'dal01', 'nyc11', 'pat01', 'dav02', 'nwc01', 'phi07', 'sup01',
+          'wil05', 'atc01', 'col03', 'far01', 'jer01', 'okc02', 'ole01', 'sai01',
+          'sci01', 'hun02', 'lan01', 'nwk03', 'rck01', 'san04', 'was04', 'phi13',
+          'day03', 'sfo01', 'den02', 'mil06', 'bal13', 'dav01', 'nol01', 'phi12',
+          'lbv01', 'sea02', 'mia02', 'atl04', 'cle07', 'min02', 'sfo02', 'phi09',
+          'bos07', 'sfo03', 'tor02', 'bir01', 'alb02', 'min01', 'tex01', 'elm01',
+          'hun01', 'mrt01', 'pit03', 'pit04', 'dar01', 'det06', 'eri01', 'hou04',
+          'kno01', 'lou03', 'red01', 'wil04', 'you01', 'buf02', 'chi03', 'cin02',
+          'eld01', 'glo02', 'has01', 'hom01', 'ind09', 'lin02', 'nbe01', 'nor02',
+          'por02', 'cam03', 'chi05', 'clc01', 'eva01', 'fts01', 'gra01', 'npn02',
+          'top01', 'buf06', 'har02', 'jac01', 'new02', 'npn01', 'cai01', 'dct02',
+          'roc03', 'bal05', 'bck01', 'cle01', 'def01', 'jop01', 'mnh01', 'mtv01',
+          'oil01', 'ptk01', 'ptx01', 'yor02', 'chi10', 'min04', 'atl02', 'los05',
+          'mex01', 'phi17', 'phi11', 'chi11', 'buf05', 'ind07', 'stp01', 'sju01',
+          'cin08', 'atl03', 'rci01', 'det04', 'pho01', 'stl07', 'bal06', 'por01',
+          'ban01', 'buf01', 'fli01', 'lsl01', 'nyc01', 'pbl01', 'pro01', 'rac01',
+          'can04', 'chi01', 'kan02', 'okc01', 'phi06', 'phi15', 'cht01', 'cle05',
+          'iro01', 'pal01', 'spr06', 'sun01', 'wil08', 'kok02', 'pta01', 'stc01',
+          'stm01', 'was08', 'bhm01', 'cha01', 'chi07', 'ind04', 'mou01', 'rkm01',
+          'spr01', 'wil01', 'wor01', 'zan02', 'bog01', 'col06', 'hrt02', 'bal01',
+          'cin10', 'col05', 'fin01', 'kan03', 'syr04', 'win02', 'dec01', 'stl11',
+          'nyc25', 'jer02', 'tok01', 'tor01', 'bra01', 'chi15', 'cle06', 'dye01',
+          'glk01', 'oak02', 'hou01', 'nyc17', 'sea03', 'stl10', 'nyc12', 'bos05',
+          'nyc13', 'stl08', 'bos06', 'axc01', 'bal02', 'chi04', 'jac02', 'mac01',
+          'mea01', 'met01', 'mun02', 'nsh02', 'nwo01', 'spr03', 'sta01', 'war02',
+          'was06', 'wsl01', 'atl05', 'cle03', 'ftw01', 'war01', 'eau01', 'keo01',
+          'mun01', 'nyc28', 'orl01', 'phi08', 'spa01', 'wac01', 'ann01', 'app01',
+          'cle10', 'cll01', 'gra03', 'lim01', 'phi18', 'syr03', 'gbw01', 'lin01',
+          'pet01', 'whe02', 'cin05', 'col07', 'for01', 'ind01', 'ind05', 'joh01',
+          'leb01', 'pai01', 'pit01', 'ric01', 'wat01', 'bos01', 'det08', 'dur01',
+          'gal01', 'kew01', 'lkc01', 'nyc03', 'spr07', 'bak01', 'cin04', 'col01',
+          'fai01', 'tup01', 'tus01', 'dec02', 'hou03', 'mon01', 'pit07', 'chi09',
+          'mtg01', 'pit05', 'las01', 'buf04', 'cin09', 'sea01', 'arl03', 'kan04',
+          'nyc21', 'bal11', 'mil05', 'cbi01', 'hon01', 'lgb01', 'uni01', 'wfi01',
+          'whe01', 'blo01', 'dal02', 'jkv01', 'pen01', 'wil07', 'alb01', 'but01',
+          'ced01', 'for02', 'ind06', 'sbd01', 'spr05', 'bal09', 'cle04', 'dov01',
+          'nor05', 'reg01', 'ric04', 'can02', 'cle11', 'cle13', 'gea01', 'gra02',
+          'nyc09', 'sha01', 'stl04', 'stl06', 'ter01', 'bos02', 'fmt01', 'for03',
+          'for04', 'for05', 'glo01', 'hou05', 'ind10', 'thr01', 'tro02', 'day01',
+          'des02', 'hag01', 'nyc02', 'tre01', 'akr01', 'alt01', 'cin01', 'den03',
+          'lou01', 'nco01', 'oza01', 'ric03', 'syr01', 'tol04', 'wor02', 'phi17',
+          'los03', 'los02', 'chi08', 'arl02', 'nyc10', 'oma01', 'cle08', 'stl09',
+          'phi10', 'los01', 'phi16', 'was09', 'cor01', 'nfn01', 'stl01', 'tul01',
+          'wav01', 'wee01', 'chi06', 'eas01', 'gad01', 'gre01', 'gre03', 'jon01',
+          'mnl01', 'tol02', 'cen01', 'cha03', 'cin06', 'ful01', 'gre04', 'msn01',
+          'nwk01', 'nyc18', 'nyc23', 'owe01', 'rck02', 'scr01', 'tro01', 'bal03',
+          'bea03', 'hel01', 'mid01', 'mil01', 'roc01', 'sat01', 'shw01', 'smo01',
+          'spr02', 'vck01', 'was03', 'ind11', 'mas01', 'mat01', 'bis01', 'day02',
+          'des01', 'det01', 'eor01', 'phi01', 'pit02', 'tol05', 'urb01', 'war03',
+          'cle14', 'gol01', 'han01', 'hrt01', 'lcr01', 'lrk01', 'nlr01', 'stl02',
+          'tre02', 'van01', 'bea02', 'chi02', 'hsp01', 'mem01', 'nor03', 'nyc24',
+          'per01', 'stl03', 'chester pa', 'det02', 'cin07', 'kan06', 'dun01', 'los04',
+          'atl01', 'oak01', 'bal14', 'hou02', 'was11', 'roc04', 'san02', 'chi12',
+          'ana01', 'mia01', 'wil02', 'nyc19', 'acy01', 'can01', 'cle12', 'cra01',
+          'ham02', 'lex01', 'mil02', 'stp02', 'was02', 'wny01', 'wym01', 'yor01',
+          'cha02', 'lou04', 'mob01', 'nsh01', 'nyc06', 'osh01', 'oxf01', 'stl13',
+          'cam02', 'ham01', 'min05', 'new01', 'ptr01', 'syr02', 'wap01', 'bal07',
+          'nia01', 'nyc22', 'wah01', 'bal04', 'dct01', 'mil03', 'nyc05', 'nyc08',
+          'oma02', 'roc02', 'wor03', 'bat01', 'bel03', 'hav01', 'kea01', 'shr01',
+          'yor03', 'zan01', 'jam01', 'mem03', 'tam01', 'hrb01', 'bal12', 'syd01',
+          'arl01', 'san03', 'san01', 'nyc15', 'mem02', 'det05', 'was10', 'wic01',
+          'nyc14', 'lon01', 'bos08', 'kan05', 'det07', 'har01', 'acy02', 'bos03',
+          'cam01', 'cle09', 'ind03', 'nyc07', 'nyc26', 'phi05', 'sci02', 'sel01',
+          'spr04', 'wil03', 'aus01', 'dan01', 'gin01', 'ind08', 'mid02', 'mil04',
+          'phi03', 'pro02', 'sby01', 'che01', 'gre02', 'knp01', 'nor04', 'ric05',
+          'was07', 'bel01', 'flc01', 'nyc04', 'ppb01', 'ral01', 'stj01', 'tol03',
+          'cov01', 'hop01', 'jnc01', 'nwk02', 'nyc27', 'phi14', 'was05', 'bel02',
+          'bos04', 'cov02', 'det03', 'kan01', 'lou05', 'nbg01', 'phi04', 'wil06',
+          'bea01', 'nor01', 'ric02', 'tol01', 'dan02', 'hml01', 'mus01', 'was01',
+          'wfl01')
+      - name: temperature_fahrenheit
+        description: ""
+        data_type: tinyint
+      - name: attendance
+        description: ""
+        data_type: bigint
+      - name: wind_speed_mph
+        description: ""
+        data_type: smallint
+      - name: use_dh
+        description: ""
+        data_type: boolean
+      - name: winning_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: losing_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: save_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: game_winning_rbi_player_id
+        description: ""
+        data_type: varchar
+      - name: duration_minutes
+        description: ""
+        data_type: bigint
+      - name: protest_info
+        description: ""
+        data_type: integer
+      - name: completion_info
+        description: ""
+        data_type: integer
+      - name: scorer
+        description: ""
+        data_type: varchar
+      - name: scoring_method
+        description: ""
+        data_type: varchar
+      - name: inputter
+        description: ""
+        data_type: varchar
+      - name: translator
+        description: ""
+        data_type: varchar
+      - name: date_inputted
+        description: ""
+        data_type: timestamp
+      - name: date_edited
+        description: ""
+        data_type: integer
+      - name: account_type
+        description: ""
+        data_type: enum('deduced', 'boxscore', 'playbyplay')
+      - name: filename
+        description: ""
+        data_type: varchar
+      - name: source_type
+        description: ""
+        data_type: varchar
+      - name: away_team_id
+        description: ""
+        data_type: enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag',
+          'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1',
+          'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2',
+          'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8',
+          'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9',
+          'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php',
+          'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has',
+          'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1',
+          'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg',
+          'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4',
+          'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa',
+          'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1',
+          'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn',
+          'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue',
+          'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu',
+          'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was',
+          'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5',
+          'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3',
+          'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7',
+          'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir',
+          'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg',
+          'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt',
+          'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase',
+          'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas',
+          'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu',
+          'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1',
+          'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')
+      - name: home_team_id
+        description: ""
+        data_type: enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag',
+          'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1',
+          'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2',
+          'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8',
+          'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9',
+          'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php',
+          'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has',
+          'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1',
+          'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg',
+          'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4',
+          'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa',
+          'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1',
+          'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn',
+          'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue',
+          'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu',
+          'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was',
+          'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5',
+          'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3',
+          'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7',
+          'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir',
+          'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg',
+          'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt',
+          'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase',
+          'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas',
+          'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu',
+          'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1',
+          'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')
+      - name: umpire_home_id
+        description: ""
+        data_type: varchar
+      - name: umpire_first_id
+        description: ""
+        data_type: varchar
+      - name: umpire_second_id
+        description: ""
+        data_type: varchar
+      - name: umpire_third_id
+        description: ""
+        data_type: varchar
+      - name: umpire_left_id
+        description: ""
+        data_type: varchar
+      - name: umpire_right_id
+        description: ""
+        data_type: varchar
+      - name: season
+        description: ""
+        data_type: smallint

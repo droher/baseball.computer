@@ -1,0 +1,56 @@
+version: 2
+
+
+models:
+  - name: calc_fielding_play_agg
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: fielding_position
+        description: ""
+        data_type: utinyint
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: fielding_plays
+        description: ""
+        data_type: utinyint
+      - name: putouts
+        description: ""
+        data_type: utinyint
+      - name: assists
+        description: ""
+        data_type: utinyint
+      - name: errors
+        description: ""
+        data_type: utinyint
+      - name: fielders_choices
+        description: ""
+        data_type: utinyint
+      - name: plays_started
+        description: ""
+        data_type: utinyint
+      - name: assisted_putouts
+        description: ""
+        data_type: utinyint
+      - name: first_errors
+        description: ""
+        data_type: bigint
+      - name: unknown_putouts
+        description: ""
+        data_type: bigint
+      - name: incomplete_events
+        description: ""
+        data_type: utinyint

@@ -1,0 +1,101 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_batting_lines
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: batter_id
+        description: ""
+        data_type: varchar
+      - name: side
+        description: ""
+        data_type: enum('home', 'away')
+      - name: lineup_position
+        description: ""
+        data_type: utinyint
+      - name: nth_player_at_position
+        description: ""
+        data_type: utinyint
+      - name: at_bats
+        description: ""
+        data_type: utinyint
+      - name: runs
+        description: ""
+        data_type: utinyint
+      - name: hits
+        description: ""
+        data_type: utinyint
+      - name: doubles
+        description: ""
+        data_type: utinyint
+      - name: triples
+        description: ""
+        data_type: utinyint
+      - name: home_runs
+        description: ""
+        data_type: utinyint
+      - name: runs_batted_in
+        description: ""
+        data_type: utinyint
+      - name: sacrifice_hits
+        description: ""
+        data_type: utinyint
+      - name: sacrifice_flies
+        description: ""
+        data_type: utinyint
+      - name: hit_by_pitches
+        description: ""
+        data_type: utinyint
+      - name: walks
+        description: ""
+        data_type: utinyint
+      - name: intentional_walks
+        description: ""
+        data_type: utinyint
+      - name: strikeouts
+        description: ""
+        data_type: utinyint
+      - name: stolen_bases
+        description: ""
+        data_type: utinyint
+      - name: caught_stealing
+        description: ""
+        data_type: utinyint
+      - name: grounded_into_double_plays
+        description: ""
+        data_type: utinyint
+      - name: reached_on_interferences
+        description: ""
+        data_type: utinyint
+      - name: singles
+        description: ""
+        data_type: utinyint
+      - name: total_bases
+        description: ""
+        data_type: utinyint
+      - name: plate_appearances
+        description: ""
+        data_type: utinyint
+      - name: on_base_opportunities
+        description: ""
+        data_type: utinyint
+      - name: on_base_successes
+        description: ""
+        data_type: utinyint
+      - name: batting_outs
+        description: ""
+        data_type: utinyint

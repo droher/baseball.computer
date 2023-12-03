@@ -1,0 +1,38 @@
+version: 2
+
+
+models:
+  - name: win_expectancy_matrix
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: win_expectancy_key
+        description: ""
+        data_type: varchar
+      - name: inning
+        description: ""
+        data_type: varchar
+      - name: frame
+        description: ""
+        data_type: enum('top', 'bottom')
+      - name: truncated_home_margin
+        description: ""
+        data_type: tinyint
+      - name: outs
+        description: ""
+        data_type: utinyint
+      - name: base_state
+        description: ""
+        data_type: utinyint
+      - name: home_win_rate
+        description: ""
+        data_type: decimal(4,3)

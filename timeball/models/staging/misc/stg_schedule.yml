@@ -1,0 +1,53 @@
+version: 2
+
+
+models:
+  - name: stg_schedule
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: date
+        description: ""
+        data_type: timestamp
+      - name: double_header
+        description: ""
+        data_type: smallint
+      - name: day_of_week
+        description: ""
+        data_type: varchar
+      - name: visiting_team
+        description: ""
+        data_type: varchar
+      - name: visiting_team_league
+        description: ""
+        data_type: varchar
+      - name: visiting_team_game_number
+        description: ""
+        data_type: smallint
+      - name: home_team
+        description: ""
+        data_type: varchar
+      - name: home_team_league
+        description: ""
+        data_type: varchar
+      - name: home_team_game_number
+        description: ""
+        data_type: integer
+      - name: day_night
+        description: ""
+        data_type: varchar
+      - name: postponement_indicator
+        description: ""
+        data_type: varchar
+      - name: makeup_dates
+        description: ""
+        data_type: varchar

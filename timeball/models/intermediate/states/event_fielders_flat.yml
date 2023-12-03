@@ -1,0 +1,56 @@
+version: 2
+
+
+models:
+  - name: event_fielders_flat
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: event_id
+        description: ""
+        data_type: utinyint
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: personnel_fielding_key
+        description: ""
+        data_type: integer
+      - name: pitcher_id
+        description: ""
+        data_type: varchar
+      - name: catcher_id
+        description: ""
+        data_type: varchar
+      - name: first_base_id
+        description: ""
+        data_type: varchar
+      - name: second_base_id
+        description: ""
+        data_type: varchar
+      - name: third_base_id
+        description: ""
+        data_type: varchar
+      - name: shortstop_id
+        description: ""
+        data_type: varchar
+      - name: left_field_id
+        description: ""
+        data_type: varchar
+      - name: center_field_id
+        description: ""
+        data_type: varchar
+      - name: right_field_id
+        description: ""
+        data_type: varchar

@@ -1,0 +1,403 @@
+version: 2
+
+
+models:
+  - name: event_offense_stats
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: varchar
+      - name: event_key
+        description: ""
+        data_type: uinteger
+      - name: team_id
+        description: ""
+        data_type: enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag',
+          'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1',
+          'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2',
+          'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8',
+          'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9',
+          'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php',
+          'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has',
+          'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1',
+          'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg',
+          'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4',
+          'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa',
+          'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1',
+          'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn',
+          'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue',
+          'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu',
+          'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was',
+          'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5',
+          'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3',
+          'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7',
+          'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir',
+          'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg',
+          'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt',
+          'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase',
+          'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas',
+          'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu',
+          'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1',
+          'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')
+      - name: player_id
+        description: ""
+        data_type: varchar
+      - name: baserunner
+        description: ""
+        data_type: enum('batter', 'first', 'second', 'third')
+      - name: plate_appearances
+        description: ""
+        data_type: tinyint
+      - name: at_bats
+        description: ""
+        data_type: tinyint
+      - name: hits
+        description: ""
+        data_type: tinyint
+      - name: singles
+        description: ""
+        data_type: tinyint
+      - name: doubles
+        description: ""
+        data_type: tinyint
+      - name: triples
+        description: ""
+        data_type: tinyint
+      - name: home_runs
+        description: ""
+        data_type: tinyint
+      - name: total_bases
+        description: ""
+        data_type: tinyint
+      - name: strikeouts
+        description: ""
+        data_type: tinyint
+      - name: walks
+        description: ""
+        data_type: tinyint
+      - name: intentional_walks
+        description: ""
+        data_type: tinyint
+      - name: hit_by_pitches
+        description: ""
+        data_type: tinyint
+      - name: sacrifice_hits
+        description: ""
+        data_type: tinyint
+      - name: sacrifice_flies
+        description: ""
+        data_type: tinyint
+      - name: reached_on_errors
+        description: ""
+        data_type: tinyint
+      - name: reached_on_interferences
+        description: ""
+        data_type: tinyint
+      - name: inside_the_park_home_runs
+        description: ""
+        data_type: tinyint
+      - name: ground_rule_doubles
+        description: ""
+        data_type: tinyint
+      - name: infield_hits
+        description: ""
+        data_type: tinyint
+      - name: on_base_opportunities
+        description: ""
+        data_type: tinyint
+      - name: on_base_successes
+        description: ""
+        data_type: tinyint
+      - name: runs_batted_in
+        description: ""
+        data_type: tinyint
+      - name: grounded_into_double_plays
+        description: ""
+        data_type: tinyint
+      - name: double_plays
+        description: ""
+        data_type: tinyint
+      - name: triple_plays
+        description: ""
+        data_type: tinyint
+      - name: batting_outs
+        description: ""
+        data_type: tinyint
+      - name: balls_in_play
+        description: ""
+        data_type: tinyint
+      - name: balls_batted
+        description: ""
+        data_type: tinyint
+      - name: contact_type_fly_ball
+        description: ""
+        data_type: tinyint
+      - name: contact_type_ground_ball
+        description: ""
+        data_type: tinyint
+      - name: contact_type_line_drive
+        description: ""
+        data_type: tinyint
+      - name: contact_type_pop_fly
+        description: ""
+        data_type: tinyint
+      - name: contact_type_unknown
+        description: ""
+        data_type: tinyint
+      - name: contact_type_known
+        description: ""
+        data_type: tinyint
+      - name: contact_broad_type_air_ball
+        description: ""
+        data_type: tinyint
+      - name: contact_broad_type_ground_ball
+        description: ""
+        data_type: tinyint
+      - name: contact_broad_type_unknown
+        description: ""
+        data_type: tinyint
+      - name: contact_broad_type_known
+        description: ""
+        data_type: tinyint
+      - name: bunts
+        description: ""
+        data_type: tinyint
+      - name: batted_distance_plate
+        description: ""
+        data_type: tinyint
+      - name: batted_distance_infield
+        description: ""
+        data_type: tinyint
+      - name: batted_distance_outfield
+        description: ""
+        data_type: tinyint
+      - name: batted_distance_unknown
+        description: ""
+        data_type: tinyint
+      - name: batted_distance_known
+        description: ""
+        data_type: tinyint
+      - name: fielded_by_battery
+        description: ""
+        data_type: tinyint
+      - name: fielded_by_infielder
+        description: ""
+        data_type: tinyint
+      - name: fielded_by_outfielder
+        description: ""
+        data_type: tinyint
+      - name: fielded_by_known
+        description: ""
+        data_type: tinyint
+      - name: fielded_by_unknown
+        description: ""
+        data_type: tinyint
+      - name: batted_angle_left
+        description: ""
+        data_type: tinyint
+      - name: batted_angle_right
+        description: ""
+        data_type: tinyint
+      - name: batted_angle_middle
+        description: ""
+        data_type: tinyint
+      - name: batted_angle_unknown
+        description: ""
+        data_type: tinyint
+      - name: batted_angle_known
+        description: ""
+        data_type: tinyint
+      - name: batted_location_plate
+        description: ""
+        data_type: tinyint
+      - name: batted_location_right_infield
+        description: ""
+        data_type: tinyint
+      - name: batted_location_middle_infield
+        description: ""
+        data_type: tinyint
+      - name: batted_location_left_infield
+        description: ""
+        data_type: tinyint
+      - name: batted_location_left_field
+        description: ""
+        data_type: tinyint
+      - name: batted_location_center_field
+        description: ""
+        data_type: tinyint
+      - name: batted_location_right_field
+        description: ""
+        data_type: tinyint
+      - name: batted_location_unknown
+        description: ""
+        data_type: tinyint
+      - name: batted_location_known
+        description: ""
+        data_type: tinyint
+      - name: batted_balls_pulled
+        description: ""
+        data_type: tinyint
+      - name: batted_balls_opposite_field
+        description: ""
+        data_type: tinyint
+      - name: runs
+        description: ""
+        data_type: tinyint
+      - name: times_reached_base
+        description: ""
+        data_type: tinyint
+      - name: stolen_bases
+        description: ""
+        data_type: tinyint
+      - name: caught_stealing
+        description: ""
+        data_type: tinyint
+      - name: picked_off
+        description: ""
+        data_type: tinyint
+      - name: picked_off_caught_stealing
+        description: ""
+        data_type: tinyint
+      - name: outs_on_basepaths
+        description: ""
+        data_type: tinyint
+      - name: unforced_outs_on_basepaths
+        description: ""
+        data_type: tinyint
+      - name: outs_avoided_on_errors
+        description: ""
+        data_type: tinyint
+      - name: advances_on_wild_pitches
+        description: ""
+        data_type: tinyint
+      - name: advances_on_passed_balls
+        description: ""
+        data_type: tinyint
+      - name: advances_on_balks
+        description: ""
+        data_type: tinyint
+      - name: advances_on_unspecified_plays
+        description: ""
+        data_type: tinyint
+      - name: advances_on_defensive_indifference
+        description: ""
+        data_type: tinyint
+      - name: advances_on_errors
+        description: ""
+        data_type: tinyint
+      - name: plate_appearances_while_on_base
+        description: ""
+        data_type: tinyint
+      - name: balls_in_play_while_running
+        description: ""
+        data_type: tinyint
+      - name: balls_in_play_while_on_base
+        description: ""
+        data_type: tinyint
+      - name: batter_total_bases_while_running
+        description: ""
+        data_type: tinyint
+      - name: batter_total_bases_while_on_base
+        description: ""
+        data_type: tinyint
+      - name: extra_base_advance_attempts
+        description: ""
+        data_type: tinyint
+      - name: bases_advanced
+        description: ""
+        data_type: tinyint
+      - name: bases_advanced_on_balls_in_play
+        description: ""
+        data_type: tinyint
+      - name: surplus_bases_advanced_on_balls_in_play
+        description: ""
+        data_type: tinyint
+      - name: outs_on_extra_base_advance_attempts
+        description: ""
+        data_type: tinyint
+      - name: pitches
+        description: ""
+        data_type: tinyint
+      - name: swings
+        description: ""
+        data_type: tinyint
+      - name: swings_with_contact
+        description: ""
+        data_type: tinyint
+      - name: strikes
+        description: ""
+        data_type: tinyint
+      - name: strikes_called
+        description: ""
+        data_type: tinyint
+      - name: strikes_swinging
+        description: ""
+        data_type: tinyint
+      - name: strikes_foul
+        description: ""
+        data_type: tinyint
+      - name: strikes_foul_tip
+        description: ""
+        data_type: tinyint
+      - name: strikes_in_play
+        description: ""
+        data_type: tinyint
+      - name: strikes_unknown
+        description: ""
+        data_type: tinyint
+      - name: balls
+        description: ""
+        data_type: tinyint
+      - name: balls_called
+        description: ""
+        data_type: tinyint
+      - name: balls_intentional
+        description: ""
+        data_type: tinyint
+      - name: balls_automatic
+        description: ""
+        data_type: tinyint
+      - name: unknown_pitches
+        description: ""
+        data_type: tinyint
+      - name: pitchouts
+        description: ""
+        data_type: tinyint
+      - name: pitcher_pickoff_attempts
+        description: ""
+        data_type: tinyint
+      - name: catcher_pickoff_attempts
+        description: ""
+        data_type: tinyint
+      - name: pitches_blocked_by_catcher
+        description: ""
+        data_type: tinyint
+      - name: pitches_with_runners_going
+        description: ""
+        data_type: tinyint
+      - name: passed_balls
+        description: ""
+        data_type: tinyint
+      - name: wild_pitches
+        description: ""
+        data_type: tinyint
+      - name: balks
+        description: ""
+        data_type: tinyint
+      - name: left_on_base
+        description: ""
+        data_type: tinyint
+      - name: left_on_base_with_two_outs
+        description: ""
+        data_type: tinyint
