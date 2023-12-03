@@ -25,6 +25,10 @@ models:
       - name: player_id
         description: ""
         data_type: varchar
+        tests:
+          - relationships:
+              field: player_id
+              to: ref('stg_bio')
       - name: side
         description: ""
         data_type: side
