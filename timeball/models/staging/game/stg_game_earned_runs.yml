@@ -25,6 +25,8 @@ models:
       - name: player_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: earned_runs
         description: ""
         data_type: utinyint

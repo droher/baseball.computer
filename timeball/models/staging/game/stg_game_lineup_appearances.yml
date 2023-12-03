@@ -18,6 +18,10 @@ models:
       - name: game_id
         description: ""
         data_type: varchar
+        tests:
+          - relationships:
+              field: game_id
+              to: ref('stg_games')
       - name: player_id
         description: ""
         data_type: varchar
