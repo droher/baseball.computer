@@ -1,0 +1,23 @@
+version: 2
+
+
+models:
+  - name: {{ model.lower() }}
+    description: ""
+    
+    config:
+      contract:
+        enforced: true
+    
+    constraints:
+      - type: primary_key
+        columns: []
+      - type: foreign_key
+        expression: ""
+    
+    columns:
+{%- for col in columns %}
+      - name: {{ col['id'] }}
+        description: ""
+      {%- endif %}
+{%- endfor %}
