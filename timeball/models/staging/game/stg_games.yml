@@ -1,0 +1,145 @@
+version: 2
+
+
+models:
+  - name: stg_games
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: game_key
+        description: ""
+        data_type: "bigint"
+      - name: date
+        description: ""
+        data_type: "date"
+      - name: start_time
+        description: ""
+        data_type: "timestamp"
+      - name: doubleheader_status
+        description: ""
+        data_type: "varchar"
+      - name: time_of_day
+        description: ""
+        data_type: "varchar"
+      - name: game_type
+        description: ""
+        data_type: "varchar"
+      - name: bat_first_side
+        description: ""
+        data_type: "varchar"
+      - name: sky
+        description: ""
+        data_type: "varchar"
+      - name: field_condition
+        description: ""
+        data_type: "varchar"
+      - name: precipitation
+        description: ""
+        data_type: "varchar"
+      - name: wind_direction
+        description: ""
+        data_type: "varchar"
+      - name: park_id
+        description: ""
+        data_type: "varchar"
+      - name: temperature_fahrenheit
+        description: ""
+        data_type: "bigint"
+      - name: attendance
+        description: ""
+        data_type: "bigint"
+      - name: wind_speed_mph
+        description: ""
+        data_type: "bigint"
+      - name: use_dh
+        description: ""
+        data_type: "boolean"
+      - name: winning_pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: losing_pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: save_pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: game_winning_rbi_player_id
+        description: ""
+        data_type: "varchar"
+      - name: duration_minutes
+        description: ""
+        data_type: "bigint"
+      - name: protest_info
+        description: ""
+        data_type: "integer"
+      - name: completion_info
+        description: ""
+        data_type: "integer"
+      - name: scorer
+        description: ""
+        data_type: "varchar"
+      - name: scoring_method
+        description: ""
+        data_type: "varchar"
+      - name: inputter
+        description: ""
+        data_type: "varchar"
+      - name: translator
+        description: ""
+        data_type: "varchar"
+      - name: date_inputted
+        description: ""
+        data_type: "timestamp"
+      - name: date_edited
+        description: ""
+        data_type: "integer"
+      - name: account_type
+        description: ""
+        data_type: "varchar"
+      - name: filename
+        description: ""
+        data_type: "varchar"
+      - name: source_type
+        description: ""
+        data_type: "varchar"
+      - name: away_team_id
+        description: ""
+        data_type: "varchar"
+      - name: home_team_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_home_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_first_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_second_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_third_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_left_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_right_id
+        description: ""
+        data_type: "varchar"
+      - name: season
+        description: ""
+        data_type: "smallint"

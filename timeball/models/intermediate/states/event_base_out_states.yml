@@ -1,0 +1,109 @@
+version: 2
+
+
+models:
+  - name: event_base_out_states
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: "uinteger"
+      - name: inning_start
+        description: ""
+        data_type: "utinyint"
+      - name: inning_end
+        description: ""
+        data_type: "utinyint"
+      - name: frame_start
+        description: ""
+        data_type: "enum('top', 'bottom')"
+      - name: frame_end
+        description: ""
+        data_type: "enum('top', 'bottom')"
+      - name: inning_in_outs_start
+        description: ""
+        data_type: "utinyint"
+      - name: outs_start
+        description: ""
+        data_type: "utinyint"
+      - name: outs_end
+        description: ""
+        data_type: "utinyint"
+      - name: outs_on_play
+        description: ""
+        data_type: "utinyint"
+      - name: is_gidp_eligible
+        description: ""
+        data_type: "boolean"
+      - name: base_state_start
+        description: ""
+        data_type: "utinyint"
+      - name: runner_first_id_start
+        description: ""
+        data_type: "varchar"
+      - name: runner_second_id_start
+        description: ""
+        data_type: "varchar"
+      - name: runner_third_id_start
+        description: ""
+        data_type: "varchar"
+      - name: runners_count_start
+        description: ""
+        data_type: "utinyint"
+      - name: base_state_end
+        description: ""
+        data_type: "utinyint"
+      - name: runners_count_end
+        description: ""
+        data_type: "utinyint"
+      - name: runner_first_id_end
+        description: ""
+        data_type: "varchar"
+      - name: runner_second_id_end
+        description: ""
+        data_type: "varchar"
+      - name: runner_third_id_end
+        description: ""
+        data_type: "varchar"
+      - name: score_home_start
+        description: ""
+        data_type: "utinyint"
+      - name: score_away_start
+        description: ""
+        data_type: "utinyint"
+      - name: score_home_end
+        description: ""
+        data_type: "utinyint"
+      - name: score_away_end
+        description: ""
+        data_type: "utinyint"
+      - name: runs_on_play
+        description: ""
+        data_type: "utinyint"
+      - name: frame_start_flag
+        description: ""
+        data_type: "boolean"
+      - name: frame_end_flag
+        description: ""
+        data_type: "boolean"
+      - name: truncated_frame_flag
+        description: ""
+        data_type: "boolean"
+      - name: game_start_flag
+        description: ""
+        data_type: "boolean"
+      - name: game_end_flag
+        description: ""
+        data_type: "boolean"

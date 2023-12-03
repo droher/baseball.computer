@@ -1,0 +1,166 @@
+version: 2
+
+
+models:
+  - name: game_start_info
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: date
+        description: ""
+        data_type: "date"
+      - name: start_time
+        description: ""
+        data_type: "timestamp"
+      - name: season
+        description: ""
+        data_type: "smallint"
+      - name: home_team_id
+        description: ""
+        data_type: "varchar"
+      - name: away_team_id
+        description: ""
+        data_type: "varchar"
+      - name: doubleheader_status
+        description: ""
+        data_type: "varchar"
+      - name: time_of_day
+        description: ""
+        data_type: "varchar"
+      - name: game_type
+        description: ""
+        data_type: "varchar"
+      - name: bat_first_side
+        description: ""
+        data_type: "varchar"
+      - name: sky
+        description: ""
+        data_type: "varchar"
+      - name: field_condition
+        description: ""
+        data_type: "varchar"
+      - name: precipitation
+        description: ""
+        data_type: "varchar"
+      - name: wind_direction
+        description: ""
+        data_type: "varchar"
+      - name: park_id
+        description: ""
+        data_type: "varchar"
+      - name: temperature_fahrenheit
+        description: ""
+        data_type: "bigint"
+      - name: attendance
+        description: ""
+        data_type: "bigint"
+      - name: wind_speed_mph
+        description: ""
+        data_type: "bigint"
+      - name: use_dh
+        description: ""
+        data_type: "boolean"
+      - name: scorer
+        description: ""
+        data_type: "varchar"
+      - name: scoring_method
+        description: ""
+        data_type: "varchar"
+      - name: source_type
+        description: ""
+        data_type: "varchar"
+      - name: umpire_home_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_first_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_second_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_third_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_left_id
+        description: ""
+        data_type: "varchar"
+      - name: umpire_right_id
+        description: ""
+        data_type: "varchar"
+      - name: filename
+        description: ""
+        data_type: "varchar"
+      - name: home_starting_pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: away_starting_pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: is_regular_season
+        description: ""
+        data_type: "varchar"
+      - name: is_postseason
+        description: ""
+        data_type: "boolean"
+      - name: is_integrated
+        description: ""
+        data_type: "boolean"
+      - name: is_negro_leagues
+        description: ""
+        data_type: "boolean"
+      - name: is_segregated_white
+        description: ""
+        data_type: "boolean"
+      - name: away_franchise_id
+        description: ""
+        data_type: "enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag', 'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1', 'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2', 'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8', 'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9', 'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php', 'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has', 'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1', 'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg', 'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4', 'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa', 'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1', 'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn', 'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue', 'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu', 'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was', 'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5', 'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3', 'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7', 'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir', 'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg', 'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt', 'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase', 'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas', 'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu', 'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1', 'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')"
+      - name: home_franchise_id
+        description: ""
+        data_type: "enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag', 'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1', 'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2', 'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8', 'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9', 'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php', 'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has', 'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1', 'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg', 'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4', 'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa', 'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1', 'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn', 'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue', 'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu', 'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was', 'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5', 'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3', 'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7', 'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir', 'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg', 'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt', 'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase', 'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas', 'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu', 'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1', 'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')"
+      - name: away_league
+        description: ""
+        data_type: "varchar"
+      - name: home_league
+        description: ""
+        data_type: "varchar"
+      - name: away_division
+        description: ""
+        data_type: "varchar"
+      - name: home_division
+        description: ""
+        data_type: "varchar"
+      - name: away_team_name
+        description: ""
+        data_type: "varchar"
+      - name: home_team_name
+        description: ""
+        data_type: "varchar"
+      - name: is_interleague
+        description: ""
+        data_type: "boolean"
+      - name: lineup_map_away
+        description: ""
+        data_type: "map(integer, varchar)"
+      - name: lineup_map_home
+        description: ""
+        data_type: "map(integer, varchar)"
+      - name: fielding_map_away
+        description: ""
+        data_type: "map(utinyint, varchar)"
+      - name: fielding_map_home
+        description: ""
+        data_type: "map(utinyint, varchar)"

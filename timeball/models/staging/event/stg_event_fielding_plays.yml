@@ -1,0 +1,37 @@
+version: 2
+
+
+models:
+  - name: stg_event_fielding_plays
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: event_id
+        description: ""
+        data_type: "utinyint"
+      - name: event_key
+        description: ""
+        data_type: "uinteger"
+      - name: sequence_id
+        description: ""
+        data_type: "utinyint"
+      - name: fielding_position
+        description: ""
+        data_type: "utinyint"
+      - name: fielding_play
+        description: ""
+        data_type: "varchar"

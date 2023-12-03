@@ -1,0 +1,34 @@
+version: 2
+
+
+models:
+  - name: event_personnel_lookup
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: event_id
+        description: ""
+        data_type: "utinyint"
+      - name: event_key
+        description: ""
+        data_type: "uinteger"
+      - name: personnel_lineup_key
+        description: ""
+        data_type: "integer"
+      - name: personnel_fielding_key
+        description: ""
+        data_type: "integer"

@@ -1,0 +1,43 @@
+version: 2
+
+
+models:
+  - name: game_line_scores
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: home_runs_scored
+        description: ""
+        data_type: "hugeint"
+      - name: away_runs_scored
+        description: ""
+        data_type: "hugeint"
+      - name: home_line_score
+        description: ""
+        data_type: "varchar"
+      - name: away_line_score
+        description: ""
+        data_type: "varchar"
+      - name: home_line_score_list
+        description: ""
+        data_type: "hugeint[]"
+      - name: away_line_score_list
+        description: ""
+        data_type: "hugeint[]"
+      - name: duration_outs
+        description: ""
+        data_type: "hugeint"

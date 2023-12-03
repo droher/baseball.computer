@@ -1,0 +1,67 @@
+version: 2
+
+
+models:
+  - name: player_game_data_completeness
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: player_id
+        description: ""
+        data_type: "varchar"
+      - name: player_type
+        description: ""
+        data_type: "varchar"
+      - name: season
+        description: ""
+        data_type: "smallint"
+      - name: date
+        description: ""
+        data_type: "date"
+      - name: league
+        description: ""
+        data_type: "varchar"
+      - name: has_contact_type
+        description: ""
+        data_type: "boolean"
+      - name: has_scoresheet_location
+        description: ""
+        data_type: "boolean"
+      - name: has_location
+        description: ""
+        data_type: "boolean"
+      - name: has_batted_to_fielder
+        description: ""
+        data_type: "boolean"
+      - name: has_count_balls
+        description: ""
+        data_type: "boolean"
+      - name: has_count_strikes
+        description: ""
+        data_type: "boolean"
+      - name: has_count
+        description: ""
+        data_type: "boolean"
+      - name: has_pitches
+        description: ""
+        data_type: "boolean"
+      - name: has_pitch_results
+        description: ""
+        data_type: "boolean"
+      - name: has_pitch_strike_types
+        description: ""
+        data_type: "boolean"

@@ -1,0 +1,37 @@
+version: 2
+
+
+models:
+  - name: stg_game_fielding_appearances
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: player_id
+        description: ""
+        data_type: "varchar"
+      - name: side
+        description: ""
+        data_type: "enum('home', 'away')"
+      - name: fielding_position
+        description: ""
+        data_type: "utinyint"
+      - name: start_event_id
+        description: ""
+        data_type: "utinyint"
+      - name: end_event_id
+        description: ""
+        data_type: "utinyint"

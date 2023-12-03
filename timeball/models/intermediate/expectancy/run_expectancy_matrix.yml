@@ -1,0 +1,43 @@
+version: 2
+
+
+models:
+  - name: run_expectancy_matrix
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: run_expectancy_key
+        description: ""
+        data_type: "varchar"
+      - name: league_group
+        description: ""
+        data_type: "varchar"
+      - name: season_group
+        description: ""
+        data_type: "bigint"
+      - name: outs
+        description: ""
+        data_type: "utinyint"
+      - name: base_state
+        description: ""
+        data_type: "utinyint"
+      - name: avg_runs_scored
+        description: ""
+        data_type: "decimal(18,3)"
+      - name: variance_runs_scored
+        description: ""
+        data_type: "decimal(18,3)"
+      - name: sample_size
+        description: ""
+        data_type: "bigint"

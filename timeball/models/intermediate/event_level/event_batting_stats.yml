@@ -1,0 +1,127 @@
+version: 2
+
+
+models:
+  - name: event_batting_stats
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: event_key
+        description: ""
+        data_type: "uinteger"
+      - name: batter_id
+        description: ""
+        data_type: "varchar"
+      - name: pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: batting_team_id
+        description: ""
+        data_type: "enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag', 'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1', 'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2', 'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8', 'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9', 'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php', 'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has', 'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1', 'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg', 'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4', 'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa', 'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1', 'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn', 'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue', 'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu', 'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was', 'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5', 'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3', 'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7', 'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir', 'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg', 'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt', 'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase', 'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas', 'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu', 'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1', 'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')"
+      - name: fielding_team_id
+        description: ""
+        data_type: "enum('sln', 'kcm', 'chm', 'cha', 'ph1', 'mem', 'nw2', 'slf', 'cag', 'hom', 'ccb', 'ptc', 'cv9', 'cda', 'phg', 'asd', 'sno', 'ptf', 'asg', 'cg1', 'day', 'ws5', 'bsp', 'cl2', 'br3', 'ph4', 'cnu', 'tl1', 'wsu', 'cl6', 'ml2', 'sl1', 'pro', 'bl5', 'chu', 'bl3', 'in6', 'mon', 'nyn', 'nws', 'scu', 'in8', 'bsn', 'dt1', 'bl1', 'blg', 'bis', 'brs', 'cia', 'sta', 'prk', 'sla', 'in9', 'bos', 'aso', 'sdo', 'lan', 'nas', 'ssa', 'sl5', 'kc2', 'nh1', 'bfp', 'php', 'sr1', 'slu', 'dtn', 'har', 'ml3', 'akr', 'min', 'cup', 'cv1', 'flo', 'has', 'lcb', 'ph6', 'prc', 'asf', 'slg', 'bir', 'spz', 'shr', 'jax', 'mla', 'ws1', 'atl', 'acy', 'pit', 'asp', 'br1', 'mln', 'kc1', 'vma', 'asc', 'nls', 'weg', 'blu', 'ny3', 'cl5', 'keo', 'ny4', 'bs2', 'cn3', 'spu', 'tln', 'sea', 'cv4', 'cv8', 'di1', 'jac', 'mtg', 'sfn', 'bro', 'ch2', 'nnl', 'cl1', 'in4', 'twa', 'asw', 'ny5', 'glk', 'brf', 'hws', 'chf', 'ind', 'bal', 'bxg', 'ls1', 'pt1', 'ws7', 'cl3', 'clp', 'ws2', 'oak', 'ana', 'col', 'cv5', 'sdn', 'ptk', 'cnn', 'ast', 'bls', 'fw1', 'chn', 'bcg', 'ags', 'bla', 'als', 'cv6', 'ws3', 'cue', 'bs1', 'kcf', 'prg', 'bkb', 'nal', 'ci2', 'buf', 'dt2', 'ls3', 'phn', 'phu', 'sl3', 'br4', 'rc2', 'bl2', 'wor', 'brp', 'trn', 'chp', 'tba', 'tor', 'was', 'wbs', 'wse', 'cb2', 'cv2', 'mnr', 'phe', 'rc1', 'hou', 'ssn', 'nsh', 'ph5', 'ws4', 'ny2', 'wsw', 'nns', 'ph2', 'nya', 'hae', 'nbg', 'wps', 'asb', 'in3', 'wsn', 'nyp', 'bfn', 'ric', 'ptp', 'tex', 'cal', 'cuh', 'cvs', 'dtw', 'in7', 'mid', 'cb1', 'phb', 'phi', 'ny6', 'tro', 'ccr', 'ny1', 'nyl', 'alm', 'pir', 'br2', 'hr1', 'cin', 'atn', 'new', 'cvb', 'laa', 'asl', 'vda', 'ml4', 'brg', 'shv', 'sl4', 'cn2', 'ls2', 'kcn', 'ws9', 'ws6', 'in1', 'cl4', 'eli', 'alt', 'wil', 'tlc', 'wle', 'kca', 'mil', 'ari', 'brn', 'cv7', 'mia', 'nw1', 'ase', 'kcr', 'pha', 'cuw', 'ecg', 'hsl', 'blf', 'det', 'mls', 'cux', 'clg', 'sas', 'cle', 'ch1', 'hil', 'ls4', 'klk', 'whk', 'pgh', 'ph3', 'sl2', 'cn1', 'bsu', 'kcu', 'ws8', 'bln', 'cn4', 'tl2', 'mlu', 'bl4', 'in2', 'sr2', 'vma ', 'se1', 'ci1', 'cv3', 'hoe', 'in5', 'lrs', 'nww')"
+      - name: batter_lineup_position
+        description: ""
+        data_type: "utinyint"
+      - name: plate_appearances
+        description: ""
+        data_type: "utinyint"
+      - name: at_bats
+        description: ""
+        data_type: "utinyint"
+      - name: hits
+        description: ""
+        data_type: "utinyint"
+      - name: singles
+        description: ""
+        data_type: "utinyint"
+      - name: doubles
+        description: ""
+        data_type: "utinyint"
+      - name: triples
+        description: ""
+        data_type: "utinyint"
+      - name: home_runs
+        description: ""
+        data_type: "utinyint"
+      - name: total_bases
+        description: ""
+        data_type: "utinyint"
+      - name: infield_hits
+        description: ""
+        data_type: "utinyint"
+      - name: strikeouts
+        description: ""
+        data_type: "utinyint"
+      - name: walks
+        description: ""
+        data_type: "utinyint"
+      - name: intentional_walks
+        description: ""
+        data_type: "utinyint"
+      - name: hit_by_pitches
+        description: ""
+        data_type: "utinyint"
+      - name: sacrifice_flies
+        description: ""
+        data_type: "utinyint"
+      - name: sacrifice_hits
+        description: ""
+        data_type: "utinyint"
+      - name: reached_on_errors
+        description: ""
+        data_type: "utinyint"
+      - name: reached_on_interferences
+        description: ""
+        data_type: "utinyint"
+      - name: ground_rule_doubles
+        description: ""
+        data_type: "utinyint"
+      - name: inside_the_park_home_runs
+        description: ""
+        data_type: "utinyint"
+      - name: on_base_opportunities
+        description: ""
+        data_type: "utinyint"
+      - name: on_base_successes
+        description: ""
+        data_type: "utinyint"
+      - name: runs_batted_in
+        description: ""
+        data_type: "utinyint"
+      - name: grounded_into_double_plays
+        description: ""
+        data_type: "utinyint"
+      - name: double_plays
+        description: ""
+        data_type: "utinyint"
+      - name: triple_plays
+        description: ""
+        data_type: "utinyint"
+      - name: batting_outs
+        description: ""
+        data_type: "utinyint"
+      - name: outs_on_play
+        description: ""
+        data_type: "utinyint"
+      - name: left_on_base
+        description: ""
+        data_type: "utinyint"
+      - name: left_on_base_with_two_outs
+        description: ""
+        data_type: "utinyint"

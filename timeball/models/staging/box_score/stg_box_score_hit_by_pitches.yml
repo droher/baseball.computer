@@ -1,0 +1,31 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_hit_by_pitches
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: pitching_side
+        description: ""
+        data_type: "varchar"
+      - name: pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: batter_id
+        description: ""
+        data_type: "varchar"

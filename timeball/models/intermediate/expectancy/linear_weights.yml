@@ -1,0 +1,49 @@
+version: 2
+
+
+models:
+  - name: linear_weights
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: season
+        description: ""
+        data_type: "smallint"
+      - name: league
+        description: ""
+        data_type: "varchar"
+      - name: play
+        description: ""
+        data_type: "varchar"
+      - name: play_category
+        description: ""
+        data_type: "varchar"
+      - name: average_run_value
+        description: ""
+        data_type: "double"
+      - name: average_win_value
+        description: ""
+        data_type: "double"
+      - name: relative_run_value
+        description: ""
+        data_type: "double"
+      - name: std_dev_run_value
+        description: ""
+        data_type: "double"
+      - name: std_dev_win_value
+        description: ""
+        data_type: "double"
+      - name: is_imputed
+        description: ""
+        data_type: "boolean"

@@ -1,0 +1,25 @@
+version: 2
+
+
+models:
+  - name: stg_event_comments
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: "uinteger"
+      - name: comment
+        description: ""
+        data_type: "varchar"

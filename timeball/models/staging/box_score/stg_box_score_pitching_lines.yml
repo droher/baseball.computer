@@ -1,0 +1,103 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_pitching_lines
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: game_id
+        description: ""
+        data_type: "varchar"
+      - name: pitcher_id
+        description: ""
+        data_type: "varchar"
+      - name: side
+        description: ""
+        data_type: "enum('home', 'away')"
+      - name: nth_pitcher
+        description: ""
+        data_type: "utinyint"
+      - name: outs_recorded
+        description: ""
+        data_type: "utinyint"
+      - name: no_out_batters
+        description: ""
+        data_type: "utinyint"
+      - name: batters_faced
+        description: ""
+        data_type: "utinyint"
+      - name: hits
+        description: ""
+        data_type: "utinyint"
+      - name: doubles
+        description: ""
+        data_type: "utinyint"
+      - name: triples
+        description: ""
+        data_type: "utinyint"
+      - name: home_runs
+        description: ""
+        data_type: "utinyint"
+      - name: runs
+        description: ""
+        data_type: "utinyint"
+      - name: earned_runs
+        description: ""
+        data_type: "utinyint"
+      - name: walks
+        description: ""
+        data_type: "utinyint"
+      - name: intentional_walks
+        description: ""
+        data_type: "utinyint"
+      - name: strikeouts
+        description: ""
+        data_type: "utinyint"
+      - name: hit_by_pitches
+        description: ""
+        data_type: "utinyint"
+      - name: wild_pitches
+        description: ""
+        data_type: "utinyint"
+      - name: balks
+        description: ""
+        data_type: "utinyint"
+      - name: sacrifice_hits
+        description: ""
+        data_type: "utinyint"
+      - name: sacrifice_flies
+        description: ""
+        data_type: "utinyint"
+      - name: singles
+        description: ""
+        data_type: "utinyint"
+      - name: total_bases
+        description: ""
+        data_type: "integer"
+      - name: on_base_opportunities
+        description: ""
+        data_type: "integer"
+      - name: on_base_successes
+        description: ""
+        data_type: "integer"
+      - name: games_started
+        description: ""
+        data_type: "integer"
+      - name: games_relieved
+        description: ""
+        data_type: "integer"
+      - name: games_finished
+        description: ""
+        data_type: "integer"

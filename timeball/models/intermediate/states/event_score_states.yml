@@ -1,0 +1,37 @@
+version: 2
+
+
+models:
+  - name: event_score_states
+    description: ""
+    
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: []
+    #   - type: foreign_key
+    #     expression: "" 
+
+    columns:
+      - name: event_key
+        description: ""
+        data_type: "uinteger"
+      - name: score_home_start
+        description: ""
+        data_type: "utinyint"
+      - name: score_away_start
+        description: ""
+        data_type: "utinyint"
+      - name: score_home_end
+        description: ""
+        data_type: "utinyint"
+      - name: score_away_end
+        description: ""
+        data_type: "utinyint"
+      - name: runs_on_play
+        description: ""
+        data_type: "utinyint"
