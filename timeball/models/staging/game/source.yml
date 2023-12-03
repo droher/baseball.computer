@@ -122,6 +122,10 @@ sources:
             tests:
               - not_null
             data_type: ACCOUNT_TYPE
+          - name: filename
+            description: ""
+            tests:
+              - not_null
           - name: away_team_id
             description: ""
             tests:

@@ -4,14 +4,14 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        playerid AS databank_player_id,
-        yearid AS season,
+        player_id AS databank_player_id,
+        year_id AS season,
         stint,
-        teamid AS team_id,
-        lgid AS league_id,
+        team_id AS team_id,
+        lg_id AS league_id,
         g AS games,
         gs AS games_started,
-        innouts AS outs_played,
+        inn_outs AS outs_played,
         po AS putouts,
         a AS assists,
         e AS errors,

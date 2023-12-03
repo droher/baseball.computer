@@ -40,9 +40,9 @@ sources:
             data_type: USMALLINT
           - name: h
             data_type: USMALLINT
-          - name: 2b
+          - name: _2b
             data_type: USMALLINT
-          - name: 3b
+          - name: _3b
             data_type: USMALLINT
           - name: hr
             data_type: USMALLINT
@@ -152,14 +152,14 @@ sources:
           - name: throws
           - name: debut
           - name: finalgame
-          - name: retroid
+          - name: retro_id
             tests:
               - unique
             data_type: PLAYER_ID
           - name: bbrefid
             tests:
               - unique
-      - name: fieldingof
+      - name: fielding_of
         description: |
           LF-CF-RF game splits
         meta:

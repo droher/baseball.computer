@@ -5,17 +5,17 @@ WITH source AS (
 renamed AS (
 
     SELECT
-        playerid AS databank_player_id,
-        yearid AS season,
+        player_id AS databank_player_id,
+        year_id AS season,
         stint,
-        teamid AS team_id,
-        lgid AS league_id,
+        team_id AS team_id,
+        lg_id AS league_id,
         g AS games,
         ab AS at_bats,
         r AS runs,
         h AS hits,
-        "2B" AS doubles, -- noqa: RF06
-        "3B" AS triples, -- noqa: RF06
+        _2b AS doubles, -- noqa: RF06
+        _3b AS triples, -- noqa: RF06
         hr AS home_runs,
         rbi AS runs_batted_in,
         sb AS stolen_bases,

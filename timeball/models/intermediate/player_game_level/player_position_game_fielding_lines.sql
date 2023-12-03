@@ -44,7 +44,8 @@ event_agg AS (
         SUM(caught_stealing)::UTINYINT AS caught_stealing,
         SUM(passed_balls)::UTINYINT AS passed_balls,
         SUM(balls_hit_to)::UTINYINT AS balls_hit_to,
-        SUM(reaching_errors)::UTINYINT AS reaching_errors
+        SUM(reaching_errors)::UTINYINT AS reaching_errors,
+        SUM(unknown_putouts_while_fielding)::UTINYINT AS unknown_putouts_while_fielding
     FROM {{ ref('event_player_fielding_stats') }}
     GROUP BY 1, 2, 3
 ),

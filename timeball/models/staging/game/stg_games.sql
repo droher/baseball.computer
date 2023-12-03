@@ -50,6 +50,7 @@ renamed AS (
         date_inputted,
         date_edited,
         account_type,
+        filename,
         source_type,
         away_team_id,
         home_team_id,

@@ -99,7 +99,7 @@
     );
     
     {# CREATE TYPE player_id AS ENUM (
-      SELECT retroid FROM baseballdatabank.people WHERE retroid IS NOT NULL
+      SELECT retro_id FROM baseballdatabank.people WHERE retro_id IS NOT NULL
       UNION
       SELECT DISTINCT player_id FROM misc.roster
       UNION

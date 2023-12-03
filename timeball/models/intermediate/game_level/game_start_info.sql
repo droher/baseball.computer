@@ -33,6 +33,7 @@ WITH games AS (
         g.umpire_third_id,
         g.umpire_left_id,
         g.umpire_right_id,
+        g.filename,
     FROM {{ ref('stg_games') }} AS g
 ),
 
@@ -79,6 +80,11 @@ add_rest AS (
         ),
         game_types.is_regular_season,
         game_types.is_postseason,
+        COALESCE(
+            add_gamelog.season >= 1947 AND add_gamelog.filename NOT LIKE '%.E%R', FALSE
+        ) AS is_integrated,
+        COALESCE(add_gamelog.filename LIKE '%.E%R', FALSE) AS is_negro_leagues,
+        (NOT is_integrated AND NOT is_negro_leagues) AS is_segregated_white,
         franchise_a.franchise_id::TEAM_ID AS away_franchise_id,
         franchise_h.franchise_id::TEAM_ID AS home_franchise_id,
         franchise_a.league AS away_league,

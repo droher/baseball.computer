@@ -4,11 +4,11 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        playerid AS databank_player_id,
-        yearid AS season,
+        player_id AS databank_player_id,
+        year_id AS season,
         stint,
-        teamid AS team_id,
-        lgid AS league_id,
+        team_id AS team_id,
+        lg_id AS league_id,
         w AS wins,
         l AS losses,
         g AS games,
@@ -16,7 +16,7 @@ renamed AS (
         cg AS complete_games,
         sho AS shutouts,
         sv AS saves,
-        ipouts AS outs_recorded,
+        ip_outs AS outs_recorded,
         h AS hits,
         er AS earned_runs,
         hr AS home_runs,
@@ -24,7 +24,7 @@ renamed AS (
         so AS strikeouts,
         -- OAV could be used in theory to back into at-bats against,
         -- but isn't populated for the years we source from this data
-        baopp AS opponent_batting_average,
+        ba_opp AS opponent_batting_average,
         era AS earned_run_average,
         ibb AS intentional_walks,
         wp AS wild_pitches,

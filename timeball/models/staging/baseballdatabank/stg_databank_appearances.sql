@@ -4,10 +4,10 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        yearid AS year_id,
-        teamid AS team_id,
-        lgid AS league_id,
-        playerid AS databank_player_id,
+        year_id AS year_id,
+        team_id AS team_id,
+        lg_id AS league_id,
+        player_id AS databank_player_id,
         g_all AS games_all,
         gs AS games_started,
         g_batting AS games_batting,

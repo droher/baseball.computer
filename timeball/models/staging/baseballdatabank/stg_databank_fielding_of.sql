@@ -1,15 +1,15 @@
 WITH source AS (
-    SELECT * FROM {{ source('baseballdatabank', 'fieldingof') }}
+    SELECT * FROM {{ source('baseballdatabank', 'fielding_of') }}
 ),
 
 renamed AS (
     SELECT
-        playerid AS databank_player_id,
-        yearid AS season,
+        player_id AS databank_player_id,
+        year_id AS season,
         stint,
-        glf AS games_left_field,
-        gcf AS games_center_field,
-        grf AS games_right_field,
+        g_lf AS games_left_field,
+        g_cf AS games_center_field,
+        g_rf AS games_right_field,
     FROM source
 )
 
