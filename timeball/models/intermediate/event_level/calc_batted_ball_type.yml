@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: game_id
@@ -23,45 +23,57 @@ models:
         data_type: uinteger
       - name: plate_appearance_result
         description: ""
-        data_type: enum('double', 'fielderschoice', 'groundruledouble', 'hitbypitch',
-          'homerun', 'inplayout', 'insidetheparkhomerun', 'intentionalwalk', 'interference',
-          'reachedonerror', 'sacrificefly', 'sacrificehit', 'single', 'strikeout',
-          'triple', 'walk')
+        data_type: plate_appearance_result
       - name: batted_to_fielder
         description: ""
         data_type: utinyint
       - name: contact
         description: ""
-        data_type: varchar
+        data_type: contact
+        constraints:
+          - type: not_null
       - name: recorded_contact
         description: ""
-        data_type: enum('fly', 'foulbunt', 'groundball', 'groundballbunt', 'linedrive',
-          'linedrivebunt', 'popfly', 'popupbunt', 'unknown', 'unspecifiedbunt')
+        data_type: contact
+        constraints:
+          - type: not_null
       - name: is_contact_inferred
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: contact_broad_classification
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: recorded_location
         description: ""
-        data_type: enum('catcher', 'catcherfirst', 'catcherthird', 'center', 'first',
-          'firstsecond', 'left', 'leftcenter', 'pitcher', 'pitcherfirst', 'pitcherthird',
-          'right', 'rightcenter', 'second', 'secondshortstop', 'shortstop', 'third',
-          'thirdshortstop', 'unknown')
+        data_type: location_general
+        constraints:
+          - type: not_null
       - name: recorded_location_depth
         description: ""
-        data_type: enum('deep', 'default', 'extradeep', 'shallow', 'unknown')
+        data_type: location_depth
+        constraints:
+          - type: not_null
       - name: recorded_location_angle
         description: ""
-        data_type: enum('default', 'foul', 'foulline', 'left', 'middle', 'right',
-          'unknown')
+        data_type: location_angle
+        constraints:
+          - type: not_null
       - name: location_depth
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: location_side
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: location_edge
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null

@@ -63,9 +63,9 @@ grouped_sequence AS (
 final AS (
     SELECT
         grouped_sequence.*,
-        other_events.passed_balls,
-        other_events.wild_pitches,
-        other_events.balks,
+        COALESCE(other_events.passed_balls, 0)::UTINYINT AS passed_balls,
+        COALESCE(other_events.wild_pitches, 0)::UTINYINT AS wild_pitches,
+        COALESCE(other_events.balks, 0)::UTINYINT AS balks
     FROM grouped_sequence
     LEFT JOIN other_events USING (event_key)
 )

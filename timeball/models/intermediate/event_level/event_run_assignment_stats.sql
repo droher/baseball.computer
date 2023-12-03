@@ -62,10 +62,10 @@ final AS (
         pitcher_id,
         MIN(game_id) AS game_id,
         MIN(team_id) AS team_id,
-        SUM(runs) AS runs,
-        SUM(team_unearned_runs) AS team_unearned_runs,
-        SUM(inherited_runners_scored) AS inherited_runners_scored,
-        SUM(bequeathed_runners_scored) AS bequeathed_runners_scored
+        SUM(runs)::UTINYINT AS runs,
+        SUM(team_unearned_runs)::UTINYINT AS team_unearned_runs,
+        SUM(inherited_runners_scored)::UTINYINT AS inherited_runners_scored,
+        SUM(bequeathed_runners_scored)::UTINYINT AS bequeathed_runners_scored
     FROM unioned
     GROUP BY 1, 2
 )

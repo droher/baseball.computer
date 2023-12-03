@@ -78,7 +78,7 @@ final AS (
         inference.event_key,
         inference.plate_appearance_result,
         inference.batted_to_fielder,
-        inference.batted_contact_type AS contact,
+        inference.batted_contact_type::CONTACT AS contact,
         inference.recorded_contact,
         inference.batted_contact_type != inference.recorded_contact AS is_contact_inferred,
         CASE WHEN inference.is_inferred_air_ball

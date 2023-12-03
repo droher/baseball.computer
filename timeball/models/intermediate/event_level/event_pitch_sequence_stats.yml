@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: event_key
@@ -21,69 +21,115 @@ models:
       - name: pitches
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: swings
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: swings_with_contact
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes_called
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes_swinging
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes_foul
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes_foul_tip
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes_in_play
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: strikes_unknown
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: balls
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: balls_called
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: balls_intentional
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: balls_automatic
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: unknown_pitches
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: pitchouts
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: pitcher_pickoff_attempts
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: catcher_pickoff_attempts
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: pitches_blocked_by_catcher
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: pitches_with_runners_going
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: passed_balls
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: wild_pitches
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: balks
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null

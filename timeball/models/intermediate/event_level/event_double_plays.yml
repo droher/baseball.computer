@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: event_key
@@ -21,9 +21,15 @@ models:
       - name: is_double_play
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: is_triple_play
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: is_ground_ball_double_play
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null

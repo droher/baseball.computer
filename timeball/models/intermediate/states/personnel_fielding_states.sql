@@ -42,6 +42,12 @@ final AS (
             AND ranges.side = appearances.side
             AND ranges.start_event_id <= appearances.end_event_id
             AND ranges.end_event_id >= appearances.start_event_id
+    -- We need this to dedupe positions on multi-sub events. There's definitely
+    -- a better way to to this that fails louder on real dupes.
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY personnel_fielding_key, appearances.fielding_position
+        ORDER BY appearances.end_event_id DESC
+    ) = 1
 )
 
 SELECT * FROM final

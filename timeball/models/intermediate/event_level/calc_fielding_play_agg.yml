@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key, fielding_position]
 
     columns:
       - name: event_key
@@ -21,36 +21,60 @@ models:
       - name: fielding_position
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: game_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: fielding_plays
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: putouts
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: assists
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: errors
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: fielders_choices
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: plays_started
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: assisted_putouts
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: first_errors
         description: ""
         data_type: bigint
+        constraints:
+          - type: not_null
       - name: unknown_putouts
         description: ""
         data_type: bigint
+        constraints:
+          - type: not_null
       - name: incomplete_events
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
