@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key, sequence_id]
 
     columns:
       - name: event_key
@@ -24,3 +24,5 @@ models:
       - name: flag
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null

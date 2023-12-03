@@ -3,10 +3,11 @@ WITH source AS (
 ),
 
 renamed AS (
-    SELECT
+    SELECT DISTINCT
         event_key,
         comment
     FROM source
+    WHERE comment IS NOT NULL
 )
 
 SELECT * FROM renamed

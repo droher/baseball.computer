@@ -6,18 +6,24 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key, comment]
 
     columns:
       - name: event_key
         description: ""
         data_type: uinteger
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
       - name: comment
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null

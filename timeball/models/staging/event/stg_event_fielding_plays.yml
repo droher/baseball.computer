@@ -6,30 +6,42 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key, sequence_id]
 
     columns:
       - name: game_id
         description: ""
         data_type: varchar
+        tests:
+          - relationships:
+              field: game_id
+              to: ref('stg_games')
       - name: event_id
         description: ""
         data_type: utinyint
       - name: event_key
         description: ""
         data_type: uinteger
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
       - name: sequence_id
         description: ""
         data_type: utinyint
       - name: fielding_position
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: fielding_play
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null

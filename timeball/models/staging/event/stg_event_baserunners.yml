@@ -6,36 +6,56 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key, baserunner]
 
     columns:
       - name: game_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - relationships:
+              field: game_id
+              to: ref('stg_games')
       - name: event_id
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: event_key
         description: ""
         data_type: uinteger
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
       - name: baserunner
         description: ""
-        data_type: enum('batter', 'first', 'second', 'third')
+        data_type: baserunner
+        constraints:
+          - type: not_null
       - name: runner_lineup_position
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: runner_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: charge_event_id
         description: ""
         data_type: uinteger
+        constraints:
+          - type: not_null
       - name: reached_on_event_id
         description: ""
         data_type: uinteger
@@ -44,39 +64,51 @@ models:
         data_type: varchar
       - name: attempted_advance_to_base
         description: ""
-        data_type: enum('home', 'first', 'second', 'third')
+        data_type: base
       - name: baserunning_play_type
         description: ""
-        data_type: enum('advancedonerror', 'balk', 'caughtstealing', 'defensiveindifference',
-          'otheradvance', 'passedball', 'pickedoff', 'pickedoffcaughtstealing', 'stolenbase',
-          'wildpitch')
+        data_type: baserunning_play
       - name: is_out
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: base_end
         description: ""
-        data_type: enum('home', 'first', 'second', 'third')
+        data_type: base
       - name: advanced_on_error_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: explicit_out_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: run_scored_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: rbi_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: reached_on_event_key
         description: ""
         data_type: uinteger
       - name: charge_event_key
         description: ""
         data_type: uinteger
+        constraints:
+          - type: not_null
       - name: baserunner_bit
         description: ""
         data_type: integer
       - name: is_advance_attempt
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null

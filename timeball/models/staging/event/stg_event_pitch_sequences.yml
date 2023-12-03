@@ -6,46 +6,65 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key, sequence_id]
 
     columns:
       - name: game_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - relationships:
+              field: game_id
+              to: ref('stg_games')
       - name: event_id
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: event_key
         description: ""
         data_type: uinteger
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
       - name: sequence_id
         description: ""
         data_type: utinyint
       - name: sequence_item
         description: ""
-        data_type: enum('automaticball', 'ball', 'calledstrike', 'foul', 'foulbunt',
-          'foulonpitchout', 'foultip', 'foultipbunt', 'hitbatter', 'inplay', 'inplayonpitchout',
-          'intentionalball', 'missedbunt', 'nopitch', 'pickoffattemptfirst', 'pickoffattemptsecond',
-          'pickoffattemptthird', 'pitchout', 'strikeunknowntype', 'swingingonpitchout',
-          'swingingstrike', 'unknown', 'unrecognized')
+        data_type: pitch_sequence_item
+        constraints:
+          - type: not_null
       - name: runners_going_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: blocked_by_catcher_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: catcher_pickoff_attempt_at_base
         description: ""
-        data_type: enum('home', 'first', 'second', 'third')
+        data_type: base
       - name: date
         description: ""
         data_type: date
+        constraints:
+          - type: not_null
       - name: season
         description: ""
         data_type: smallint
+        constraints:
+          - type: not_null
+  

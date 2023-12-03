@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [game_id, event_id]
 
     columns:
       - name: game_id
@@ -24,9 +24,19 @@ models:
       - name: filename
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: line_number
         description: ""
         data_type: uinteger
+        constraints:
+          - type: not_null
       - name: event_key
         description: ""
         data_type: uinteger
+        constraints:
+          - type: unique
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
