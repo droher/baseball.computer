@@ -33,7 +33,7 @@ final AS (
         putouts,
         assists,
         errors,
-        ROUND(reached_on_errors/errors * 100)
+        ROUND(reached_on_errors/errors * 100) AS reached_on_errors_percentage
     FROM season_pitching
     FULL OUTER JOIN season_fielding USING (season)
 )

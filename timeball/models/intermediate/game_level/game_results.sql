@@ -3,19 +3,7 @@
     materialized = 'table',
     )
 }}
-WITH gamelog_results AS (
-    SELECT
-        game_id,
-        date,
-        duration_minutes,
-        home_runs_scored,
-        away_runs_scored,
-        away_line_score,
-        home_line_score,
-    FROM {{ ref('stg_gamelog') }}
-),
-
-event_and_box_results AS (
+WITH event_and_box_results AS (
     SELECT
         game_id,
         games.date,
@@ -32,6 +20,19 @@ event_and_box_results AS (
     FROM {{ ref('stg_games') }} AS games
     LEFT JOIN {{ ref('game_line_scores') }} AS line_scores USING (game_id)
 
+),
+
+gamelog_results AS (
+    SELECT
+        game_id,
+        date,
+        duration_minutes,
+        home_runs_scored,
+        away_runs_scored,
+        away_line_score,
+        home_line_score,
+    FROM {{ ref('stg_gamelog') }}
+    WHERE game_id NOT IN (SELECT game_id FROM event_and_box_results)
 ),
 
 unioned AS (

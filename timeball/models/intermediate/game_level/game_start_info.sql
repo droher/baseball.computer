@@ -68,6 +68,7 @@ add_gamelog AS (
         'Unknown'::PRECIPITATION AS precipitation,
         'Unknown'::WIND_DIRECTION AS wind_direction,
     FROM {{ ref('stg_gamelog') }}
+    WHERE game_id NOT IN (SELECT game_id FROM games)
 ),
 
 add_rest AS (
@@ -77,6 +78,7 @@ add_rest AS (
             AS away_starting_pitcher_id,
             COALESCE(add_gamelog.home_starting_pitcher_id, lineups.fielding_map_home[1][1])
             AS home_starting_pitcher_id,
+            COALESCE(add_gamelog.park_id, missing_parks.park_id) AS park_id,
         ),
         game_types.is_regular_season,
         game_types.is_postseason,
@@ -111,6 +113,9 @@ add_rest AS (
             franchise_h.date_start AND COALESCE(franchise_h.date_end, '9999-12-31')
     LEFT JOIN {{ ref('game_starting_lineups') }} AS lineups USING (game_id)
     LEFT JOIN {{ ref('seed_game_types') }} AS game_types USING (game_type)
+    -- Some parks are missing from early box files, so we supplement with the gamelog
+    -- Otherwise, gamelog games are mutually exclusive with box/event games in this data
+    LEFT JOIN {{ ref('stg_gamelog') }} AS missing_parks USING (game_id)
 )
 
 SELECT * FROM add_rest

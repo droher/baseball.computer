@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: []
+        columns: [season]
 
     columns:
       - name: season
@@ -42,6 +42,6 @@ models:
       - name: errors
         description: ""
         data_type: hugeint
-      - name: round_reached_on_errors_errors_100
+      - name: reached_on_errors_percentage
         description: ""
         data_type: double

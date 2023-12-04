@@ -139,6 +139,11 @@ models:
         data_type: utinyint
         constraints:
           - type: not_null
+      - name: no_play_flag
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
       - name: date
         description: ""
         data_type: date

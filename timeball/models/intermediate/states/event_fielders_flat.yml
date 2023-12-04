@@ -6,51 +6,75 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: event_id
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: event_key
         description: ""
         data_type: uinteger
+        constraints:
+          - type: not_null
       - name: personnel_fielding_key
         description: ""
         data_type: integer
+        constraints:
+          - type: not_null
       - name: pitcher_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: catcher_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: first_base_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: second_base_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: third_base_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: shortstop_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: left_field_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: center_field_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: right_field_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null

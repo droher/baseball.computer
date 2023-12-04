@@ -83,11 +83,8 @@ models:
       - name: park_id
         description: ""
         data_type: park_id
-        # TODO: Change to constraint after fix
-        tests:
-          - not_null:
-              config:
-                severity: warn
+        constraints:
+          - type: not_null
       - name: temperature_fahrenheit
         description: ""
         data_type: tinyint

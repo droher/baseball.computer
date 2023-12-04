@@ -92,7 +92,7 @@ models:
         data_type: bigint
       - name: wind_speed_mph
         description: ""
-        data_type: smallint
+        data_type: utinyint
       - name: use_dh
         description: ""
         data_type: boolean

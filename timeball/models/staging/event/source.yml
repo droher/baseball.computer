@@ -171,3 +171,5 @@ sources:
             data_type: UTINYINT
           - name: team_unearned_runs
             data_type: UTINYINT
+          - name: no_play_flag
+            data_type: BOOLEAN

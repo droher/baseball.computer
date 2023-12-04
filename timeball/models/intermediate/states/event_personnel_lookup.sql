@@ -41,6 +41,7 @@ final AS (
         ON events.game_id = fielding.game_id
             AND events.batting_side != fielding.fielding_side
             AND events.event_id BETWEEN fielding.start_event_id AND fielding.end_event_id
+    WHERE NOT events.no_play_flag
 )
 
 SELECT * FROM final

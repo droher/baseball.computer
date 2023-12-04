@@ -39,6 +39,12 @@ final AS (
     FULL OUTER JOIN box_files USING (player_id)
     FULL OUTER JOIN {{ ref('stg_people') }} AS databank
         ON databank.retrosheet_player_id = COALESCE(retro.player_id, roster_files.player_id, box_files.player_id)
+    WHERE COALESCE(
+            retro.player_id,
+            databank.retrosheet_player_id,
+            roster_files.player_id,
+            box_files.player_id
+        ) IS NOT NULL
 )
 
 SELECT * FROM final

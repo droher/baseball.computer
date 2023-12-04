@@ -11,28 +11,28 @@ WITH databank AS (
         COALESCE(field.fielding_position, 0) AS fielding_position,
         ANY_VALUE('RegularSeason') AS game_type,
         ANY_VALUE(field.fielding_position_category) AS fielding_position_category,
-        SUM(field.games) AS games,
-        SUM(field.games_started) AS games_started,
+        SUM(field.games)::USMALLINT AS games,
+        SUM(field.games_started)::USMALLINT AS games_started,
         CASE WHEN ANY_VALUE(field.fielding_position_category) = 'OF'
                 THEN COALESCE(SUM(of_games.games_left_field), 0)
             ELSE 0
-        END AS games_left_field,
+        END::USMALLINT AS games_left_field,
         CASE WHEN ANY_VALUE(field.fielding_position_category) = 'OF'
                 THEN COALESCE(SUM(of_games.games_center_field), 0)
             ELSE 0
-        END AS games_center_field,
+        END::USMALLINT AS games_center_field,
         CASE WHEN ANY_VALUE(field.fielding_position_category) = 'OF'
                 THEN COALESCE(SUM(of_games.games_right_field), 0)
             ELSE 0
-        END AS games_right_field,
-        SUM(field.outs_played) AS outs_played,
-        SUM(field.putouts) AS putouts,
-        SUM(field.assists) AS assists,
-        SUM(field.errors) AS errors,
-        SUM(field.double_plays) AS double_plays,
-        SUM(field.passed_balls) AS passed_balls,
-        SUM(field.stolen_bases) AS stolen_bases,
-        SUM(field.caught_stealing) AS caught_stealing,
+        END::USMALLINT AS games_right_field,
+        SUM(field.outs_played)::USMALLINT AS outs_played,
+        SUM(field.putouts)::USMALLINT AS putouts,
+        SUM(field.assists)::USMALLINT AS assists,
+        SUM(field.errors)::USMALLINT AS errors,
+        SUM(field.double_plays)::USMALLINT AS double_plays,
+        SUM(field.passed_balls)::USMALLINT AS passed_balls,
+        SUM(field.stolen_bases)::USMALLINT AS stolen_bases,
+        SUM(field.caught_stealing)::USMALLINT AS caught_stealing,
     FROM {{ ref('stg_databank_fielding') }} AS field
     LEFT JOIN {{ ref('stg_databank_fielding_of') }} AS of_games USING (databank_player_id, season, stint)
     INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
@@ -56,7 +56,7 @@ game_agg AS (
             WHEN stats.fielding_position BETWEEN 7 AND 9 THEN 'OF'
             WHEN stats.fielding_position = 10 THEN 'DH'
         END) AS fielding_position_category,
-        COUNT(*) AS games,
+        COUNT(*)::USMALLINT AS games,
         SUM(stats.games_started)::USMALLINT AS games_started,
         SUM(stats.outs_played)::USMALLINT AS outs_played,
         SUM(stats.plate_appearances_in_field)::USMALLINT AS plate_appearances_in_field,

@@ -65,6 +65,7 @@ final AS (
     LEFT JOIN {{ ref('event_double_plays') }} AS dp USING (event_key)
     LEFT JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
     LEFT JOIN fielding_plays_agg AS fp USING (event_key)
+    WHERE NOT events.no_play_flag
 )
 
 SELECT * FROM final
