@@ -3,36 +3,43 @@ version: 2
 
 models:
   - name: game_suspensions
-    description: ""
+    description: "Information about games that were suspended and resumed at a later date."
 
+    config:
+      contract:
+        enforced: true
 
-    # config:
-    #   contract:
-    #     enforced: true
-
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [game_id]
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: event_key_at_suspension
         description: ""
         data_type: uinteger
+        constraints:
+          - type: not_null
       - name: date_resumed
         description: ""
         data_type: date
       - name: new_park_id
         description: ""
-        data_type: varchar
+        data_type: park_id
       - name: away_score_at_suspension
         description: ""
-        data_type: integer
+        data_type: utinyint
+        constraints:
+          - type: not_null
       - name: home_score_at_suspension
         description: ""
-        data_type: integer
+        data_type: utinyint
+        constraints:
+          - type: not_null
       - name: game_outs_recorded_at_suspension
         description: ""
-        data_type: integer
+        data_type: utinyint
+        constraints:
+          - type: not_null

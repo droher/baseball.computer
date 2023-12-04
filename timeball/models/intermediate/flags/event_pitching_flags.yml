@@ -6,66 +6,98 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: game_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: event_key
         description: ""
         data_type: uinteger
       - name: event_id
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: previous_pitcher_id
         description: ""
         data_type: varchar
       - name: pitcher_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: starting_pitcher_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: bequeathed_runners
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: inherited_runners
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: new_relief_pitcher_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: pitcher_exit_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: pitcher_finish_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: starting_pitcher_exit_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: starting_pitcher_early_exit_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: save_situation_start_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: hold_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: save_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: blown_save_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: blown_long_save_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null

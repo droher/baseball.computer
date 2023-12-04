@@ -6,42 +6,62 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [season, league, play]
 
     columns:
       - name: season
         description: ""
         data_type: smallint
+        constraints:
+          - type: not_null
       - name: league
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: play
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: play_category
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: average_run_value
         description: ""
         data_type: double
+        constraints:
+          - type: not_null
       - name: average_win_value
         description: ""
         data_type: double
+        constraints:
+          - type: not_null
       - name: relative_run_value
         description: ""
         data_type: double
+        constraints:
+          - type: not_null
       - name: std_dev_run_value
         description: ""
         data_type: double
+        constraints:
+          - type: not_null
       - name: std_dev_win_value
         description: ""
         data_type: double
+        constraints:
+          - type: not_null
       - name: is_imputed
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null

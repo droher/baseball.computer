@@ -1,5 +1,6 @@
 WITH season_pitching AS (
-    SELECT season,
+    SELECT 
+        season,
         SUM(hits - home_runs) AS hits_in_play,
         SUM(reached_on_errors) AS reached_on_errors,
         SUM(strikeouts) AS strikeouts,

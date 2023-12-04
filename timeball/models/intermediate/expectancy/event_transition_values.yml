@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: event_key
@@ -21,50 +21,70 @@ models:
       - name: run_expectancy_start_key
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: run_expectancy_end_key
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: win_expectancy_start_key
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: win_expectancy_end_key
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: season
         description: ""
         data_type: smallint
+        constraints:
+          - type: not_null
       - name: league
         description: ""
         data_type: varchar
       - name: game_type
         description: ""
-        data_type: enum('allstargame', 'divisionseries', 'exhibition', 'leaguechampionshipseries',
-          'otherchampionship', 'regularseason', 'tiebreakerplayoff', 'wildcardseries',
-          'worldseries')
+        data_type: game_type
       - name: inning_start
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: frame_start
         description: ""
-        data_type: enum('top', 'bottom')
+        data_type: frame
+        constraints:
+          - type: not_null
       - name: truncated_home_margin_start
         description: ""
         data_type: tinyint
+        constraints:
+          - type: not_null
       - name: batting_side
         description: ""
-        data_type: enum('home', 'away')
+        data_type: side
+        constraints:
+          - type: not_null
       - name: base_state_start
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: outs_start
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: inning_end
         description: ""
         data_type: utinyint
       - name: frame_end
         description: ""
-        data_type: enum('top', 'bottom')
+        data_type: frame
       - name: truncated_home_margin_end
         description: ""
         data_type: tinyint
@@ -77,15 +97,25 @@ models:
       - name: runs_on_play
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: game_end_flag
         description: ""
         data_type: boolean
+        constraints:
+          - type: not_null
       - name: expected_runs_change
         description: ""
         data_type: decimal(18,3)
+        constraints:
+          - type: not_null
       - name: expected_home_win_change
         description: ""
         data_type: decimal(14,3)
+        constraints:
+          - type: not_null
       - name: expected_batting_win_change
         description: ""
         data_type: decimal(14,3)
+        constraints:
+          - type: not_null

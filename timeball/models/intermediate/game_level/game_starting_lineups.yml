@@ -6,27 +6,35 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [game_id]
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: lineup_map_away
         description: ""
         data_type: map(integer, varchar)
+        constraints:
+          - type: not_null
       - name: fielding_map_away
         description: ""
         data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null
       - name: lineup_map_home
         description: ""
-        data_type: map(integer, varchar)
+        data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null
       - name: fielding_map_home
         description: ""
         data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null

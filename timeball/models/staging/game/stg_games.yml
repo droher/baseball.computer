@@ -77,6 +77,13 @@ models:
       - name: park_id
         description: ""
         data_type: park_id
+        tests:
+          - relationships:
+              field: park_id
+              to: ref('stg_parks')
+          - not_null:
+              config:
+                severity: warn
       - name: temperature_fahrenheit
         description: ""
         data_type: tinyint

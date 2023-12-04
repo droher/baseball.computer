@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [win_expectancy_key]
 
     columns:
       - name: win_expectancy_key
@@ -21,18 +21,30 @@ models:
       - name: inning
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: frame
         description: ""
-        data_type: enum('top', 'bottom')
+        data_type: frame
+        constraints:
+          - type: not_null
       - name: truncated_home_margin
         description: ""
         data_type: tinyint
+        constraints:
+          - type: not_null
       - name: outs
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: base_state
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: home_win_rate
         description: ""
         data_type: decimal(4,3)
+        constraints:
+          - type: not_null
