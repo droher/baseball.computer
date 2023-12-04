@@ -31,16 +31,11 @@ WITH init_flags AS (
         END AS bequeathed_runners,
 
         -- A new relief pitcher can enter the game as the first pitcher in rare cases
-        new_pitcher_flag
-        AND pitching_team_starting_pitcher_id != pitcher_id
+        COALESCE(new_pitcher_flag AND pitching_team_starting_pitcher_id != pitcher_id, FALSE)
         AS new_relief_pitcher_flag,
-
-        new_pitcher_flag
-        AND previous_pitcher_id = pitching_team_starting_pitcher_id
+        COALESCE(new_pitcher_flag AND previous_pitcher_id = pitching_team_starting_pitcher_id, FALSE)
         AS starting_pitcher_exit_flag,
-
-        starting_pitcher_exit_flag
-        AND inning_in_outs_start < 15
+        COALESCE(starting_pitcher_exit_flag AND inning_in_outs_start < 15, FALSE)
         AS starting_pitcher_early_exit_flag,
 
         -- Conditions (necessary but not sufficient) for all 3 save situation types:
@@ -73,16 +68,19 @@ WITH init_flags AS (
         -- but not in the third.
         CASE WHEN save_situation_base
                 THEN inning_in_outs_start <= 18
+            ELSE FALSE
         END AS long_save_eligible_start_flag,
 
         -- This is non-null only on the first event for each new pitcher,
         -- which allows LAG to work properly in the subsequent query
         CASE WHEN new_pitcher_flag
                 THEN save_situation_1_flag OR save_situation_2_flag
+            ELSE FALSE
         END AS save_situation_start_flag,
 
         CASE WHEN new_pitcher_flag
                 THEN save_situation_1_flag OR save_situation_2_flag OR long_save_eligible_start_flag
+            ELSE FALSE
         END AS save_eligible_start_flag,
 
         -- These flags only apply if the exiting/finishing pitcher

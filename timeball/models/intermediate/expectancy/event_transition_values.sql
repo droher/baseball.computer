@@ -57,6 +57,8 @@ WITH final AS (
     LEFT JOIN {{ ref('win_expectancy_matrix' ) }} AS wins_end
         ON wins_end.win_expectancy_key = states.win_expectancy_end_key
     WHERE states.game_type = 'RegularSeason'
+        -- We can include plays from called games, but not the very last one
+        AND NOT (states.game_end_flag AND states.truncated_home_margin_end = 0)
 )
 
 SELECT * FROM final

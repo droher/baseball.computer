@@ -1,2 +1,4 @@
 - Check that all referencd batters are in the game at the time of their PA
 - Smoke test for all-time HR leaders
+- Ranges for franchises/teams
+- Fix PGH/PHG typo in raw data

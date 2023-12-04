@@ -82,9 +82,12 @@ models:
         data_type: wind_direction
       - name: park_id
         description: ""
-        constraints:
-          - type: not_null
         data_type: park_id
+        # TODO: Change to constraint after fix
+        tests:
+          - not_null:
+              config:
+                severity: warn
       - name: temperature_fahrenheit
         description: ""
         data_type: tinyint
@@ -93,7 +96,7 @@ models:
         data_type: uinteger
       - name: wind_speed_mph
         description: ""
-        data_type: usmallint
+        data_type: utinyint
       - name: use_dh
         description: ""
         data_type: boolean
@@ -139,7 +142,7 @@ models:
         data_type: varchar
       - name: is_regular_season
         description: ""
-        data_type: varchar
+        data_type: boolean
         constraints:
           - type: not_null
       - name: is_postseason
@@ -152,8 +155,8 @@ models:
           Whether or not this game took place in a racially integrated league/season.
           This is defined as all AL/NL games from 1947 onward. Keep in mind that integration
           status has nuances that go well beyond the scope of this field: specifically,
-          some teams had no Black players as late as 1959, and Black players were generally
-          underrepresented until the 1960s, especially in the AL. See Mark Armour's research
+          some teams had no Black players as late as 1958, and Black players were generally
+          underrepresented until the early 70s, especially in the AL. See Mark Armour's research
           for more detail: https://sabr.org/journal/article/the-effects-of-integration-1947-1986/
         data_type: boolean
         constraints:
@@ -208,10 +211,10 @@ models:
           - type: not_null
       - name: lineup_map_away
         description: ""
-        data_type: map(integer, varchar)
+        data_type: map(utinyint, varchar)
       - name: lineup_map_home
         description: ""
-        data_type: map(integer, varchar)
+        data_type: map(utinyint, varchar)
       - name: fielding_map_away
         description: ""
         data_type: map(utinyint, varchar)

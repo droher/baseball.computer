@@ -85,7 +85,7 @@ WITH final AS (
         base_out.truncated_frame_flag,
         base_out.game_end_flag,
         -- IDs for calculating expectancy_values
-        CASE WHEN g.home_league NOT IN ('AL', 'NL', 'FL')
+        CASE WHEN g.home_league NOT IN ('AL', 'NL', 'FL') OR g.home_league IS NULL
                 THEN 'Other'
             ELSE g.home_league
         END AS league_group,
@@ -95,7 +95,13 @@ WITH final AS (
             WHEN g.season >= 2020 AND g.game_type = 'RegularSeason'
                 THEN 11
             ELSE 10
-        END AS inning_group,
+        END AS inning_group_start,
+        CASE WHEN base_out.inning_start < 10
+                THEN base_out.inning_end::VARCHAR
+            WHEN g.season >= 2020 AND g.game_type = 'RegularSeason'
+                THEN 11
+            ELSE 10
+        END AS inning_group_end,
         GREATEST(LEAST(home_margin_start, 10), -10)::INT1 AS truncated_home_margin_start,
         GREATEST(LEAST(home_margin_end, 10), -10)::INT1 AS truncated_home_margin_end,
         CONCAT_WS(
@@ -107,11 +113,11 @@ WITH final AS (
             base_out.outs_end, COALESCE(base_out.base_state_end, 0)
         ) AS run_expectancy_end_key,
         CONCAT_WS(
-            '_', inning_group, base_out.frame_start, truncated_home_margin_start,
+            '_', inning_group_start, base_out.frame_start, truncated_home_margin_start,
             base_out.outs_start, base_out.base_state_start
         ) AS win_expectancy_start_key,
         CONCAT_WS(
-            '_', inning_group, base_out.frame_end, truncated_home_margin_end,
+            '_', inning_group_end, base_out.frame_end, truncated_home_margin_end,
             base_out.outs_end % 3, COALESCE(base_out.base_state_end, 0)
         ) AS win_expectancy_end_key,
     FROM {{ ref('stg_events') }} AS e

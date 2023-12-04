@@ -8,7 +8,7 @@ WITH states AS (
         -- Treat 9th and later as the same to increase sample size
         -- TODO: Put add upstream `truncated_inning` col
         win_expectancy_start_key AS win_expectancy_key,
-        inning_group AS inning,
+        inning_group_start AS inning,
         truncated_home_margin_start AS truncated_home_margin,
         frame_start AS frame,
         outs_start AS outs,

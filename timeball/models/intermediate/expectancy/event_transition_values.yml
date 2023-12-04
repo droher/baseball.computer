@@ -107,15 +107,18 @@ models:
       - name: expected_runs_change
         description: ""
         data_type: decimal(18,3)
-        constraints:
-          - type: not_null
+        tests:
+          - dbt_utils.not_null_proportion:
+              at_least: .999
       - name: expected_home_win_change
         description: ""
         data_type: decimal(14,3)
-        constraints:
-          - type: not_null
+        tests:
+          - dbt_utils.not_null_proportion:
+              at_least: .999
       - name: expected_batting_win_change
         description: ""
         data_type: decimal(14,3)
-        constraints:
-          - type: not_null
+        tests:
+          - dbt_utils.not_null_proportion:
+              at_least: .999

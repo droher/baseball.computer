@@ -59,10 +59,10 @@ models:
         data_type: integer
       - name: runs_scored
         description: ""
-        data_type: hugeint
+        data_type: utinyint
       - name: runs_allowed
         description: ""
-        data_type: hugeint
+        data_type: utinyint
       - name: hits
         description: ""
         data_type: usmallint

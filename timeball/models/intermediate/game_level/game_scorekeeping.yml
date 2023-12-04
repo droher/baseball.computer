@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [game_id]
+        columns: [game_id, cleaned_scorer]
 
     columns:
       - name: season

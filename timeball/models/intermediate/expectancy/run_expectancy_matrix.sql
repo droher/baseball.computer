@@ -3,7 +3,7 @@
         materialized = 'table',
     )
 }}
-WITH final AS (
+WITH next_runs AS (
     SELECT
         run_expectancy_start_key AS run_expectancy_key,
         league_group,
@@ -22,16 +22,20 @@ WITH final AS (
             ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
         )
     QUALIFY NOT BOOL_OR(truncated_frame_flag) OVER rest_of_inning
+),
+
+final AS (
+    SELECT
+        run_expectancy_key,
+        ANY_VALUE(league_group) AS league_group,
+        ANY_VALUE(season_group) AS season_group,
+        ANY_VALUE(outs_start) AS outs,
+        ANY_VALUE(base_state_start) AS base_state,
+        ROUND(AVG(runs_scored), 2)::DECIMAL AS avg_runs_scored,
+        ROUND(COALESCE(VAR_SAMP(runs_scored), 2), 0)::DECIMAL AS variance_runs_scored,
+        COUNT(*) AS sample_size
+    FROM next_runs
+    GROUP BY 1
 )
 
-SELECT
-    run_expectancy_key,
-    ANY_VALUE(league_group) AS league_group,
-    ANY_VALUE(season_group) AS season_group,
-    ANY_VALUE(outs_start) AS outs,
-    ANY_VALUE(base_state_start) AS base_state,
-    ROUND(AVG(runs_scored), 2)::DECIMAL AS avg_runs_scored,
-    ROUND(VAR_SAMP(runs_scored), 2)::DECIMAL AS variance_runs_scored,
-    COUNT(*) AS sample_size
-FROM final
-GROUP BY 1
+SELECT * FROM final

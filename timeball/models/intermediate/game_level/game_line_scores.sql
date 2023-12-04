@@ -30,7 +30,7 @@ game_agg AS (
             ELSE runs::STRING
         END, '') AS line_score,
         SUM(outs) AS duration_outs,
-        LIST(runs ORDER BY inning) AS line_score_list
+        LIST(runs::UTINYINT ORDER BY inning) AS line_score_list
     FROM unioned
     GROUP BY 1, 2
 ),
@@ -53,7 +53,7 @@ side_agg AS (
         FIRST(g.line_score) FILTER (WHERE side = 'Away') AS away_line_score,
         FIRST(g.line_score_list) FILTER (WHERE side = 'Home') AS home_line_score_list,
         FIRST(g.line_score_list) FILTER (WHERE side = 'Away') AS away_line_score_list,
-        SUM(COALESCE(g.duration_outs, box_outs.duration_outs)) AS duration_outs,
+        SUM(COALESCE(g.duration_outs, box_outs.duration_outs))::UTINYINT AS duration_outs,
     FROM game_agg AS g
     LEFT JOIN box_outs USING (game_id, side)
     GROUP BY 1

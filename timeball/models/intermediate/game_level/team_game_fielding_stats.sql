@@ -84,11 +84,11 @@ players AS (
         SUM(putouts) AS putouts,
         SUM(assists) AS assists,
         SUM(errors) AS errors,
-        SUM(fielders_choices) AS fielders_choices,
-        SUM(assisted_putouts) AS assisted_putouts,
-        SUM(in_play_putouts) AS in_play_putouts,
-        SUM(in_play_assists) AS in_play_assists,
-        SUM(passed_balls) AS passed_balls,
+        SUM(fielders_choices)::UTINYINT AS fielders_choices,
+        SUM(assisted_putouts)::UTINYINT AS assisted_putouts,
+        SUM(in_play_putouts)::UTINYINT AS in_play_putouts,
+        SUM(in_play_assists)::UTINYINT AS in_play_assists,
+        SUM(passed_balls)::UTINYINT AS passed_balls,
     FROM {{ ref('player_position_game_fielding_lines') }}
     GROUP BY 1, 2
 ),

@@ -96,19 +96,19 @@ agged AS (
     SELECT
         game_id,
         MAP(
-            LIST(lineup_position ORDER BY lineup_position) FILTER (WHERE side = 'Away'),
+            LIST(lineup_position::UTINYINT ORDER BY lineup_position) FILTER (WHERE side = 'Away'),
             LIST(player_id ORDER BY lineup_position) FILTER (WHERE side = 'Away')
         ) AS lineup_map_away,
         MAP(
-            LIST(fielding_position ORDER BY fielding_position) FILTER (WHERE side = 'Away'),
+            LIST(fielding_position::UTINYINT ORDER BY fielding_position) FILTER (WHERE side = 'Away'),
             LIST(player_id ORDER BY fielding_position) FILTER (WHERE side = 'Away')
         ) AS fielding_map_away,
         MAP(
-            LIST(lineup_position ORDER BY lineup_position) FILTER (WHERE side = 'Home'),
+            LIST(lineup_position::UTINYINT ORDER BY lineup_position) FILTER (WHERE side = 'Home'),
             LIST(player_id ORDER BY lineup_position) FILTER (WHERE side = 'Home')
         ) AS lineup_map_home,
         MAP(
-            LIST(fielding_position ORDER BY fielding_position) FILTER (WHERE side = 'Home'),
+            LIST(fielding_position::UTINYINT ORDER BY fielding_position) FILTER (WHERE side = 'Home'),
             LIST(player_id ORDER BY fielding_position) FILTER (WHERE side = 'Home')
         ) AS fielding_map_home
     FROM unioned

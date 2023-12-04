@@ -20,7 +20,7 @@ models:
         data_type: varchar
       - name: lineup_map_away
         description: ""
-        data_type: map(integer, varchar)
+        data_type: map(utinyint, varchar)
         constraints:
           - type: not_null
       - name: fielding_map_away

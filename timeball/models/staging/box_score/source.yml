@@ -272,7 +272,7 @@ sources:
             data_type: INT
           - name: wind_speed_mph
             description: ""
-            data_type: INT1
+            data_type: utinyint
           - name: use_dh
             description: ""
             tests:

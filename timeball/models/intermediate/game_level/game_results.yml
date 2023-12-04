@@ -95,7 +95,7 @@ models:
           - type: not_null
       - name: away_runs_scored
         description: ""
-        data_type: hugeint
+        data_type: utinyint
         constraints:
           - type: not_null
       - name: away_line_score

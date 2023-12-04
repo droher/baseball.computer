@@ -172,7 +172,7 @@ models:
         data_type: bigint
       - name: wind_speed_mph
         description: ""
-        data_type: smallint
+        data_type: utinyint
       - name: use_dh
         description: ""
         data_type: boolean
@@ -208,7 +208,7 @@ models:
         data_type: varchar
       - name: is_regular_season
         description: ""
-        data_type: varchar
+        data_type: boolean
       - name: is_postseason
         description: ""
         data_type: boolean

@@ -1,5 +1,5 @@
 WITH flattened_init AS (
-    SELECT DISTINCT
+    SELECT
         season,
         game_id,
         away_team_id,
@@ -31,7 +31,7 @@ flattened AS (
 ),
 
 counts AS (
-    SELECT
+    SELECT DISTINCT ON (f.game_id, cleaned_scorer)
         f.season,
         f.game_id,
         f.date,

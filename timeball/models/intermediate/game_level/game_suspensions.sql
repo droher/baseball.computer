@@ -44,7 +44,7 @@ SELECT
     game_id,
     event_key_at_suspension,
     STRPTIME(suspension_info[1], '%Y%m%d')::DATE AS date_resumed,
-    suspension_info[2]::PARK_ID AS new_park_id,
+    NULLIF(suspension_info[2], '')::PARK_ID AS new_park_id,
     suspension_info[3]::UTINYINT AS away_score_at_suspension,
     suspension_info[4]::UTINYINT AS home_score_at_suspension,
     suspension_info[5]::UTINYINT AS game_outs_recorded_at_suspension,

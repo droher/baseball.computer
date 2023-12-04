@@ -231,14 +231,14 @@ ALS,ALS,,,American League,All Stars,,1926-01-01,,,
 ASB,ASB,,,Baltimore,All Stars,,1927-01-01,1933-12-31,Baltimore,MD
 ASC,ASC,,,Max Carey,All Stars,,1930-01-01,1931-12-31,,
 ASD,ASD,,,Dizzy Dean,All Stars,,1933-01-01,1942-12-31,,
-ASE,ASE,,,East,All Stars,,1933-01-01,1958-12-31,,
+ASE,ASE,,,East,All Stars,,1933-01-01,1961-12-31,,
 ASF,ASF,,,Bob Feller,All Stars,,1945-01-01,1947-12-31,,
 ASG,ASG,,,Lefty Grove,All Stars,,1930-01-01,1930-12-31,,
 ASL,ASL,,,Lou Gehrig,All Stars,,1929-01-01,1929-12-31,,
 ASO,ASO,,,Steve O'Neill,All Stars,,1931-01-01,1931-12-31,,
 ASP,ASP,,,Satchel Paige,All-Stars,,1946-01-01,1946-12-31,,
 AST,AST,,,Taylor,All Stars,,1940-01-01,1940-12-31,,
-ASW,ASW,,,West,All Stars,,1933-01-01,1958-12-31,,
+ASW,ASW,,,West,All Stars,,1933-01-01,1961-12-31,,
 ATN,ATN,,,Atlanta,Black Crackers,,1932-01-01,1939-12-31,Atlanta,GA
 BCG,BCG,,,Baltimore,Colored Giants,,1943-01-01,1943-12-31,Baltimore,MD
 BIR,BIR,NNL,,Birmingham,Black Barons,,1923-01-01,1948-12-31,Birmingham,AL
@@ -259,7 +259,7 @@ CCB,CCB,NAL,,Cincinnati-Cleveland,Buckeyes,,1942-01-01,1942-12-31,,
 CCR,CCR,,,Cincinnati,Crescents,,1946-01-01,1946-12-31,Cincinnati,OH
 CDA,CDA,,,Chuck Dressen,All Stars,,1945-01-01,1945-12-31,,
 CG1,CG1,NN1,,Chicago,Giants,,1911-01-01,1921-12-31,Chicago,IL
-CHM,CHM,,,Chicago Mills,,,1934-01-01,1935-12-31,Chicago,IL
+CHM,CHM,,,Chicago,Mills,,1934-01-01,1935-12-31,Chicago,IL
 CI1,CI1,NAL,,Cincinnati,Tigers,,1937-01-01,1937-12-31,Cincinnati,OH
 CI2,CI2,NAL,,Cincinnati,Clowns,,1942-01-01,1943-12-31,Cincinnati,OH
 CIA,CIA,NAL,,Cincinnati-Indianapolis,Clowns,,1944-01-01,1945-12-31,,
@@ -330,6 +330,7 @@ PH6,PH6,,,Philadelphia,Bacharach Giants,,1934-01-01,1934-12-31,Philadelphia,PA
 PHB,PHB,,,Philadelphia-Birmingham,Baron Stars,,1945-01-01,1945-12-31,,
 PHE,PHE,,,Philadelphia,Tigers,,1928-01-01,1928-12-31,Philadelphia,PA
 PHG,PHG,,,Philadelphia,Giants,,1903-01-01,1904-12-31,Philadelphia,PA
+PGH,PGH,,,Philadelphia,Giants,,1903-01-01,1904-12-31,Philadelphia,PA
 PIR,PIR,,,Pirrone,All Stars,,1925-01-01,1943-12-31,Pirrone,
 PRC,PRC,,,Pennsylvania,Red Caps,,1917-01-01,1920-12-31,,
 PRG,PRG,,,Philadelphia,Royal Giants,,1925-01-01,1942-12-31,Philadelphia,PA
