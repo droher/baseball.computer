@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [win_expectancy_key]
+        columns: &pk [win_expectancy_key]
 
     columns:
       - name: win_expectancy_key

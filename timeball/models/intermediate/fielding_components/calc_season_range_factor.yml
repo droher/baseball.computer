@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [season]
+        columns: &pk [season]
 
     columns:
       - name: season

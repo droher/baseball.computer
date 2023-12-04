@@ -11,7 +11,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [game_id]
+        columns: &pk [game_id]
 
     columns:
       - name: game_id

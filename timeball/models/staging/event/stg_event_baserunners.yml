@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [event_key, baserunner]
+        columns: &pk [event_key, baserunner]
 
     columns:
       - name: game_id

@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [park_id]
+        columns: &pk [park_id]
 
     columns:
       - name: park_id

@@ -12,7 +12,10 @@ models:
 
     # constraints:
     #   - type: primary_key
-    #     columns: []
+    #     columns: &pk []
+
+    # meta:
+    #   primary_keys: *pk
 """
     }}
     columns:

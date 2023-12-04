@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [game_id, player_id, fielding_position]
+        columns: &pk [game_id, player_id, fielding_position]
 
     columns:
       - name: game_id

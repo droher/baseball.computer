@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [run_expectancy_key]
+        columns: &pk [run_expectancy_key]
 
     columns:
       - name: run_expectancy_key

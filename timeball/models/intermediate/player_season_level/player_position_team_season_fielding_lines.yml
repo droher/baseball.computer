@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [season, team_id, player_id, fielding_position, game_type]
+        columns: &pk [season, team_id, player_id, fielding_position, game_type]
 
     columns:
       - name: season

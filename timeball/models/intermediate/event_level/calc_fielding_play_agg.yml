@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [event_key, fielding_position]
+        columns: &pk [event_key, fielding_position]
 
     columns:
       - name: event_key

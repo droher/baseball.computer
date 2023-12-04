@@ -12,7 +12,7 @@ models:
 
     # constraints:
     #   - type: primary_key
-    #     columns: []
+    #     columns: &pk []
 
     columns:
       - name: team_id

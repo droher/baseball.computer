@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [personnel_lineup_key, lineup_position]
+        columns: &pk [personnel_lineup_key, lineup_position]
 
     columns:
       - name: game_id

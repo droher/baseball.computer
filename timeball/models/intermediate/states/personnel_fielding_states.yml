@@ -11,7 +11,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [personnel_fielding_key, fielding_position]
+        columns: &pk [personnel_fielding_key, fielding_position]
 
     columns:
       - name: game_id

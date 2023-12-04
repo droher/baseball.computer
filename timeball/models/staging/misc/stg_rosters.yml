@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [year, player_id, team_id]
+        columns: &pk [year, player_id, team_id]
 
     columns:
       - name: year
