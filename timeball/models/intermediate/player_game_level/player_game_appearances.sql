@@ -79,10 +79,10 @@ offense_agg AS (
         game_id,
         player_id,
         ANY_VALUE(side) AS side,
-        BOOL_OR(entered_game_as = 'Starter')::INT1 AS games_started,
-        BOOL_OR(entered_game_as = 'PinchHitter')::INT1 AS games_pinch_hit,
-        BOOL_OR(entered_game_as = 'PinchRunner')::INT1 AS games_pinch_run,
-        BOOL_OR(entered_game_as = 'DefensiveSubstitution')::INT1 AS games_defensive_sub,
+        BOOL_OR(entered_game_as = 'Starter')::UTINYINT AS games_started,
+        BOOL_OR(entered_game_as = 'PinchHitter')::UTINYINT AS games_pinch_hit,
+        BOOL_OR(entered_game_as = 'PinchRunner')::UTINYINT AS games_pinch_run,
+        BOOL_OR(entered_game_as = 'DefensiveSubstitution')::UTINYINT AS games_defensive_sub,
         -- Just choose first sub location - We can track courtesy runner situations somewhere else
         FIRST(lineup_position) AS lineup_position
     -- Ignore pitcher in DH lineups
@@ -98,8 +98,9 @@ fielding_agg AS (
         ANY_VALUE(side) AS side,
         -- Sort by fielding position to choose pitcher first in event of Ohtani rule
         LIST(fielding_position ORDER BY position_order, fielding_position) AS fielding_positions,
-        (BOOL_OR(fielding_position = 1 AND position_order = 1) AND BOOL_OR(fielding_position = 10 AND position_order = 1) 
-        )::INT1 AS games_ohtani_rule
+        (BOOL_OR(fielding_position = 1 AND position_order = 1)
+            AND BOOL_OR(fielding_position = 10 AND position_order = 1) 
+        )::UTINYINT AS games_ohtani_rule
     FROM fielding_union
     -- Keep DH, but ignore PH/PR
     WHERE fielding_position BETWEEN 1 AND 10

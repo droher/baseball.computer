@@ -2,3 +2,4 @@
 - Smoke test for all-time HR leaders
 - Ranges for franchises/teams
 - Fix PGH/PHG typo in raw data
+- CAG194209072: radca101 appears on both sides

@@ -6,42 +6,54 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [game_id, player_id]
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: player_id
         description: ""
         data_type: varchar
       - name: side
         description: ""
-        data_type: enum('home', 'away')
+        data_type: side
       - name: games_started
         description: ""
-        data_type: tinyint
+        data_type: utinyint
+        constraints:
+          - type: not_null
       - name: games_pinch_hit
         description: ""
-        data_type: tinyint
+        data_type: utinyint
+        constraints:
+          - type: not_null
       - name: games_pinch_run
         description: ""
-        data_type: tinyint
+        data_type: utinyint
+        constraints:
+          - type: not_null
       - name: games_defensive_sub
         description: ""
-        data_type: tinyint
+        data_type: utinyint
+        constraints:
+          - type: not_null
       - name: games_ohtani_rule
         description: ""
         data_type: integer
+        constraints:
+          - type: not_null
       - name: lineup_position
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: first_fielding_position
         description: ""
         data_type: utinyint

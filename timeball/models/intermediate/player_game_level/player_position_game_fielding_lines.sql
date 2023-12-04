@@ -103,9 +103,9 @@ final AS (
         COALESCE(box_agg.passed_balls, event_agg.passed_balls)::UTINYINT AS passed_balls,
         event_agg.stolen_bases,
         event_agg.caught_stealing,
-        box_agg.putouts - event_agg.putouts AS surplus_box_putouts,
-        box_agg.assists - event_agg.assists AS surplus_box_assists,
-        box_agg.errors - event_agg.errors AS surplus_box_errors,
+        (box_agg.putouts - event_agg.putouts)::TINYINT AS surplus_box_putouts,
+        (box_agg.assists - event_agg.assists)::TINYINT AS surplus_box_assists,
+        (box_agg.errors - event_agg.errors)::TINYINT AS surplus_box_errors,
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
     LEFT JOIN {{ ref('player_game_appearances') }} AS appearances USING (game_id, player_id)
