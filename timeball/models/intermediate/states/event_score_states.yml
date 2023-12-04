@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [event_key]
 
     columns:
       - name: event_key
@@ -21,15 +21,25 @@ models:
       - name: score_home_start
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: score_away_start
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: score_home_end
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: score_away_end
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: runs_on_play
         description: ""
         data_type: utinyint
+        constraints:
+          - type: not_null

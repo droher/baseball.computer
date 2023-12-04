@@ -22,10 +22,7 @@ models:
         description: ""
         data_type: uinteger
         constraints:
-          - type: not_null
-        # TODO: Change to constraint after fix
-        tests:
-          - unique
+          - type: unique
       - name: date
         description: ""
         data_type: date

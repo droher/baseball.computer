@@ -12,7 +12,10 @@ models:
 
     constraints:
       - type: primary_key
-        columns: [player_id]
+        columns: &pk [player_id]
+
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: player_id
