@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [season, team_id, game_type]
 
     columns:
       - name: season
@@ -26,49 +26,53 @@ models:
         data_type: varchar
       - name: games
         description: ""
-        data_type: bigint
+        data_type: usmallint
+        constraints:
+          - type: not_null
       - name: outs_played
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: putouts
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: assists
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: errors
         description: ""
-        data_type: hugeint
+        data_type: usmallint
+        constraints:
+          - type: not_null
       - name: passed_balls
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: stolen_bases
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: caught_stealing
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: plate_appearances_in_field
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: plate_appearances_in_field_with_ball_in_play
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: fielders_choices
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: reaching_errors
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: pickoffs
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: double_plays
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: triple_plays
         description: ""
-        data_type: hugeint
+        data_type: usmallint
       - name: ground_ball_double_plays
         description: ""
-        data_type: hugeint
+        data_type: usmallint

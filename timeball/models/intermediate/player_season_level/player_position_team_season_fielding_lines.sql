@@ -8,14 +8,23 @@ WITH databank AS (
         field.season,
         field.team_id,
         people.retrosheet_player_id AS player_id,
-        field.fielding_position,
+        COALESCE(field.fielding_position, 0) AS fielding_position,
         ANY_VALUE('RegularSeason') AS game_type,
         ANY_VALUE(field.fielding_position_category) AS fielding_position_category,
         SUM(field.games) AS games,
         SUM(field.games_started) AS games_started,
-        COALESCE(SUM(of_games.games_left_field), 0) AS games_left_field,
-        COALESCE(SUM(of_games.games_center_field), 0) AS games_center_field,
-        COALESCE(SUM(of_games.games_right_field), 0) AS games_right_field,
+        CASE WHEN ANY_VALUE(field.fielding_position_category) = 'OF'
+                THEN COALESCE(SUM(of_games.games_left_field), 0)
+            ELSE 0
+        END AS games_left_field,
+        CASE WHEN ANY_VALUE(field.fielding_position_category) = 'OF'
+                THEN COALESCE(SUM(of_games.games_center_field), 0)
+            ELSE 0
+        END AS games_center_field,
+        CASE WHEN ANY_VALUE(field.fielding_position_category) = 'OF'
+                THEN COALESCE(SUM(of_games.games_right_field), 0)
+            ELSE 0
+        END AS games_right_field,
         SUM(field.outs_played) AS outs_played,
         SUM(field.putouts) AS putouts,
         SUM(field.assists) AS assists,
@@ -48,25 +57,25 @@ game_agg AS (
             WHEN stats.fielding_position = 10 THEN 'DH'
         END) AS fielding_position_category,
         COUNT(*) AS games,
-        SUM(stats.games_started) AS games_started,
-        SUM(stats.outs_played) AS outs_played,
-        SUM(stats.plate_appearances_in_field) AS plate_appearances_in_field,
-        SUM(stats.plate_appearances_in_field_with_ball_in_play) AS plate_appearances_in_field_with_ball_in_play,
-        SUM(stats.putouts) AS putouts,
-        SUM(stats.assists) AS assists,
-        SUM(stats.errors) AS errors,
-        SUM(stats.fielders_choices) AS fielders_choices,
-        SUM(stats.reaching_errors) AS reaching_errors,
-        SUM(stats.double_plays) AS double_plays,
-        SUM(stats.triple_plays) AS triple_plays,
-        SUM(stats.ground_ball_double_plays) AS ground_ball_double_plays,
-        SUM(stats.passed_balls) AS passed_balls,
-        SUM(stats.balls_hit_to) AS balls_hit_to,
-        SUM(stats.stolen_bases) AS stolen_bases,
-        SUM(stats.caught_stealing) AS caught_stealing,
-        COUNT_IF(stats.fielding_position = 7) AS games_left_field,
-        COUNT_IF(stats.fielding_position = 8) AS games_center_field,
-        COUNT_IF(stats.fielding_position = 9) AS games_right_field,
+        SUM(stats.games_started)::USMALLINT AS games_started,
+        SUM(stats.outs_played)::USMALLINT AS outs_played,
+        SUM(stats.plate_appearances_in_field)::USMALLINT AS plate_appearances_in_field,
+        SUM(stats.plate_appearances_in_field_with_ball_in_play)::USMALLINT AS plate_appearances_in_field_with_ball_in_play,
+        SUM(stats.putouts)::USMALLINT AS putouts,
+        SUM(stats.assists)::USMALLINT AS assists,
+        SUM(stats.errors)::USMALLINT AS errors,
+        SUM(stats.fielders_choices)::USMALLINT AS fielders_choices,
+        SUM(stats.reaching_errors)::USMALLINT AS reaching_errors,
+        SUM(stats.double_plays)::USMALLINT AS double_plays,
+        SUM(stats.triple_plays)::USMALLINT AS triple_plays,
+        SUM(stats.ground_ball_double_plays)::USMALLINT AS ground_ball_double_plays,
+        SUM(stats.passed_balls)::USMALLINT AS passed_balls,
+        SUM(stats.balls_hit_to)::USMALLINT AS balls_hit_to,
+        SUM(stats.stolen_bases)::USMALLINT AS stolen_bases,
+        SUM(stats.caught_stealing)::USMALLINT AS caught_stealing,
+        COUNT_IF(stats.fielding_position = 7)::USMALLINT AS games_left_field,
+        COUNT_IF(stats.fielding_position = 8)::USMALLINT AS games_center_field,
+        COUNT_IF(stats.fielding_position = 9)::USMALLINT AS games_right_field,
     FROM {{ ref('stg_games') }} AS games
     INNER JOIN {{ ref('player_position_game_fielding_lines') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4, 5

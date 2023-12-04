@@ -6,13 +6,13 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
+    constraints:
+      - type: primary_key
+        columns: [season, team_id, player_id, game_type]
 
     columns:
       - name: season
@@ -375,9 +375,6 @@ models:
       - name: games_started
         description: ""
         data_type: hugeint
-      - name: innings_pitched_1
-        description: ""
-        data_type: decimal(38,4)
       - name: inherited_runners
         description: ""
         data_type: hugeint

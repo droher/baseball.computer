@@ -21,7 +21,7 @@ box_offense AS (
             WHEN pinch_run.pinch_runner_id IS NOT NULL THEN 'PinchRunner'
             ELSE 'DefensiveSubstitution'
         END AS entered_game_as,
-        nth_player_at_position AS position_order
+        bat.nth_player_at_position AS position_order
     FROM {{ ref('stg_box_score_batting_lines') }} AS bat
     LEFT JOIN {{ ref('stg_box_score_pinch_hitting_lines') }} AS pinch_hit
         ON pinch_hit.game_id = bat.game_id

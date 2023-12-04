@@ -6,14 +6,14 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: []
-
+    constraints:
+      - type: primary_key
+        columns: [season, team_id, player_id, game_type]
+  
     columns:
       - name: season
         description: ""

@@ -46,7 +46,6 @@ retrosheet AS (
         stats.team_id,
         stats.player_id,
         games.game_type,
-        ROUND(SUM(stats.outs_recorded) / 3, 2) AS innings_pitched,
         COUNT(*) AS games,
         {% for stat in event_level_pitching_stats() + game_level_pitching_stats() -%}
             SUM({{ stat }}) AS {{ stat }},
@@ -54,8 +53,15 @@ retrosheet AS (
     FROM {{ ref('stg_games') }} AS games
     INNER JOIN {{ ref('player_game_pitching_lines') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
+),
+
+reround_ip AS (
+    SELECT * REPLACE (
+        ROUND(outs_recorded / 3, 2) AS innings_pitched
+    )
+    FROM retrosheet
 )
 
-SELECT * FROM retrosheet
+SELECT * FROM reround_ip
 UNION ALL BY NAME
 SELECT * FROM databank
