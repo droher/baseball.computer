@@ -19,46 +19,46 @@ models:
 
     columns:
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: balls_batted
-        description: ""
+        description: "{{ doc('balls_batted') }}"
         data_type: utinyint
       - name: balls_in_play
-        description: ""
+        description: "{{ doc('balls_in_play') }}"
         data_type: utinyint
       - name: trajectory_fly_ball
-        description: ""
+        description: "{{ doc('trajectory_fly_ball') }}"
         data_type: utinyint
       - name: trajectory_ground_ball
-        description: ""
+        description: "{{ doc('trajectory_ground_ball') }}"
         data_type: utinyint
       - name: trajectory_line_drive
-        description: ""
+        description: "{{ doc('trajectory_line_drive') }}"
         data_type: utinyint
       - name: trajectory_pop_fly
-        description: ""
+        description: "{{ doc('trajectory_pop_fly') }}"
         data_type: utinyint
       - name: trajectory_unknown
-        description: ""
+        description: "{{ doc('trajectory_unknown') }}"
         data_type: utinyint
       - name: trajectory_known
-        description: ""
+        description: "{{ doc('trajectory_known') }}"
         data_type: utinyint
       - name: trajectory_broad_type_air_ball
-        description: ""
+        description: "{{ doc('trajectory_broad_type_air_ball') }}"
         data_type: utinyint
       - name: trajectory_broad_type_ground_ball
-        description: ""
+        description: "{{ doc('trajectory_broad_type_ground_ball') }}"
         data_type: utinyint
       - name: trajectory_broad_type_unknown
-        description: ""
+        description: "{{ doc('trajectory_broad_type_unknown') }}"
         data_type: utinyint
       - name: trajectory_broad_type_known
-        description: ""
+        description: "{{ doc('trajectory_broad_type_known') }}"
         data_type: utinyint
       - name: bunts
-        description: ""
+        description: "{{ doc('bunts') }}"
         data_type: utinyint
       - name: batted_distance_plate
         description: ""

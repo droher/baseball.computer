@@ -21,25 +21,25 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: date
-        description: ""
+        description: "{{ doc('date') }}"
         data_type: date
         constraints:
           - type: not_null
       - name: start_time
-        description: ""
+        description: "{{ doc('start_time') }}"
         data_type: timestamp
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
         constraints:
           - type: not_null
       - name: home_team_id
-        description: ""
+        description: "{{ doc('home_team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
       - name: away_team_id
-        description: ""
+        description: "{{ doc('away_team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
@@ -49,53 +49,53 @@ models:
         constraints:
           - type: not_null
       - name: time_of_day
-        description: ""
+        description: "{{ doc('time_of_day') }}"
         data_type: time_of_day
         constraints:
           - type: not_null
       - name: game_type
-        description: ""
+        description: "{{ doc('game_type') }}"
         data_type: game_type
         constraints:
           - type: not_null
       - name: bat_first_side
-        description: ""
+        description: "{{ doc('bat_first_side') }}"
         data_type: side
         constraints:
           - type: not_null
       - name: sky
-        description: ""
+        description: "{{ doc('sky') }}"
         data_type: sky
         constraints:
           - type: not_null
       - name: field_condition
-        description: ""
+        description: "{{ doc('field_condition') }}"
         data_type: field_condition
         constraints:
           - type: not_null
       - name: precipitation
-        description: ""
+        description: "{{ doc('precipitation') }}"
         data_type: precipitation
         constraints:
           - type: not_null
       - name: wind_direction
-        description: ""
+        description: "{{ doc('wind_direction') }}"
         constraints:
           - type: not_null
         data_type: wind_direction
       - name: park_id
-        description: ""
+        description: "{{ doc('park_id') }}"
         data_type: park_id
         constraints:
           - type: not_null
       - name: temperature_fahrenheit
-        description: ""
+        description: "{{ doc('temperature_fahrenheit') }}"
         data_type: tinyint
       - name: attendance
-        description: ""
+        description: "{{ doc('attendance') }}"
         data_type: uinteger
       - name: wind_speed_mph
-        description: ""
+        description: "{{ doc('wind_speed_mph') }}"
         data_type: utinyint
       - name: use_dh
         description: ""
@@ -109,7 +109,7 @@ models:
         description: ""
         data_type: varchar
       - name: source_type
-        description: ""
+        description: "{{ doc('source_type') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -132,7 +132,7 @@ models:
         description: ""
         data_type: varchar
       - name: filename
-        description: ""
+        description: "{{ doc('filename') }}"
         data_type: varchar
       - name: home_starting_pitcher_id
         description: ""

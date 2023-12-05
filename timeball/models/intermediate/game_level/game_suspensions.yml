@@ -3,7 +3,8 @@ version: 2
 
 models:
   - name: game_suspensions
-    description: "Information about games that were suspended and resumed at a later date."
+    description: "Information about games that were suspended and resumed at a later
+      date."
 
     config:
       contract:

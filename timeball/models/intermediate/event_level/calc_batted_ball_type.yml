@@ -19,10 +19,10 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: plate_appearance_result
         description: ""

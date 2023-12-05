@@ -24,12 +24,12 @@ models:
         constraints:
           - type: not_null
       - name: event_id
-        description: ""
+        description: "{{ doc('event_id') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: personnel_lineup_key
         description: ""

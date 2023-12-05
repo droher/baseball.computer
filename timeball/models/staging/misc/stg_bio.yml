@@ -19,7 +19,7 @@ models:
 
     columns:
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: last_name
         description: ""

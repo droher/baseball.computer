@@ -19,22 +19,22 @@ models:
 
     columns:
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: hits_in_play
         description: ""
         data_type: hugeint
       - name: strikeouts
-        description: ""
+        description: "{{ doc('strikeouts') }}"
         data_type: hugeint
       - name: reached_on_errors
-        description: ""
+        description: "{{ doc('reached_on_errors') }}"
         data_type: hugeint
       - name: outs_recorded
         description: ""
         data_type: hugeint
       - name: balls_in_play
-        description: ""
+        description: "{{ doc('balls_in_play') }}"
         data_type: hugeint
       - name: putouts
         description: ""

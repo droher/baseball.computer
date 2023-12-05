@@ -22,13 +22,13 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
@@ -62,13 +62,13 @@ models:
           - dbt_utils.not_null_proportion:
               at_least: .995
       - name: double_plays
-        description: ""
+        description: "{{ doc('double_plays') }}"
         data_type: utinyint
         tests:
           - dbt_utils.not_null_proportion:
               at_least: .995
       - name: triple_plays
-        description: ""
+        description: "{{ doc('triple_plays') }}"
         data_type: utinyint
         tests:
           - dbt_utils.not_null_proportion:

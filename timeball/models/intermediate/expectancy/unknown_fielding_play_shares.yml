@@ -19,16 +19,16 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: estimated_unknown_plays
         description: ""

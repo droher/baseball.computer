@@ -19,10 +19,10 @@ models:
 
     columns:
       - name: databank_player_id
-        description: ""
+        description: "{{ doc('databank_player_id') }}"
         data_type: varchar
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: stint
         description: ""

@@ -22,10 +22,10 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: side
-        description: ""
+        description: "{{ doc('side') }}"
         data_type: side
       - name: games_started
         description: ""

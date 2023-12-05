@@ -19,25 +19,25 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: event_id
-        description: ""
+        description: "{{ doc('event_id') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
         constraints:
           - type: not_null
       - name: league
-        description: ""
+        description: "{{ doc('league') }}"
         data_type: varchar
       - name: is_interleague
         description: ""
@@ -45,27 +45,27 @@ models:
         constraints:
           - type: not_null
       - name: game_type
-        description: ""
+        description: "{{ doc('game_type') }}"
         data_type: game_type
         constraints:
           - type: not_null
       - name: date
-        description: ""
+        description: "{{ doc('date') }}"
         data_type: date
         constraints:
           - type: not_null
       - name: park_id
-        description: ""
+        description: "{{ doc('park_id') }}"
         data_type: park_id
         constraints:
           - type: not_null
       - name: bat_first_side
-        description: ""
+        description: "{{ doc('bat_first_side') }}"
         data_type: side
         constraints:
           - type: not_null
       - name: time_of_day
-        description: ""
+        description: "{{ doc('time_of_day') }}"
         data_type: time_of_day
         constraints:
           - type: not_null
@@ -80,7 +80,7 @@ models:
         constraints:
           - type: not_null
       - name: frame_start
-        description: ""
+        description: "{{ doc('frame_start') }}"
         data_type: frame
         constraints:
           - type: not_null
@@ -100,7 +100,7 @@ models:
         constraints:
           - type: not_null
       - name: batting_side
-        description: ""
+        description: "{{ doc('batting_side') }}"
         data_type: side
         constraints:
           - type: not_null
@@ -144,12 +144,12 @@ models:
         description: ""
         data_type: hand
       - name: away_team_id
-        description: ""
+        description: "{{ doc('away_team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
       - name: home_team_id
-        description: ""
+        description: "{{ doc('home_team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
@@ -164,12 +164,12 @@ models:
         constraints:
           - type: not_null
       - name: batter_id
-        description: ""
+        description: "{{ doc('batter_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: pitcher_id
-        description: ""
+        description: "{{ doc('pitcher_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -207,7 +207,7 @@ models:
         description: ""
         data_type: utinyint
       - name: frame_end
-        description: ""
+        description: "{{ doc('frame_end') }}"
         data_type: frame
       - name: outs_on_play
         description: ""

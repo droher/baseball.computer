@@ -19,15 +19,15 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: batting_side
-        description: ""
+        description: "{{ doc('batting_side') }}"
         data_type: side
         constraints:
           - type: not_null
@@ -47,7 +47,7 @@ models:
         constraints:
           - type: not_null
       - name: batter_id
-        description: ""
+        description: "{{ doc('batter_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -60,7 +60,7 @@ models:
         description: ""
         data_type: utinyint
       - name: pitcher_id
-        description: ""
+        description: "{{ doc('pitcher_id') }}"
         data_type: varchar
         constraints:
           - type: not_null

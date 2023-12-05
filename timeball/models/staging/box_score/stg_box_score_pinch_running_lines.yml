@@ -12,7 +12,7 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -22,10 +22,10 @@ models:
         constraints:
           - type: not_null
       - name: inning
-        description: ""
+        description: "{{ doc('inning') }}"
         data_type: bigint
       - name: side
-        description: ""
+        description: "{{ doc('side') }}"
         data_type: varchar
         constraints:
           - type: not_null

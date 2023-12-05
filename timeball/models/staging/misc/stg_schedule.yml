@@ -9,10 +9,10 @@ models:
     config:
       contract:
         enforced: true
-  
+
     columns:
       - name: date
-        description: ""
+        description: "{{ doc('date') }}"
         data_type: timestamp
         constraints:
           - type: not_null

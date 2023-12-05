@@ -19,7 +19,7 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -28,23 +28,23 @@ models:
               field: game_id
               to: ref('stg_games')
       - name: event_id
-        description: ""
+        description: "{{ doc('event_id') }}"
         data_type: utinyint
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: batting_side
-        description: ""
+        description: "{{ doc('batting_side') }}"
         data_type: side
         constraints:
           - type: not_null
       - name: inning
-        description: ""
+        description: "{{ doc('inning') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: frame
-        description: ""
+        description: "{{ doc('frame') }}"
         data_type: frame
         constraints:
           - type: not_null
@@ -54,12 +54,12 @@ models:
         constraints:
           - type: not_null
       - name: batter_id
-        description: ""
+        description: "{{ doc('batter_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: pitcher_id
-        description: ""
+        description: "{{ doc('pitcher_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -133,7 +133,7 @@ models:
         constraints:
           - type: not_null
       - name: runs_batted_in
-        description: ""
+        description: "{{ doc('runs_batted_in') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -148,12 +148,12 @@ models:
         constraints:
           - type: not_null
       - name: date
-        description: ""
+        description: "{{ doc('date') }}"
         data_type: date
         constraints:
           - type: not_null
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
         constraints:
           - type: not_null

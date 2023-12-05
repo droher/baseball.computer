@@ -24,7 +24,7 @@ models:
         constraints:
           - type: not_null
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         constraints:
           - type: not_null
         data_type: varchar
@@ -41,7 +41,7 @@ models:
         description: ""
         data_type: varchar
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: position
         description: ""

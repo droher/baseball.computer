@@ -19,136 +19,136 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: baserunner
         description: ""
         data_type: baserunner
       - name: plate_appearances
-        description: ""
+        description: "{{ doc('plate_appearances') }}"
         data_type: tinyint
       - name: at_bats
-        description: ""
+        description: "{{ doc('at_bats') }}"
         data_type: tinyint
       - name: hits
-        description: ""
+        description: "{{ doc('hits') }}"
         data_type: tinyint
       - name: singles
-        description: ""
+        description: "{{ doc('singles') }}"
         data_type: tinyint
       - name: doubles
-        description: ""
+        description: "{{ doc('doubles') }}"
         data_type: tinyint
       - name: triples
-        description: ""
+        description: "{{ doc('triples') }}"
         data_type: tinyint
       - name: home_runs
-        description: ""
+        description: "{{ doc('home_runs') }}"
         data_type: tinyint
       - name: total_bases
-        description: ""
+        description: "{{ doc('total_bases') }}"
         data_type: tinyint
       - name: strikeouts
-        description: ""
+        description: "{{ doc('strikeouts') }}"
         data_type: tinyint
       - name: walks
-        description: ""
+        description: "{{ doc('walks') }}"
         data_type: tinyint
       - name: intentional_walks
-        description: ""
+        description: "{{ doc('intentional_walks') }}"
         data_type: tinyint
       - name: hit_by_pitches
-        description: ""
+        description: "{{ doc('hit_by_pitches') }}"
         data_type: tinyint
       - name: sacrifice_hits
-        description: ""
+        description: "{{ doc('sacrifice_hits') }}"
         data_type: tinyint
       - name: sacrifice_flies
-        description: ""
+        description: "{{ doc('sacrifice_flies') }}"
         data_type: tinyint
       - name: reached_on_errors
-        description: ""
+        description: "{{ doc('reached_on_errors') }}"
         data_type: tinyint
       - name: reached_on_interferences
-        description: ""
+        description: "{{ doc('reached_on_interferences') }}"
         data_type: tinyint
       - name: inside_the_park_home_runs
-        description: ""
+        description: "{{ doc('inside_the_park_home_runs') }}"
         data_type: tinyint
       - name: ground_rule_doubles
-        description: ""
+        description: "{{ doc('ground_rule_doubles') }}"
         data_type: tinyint
       - name: infield_hits
-        description: ""
+        description: "{{ doc('infield_hits') }}"
         data_type: tinyint
       - name: on_base_opportunities
-        description: ""
+        description: "{{ doc('on_base_opportunities') }}"
         data_type: tinyint
       - name: on_base_successes
-        description: ""
+        description: "{{ doc('on_base_successes') }}"
         data_type: tinyint
       - name: runs_batted_in
-        description: ""
+        description: "{{ doc('runs_batted_in') }}"
         data_type: tinyint
       - name: grounded_into_double_plays
-        description: ""
+        description: "{{ doc('grounded_into_double_plays') }}"
         data_type: tinyint
       - name: double_plays
-        description: ""
+        description: "{{ doc('double_plays') }}"
         data_type: tinyint
       - name: triple_plays
-        description: ""
+        description: "{{ doc('triple_plays') }}"
         data_type: tinyint
       - name: batting_outs
-        description: ""
+        description: "{{ doc('batting_outs') }}"
         data_type: tinyint
       - name: balls_in_play
-        description: ""
+        description: "{{ doc('balls_in_play') }}"
         data_type: tinyint
       - name: balls_batted
-        description: ""
+        description: "{{ doc('balls_batted') }}"
         data_type: tinyint
       - name: trajectory_fly_ball
-        description: ""
+        description: "{{ doc('trajectory_fly_ball') }}"
         data_type: tinyint
       - name: trajectory_ground_ball
-        description: ""
+        description: "{{ doc('trajectory_ground_ball') }}"
         data_type: tinyint
       - name: trajectory_line_drive
-        description: ""
+        description: "{{ doc('trajectory_line_drive') }}"
         data_type: tinyint
       - name: trajectory_pop_fly
-        description: ""
+        description: "{{ doc('trajectory_pop_fly') }}"
         data_type: tinyint
       - name: trajectory_unknown
-        description: ""
+        description: "{{ doc('trajectory_unknown') }}"
         data_type: tinyint
       - name: trajectory_known
-        description: ""
+        description: "{{ doc('trajectory_known') }}"
         data_type: tinyint
       - name: trajectory_broad_type_air_ball
-        description: ""
+        description: "{{ doc('trajectory_broad_type_air_ball') }}"
         data_type: tinyint
       - name: trajectory_broad_type_ground_ball
-        description: ""
+        description: "{{ doc('trajectory_broad_type_ground_ball') }}"
         data_type: tinyint
       - name: trajectory_broad_type_unknown
-        description: ""
+        description: "{{ doc('trajectory_broad_type_unknown') }}"
         data_type: tinyint
       - name: trajectory_broad_type_known
-        description: ""
+        description: "{{ doc('trajectory_broad_type_known') }}"
         data_type: tinyint
       - name: bunts
-        description: ""
+        description: "{{ doc('bunts') }}"
         data_type: tinyint
       - name: batted_distance_plate
         description: ""

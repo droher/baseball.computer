@@ -19,7 +19,7 @@ models:
 
     columns:
       - name: park_id
-        description: ""
+        description: "{{ doc('park_id') }}"
         data_type: park_id
       - name: name
         description: ""
@@ -44,7 +44,7 @@ models:
         description: ""
         data_type: varchar
       - name: league
-        description: ""
+        description: "{{ doc('league') }}"
         data_type: varchar
       - name: notes
         description: ""

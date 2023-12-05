@@ -22,12 +22,12 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
         constraints:
           - type: not_null
       - name: game_type
-        description: ""
+        description: "{{ doc('game_type') }}"
         data_type: game_type
         constraints:
           - type: not_null
@@ -37,12 +37,12 @@ models:
         constraints:
           - type: not_null
       - name: home_team_id
-        description: ""
+        description: "{{ doc('home_team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
       - name: away_team_id
-        description: ""
+        description: "{{ doc('away_team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null

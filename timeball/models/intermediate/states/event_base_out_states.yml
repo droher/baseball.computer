@@ -19,7 +19,7 @@ models:
 
     columns:
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: inning_start
         description: ""
@@ -30,10 +30,10 @@ models:
         description: ""
         data_type: utinyint
       - name: frame_start
-        description: ""
+        description: "{{ doc('frame_start') }}"
         data_type: frame
       - name: frame_end
-        description: ""
+        description: "{{ doc('frame_end') }}"
         data_type: frame
       - name: inning_in_outs_start
         description: ""

@@ -18,7 +18,7 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -46,10 +46,10 @@ models:
         constraints:
           - type: not_null
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint

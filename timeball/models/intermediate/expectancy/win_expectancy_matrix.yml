@@ -22,12 +22,12 @@ models:
         description: ""
         data_type: varchar
       - name: inning
-        description: ""
+        description: "{{ doc('inning') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: frame
-        description: ""
+        description: "{{ doc('frame') }}"
         data_type: frame
         constraints:
           - type: not_null

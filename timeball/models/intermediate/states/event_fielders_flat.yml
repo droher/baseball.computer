@@ -22,12 +22,12 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: event_id
-        description: ""
+        description: "{{ doc('event_id') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
         constraints:
           - type: not_null
@@ -37,7 +37,7 @@ models:
         constraints:
           - type: not_null
       - name: pitcher_id
-        description: ""
+        description: "{{ doc('pitcher_id') }}"
         data_type: varchar
         constraints:
           - type: not_null

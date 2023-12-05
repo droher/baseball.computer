@@ -12,7 +12,7 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: running_side
         description: ""
@@ -21,11 +21,11 @@ models:
         description: ""
         data_type: varchar
       - name: pitcher_id
-        description: ""
+        description: "{{ doc('pitcher_id') }}"
         data_type: varchar
       - name: catcher_id
         description: ""
         data_type: varchar
       - name: inning
-        description: ""
+        description: "{{ doc('inning') }}"
         data_type: bigint

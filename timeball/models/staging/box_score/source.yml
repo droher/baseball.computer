@@ -701,4 +701,3 @@ sources:
               - not_null
 
       - name: box_score_line_scores
-  

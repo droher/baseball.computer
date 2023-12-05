@@ -19,23 +19,23 @@ models:
 
     columns:
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
@@ -128,12 +128,12 @@ models:
         constraints:
           - type: not_null
       - name: double_plays
-        description: ""
+        description: "{{ doc('double_plays') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: triple_plays
-        description: ""
+        description: "{{ doc('triple_plays') }}"
         data_type: utinyint
         constraints:
           - type: not_null

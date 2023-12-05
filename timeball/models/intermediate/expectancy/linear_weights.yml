@@ -19,12 +19,12 @@ models:
 
     columns:
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
         constraints:
           - type: not_null
       - name: league
-        description: ""
+        description: "{{ doc('league') }}"
         data_type: varchar
         constraints:
           - type: not_null

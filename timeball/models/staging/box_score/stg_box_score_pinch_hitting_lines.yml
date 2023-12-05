@@ -19,55 +19,55 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: pinch_hitter_id
         description: ""
         data_type: varchar
       - name: inning
-        description: ""
+        description: "{{ doc('inning') }}"
         data_type: bigint
       - name: side
-        description: ""
+        description: "{{ doc('side') }}"
         data_type: varchar
       - name: at_bats
-        description: ""
+        description: "{{ doc('at_bats') }}"
         data_type: bigint
       - name: runs
         description: ""
         data_type: bigint
       - name: hits
-        description: ""
+        description: "{{ doc('hits') }}"
         data_type: bigint
       - name: doubles
-        description: ""
+        description: "{{ doc('doubles') }}"
         data_type: bigint
       - name: triples
-        description: ""
+        description: "{{ doc('triples') }}"
         data_type: bigint
       - name: home_runs
-        description: ""
+        description: "{{ doc('home_runs') }}"
         data_type: bigint
       - name: rbi
         description: ""
         data_type: bigint
       - name: sacrifice_hits
-        description: ""
+        description: "{{ doc('sacrifice_hits') }}"
         data_type: bigint
       - name: sacrifice_flies
-        description: ""
+        description: "{{ doc('sacrifice_flies') }}"
         data_type: bigint
       - name: hit_by_pitches
-        description: ""
+        description: "{{ doc('hit_by_pitches') }}"
         data_type: bigint
       - name: walks
-        description: ""
+        description: "{{ doc('walks') }}"
         data_type: bigint
       - name: intentional_walks
-        description: ""
+        description: "{{ doc('intentional_walks') }}"
         data_type: bigint
       - name: strikeouts
-        description: ""
+        description: "{{ doc('strikeouts') }}"
         data_type: bigint
       - name: stolen_bases
         description: ""
@@ -76,7 +76,7 @@ models:
         description: ""
         data_type: bigint
       - name: grounded_into_double_plays
-        description: ""
+        description: "{{ doc('grounded_into_double_plays') }}"
         data_type: bigint
       - name: reached_on_interference
         description: ""

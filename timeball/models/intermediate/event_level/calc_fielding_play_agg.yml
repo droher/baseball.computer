@@ -19,15 +19,15 @@ models:
 
     columns:
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null

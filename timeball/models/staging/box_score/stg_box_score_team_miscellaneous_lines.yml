@@ -19,10 +19,10 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: side
-        description: ""
+        description: "{{ doc('side') }}"
         data_type: varchar
       - name: left_on_base
         description: ""

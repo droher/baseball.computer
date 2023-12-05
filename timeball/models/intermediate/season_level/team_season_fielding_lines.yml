@@ -19,13 +19,13 @@ models:
 
     columns:
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: varchar
       - name: game_type
-        description: ""
+        description: "{{ doc('game_type') }}"
         data_type: varchar
       - name: games
         description: ""
@@ -71,10 +71,10 @@ models:
         description: ""
         data_type: usmallint
       - name: double_plays
-        description: ""
+        description: "{{ doc('double_plays') }}"
         data_type: usmallint
       - name: triple_plays
-        description: ""
+        description: "{{ doc('triple_plays') }}"
         data_type: usmallint
       - name: ground_ball_double_plays
         description: ""

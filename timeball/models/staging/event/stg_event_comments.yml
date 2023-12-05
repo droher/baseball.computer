@@ -19,7 +19,7 @@ models:
 
     columns:
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
         tests:
           - relationships:

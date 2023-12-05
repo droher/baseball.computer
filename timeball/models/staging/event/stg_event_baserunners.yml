@@ -19,7 +19,7 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
@@ -28,12 +28,12 @@ models:
               field: game_id
               to: ref('stg_games')
       - name: event_id
-        description: ""
+        description: "{{ doc('event_id') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
         tests:
           - relationships:

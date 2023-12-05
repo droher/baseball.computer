@@ -19,16 +19,16 @@ models:
 
     columns:
       - name: databank_player_id
-        description: ""
+        description: "{{ doc('databank_player_id') }}"
         data_type: varchar
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: stint
         description: ""
         data_type: smallint
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: varchar
       - name: league_id
         description: ""
@@ -58,19 +58,19 @@ models:
         description: ""
         data_type: smallint
       - name: hits
-        description: ""
+        description: "{{ doc('hits') }}"
         data_type: smallint
       - name: earned_runs
         description: ""
         data_type: smallint
       - name: home_runs
-        description: ""
+        description: "{{ doc('home_runs') }}"
         data_type: smallint
       - name: walks
-        description: ""
+        description: "{{ doc('walks') }}"
         data_type: smallint
       - name: strikeouts
-        description: ""
+        description: "{{ doc('strikeouts') }}"
         data_type: smallint
       - name: opponent_batting_average
         description: ""
@@ -79,13 +79,13 @@ models:
         description: ""
         data_type: double
       - name: intentional_walks
-        description: ""
+        description: "{{ doc('intentional_walks') }}"
         data_type: smallint
       - name: wild_pitches
         description: ""
         data_type: smallint
       - name: hit_by_pitches
-        description: ""
+        description: "{{ doc('hit_by_pitches') }}"
         data_type: smallint
       - name: balks
         description: ""
@@ -100,11 +100,11 @@ models:
         description: ""
         data_type: smallint
       - name: sacrifice_hits
-        description: ""
+        description: "{{ doc('sacrifice_hits') }}"
         data_type: smallint
       - name: sacrifice_flies
-        description: ""
+        description: "{{ doc('sacrifice_flies') }}"
         data_type: smallint
       - name: grounded_into_double_plays
-        description: ""
+        description: "{{ doc('grounded_into_double_plays') }}"
         data_type: smallint

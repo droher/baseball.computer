@@ -20,13 +20,13 @@ models:
 
     columns:
       - name: park_id
-        description: ""
+        description: "{{ doc('park_id') }}"
         data_type: park_id
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: league
-        description: ""
+        description: "{{ doc('league') }}"
         data_type: varchar
       - name: sqrt_sample_size
         description: ""

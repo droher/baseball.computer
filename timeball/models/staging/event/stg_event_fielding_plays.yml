@@ -19,17 +19,17 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
         tests:
           - relationships:
               field: game_id
               to: ref('stg_games')
       - name: event_id
-        description: ""
+        description: "{{ doc('event_id') }}"
         data_type: utinyint
       - name: event_key
-        description: ""
+        description: "{{ doc('event_key') }}"
         data_type: uinteger
         tests:
           - relationships:
@@ -39,7 +39,7 @@ models:
         description: ""
         data_type: utinyint
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint
         constraints:
           - type: not_null

@@ -19,14 +19,14 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         tests:
           - relationships:
               to: ref('stg_games')
               field: game_id
         data_type: varchar
       - name: player_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
         constraints:
           - type: not_null

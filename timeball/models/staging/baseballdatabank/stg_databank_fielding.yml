@@ -19,16 +19,16 @@ models:
 
     columns:
       - name: databank_player_id
-        description: ""
+        description: "{{ doc('databank_player_id') }}"
         data_type: varchar
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: stint
         description: ""
         data_type: smallint
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: varchar
       - name: league_id
         description: ""
@@ -52,7 +52,7 @@ models:
         description: ""
         data_type: smallint
       - name: double_plays
-        description: ""
+        description: "{{ doc('double_plays') }}"
         data_type: smallint
       - name: passed_balls
         description: ""
@@ -67,7 +67,7 @@ models:
         description: ""
         data_type: smallint
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: integer
       - name: fielding_position_category
         description: ""

@@ -19,16 +19,16 @@ models:
 
     columns:
       - name: databank_player_id
-        description: ""
+        description: "{{ doc('databank_player_id') }}"
         data_type: varchar
       - name: season
-        description: ""
+        description: "{{ doc('season') }}"
         data_type: smallint
       - name: stint
         description: ""
         data_type: smallint
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: varchar
       - name: league_id
         description: ""
@@ -37,25 +37,25 @@ models:
         description: ""
         data_type: usmallint
       - name: at_bats
-        description: ""
+        description: "{{ doc('at_bats') }}"
         data_type: usmallint
       - name: runs
         description: ""
         data_type: usmallint
       - name: hits
-        description: ""
+        description: "{{ doc('hits') }}"
         data_type: usmallint
       - name: doubles
-        description: ""
+        description: "{{ doc('doubles') }}"
         data_type: usmallint
       - name: triples
-        description: ""
+        description: "{{ doc('triples') }}"
         data_type: usmallint
       - name: home_runs
-        description: ""
+        description: "{{ doc('home_runs') }}"
         data_type: usmallint
       - name: runs_batted_in
-        description: ""
+        description: "{{ doc('runs_batted_in') }}"
         data_type: usmallint
       - name: stolen_bases
         description: ""
@@ -64,38 +64,38 @@ models:
         description: ""
         data_type: usmallint
       - name: walks
-        description: ""
+        description: "{{ doc('walks') }}"
         data_type: usmallint
       - name: strikeouts
-        description: ""
+        description: "{{ doc('strikeouts') }}"
         data_type: usmallint
       - name: intentional_walks
-        description: ""
+        description: "{{ doc('intentional_walks') }}"
         data_type: usmallint
       - name: hit_by_pitches
-        description: ""
+        description: "{{ doc('hit_by_pitches') }}"
         data_type: usmallint
       - name: sacrifice_hits
-        description: ""
+        description: "{{ doc('sacrifice_hits') }}"
         data_type: usmallint
       - name: sacrifice_flies
-        description: ""
+        description: "{{ doc('sacrifice_flies') }}"
         data_type: usmallint
       - name: grounded_into_double_plays
-        description: ""
+        description: "{{ doc('grounded_into_double_plays') }}"
         data_type: usmallint
       - name: singles
-        description: ""
+        description: "{{ doc('singles') }}"
         data_type: usmallint
       - name: total_bases
-        description: ""
+        description: "{{ doc('total_bases') }}"
         data_type: integer
       - name: plate_appearances
-        description: ""
+        description: "{{ doc('plate_appearances') }}"
         data_type: integer
       - name: on_base_opportunities
-        description: ""
+        description: "{{ doc('on_base_opportunities') }}"
         data_type: integer
       - name: on_base_successes
-        description: ""
+        description: "{{ doc('on_base_successes') }}"
         data_type: integer

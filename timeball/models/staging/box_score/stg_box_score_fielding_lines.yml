@@ -20,16 +20,16 @@ models:
 
     columns:
       - name: game_id
-        description: ""
+        description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: fielder_id
         description: ""
         data_type: varchar
       - name: side
-        description: ""
+        description: "{{ doc('side') }}"
         data_type: side
       - name: fielding_position
-        description: ""
+        description: "{{ doc('fielding_position') }}"
         data_type: utinyint
       - name: nth_position_played_by_player
         description: ""
@@ -47,10 +47,10 @@ models:
         description: ""
         data_type: utinyint
       - name: double_plays
-        description: ""
+        description: "{{ doc('double_plays') }}"
         data_type: utinyint
       - name: triple_plays
-        description: ""
+        description: "{{ doc('triple_plays') }}"
         data_type: utinyint
       - name: passed_balls
         description: ""

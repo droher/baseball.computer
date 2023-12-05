@@ -22,13 +22,13 @@ models:
         description: ""
         data_type: smallint
       - name: team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: varchar
       - name: league_id
         description: ""
         data_type: varchar
       - name: databank_player_id
-        description: ""
+        description: "{{ doc('databank_player_id') }}"
         data_type: varchar
       - name: games_all
         description: ""

@@ -9,12 +9,14 @@ def load_manifest(manifest_path):
 def find_docs_in_manifest(manifest):
     docs = []
     for node in manifest['docs'].values():
-            docs.append(node['name'].split('.')[-1])
+        docs.append(node['name'].split('.')[-1])
     return docs
 
 def update_yaml_files(docs, models_dir):
     yaml = YAML()
     yaml.preserve_quotes = True
+    yaml.indent(mapping=2, sequence=4, offset=2)
+
     for root, dirs, files in os.walk(models_dir):
         for file in files:
             if file.endswith('.yml'):
@@ -28,14 +30,14 @@ def update_yaml_files(docs, models_dir):
                             for column in model['columns']:
                                 if column['name'] in docs and ('description' not in column or not column['description']):
                                     print("Updating " + file_path + " with doc block reference for " + column['name'])
-                                    #  column['description'] = "{{ doc('" + column['name'] + "') }}"
+                                    column['description'] = "{{ doc('" + column['name'] + "') }}"
 
                 with open(file_path, 'w') as f:
                     yaml.dump(data, f)
 
 def main():
-    manifest_path = 'path/to/your/manifest.json'  # Update this path
-    models_dir = 'path/to/your/models/directory'  # Update this path
+    manifest_path = 'timeball/target/manifest.json'
+    models_dir = 'timeball/models'
 
     manifest = load_manifest(manifest_path)
     docs = find_docs_in_manifest(manifest)
