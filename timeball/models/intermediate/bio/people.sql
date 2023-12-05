@@ -13,14 +13,14 @@ box_files AS (
       SELECT DISTINCT fielder_id AS player_id FROM box_score.box_score_fielding_lines
 ),
 
-final AS (
+joined AS (
     SELECT
         COALESCE(
             retro.player_id,
             databank.retrosheet_player_id,
             roster_files.player_id,
             box_files.player_id
-        ) AS player_id,
+        ) AS person_id,
         databank.baseball_reference_player_id,
         COALESCE(retro.first_name, databank.first_name) AS first_name,
         COALESCE(retro.last_name, databank.last_name) AS last_name,
@@ -45,6 +45,13 @@ final AS (
             roster_files.player_id,
             box_files.player_id
         ) IS NOT NULL
+),
+
+final AS (
+    SELECT
+        CASE WHEN person_id SIMILAR TO '[a-z]{5}[01][0-9]{2}' THEN person_id ELSE NULL END AS player_id,
+        *
+    FROM joined
 )
 
 SELECT * FROM final

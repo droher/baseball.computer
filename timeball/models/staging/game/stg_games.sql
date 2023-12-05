@@ -32,7 +32,11 @@ renamed AS (
         wind_direction,
         park_id,
         temperature_fahrenheit,
-        attendance,
+        CASE
+            WHEN attendance = 0 AND year != 2020
+                THEN NULL
+            ELSE attendance
+        END::USMALLINT AS attendance,
         wind_speed_mph,
         use_dh,
         -- TODO: Change in source

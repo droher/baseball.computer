@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: &pk [databank_player_id, season, stint, team_id, fielding_position]
+        columns: &pk [databank_player_id, season, stint, fielding_position]
 
     meta:
       primary_keys: *pk
