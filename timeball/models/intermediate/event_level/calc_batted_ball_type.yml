@@ -14,6 +14,9 @@ models:
       - type: primary_key
         columns: &pk [event_key]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: game_id
         description: ""
@@ -27,22 +30,22 @@ models:
       - name: batted_to_fielder
         description: ""
         data_type: utinyint
-      - name: contact
+      - name: trajectory
         description: ""
-        data_type: contact
+        data_type: trajectory
         constraints:
           - type: not_null
       - name: recorded_contact
         description: ""
-        data_type: contact
+        data_type: trajectory
         constraints:
           - type: not_null
-      - name: is_contact_inferred
+      - name: is_trajectory_inferred
         description: ""
         data_type: boolean
         constraints:
           - type: not_null
-      - name: contact_broad_classification
+      - name: trajectory_broad_classification
         description: ""
         data_type: varchar
         constraints:

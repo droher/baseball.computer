@@ -25,7 +25,7 @@ renamed AS (
         strikeout_responsible_batter_id,
         walk_responsible_pitcher_id,
         plate_appearance_result,
-        batted_contact_type,
+        batted_trajectory,
         batted_to_fielder,
         batted_location_general,
         batted_location_depth,

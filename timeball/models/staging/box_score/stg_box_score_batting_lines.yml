@@ -6,13 +6,16 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, side, batter_id]
+
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: game_id
@@ -23,7 +26,7 @@ models:
         data_type: varchar
       - name: side
         description: ""
-        data_type: enum('home', 'away')
+        data_type: side
       - name: lineup_position
         description: ""
         data_type: utinyint

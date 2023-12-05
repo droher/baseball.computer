@@ -7,7 +7,7 @@ WITH base_data AS (
         b.runner_id,
         e.base_state,
         e.batted_to_fielder,
-        COALESCE(bbt.contact_broad_classification, 'Unknown') AS contact,
+        COALESCE(bbt.trajectory_broad_classification, 'Unknown') AS trajectory,
         b.bases_advanced,
         b.unforced_outs_on_basepaths,
         -- We don't want to distinguish between out types
@@ -31,7 +31,7 @@ averages AS (
         baserunner,
         batted_to_fielder,
         plate_appearance_result,
-        contact,
+        trajectory,
         AVG(bases_advanced) AS average_bases_advanced,
         AVG(unforced_outs_on_basepaths) AS average_outs_on_basepaths,
     FROM base_data
@@ -51,7 +51,7 @@ expectations AS (
         outs_on_basepaths_above_average - season_adjustment_outs AS adjusted_outs_on_basepaths
     FROM base_data AS bd
     INNER JOIN averages AS a
-        USING (base_state, outs, baserunner, batted_to_fielder, plate_appearance_result, contact)
+        USING (base_state, outs, baserunner, batted_to_fielder, plate_appearance_result, trajectory)
     WINDOW baseline AS (PARTITION BY season, base_state, outs, baserunner, plate_appearance_result, batted_to_fielder)
 ),
 

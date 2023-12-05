@@ -14,6 +14,9 @@ models:
       - type: primary_key
         columns: &pk [event_key, baserunner]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: game_id
         description: ""
@@ -114,34 +117,34 @@ models:
       - name: balls_batted
         description: ""
         data_type: tinyint
-      - name: contact_type_fly_ball
+      - name: trajectory_fly_ball
         description: ""
         data_type: tinyint
-      - name: contact_type_ground_ball
+      - name: trajectory_ground_ball
         description: ""
         data_type: tinyint
-      - name: contact_type_line_drive
+      - name: trajectory_line_drive
         description: ""
         data_type: tinyint
-      - name: contact_type_pop_fly
+      - name: trajectory_pop_fly
         description: ""
         data_type: tinyint
-      - name: contact_type_unknown
+      - name: trajectory_unknown
         description: ""
         data_type: tinyint
-      - name: contact_type_known
+      - name: trajectory_known
         description: ""
         data_type: tinyint
-      - name: contact_broad_type_air_ball
+      - name: trajectory_broad_type_air_ball
         description: ""
         data_type: tinyint
-      - name: contact_broad_type_ground_ball
+      - name: trajectory_broad_type_ground_ball
         description: ""
         data_type: tinyint
-      - name: contact_broad_type_unknown
+      - name: trajectory_broad_type_unknown
         description: ""
         data_type: tinyint
-      - name: contact_broad_type_known
+      - name: trajectory_broad_type_known
         description: ""
         data_type: tinyint
       - name: bunts

@@ -9,6 +9,7 @@ renamed AS (
         filename,
         line_number,
         event_key,
+        raw_play
     FROM source
 )
 

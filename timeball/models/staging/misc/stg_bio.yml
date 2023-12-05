@@ -14,6 +14,9 @@ models:
       - type: primary_key
         columns: &pk [player_id]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: player_id
         description: ""

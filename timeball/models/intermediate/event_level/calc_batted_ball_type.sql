@@ -3,7 +3,7 @@
     materialized = 'table',
     )
 }}
--- Contact type inference rules (only valid for batted balls without contact type)
+-- trajectory type inference rules (only valid for batted balls without trajectory type)
 -- 1. Unassisted putouts are air balls (unassisted GB putouts should already be explicit grounders)
 -- 2. Balls with an outfield locaiton are air balls
 -- 2. Home runs are air balls
@@ -44,7 +44,7 @@ inference AS (
         CASE WHEN batted_ball.plate_appearance_result NOT IN ('HomeRun', 'GroundRuleDouble')
                 THEN batted_ball.batted_to_fielder
         END AS batted_to_fielder,
-        batted_ball.batted_contact_type AS recorded_contact,
+        batted_ball.batted_trajectory AS recorded_contact,
         batted_ball.batted_location_general AS recorded_location,
         batted_ball.batted_location_depth AS recorded_location_depth,
         batted_ball.batted_location_angle AS recorded_location_angle,
@@ -65,11 +65,11 @@ inference AS (
         END AS inferred_contact,
         CASE WHEN recorded_contact = 'Unknown' THEN inferred_contact
             ELSE recorded_contact
-        END AS batted_contact_type,
+        END AS batted_trajectory,
     FROM {{ ref('stg_events') }} AS batted_ball
     LEFT JOIN putouts USING (event_key)
     LEFT JOIN {{ ref('seed_hit_location_categories') }} AS location_info USING (batted_location_general)
-    WHERE batted_ball.batted_contact_type IS NOT NULL
+    WHERE batted_ball.batted_trajectory IS NOT NULL
 ),
 
 final AS (
@@ -78,20 +78,20 @@ final AS (
         inference.event_key,
         inference.plate_appearance_result,
         inference.batted_to_fielder,
-        inference.batted_contact_type::CONTACT AS contact,
+        inference.batted_trajectory::trajectory AS trajectory,
         inference.recorded_contact,
-        inference.batted_contact_type != inference.recorded_contact AS is_contact_inferred,
+        inference.batted_trajectory != inference.recorded_contact AS is_trajectory_inferred,
         CASE WHEN inference.is_inferred_air_ball
                 THEN 'AirBall'
-            ELSE contact_info.broad_classification
-        END AS contact_broad_classification,
+            ELSE trajectory_info.broad_classification
+        END AS trajectory_broad_classification,
         inference.recorded_location,
         inference.recorded_location_depth,
         inference.recorded_location_angle,
         CASE
-            WHEN inference.batted_contact_type = 'GroundBall' AND inference.batted_to_fielder BETWEEN 7 AND 9
+            WHEN inference.batted_trajectory = 'GroundBall' AND inference.batted_to_fielder BETWEEN 7 AND 9
                 THEN 'Infield'
-            WHEN inference.batted_contact_type = 'Unknown' AND inference.batted_to_fielder BETWEEN 7 AND 9
+            WHEN inference.batted_trajectory = 'Unknown' AND inference.batted_to_fielder BETWEEN 7 AND 9
                 THEN 'Unknown'
             WHEN fielder.category_depth IS NOT NULL
                 THEN fielder.category_depth
@@ -102,7 +102,7 @@ final AS (
         COALESCE(fielder.category_side, inference.category_side, 'Unknown') AS location_side,
         COALESCE(inference.category_edge, 'Unknown') AS location_edge,
     FROM inference
-    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS contact_info USING (batted_contact_type)
+    LEFT JOIN {{ ref('seed_plate_appearance_trajectories') }} AS trajectory_info USING (batted_trajectory)
     LEFT JOIN {{ ref('seed_hit_to_fielder_categories') }} AS fielder USING (batted_to_fielder)
 )
 

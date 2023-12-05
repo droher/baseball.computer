@@ -151,8 +151,8 @@ sources:
             data_type: PLAYER_ID
           - name: plate_appearance_result
             data_type: PLATE_APPEARANCE_RESULT
-          - name: batted_contact_type
-            data_type: CONTACT
+          - name: batted_trajectory
+            data_type: trajectory
           - name: batted_to_fielder
             data_type: UTINYINT
           - name: batted_location_general

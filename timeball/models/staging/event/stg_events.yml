@@ -14,6 +14,9 @@ models:
       - type: primary_key
         columns: &pk [event_key]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: game_id
         description: ""
@@ -101,9 +104,9 @@ models:
       - name: plate_appearance_result
         description: ""
         data_type: plate_appearance_result
-      - name: batted_contact_type
+      - name: batted_trajectory
         description: ""
-        data_type: contact
+        data_type: trajectory
       - name: batted_to_fielder
         description: ""
         data_type: utinyint

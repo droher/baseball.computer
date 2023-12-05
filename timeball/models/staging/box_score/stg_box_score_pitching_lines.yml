@@ -6,13 +6,17 @@ models:
     description: ""
 
 
+    # TODO: Resolve dupes in raw data
     # config:
     #   contract:
     #     enforced: true
 
     # constraints:
     #   - type: primary_key
-    #     columns: &pk []
+    #     columns: &pk [game_id, side, nth_pitcher]
+
+    # meta:
+    #   primary_keys: *pk
 
     columns:
       - name: game_id
@@ -23,7 +27,7 @@ models:
         data_type: varchar
       - name: side
         description: ""
-        data_type: enum('home', 'away')
+        data_type: side
       - name: nth_pitcher
         description: ""
         data_type: utinyint

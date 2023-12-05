@@ -6,13 +6,16 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, side]
+
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: game_id

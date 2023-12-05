@@ -1,7 +1,7 @@
 WITH batted_balls AS (
     SELECT
         bb.game_id,
-        BOOL_AND(bb.contact != 'Unknown') AS has_contact_type,
+        BOOL_AND(bb.trajectory != 'Unknown') AS has_trajectory,
         BOOL_AND(bb.location_side != 'Unknown') AS has_location,
         BOOL_AND(bb.batted_to_fielder != 0 OR NOT rt.is_in_play) AS has_batted_to_fielder,
     FROM {{ ref('calc_batted_ball_type') }} AS bb
@@ -42,7 +42,7 @@ joined AS (
         game_start_info.home_league AS league,
         game_start_info.source_type = 'PlayByPlay' AS has_play_by_play,
         game_start_info.source_type IN ('Event', 'BoxScore') AS has_box_score,
-        COALESCE(batted_balls.has_contact_type, FALSE) AS has_contact_type,
+        COALESCE(batted_balls.has_trajectory, FALSE) AS has_trajectory,
         COALESCE(batted_balls.has_location, FALSE) AS has_location,
         COALESCE(batted_balls.has_batted_to_fielder, FALSE) AS has_batted_to_fielder,
         COALESCE(fielding_credit.has_fielder_putouts, FALSE) AS has_fielder_putouts,

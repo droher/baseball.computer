@@ -20,7 +20,7 @@ e AS (
         COUNT_IF(
             e.batted_to_fielder BETWEEN 1 AND 6
             AND e.outs_on_play = 1
-            AND e.batted_contact_type = 'Unknown'
+            AND e.batted_trajectory = 'Unknown'
             AND f.event_key IS NULL
             AND s.putouts - s.assisted_putouts = 1
             AND e.base_state % 2 = 0

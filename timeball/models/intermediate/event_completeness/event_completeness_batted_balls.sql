@@ -1,7 +1,7 @@
 WITH final AS (
     SELECT
         event_key,
-        COALESCE(e.batted_contact_type != 'Unknown', FALSE) AS has_contact_type,
+        COALESCE(e.batted_trajectory != 'Unknown', FALSE) AS has_trajectory,
         COALESCE(e.batted_location_general != 'Unknown', FALSE) AS has_general_location,
         -- To avoid false negatives, we'll say that a fielder is present regardless
         -- if it's a ground-rule double or home run where there is location info
@@ -73,7 +73,7 @@ WITH final AS (
     FROM {{ ref('stg_events') }} e
     INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS rt USING (plate_appearance_result)
     LEFT JOIN {{ ref('seed_hit_location_categories') }} AS lt USING (batted_location_general)
-    LEFT JOIN {{ ref('seed_plate_appearance_contact_types') }} AS ct USING (batted_contact_type)
+    LEFT JOIN {{ ref('seed_plate_appearance_trajectories') }} AS ct USING (batted_trajectory)
 )
 
 SELECT * FROM final

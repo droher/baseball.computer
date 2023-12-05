@@ -3,3 +3,4 @@
 - Ranges for franchises/teams
 - Fix PGH/PHG typo in raw data
 - CAG194209072: radca101 appears on both sides
+- Dupes in box scsore lines - fielding: ("SLN193807150, Away, garmd101, 1") and pitching: ("CHA195010012, Home, 1")

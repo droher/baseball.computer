@@ -14,6 +14,9 @@ models:
       - type: primary_key
         columns: &pk [game_id, cleaned_scorer]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: season
         description: ""

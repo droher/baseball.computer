@@ -6,13 +6,16 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [win_expectancy_start_key]
+
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: win_expectancy_start_key

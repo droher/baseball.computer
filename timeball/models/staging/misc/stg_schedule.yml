@@ -9,7 +9,7 @@ models:
     config:
       contract:
         enforced: true
-
+  
     columns:
       - name: date
         description: ""

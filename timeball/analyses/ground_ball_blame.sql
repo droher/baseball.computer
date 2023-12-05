@@ -19,10 +19,10 @@ WITH base AS (
     FROM {{ ref('event_offense_stats') }} AS e
     INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (event_key)
     INNER JOIN {{ ref('event_states_full') }} AS s USING (event_key)
-    WHERE c.contact = 'GroundBall'
+    WHERE c.trajectory = 'GroundBall'
         AND e.plate_appearances = 1
         AND c.recorded_location != 'Unknown'
-        -- These are the only seasons in the current data where location/contact data
+        -- These are the only seasons in the current data where location/trajectory data
         -- is widely available and unaffected by selection bias.
         -- 2000-2019 coverage should improve substantially in a future Retrosheet release.
         AND (

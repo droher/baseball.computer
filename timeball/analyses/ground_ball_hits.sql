@@ -10,7 +10,7 @@ WITH t AS (
 FROM {{ ref('event_pitching_stats') }} e
 JOIN {{ ref('stg_games') }} USING (game_id)
 WHERE at_bats = 1
-    AND contact_type_ground_ball = 1
+    AND trajectory_ground_ball = 1
     AND fielded_by_known = 1
     AND season BETWEEN 1993 AND 1999
 GROUP BY 1 

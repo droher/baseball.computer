@@ -6,13 +6,16 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: event_key
@@ -24,7 +27,7 @@ models:
       - name: outcome_is_in_play_bin
         description: ""
         data_type: utinyint
-      - name: outcome_batted_contact_cat
+      - name: outcome_batted_trajectory_cat
         description: ""
         data_type: varchar
       - name: outcome_batted_location_cat
@@ -51,7 +54,7 @@ models:
       - name: in_play_sample_weight
         description: ""
         data_type: float
-      - name: contact_sample_weight
+      - name: trajectory_sample_weight
         description: ""
         data_type: float
       - name: location_sample_weight

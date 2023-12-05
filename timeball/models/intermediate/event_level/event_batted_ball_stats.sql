@@ -8,23 +8,23 @@ WITH batted_ball AS (
         event_key,
         1::UTINYINT AS balls_batted,
         (batted_to_fielder IS NOT NULL)::UTINYINT AS balls_in_play,
-        CASE WHEN contact = 'Fly' THEN 1 ELSE 0 END::UTINYINT AS contact_type_fly_ball,
-        CASE WHEN contact = 'GroundBall' THEN 1 ELSE 0 END::UTINYINT AS contact_type_ground_ball,
-        CASE WHEN contact = 'LineDrive' THEN 1 ELSE 0 END::UTINYINT AS contact_type_line_drive,
-        CASE WHEN contact = 'PopFly' THEN 1 ELSE 0 END::UTINYINT AS contact_type_pop_fly,
+        CASE WHEN trajectory = 'Fly' THEN 1 ELSE 0 END::UTINYINT AS trajectory_fly_ball,
+        CASE WHEN trajectory = 'GroundBall' THEN 1 ELSE 0 END::UTINYINT AS trajectory_ground_ball,
+        CASE WHEN trajectory = 'LineDrive' THEN 1 ELSE 0 END::UTINYINT AS trajectory_line_drive,
+        CASE WHEN trajectory = 'PopFly' THEN 1 ELSE 0 END::UTINYINT AS trajectory_pop_fly,
         CASE
-            WHEN COALESCE(contact, 'Unknown') = 'Unknown' THEN 1 ELSE 0
-        END::UTINYINT AS contact_type_unknown,
-        (1 - contact_type_unknown)::UTINYINT AS contact_type_known,
-        CASE WHEN contact_broad_classification = 'AirBall' THEN 1 ELSE 0 END::UTINYINT AS contact_broad_type_air_ball,
+            WHEN COALESCE(trajectory, 'Unknown') = 'Unknown' THEN 1 ELSE 0
+        END::UTINYINT AS trajectory_unknown,
+        (1 - trajectory_unknown)::UTINYINT AS trajectory_known,
+        CASE WHEN trajectory_broad_classification = 'AirBall' THEN 1 ELSE 0 END::UTINYINT AS trajectory_broad_type_air_ball,
         CASE
-            WHEN contact_broad_classification = 'GroundBall' THEN 1 ELSE 0
-        END::UTINYINT AS contact_broad_type_ground_ball,
+            WHEN trajectory_broad_classification = 'GroundBall' THEN 1 ELSE 0
+        END::UTINYINT AS trajectory_broad_type_ground_ball,
         CASE
-            WHEN COALESCE(contact_broad_classification, 'Unknown') = 'Unknown' THEN 1 ELSE 0
-        END::UTINYINT AS contact_broad_type_unknown,
-        (1 - contact_broad_type_unknown)::UTINYINT AS contact_broad_type_known,
-        CASE WHEN contact_broad_classification = 'Bunt' THEN 1 ELSE 0 END::UTINYINT AS bunts,
+            WHEN COALESCE(trajectory_broad_classification, 'Unknown') = 'Unknown' THEN 1 ELSE 0
+        END::UTINYINT AS trajectory_broad_type_unknown,
+        (1 - trajectory_broad_type_unknown)::UTINYINT AS trajectory_broad_type_known,
+        CASE WHEN trajectory_broad_classification = 'Bunt' THEN 1 ELSE 0 END::UTINYINT AS bunts,
         -- Distances,
         CASE WHEN location_depth = 'Plate' THEN 1 ELSE 0 END::UTINYINT AS batted_distance_plate,
         CASE WHEN location_depth = 'Infield' THEN 1 ELSE 0 END::UTINYINT AS batted_distance_infield,

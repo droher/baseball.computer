@@ -14,6 +14,9 @@ models:
       - type: primary_key
         columns: &pk [game_id, event_id]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: game_id
         description: ""
@@ -40,3 +43,8 @@ models:
           - relationships:
               field: event_key
               to: ref('stg_events')
+      - name: raw_play
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null

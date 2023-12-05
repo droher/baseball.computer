@@ -6,13 +6,16 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [year_id, team_id, databank_player_id]
+
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: year_id

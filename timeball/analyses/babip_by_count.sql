@@ -3,7 +3,7 @@ WITH players AS (
     s.pitcher_id as player_id,
     s.count_balls,
     s.count_strikes,
-    b.contact,
+    b.trajectory,
     COUNT(*) as ab,
     SUM(hits) as h,
     h / ab AS avg
@@ -24,19 +24,19 @@ odds AS (
         player_id,
         count_balls,
         count_strikes,
-        contact,
+        trajectory,
         ab,
         SUM(h) OVER w / SUM(ab) OVER w as avg_total,
         avg - avg_total AS avg_diff,
     FROM players
-    WINDOW w AS (PARTITION BY player_id, contact)
+    WINDOW w AS (PARTITION BY player_id, trajectory)
 ),
 
 weighted AS (
     SELECT
         count_balls,
         count_strikes,
-        contact,
+        trajectory,
         SUM(ab) as ab,
         SUM(avg_diff * ab) / SUM(ab) * 1000 as avg_diff
     FROM odds

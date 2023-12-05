@@ -9,11 +9,7 @@ models:
     # config:
     #   contract:
     #     enforced: true
-
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
-
+  
     columns:
       - name: game_id
         description: ""

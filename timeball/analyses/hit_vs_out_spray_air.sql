@@ -11,8 +11,8 @@ FROM {{ ref('game_data_completeness') }} AS g
 INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (game_id)
 INNER JOIN {{ ref('event_offense_stats') }} AS e USING (event_key)
 INNER JOIN {{ ref('event_states_full') }} p USING (event_key)
-WHERE g.has_batted_to_fielder AND g.has_contact_type
-    AND contact_broad_type_air_ball = 1
+WHERE g.has_batted_to_fielder AND g.has_trajectory
+    AND trajectory_broad_type_air_ball = 1
     AND bunts = 0
     AND balls_in_play = 1
     AND fielded_by_outfielder = 1

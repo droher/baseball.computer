@@ -13,6 +13,9 @@ models:
       - type: primary_key
         columns: &pk [personnel_fielding_key, fielding_position]
 
+    meta:
+      primary_keys: *pk
+
     columns:
       - name: game_id
         description: ""

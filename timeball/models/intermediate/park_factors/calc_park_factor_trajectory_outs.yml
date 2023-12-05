@@ -2,7 +2,7 @@ version: 2
 
 
 models:
-  - name: calc_park_factor_plate_appearances
+  - name: calc_park_factor_trajectory_outs
     description: ""
 
 
@@ -13,7 +13,6 @@ models:
     constraints:
       - type: primary_key
         columns: &pk [park_id, season, league]
-
 
     meta:
       primary_keys: *pk
@@ -31,33 +30,18 @@ models:
       - name: sqrt_sample_size
         description: ""
         data_type: double
-      - name: singles_park_factor
+      - name: trajectory_broad_type_air_ball_park_factor
         description: ""
         data_type: double
-      - name: doubles_park_factor
+      - name: trajectory_ground_ball_park_factor
         description: ""
         data_type: double
-      - name: triples_park_factor
+      - name: trajectory_fly_ball_park_factor
         description: ""
         data_type: double
-      - name: home_runs_park_factor
+      - name: trajectory_line_drive_park_factor
         description: ""
         data_type: double
-      - name: strikeouts_park_factor
-        description: ""
-        data_type: double
-      - name: reached_on_errors_park_factor
-        description: ""
-        data_type: double
-      - name: walks_park_factor
-        description: ""
-        data_type: double
-      - name: batting_outs_park_factor
-        description: ""
-        data_type: double
-      - name: runs_park_factor
-        description: ""
-        data_type: double
-      - name: balls_in_play_park_factor
+      - name: trajectory_pop_fly_park_factor
         description: ""
         data_type: double

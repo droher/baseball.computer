@@ -6,27 +6,29 @@ models:
     description: ""
 
 
-    # config:
-    #   contract:
-    #     enforced: true
-
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    config:
+      contract:
+        enforced: true
 
     columns:
       - name: game_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: pinch_runner_id
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: inning
         description: ""
         data_type: bigint
       - name: side
         description: ""
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: runs
         description: ""
         data_type: bigint

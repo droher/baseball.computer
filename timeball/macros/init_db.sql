@@ -40,7 +40,7 @@
     DROP TYPE IF EXISTS team_id;
     DROP TYPE IF EXISTS game_id;
     DROP TYPE IF EXISTS player_id;
-    DROP TYPE IF EXISTS contact;
+    DROP TYPE IF EXISTS trajectory;
     DROP TYPE IF EXISTS location_general;
     DROP TYPE IF EXISTS location_depth;
     DROP TYPE IF EXISTS location_angle;
@@ -64,7 +64,7 @@
     CREATE TYPE wind_direction AS ENUM (SELECT DISTINCT wind_direction FROM game.games ORDER BY 1);
     CREATE TYPE plate_appearance_result AS ENUM (SELECT DISTINCT plate_appearance_result FROM event.events WHERE plate_appearance_result IS NOT NULL ORDER BY 1);
     CREATE TYPE pitch_sequence_item AS ENUM (SELECT DISTINCT sequence_item FROM event.event_pitch_sequences ORDER BY 1);
-    CREATE TYPE contact AS ENUM (SELECT DISTINCT batted_contact_type FROM event.events WHERE batted_contact_type IS NOT NULL ORDER BY 1);
+    CREATE TYPE trajectory AS ENUM (SELECT DISTINCT batted_trajectory FROM event.events WHERE batted_trajectory IS NOT NULL ORDER BY 1);
     CREATE TYPE location_general AS ENUM (SELECT DISTINCT batted_location_general FROM event.events WHERE batted_location_general IS NOT NULL ORDER BY 1);
     CREATE TYPE location_depth AS ENUM (SELECT DISTINCT batted_location_depth FROM event.events WHERE batted_location_depth IS NOT NULL ORDER BY 1);
     CREATE TYPE location_angle AS ENUM (SELECT DISTINCT batted_location_angle FROM event.events WHERE batted_location_angle IS NOT NULL ORDER BY 1);

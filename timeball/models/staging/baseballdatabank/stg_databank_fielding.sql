@@ -27,6 +27,7 @@ renamed AS (
             WHEN '2B' THEN 4
             WHEN '3B' THEN 5
             WHEN 'SS' THEN 6
+            ELSE 0 
         END AS fielding_position,
         CASE
             WHEN pos IN ('P', 'C', 'OF') THEN pos
