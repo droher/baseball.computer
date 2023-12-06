@@ -3,7 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_fielding_lines
-    description: ""
+    description: |
+      Aggregate defensive data for each player in each game,
+      derived from Retroshet box score data.
 
 
     config:
@@ -32,7 +34,7 @@ models:
         description: "{{ doc('fielding_position') }}"
         data_type: utinyint
       - name: nth_position_played_by_player
-        description: ""
+        description: "Number increments on position switch, even if to a previous position"
         data_type: utinyint
       - name: outs_played
         description: ""

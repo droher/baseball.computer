@@ -3,7 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_double_plays
-    description: ""
+    description: |
+      Individually noted double play events from box score accounts,
+      with varying degrees of detail.
 
 
     # config:

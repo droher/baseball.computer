@@ -3,8 +3,11 @@ version: 2
 
 models:
   - name: stg_databank_fielding_of
-    description: ""
-
+    description: |
+      Gives information about the number of games played at each outfield position
+      by player, season, and stint with a given team. This table is important for 19th century
+      data because fielding stats are aggregated across outfield positions, so we need to infer
+      which stats they accumulated at each position.
 
     config:
       contract:
@@ -28,11 +31,11 @@ models:
         description: ""
         data_type: smallint
       - name: games_left_field
-        description: ""
+        description: "Total number of games played in left field"
         data_type: smallint
       - name: games_center_field
-        description: ""
+        description: "Total number of games played in center field"
         data_type: smallint
       - name: games_right_field
-        description: ""
+        description: "Total number of games played in right field"
         data_type: smallint

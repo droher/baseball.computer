@@ -3,7 +3,7 @@ version: 2
 
 models:
   - name: stg_databank_fielding
-    description: ""
+    description: "Aggregate fielding statistics by player, season, and stint with a given team."
 
 
     config:

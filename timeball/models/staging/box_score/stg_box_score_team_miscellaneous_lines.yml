@@ -3,7 +3,10 @@ version: 2
 
 models:
   - name: stg_box_score_team_miscellaneous_lines
-    description: ""
+    description: |
+      Team-level miscellaneous lines from box score accounts,
+      featuring stats that either only apply at a team level
+      or were only tracked at a team level.
 
 
     config:

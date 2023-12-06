@@ -3,7 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_batting_lines
-    description: ""
+    description: |
+      Aggregate offensive data for each player in each game,
+      derived from Retroshet box score data.
 
 
     config:
@@ -31,7 +33,7 @@ models:
         description: ""
         data_type: utinyint
       - name: nth_player_at_position
-        description: ""
+        description: "The nth player to occupy this spot in the order during the game"
         data_type: utinyint
       - name: at_bats
         description: "{{ doc('at_bats') }}"

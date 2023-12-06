@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_team_batting_lines
-    description: ""
-
+    description: |
+      Team-level batting lines from box score accounts.
+      These are generally rare and are only present in certain files.
 
     config:
       contract:

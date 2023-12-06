@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_pinch_running_lines
-    description: ""
-
+    description: |
+      Box score batting lines that are specific to stats accumulated
+      while a player is pinch hitting.
 
     config:
       contract:

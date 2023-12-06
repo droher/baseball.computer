@@ -3,7 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_pitching_lines
-    description: ""
+    description: |
+      Aggregate pitching data for each player in each game,
+      derived from Retroshet box score data.
 
 
     # TODO: Resolve dupes in raw data
@@ -29,13 +31,18 @@ models:
         description: "{{ doc('side') }}"
         data_type: side
       - name: nth_pitcher
-        description: ""
+        description: |
+          Nth player to pitch for this team in this game.
+          Differentiates appearances by the same player who switches between pitcher and other
+          positions.
         data_type: utinyint
       - name: outs_recorded
         description: "{{ doc('outs_recorded') }}"
         data_type: utinyint
       - name: no_out_batters
-        description: ""
+        description: |
+          Number of batters faced by this pitcher in his final inning of work,
+          if he did not record an out in that inning.
         data_type: utinyint
       - name: batters_faced
         description: ""

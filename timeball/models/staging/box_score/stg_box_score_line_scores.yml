@@ -3,7 +3,8 @@ version: 2
 
 models:
   - name: stg_box_score_line_scores
-    description: ""
+    description: |
+      Inning-by-inning run totals from box score accounts.
 
 
     config:

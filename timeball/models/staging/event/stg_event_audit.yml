@@ -3,7 +3,7 @@ version: 2
 
 models:
   - name: stg_event_audit
-    description: ""
+    description: "Connects each event to the raw Retrosheet data to enable QA/debugging."
 
 
     config:
@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: &pk [game_id, event_id]
+        columns: &pk [event_key]
 
     meta:
       primary_keys: *pk
@@ -21,30 +21,32 @@ models:
       - name: game_id
         description: "{{ doc('game_id') }}"
         data_type: varchar
+        constraints:
+          - type: not_null
       - name: event_id
         description: "{{ doc('event_id') }}"
         data_type: utinyint
+        constraints:
+          - type: not_null
       - name: filename
         description: "{{ doc('filename') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: line_number
-        description: ""
+        description: "Line number of the file on which the event was found"
         data_type: uinteger
         constraints:
           - type: not_null
       - name: event_key
         description: "{{ doc('event_key') }}"
         data_type: uinteger
-        constraints:
-          - type: unique
         tests:
           - relationships:
               field: event_key
               to: ref('stg_events')
       - name: raw_play
-        description: ""
+        description: "The string representation of the play"
         data_type: varchar
         constraints:
           - type: not_null

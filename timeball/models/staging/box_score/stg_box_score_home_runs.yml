@@ -3,7 +3,9 @@ version: 2
 
 models:
   - name: stg_box_score_home_runs
-    description: ""
+    description: |
+      Individually noted home run events from box score accounts,
+      with varying degrees of detail.
 
 
     # config:

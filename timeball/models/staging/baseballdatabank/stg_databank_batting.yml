@@ -3,7 +3,7 @@ version: 2
 
 models:
   - name: stg_databank_batting
-    description: ""
+    description: "Aggregate batting statistics by player, season, and stint with a given team."
 
 
     config:
@@ -34,7 +34,7 @@ models:
         description: ""
         data_type: varchar
       - name: games
-        description: ""
+        description: "Total number of games played"
         data_type: usmallint
       - name: at_bats
         description: "{{ doc('at_bats') }}"

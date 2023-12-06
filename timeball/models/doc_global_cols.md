@@ -121,6 +121,19 @@
     ```
 {% enddocs %}
 
+{% docs fielding_position_category %}
+    Divided between P, C, IF, OF, and DH.
+    This is particularly important for 19th century data, where we don't know
+    which specific outfield position a player accumulated his stats at.
+{% enddocs %}
+
+{% docs lineup_position %}
+    1-byte integer for the traditional 1-9 batting order position, along with
+    10 for the pitcher in games with a DH. With very few exceptions, a player will
+    only appear in one lineup position per game. The exceptions are from courtesy
+    runners and the Ohtani rule.
+{% enddocs %}
+
 {% docs inning %}
     The inning during which the entity took place.
 {% enddocs %}
@@ -200,6 +213,37 @@
     Helpful for debugging.
 {% enddocs %}
 
-{docs umpire_id %}
-    Retrosheet person ID of the umpire at this position.
+{% docs umpire_home_id %}
+    Retrosheet person ID of the umpire at home plate.
+{% enddocs %}
+
+{% docs umpire_first_id %}
+    Retrosheet person ID of the umpire at first base.
+{% enddocs %}
+
+{% docs umpire_second_id %}
+    Retrosheet person ID of the umpire at second base.
+{% enddocs %}
+
+{% docs umpire_third_id %}
+    Retrosheet person ID of the umpire at third base.
+{% enddocs %}
+
+{% docs umpire_left_id %}
+    Retrosheet person ID of the umpire in left field.
+{% enddocs %}
+
+{% docs umpire_right_id %}
+    Retrosheet person ID of the umpire in right field.
+{% enddocs %}
+
+{% docs sequence_id %}
+    The nth item of a given sequence, used to differentiate and order
+    multiple items of the same type within a single entity.
+{% enddocs %}
+
+{% docs comment %}
+    Comment string from a Retrosheet file. Sometimes these are misc.
+    details and trivia from the game, but they are also used as adhoc
+    data structures for things like ejections.
 {% enddocs %}

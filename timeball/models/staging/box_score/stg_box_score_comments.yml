@@ -3,7 +3,7 @@ version: 2
 
 models:
   - name: stg_box_score_comments
-    description: ""
+    description: "Comment lines from box score files, along with their associated game"
 
 
     config:
