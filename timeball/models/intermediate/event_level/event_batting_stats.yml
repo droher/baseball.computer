@@ -121,8 +121,8 @@ models:
         description: ""
         data_type: utinyint
       - name: left_on_base
-        description: ""
+        description: "{{ doc('left_on_base') }}"
         data_type: utinyint
       - name: left_on_base_with_two_outs
-        description: ""
+        description: "{{ doc('left_on_base_with_two_outs') }}"
         data_type: utinyint

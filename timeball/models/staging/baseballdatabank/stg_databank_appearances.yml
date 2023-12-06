@@ -34,7 +34,7 @@ models:
         description: ""
         data_type: smallint
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: smallint
       - name: games_batting
         description: ""

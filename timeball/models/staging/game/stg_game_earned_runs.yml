@@ -31,7 +31,7 @@ models:
         constraints:
           - type: not_null
       - name: earned_runs
-        description: ""
+        description: "{{ doc('earned_runs') }}"
         data_type: utinyint
         constraints:
           - type: not_null

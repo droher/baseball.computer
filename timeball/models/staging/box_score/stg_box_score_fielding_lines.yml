@@ -53,5 +53,5 @@ models:
         description: "{{ doc('triple_plays') }}"
         data_type: utinyint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: utinyint

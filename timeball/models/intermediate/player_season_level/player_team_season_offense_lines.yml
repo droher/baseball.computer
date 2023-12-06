@@ -150,230 +150,230 @@ models:
         description: "{{ doc('bunts') }}"
         data_type: hugeint
       - name: batted_distance_plate
-        description: ""
+        description: "{{ doc('batted_distance_plate') }}"
         data_type: hugeint
       - name: batted_distance_infield
-        description: ""
+        description: "{{ doc('batted_distance_infield') }}"
         data_type: hugeint
       - name: batted_distance_outfield
-        description: ""
+        description: "{{ doc('batted_distance_outfield') }}"
         data_type: hugeint
       - name: batted_distance_unknown
-        description: ""
+        description: "{{ doc('batted_distance_unknown') }}"
         data_type: hugeint
       - name: batted_distance_known
-        description: ""
+        description: "{{ doc('batted_distance_known') }}"
         data_type: hugeint
       - name: fielded_by_battery
-        description: ""
+        description: "{{ doc('fielded_by_battery') }}"
         data_type: hugeint
       - name: fielded_by_infielder
-        description: ""
+        description: "{{ doc('fielded_by_infielder') }}"
         data_type: hugeint
       - name: fielded_by_outfielder
-        description: ""
+        description: "{{ doc('fielded_by_outfielder') }}"
         data_type: hugeint
       - name: fielded_by_known
-        description: ""
+        description: "{{ doc('fielded_by_known') }}"
         data_type: hugeint
       - name: fielded_by_unknown
-        description: ""
+        description: "{{ doc('fielded_by_unknown') }}"
         data_type: hugeint
       - name: batted_angle_left
-        description: ""
+        description: "{{ doc('batted_angle_left') }}"
         data_type: hugeint
       - name: batted_angle_right
-        description: ""
+        description: "{{ doc('batted_angle_right') }}"
         data_type: hugeint
       - name: batted_angle_middle
-        description: ""
+        description: "{{ doc('batted_angle_middle') }}"
         data_type: hugeint
       - name: batted_angle_unknown
-        description: ""
+        description: "{{ doc('batted_angle_unknown') }}"
         data_type: hugeint
       - name: batted_angle_known
-        description: ""
+        description: "{{ doc('batted_angle_known') }}"
         data_type: hugeint
       - name: batted_location_plate
-        description: ""
+        description: "{{ doc('batted_location_plate') }}"
         data_type: hugeint
       - name: batted_location_right_infield
-        description: ""
+        description: "{{ doc('batted_location_right_infield') }}"
         data_type: hugeint
       - name: batted_location_middle_infield
-        description: ""
+        description: "{{ doc('batted_location_middle_infield') }}"
         data_type: hugeint
       - name: batted_location_left_infield
-        description: ""
+        description: "{{ doc('batted_location_left_infield') }}"
         data_type: hugeint
       - name: batted_location_left_field
-        description: ""
+        description: "{{ doc('batted_location_left_field') }}"
         data_type: hugeint
       - name: batted_location_center_field
-        description: ""
+        description: "{{ doc('batted_location_center_field') }}"
         data_type: hugeint
       - name: batted_location_right_field
-        description: ""
+        description: "{{ doc('batted_location_right_field') }}"
         data_type: hugeint
       - name: batted_location_unknown
-        description: ""
+        description: "{{ doc('batted_location_unknown') }}"
         data_type: hugeint
       - name: batted_location_known
-        description: ""
+        description: "{{ doc('batted_location_known') }}"
         data_type: hugeint
       - name: batted_balls_pulled
-        description: ""
+        description: "{{ doc('batted_balls_pulled') }}"
         data_type: hugeint
       - name: batted_balls_opposite_field
-        description: ""
+        description: "{{ doc('batted_balls_opposite_field') }}"
         data_type: hugeint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: hugeint
       - name: times_reached_base
-        description: ""
+        description: "{{ doc('times_reached_base') }}"
         data_type: hugeint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: hugeint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: hugeint
       - name: picked_off
-        description: ""
+        description: "{{ doc('picked_off') }}"
         data_type: hugeint
       - name: picked_off_caught_stealing
-        description: ""
+        description: "{{ doc('picked_off_caught_stealing') }}"
         data_type: hugeint
       - name: outs_on_basepaths
-        description: ""
+        description: "{{ doc('outs_on_basepaths') }}"
         data_type: hugeint
       - name: unforced_outs_on_basepaths
-        description: ""
+        description: "{{ doc('unforced_outs_on_basepaths') }}"
         data_type: hugeint
       - name: outs_avoided_on_errors
-        description: ""
+        description: "{{ doc('outs_avoided_on_errors') }}"
         data_type: hugeint
       - name: advances_on_wild_pitches
-        description: ""
+        description: "{{ doc('advances_on_wild_pitches') }}"
         data_type: hugeint
       - name: advances_on_passed_balls
-        description: ""
+        description: "{{ doc('advances_on_passed_balls') }}"
         data_type: hugeint
       - name: advances_on_balks
-        description: ""
+        description: "{{ doc('advances_on_balks') }}"
         data_type: hugeint
       - name: advances_on_unspecified_plays
-        description: ""
+        description: "{{ doc('advances_on_unspecified_plays') }}"
         data_type: hugeint
       - name: advances_on_defensive_indifference
-        description: ""
+        description: "{{ doc('advances_on_defensive_indifference') }}"
         data_type: hugeint
       - name: advances_on_errors
-        description: ""
+        description: "{{ doc('advances_on_errors') }}"
         data_type: hugeint
       - name: plate_appearances_while_on_base
-        description: ""
+        description: "{{ doc('plate_appearances_while_on_base') }}"
         data_type: hugeint
       - name: balls_in_play_while_running
-        description: ""
+        description: "{{ doc('balls_in_play_while_running') }}"
         data_type: hugeint
       - name: balls_in_play_while_on_base
-        description: ""
+        description: "{{ doc('balls_in_play_while_on_base') }}"
         data_type: hugeint
       - name: batter_total_bases_while_running
-        description: ""
+        description: "{{ doc('batter_total_bases_while_running') }}"
         data_type: hugeint
       - name: batter_total_bases_while_on_base
-        description: ""
+        description: "{{ doc('batter_total_bases_while_on_base') }}"
         data_type: hugeint
       - name: extra_base_advance_attempts
-        description: ""
+        description: "{{ doc('extra_base_advance_attempts') }}"
         data_type: hugeint
       - name: bases_advanced
-        description: ""
+        description: "{{ doc('bases_advanced') }}"
         data_type: hugeint
       - name: bases_advanced_on_balls_in_play
-        description: ""
+        description: "{{ doc('bases_advanced_on_balls_in_play') }}"
         data_type: hugeint
       - name: surplus_bases_advanced_on_balls_in_play
-        description: ""
+        description: "{{ doc('surplus_bases_advanced_on_balls_in_play') }}"
         data_type: hugeint
       - name: outs_on_extra_base_advance_attempts
-        description: ""
+        description: "{{ doc('outs_on_extra_base_advance_attempts') }}"
         data_type: hugeint
       - name: pitches
-        description: ""
+        description: "{{ doc('pitches') }}"
         data_type: hugeint
       - name: swings
-        description: ""
+        description: "{{ doc('swings') }}"
         data_type: hugeint
       - name: swings_with_contact
-        description: ""
+        description: "{{ doc('swings_with_contact') }}"
         data_type: hugeint
       - name: strikes
-        description: ""
+        description: "{{ doc('strikes') }}"
         data_type: hugeint
       - name: strikes_called
-        description: ""
+        description: "{{ doc('strikes_called') }}"
         data_type: hugeint
       - name: strikes_swinging
-        description: ""
+        description: "{{ doc('strikes_swinging') }}"
         data_type: hugeint
       - name: strikes_foul
-        description: ""
+        description: "{{ doc('strikes_foul') }}"
         data_type: hugeint
       - name: strikes_foul_tip
-        description: ""
+        description: "{{ doc('strikes_foul_tip') }}"
         data_type: hugeint
       - name: strikes_in_play
-        description: ""
+        description: "{{ doc('strikes_in_play') }}"
         data_type: hugeint
       - name: strikes_unknown
-        description: ""
+        description: "{{ doc('strikes_unknown') }}"
         data_type: hugeint
       - name: balls
-        description: ""
+        description: "{{ doc('balls') }}"
         data_type: hugeint
       - name: balls_called
-        description: ""
+        description: "{{ doc('balls_called') }}"
         data_type: hugeint
       - name: balls_intentional
-        description: ""
+        description: "{{ doc('balls_intentional') }}"
         data_type: hugeint
       - name: balls_automatic
-        description: ""
+        description: "{{ doc('balls_automatic') }}"
         data_type: hugeint
       - name: unknown_pitches
-        description: ""
+        description: "{{ doc('unknown_pitches') }}"
         data_type: hugeint
       - name: pitchouts
-        description: ""
+        description: "{{ doc('pitchouts') }}"
         data_type: hugeint
       - name: pitcher_pickoff_attempts
-        description: ""
+        description: "{{ doc('pitcher_pickoff_attempts') }}"
         data_type: hugeint
       - name: catcher_pickoff_attempts
-        description: ""
+        description: "{{ doc('catcher_pickoff_attempts') }}"
         data_type: hugeint
       - name: pitches_blocked_by_catcher
-        description: ""
+        description: "{{ doc('pitches_blocked_by_catcher') }}"
         data_type: hugeint
       - name: pitches_with_runners_going
-        description: ""
+        description: "{{ doc('pitches_with_runners_going') }}"
         data_type: hugeint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: hugeint
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: hugeint
       - name: balks
-        description: ""
+        description: "{{ doc('balks') }}"
         data_type: hugeint
       - name: left_on_base
-        description: ""
+        description: "{{ doc('left_on_base') }}"
         data_type: hugeint
       - name: left_on_base_with_two_outs
-        description: ""
+        description: "{{ doc('left_on_base_with_two_outs') }}"
         data_type: hugeint

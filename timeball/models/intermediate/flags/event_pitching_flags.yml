@@ -45,12 +45,12 @@ models:
         constraints:
           - type: not_null
       - name: bequeathed_runners
-        description: ""
+        description: "{{ doc('bequeathed_runners') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: inherited_runners
-        description: ""
+        description: "{{ doc('inherited_runners') }}"
         data_type: utinyint
         constraints:
           - type: not_null

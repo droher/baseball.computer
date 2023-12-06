@@ -138,7 +138,7 @@ models:
         constraints:
           - type: not_null
       - name: team_unearned_runs
-        description: ""
+        description: "{{ doc('team_unearned_runs') }}"
         data_type: utinyint
         constraints:
           - type: not_null

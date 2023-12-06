@@ -25,7 +25,7 @@ models:
         description: "{{ doc('side') }}"
         data_type: varchar
       - name: left_on_base
-        description: ""
+        description: "{{ doc('left_on_base') }}"
         data_type: bigint
       - name: team_earned_runs
         description: ""

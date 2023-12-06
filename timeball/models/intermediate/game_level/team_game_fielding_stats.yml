@@ -52,13 +52,13 @@ models:
         description: ""
         data_type: utinyint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: utinyint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
       - name: double_plays
         description: "{{ doc('double_plays') }}"

@@ -32,7 +32,7 @@ models:
         description: ""
         data_type: utinyint
       - name: outs_recorded
-        description: ""
+        description: "{{ doc('outs_recorded') }}"
         data_type: utinyint
       - name: no_out_batters
         description: ""
@@ -53,10 +53,10 @@ models:
         description: "{{ doc('home_runs') }}"
         data_type: utinyint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: utinyint
       - name: earned_runs
-        description: ""
+        description: "{{ doc('earned_runs') }}"
         data_type: utinyint
       - name: walks
         description: "{{ doc('walks') }}"
@@ -71,10 +71,10 @@ models:
         description: "{{ doc('hit_by_pitches') }}"
         data_type: utinyint
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: utinyint
       - name: balks
-        description: ""
+        description: "{{ doc('balks') }}"
         data_type: utinyint
       - name: sacrifice_hits
         description: "{{ doc('sacrifice_hits') }}"
@@ -95,11 +95,11 @@ models:
         description: "{{ doc('on_base_successes') }}"
         data_type: integer
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: integer
       - name: games_relieved
-        description: ""
+        description: "{{ doc('games_relieved') }}"
         data_type: integer
       - name: games_finished
-        description: ""
+        description: "{{ doc('games_finished') }}"
         data_type: integer

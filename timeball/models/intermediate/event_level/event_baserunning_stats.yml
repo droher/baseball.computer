@@ -52,13 +52,13 @@ models:
         description: ""
         data_type: varchar
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: utinyint
       - name: outs_on_basepaths
-        description: ""
+        description: "{{ doc('outs_on_basepaths') }}"
         data_type: utinyint
       - name: times_reached_base
-        description: ""
+        description: "{{ doc('times_reached_base') }}"
         data_type: utinyint
       - name: times_lead_runner
         description: ""
@@ -82,7 +82,7 @@ models:
         description: ""
         data_type: utinyint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
       - name: stolen_bases_second
         description: ""
@@ -94,7 +94,7 @@ models:
         description: ""
         data_type: utinyint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
       - name: caught_stealing_second
         description: ""
@@ -106,7 +106,7 @@ models:
         description: ""
         data_type: utinyint
       - name: picked_off
-        description: ""
+        description: "{{ doc('picked_off') }}"
         data_type: utinyint
       - name: picked_off_first
         description: ""
@@ -118,59 +118,59 @@ models:
         description: ""
         data_type: utinyint
       - name: picked_off_caught_stealing
-        description: ""
+        description: "{{ doc('picked_off_caught_stealing') }}"
         data_type: utinyint
       - name: advances_on_wild_pitches
-        description: ""
+        description: "{{ doc('advances_on_wild_pitches') }}"
         data_type: utinyint
       - name: advances_on_passed_balls
-        description: ""
+        description: "{{ doc('advances_on_passed_balls') }}"
         data_type: utinyint
       - name: advances_on_balks
-        description: ""
+        description: "{{ doc('advances_on_balks') }}"
         data_type: utinyint
       - name: advances_on_unspecified_plays
-        description: ""
+        description: "{{ doc('advances_on_unspecified_plays') }}"
         data_type: utinyint
       - name: advances_on_defensive_indifference
-        description: ""
+        description: "{{ doc('advances_on_defensive_indifference') }}"
         data_type: utinyint
       - name: advances_on_errors
-        description: ""
+        description: "{{ doc('advances_on_errors') }}"
         data_type: utinyint
       - name: plate_appearances_while_on_base
-        description: ""
+        description: "{{ doc('plate_appearances_while_on_base') }}"
         data_type: utinyint
       - name: balls_in_play_while_running
-        description: ""
+        description: "{{ doc('balls_in_play_while_running') }}"
         data_type: utinyint
       - name: balls_in_play_while_on_base
-        description: ""
+        description: "{{ doc('balls_in_play_while_on_base') }}"
         data_type: utinyint
       - name: batter_total_bases_while_running
-        description: ""
+        description: "{{ doc('batter_total_bases_while_running') }}"
         data_type: utinyint
       - name: batter_total_bases_while_on_base
-        description: ""
+        description: "{{ doc('batter_total_bases_while_on_base') }}"
         data_type: utinyint
       - name: extra_base_advance_attempts
-        description: ""
+        description: "{{ doc('extra_base_advance_attempts') }}"
         data_type: utinyint
       - name: bases_advanced
-        description: ""
+        description: "{{ doc('bases_advanced') }}"
         data_type: tinyint
       - name: bases_advanced_on_balls_in_play
-        description: ""
+        description: "{{ doc('bases_advanced_on_balls_in_play') }}"
         data_type: tinyint
       - name: surplus_bases_advanced_on_balls_in_play
-        description: ""
+        description: "{{ doc('surplus_bases_advanced_on_balls_in_play') }}"
         data_type: tinyint
       - name: outs_on_extra_base_advance_attempts
-        description: ""
+        description: "{{ doc('outs_on_extra_base_advance_attempts') }}"
         data_type: utinyint
       - name: outs_avoided_on_errors
-        description: ""
+        description: "{{ doc('outs_avoided_on_errors') }}"
         data_type: utinyint
       - name: unforced_outs_on_basepaths
-        description: ""
+        description: "{{ doc('unforced_outs_on_basepaths') }}"
         data_type: utinyint

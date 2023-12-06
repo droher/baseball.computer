@@ -40,7 +40,7 @@ models:
         description: "{{ doc('at_bats') }}"
         data_type: usmallint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: usmallint
       - name: hits
         description: "{{ doc('hits') }}"
@@ -58,10 +58,10 @@ models:
         description: "{{ doc('runs_batted_in') }}"
         data_type: usmallint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: usmallint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: usmallint
       - name: walks
         description: "{{ doc('walks') }}"

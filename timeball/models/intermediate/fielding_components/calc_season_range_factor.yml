@@ -31,7 +31,7 @@ models:
         description: "{{ doc('reached_on_errors') }}"
         data_type: hugeint
       - name: outs_recorded
-        description: ""
+        description: "{{ doc('outs_recorded') }}"
         data_type: hugeint
       - name: balls_in_play
         description: "{{ doc('balls_in_play') }}"

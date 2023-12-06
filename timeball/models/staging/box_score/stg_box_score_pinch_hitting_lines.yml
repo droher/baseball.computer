@@ -34,7 +34,7 @@ models:
         description: "{{ doc('at_bats') }}"
         data_type: bigint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: bigint
       - name: hits
         description: "{{ doc('hits') }}"
@@ -70,10 +70,10 @@ models:
         description: "{{ doc('strikeouts') }}"
         data_type: bigint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: bigint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: bigint
       - name: grounded_into_double_plays
         description: "{{ doc('grounded_into_double_plays') }}"

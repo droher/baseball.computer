@@ -37,22 +37,22 @@ models:
         constraints:
           - type: not_null
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: team_unearned_runs
-        description: ""
+        description: "{{ doc('team_unearned_runs') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: inherited_runners_scored
-        description: ""
+        description: "{{ doc('inherited_runners_scored') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: bequeathed_runners_scored
-        description: ""
+        description: "{{ doc('bequeathed_runners_scored') }}"
         data_type: utinyint
         constraints:
           - type: not_null

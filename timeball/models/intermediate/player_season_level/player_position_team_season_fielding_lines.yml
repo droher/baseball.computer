@@ -40,7 +40,7 @@ models:
         description: ""
         data_type: usmallint
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: usmallint
       - name: outs_played
         description: ""
@@ -76,16 +76,16 @@ models:
         description: ""
         data_type: usmallint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: usmallint
       - name: balls_hit_to
         description: ""
         data_type: usmallint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: usmallint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: usmallint
       - name: games_left_field
         description: ""

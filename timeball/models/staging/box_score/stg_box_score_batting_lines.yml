@@ -37,7 +37,7 @@ models:
         description: "{{ doc('at_bats') }}"
         data_type: utinyint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: utinyint
       - name: hits
         description: "{{ doc('hits') }}"
@@ -73,10 +73,10 @@ models:
         description: "{{ doc('strikeouts') }}"
         data_type: utinyint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
       - name: grounded_into_double_plays
         description: "{{ doc('grounded_into_double_plays') }}"

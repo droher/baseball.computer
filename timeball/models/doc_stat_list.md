@@ -337,7 +337,7 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 {% enddocs %}
 
 {% docs trajectory_pop_fly %}
-    (sometimes PU) Number of times a batter hit a pop fly, also called a pop-up.
+    (sometimes PU)  Number of plate appearances that ended in a pop fly, also called a pop-up.
     Pop flies are distinguished from fly balls in that they are hit at a higher angle, tend to be
     hit with less exit velocity, and (as a result) end up in the infield or shallow outfield. Before
     Statcast-era standardization, the distinction between a fly ball and a pop-up was a matter of
@@ -354,28 +354,531 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 {% enddocs %}
 
 {% docs trajectory_known %}
-    Number of times a batter hit a ball in play whose trajectory was recorded or was reliably inferred
+    Number of plate appearances ending in a batted ball whose trajectory was recorded or was reliably inferred
     from the context. An example of reliable inference is an at-bat with the fielding play 6-3, which
     almost always is a ground ball fielded by the shortstop and thrown to the first baseman. See
     `calc_batted_ball_type` for the inference logic.
 {% enddocs %}
 
 {% docs trajectory_broad_type_air_ball %}
-    Number of times a batter hit a ball in play whose trajectory was recorded and was an air ball.
+    Number of plate appearances that ended in an air ball (a fly ball, line drive, or pop-up).
+    Because it is much easier to infer that a ball was hit in the air than it is to infer the exact
+    trajectory, this number field is more reliably populated than any of its three consituent parts.
 {% enddocs %}
 
 {% docs trajectory_broad_type_ground_ball %}
-    Number of times a batter hit a ball in play whose trajectory was recorded and was a ground ball.
+    Same as `trajectory_ground_ball`.
 {% enddocs %}
 
 {% docs trajectory_broad_type_unknown %}
-    Number of times a batter hit a ball in play whose trajectory was recorded and was unknown.
+    Number of plate appearances ending in a batted ball whose trajectory was not recorded and cannot
+    be reliably inferred from context, even to the extent of knowing whether it was a ground ball or an air ball.
+    This will include a disproportionate number of hits, which are more likely to be missing trajectory data
+    and harder to make inferences about.
 {% enddocs %}
 
 {% docs trajectory_broad_type_known %}
-    Number of times a batter hit a ball in play whose trajectory was recorded and was known.
+    Number of plate appearances ending in a batted ball whose ground/air status was recorded or
+    reliably inferred from the context. This is the sum of `trajectory_broad_type_air_ball` and
+    `trajectory_broad_type_ground_ball`. Outs in play have excellent coverage historically here,
+    even for older games.
 {% enddocs %}
 
 {% docs bunts %}
-    Number of times a batter attempted a bunt.
+    Number of plate appearances ending in an in-play bunt.
+    This does not include strikeouts on foul bunts with two strikes.
+{% enddocs %}
+
+{% docs batted_distance_plate %}
+    Number of plate appearances in which the ball was batted to catcher's area around home plate.
+{% enddocs %}
+
+{% docs batted_distance_infield %}
+    Number of plate appearances in which the ball was batted to the infield (not including the catcher).
+    All ground balls are included here, regardless of whether they made it through to the outfield.
+{% enddocs %}
+
+{% docs batted_distance_outfield %}
+    Number of plate appearances in which the ball was hit on the fly to the outfield.
+{% enddocs %}
+
+{% docs batted_distance_unknown %}
+    Number of plate appearances in which the ball was hit, but the distance was not recorded
+    and cannot be reliably inferred from context.
+{% enddocs %}
+
+{% docs batted_distance_known %}
+    Number of plate appearances in which the ball was hit, and the distance was either
+    recorded or reliably inferred from context.
+{% enddocs %}
+
+{% docs fielded_by_battery %}
+    Number of plate appearances in which the ball was fielded by the pitcher or catcher.
+{% enddocs %}
+
+{% docs fielded_by_infielder %}
+    Number of plate appearances in which the ball was fielded by an infielder.
+{% enddocs %}
+
+{% docs fielded_by_outfielder %}
+    Number of plate appearances in which the ball was fielded by an outfielder.
+{% enddocs %}
+
+{% docs fielded_by_known %}
+    Number of plate appearances in which the ball was fielded by a player, and the player was recorded.
+{% enddocs %}
+
+{% docs fielded_by_unknown %}
+    Number of plate appearances in which the ball was fielded by a player, but the player was not recorded.
+{% enddocs %}
+
+{% docs batted_angle_left %}
+    Number of plate appearances in which the ball was batted to the left side of the field.
+    This includes balls where the location was not recorded, but the fielder is on the left side
+    (3B, LF). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_angle_right %}
+    Number of plate appearances in which the ball was batted to the right side of the field.
+    This includes balls where the location was not recorded, but the fielder is on the right side
+    (1B, RF). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_angle_middle %}
+    Number of plate appearances in which the ball was batted to the middle of the field.
+    This includes balls where the location was not recorded, but the fielder is up the middle
+    (P, 2B, SS, CF). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_angle_unknown %}
+    Number of plate appearances in which the ball was batted, but we don't have enough location
+    to determine the spray angle.
+{% enddocs %}
+
+{% docs batted_angle_known %}
+    Number of plate appearances in which the ball was hit and we have enough location to determine
+    the spray angle.
+{% enddocs %}
+
+{% docs batted_location_plate %}
+    Number of plate appearances in which the ball was batted to the catcher's area around home plate.
+{% enddocs %}
+
+{% docs batted_location_right_infield %}
+    Number of plate appearances in which the ball was batted to the right side of the infield.
+    This includes balls where the location was not recorded, but the fielder is on the right side
+    (1B). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_location_middle_infield %}
+    Number of plate appearances in which the ball was batted to the middle of the infield.
+    This includes balls where the location was not recorded, but the fielder is up the middle
+    (P, SS, 2B). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_location_left_infield %}
+    Number of plate appearances in which the ball was batted to the left side of the infield.
+    This includes balls where the location was not recorded, but the fielder is on the left side
+    (3B). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_location_left_field %}
+    Number of plate appearances in which the ball was batted to the left side of the outfield.
+    This includes balls where the location was not recorded, but the fielder is on the left side
+    (LF). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_location_center_field %}
+    Number of plate appearances in which the ball was batted to the center of the outfield.
+    This includes balls where the location was not recorded, but the fielder is up the middle
+    (CF). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_location_right_field %}
+    Number of plate appearances in which the ball was batted to the right side of the outfield.
+    This includes balls where the location was not recorded, but the fielder is on the right side
+    (RF, CF). See `seed_hit_location_categories` and `seed_hit_to_fielder_categories` for more details.
+{% enddocs %}
+
+{% docs batted_location_unknown %}
+    Number of plate appearances in which the ball was batted, but we don't have enough location
+    to determine the specific location.
+{% enddocs %}
+
+{% docs batted_location_known %}
+    Number of plate appearances in which the ball was batted and we have enough location to determine
+    the specific location.
+{% enddocs %}
+
+{% docs batted_balls_pulled %}
+    Number of plate appearances in which the ball was pulled (the left side for right-handed batters, the right side for left-handed batters).
+{% enddocs %}
+
+{% docs batted_balls_opposite_field %}
+    Number of plate appearances in which the ball was hit to the opposite field (the right side for right-handed batters, the left side for left-handed batters).
+{% enddocs %}
+
+{% docs runs %}
+   (R) Number of runs scored.
+{% enddocs %}
+
+{% docs times_reached_base %}
+    Number of times a batter ended a plate appearance on base, even if it was through a fielder's choice, error, etc.
+{% enddocs %}
+
+{% docs stolen_bases %}
+    (SB) Number of successful stolen bases.
+{% enddocs %}
+
+{% docs caught_stealing %}
+    (CS) Number of times a runner was caught stealing.
+{% enddocs %}
+
+{% docs picked_off %}
+    (PO) Number of times a runner was picked off.
+{% enddocs %}
+
+{% docs picked_off_caught_stealing %}
+    (POCS) Number of times a runner was picked off, but instead of going back to the bag,
+    tried to run to the next base and was put out.
+{% enddocs %}
+
+{% docs outs_on_basepaths %}
+    Number of outs recorded by a baserunner (this is not mutually exclusive with outs recorded by the batter
+    in cases like failed advances or dropped third-strike putouts).
+{% enddocs %}
+
+{% docs unforced_outs_on_basepaths %}
+    Number of outs recorded by a baserunner that was not the result of a force on the runner.
+    "Unforced" is meant to be in both the literal sense of a force not being in play, but also
+    the figurative sense of the runner being responsible for the out. The latter may or may not
+    be the best interpretation of any given play, but it is useful to assign responsibility to the
+    runner by default in those contexts.
+{% enddocs %}
+
+{% docs outs_avoided_on_errors %}
+    Number of times that a baserunner would have been out, but an error allowed them to remain
+    on the basepaths (either staying put or advancing).
+{% enddocs %}
+
+{% docs advances_on_wild_pitches %}
+    (WP) Number of times a baserunner advanced on a wild pitch.
+{% enddocs %}
+
+{% docs advances_on_passed_balls %}
+    (PB) Number of times a baserunner advanced on a passed ball.
+{% enddocs %}
+
+{% docs advances_on_balks %}
+    (sometimes BK) Number of times a baserunner advanced on a balk.
+{% enddocs %}
+
+{% docs advances_on_unspecified_plays %}
+    Number of times a baserunner advanced for an unspecified reason.
+{% enddocs %}
+
+{% docs advances_on_defensive_indifference %}
+   (DI) Number of times a baserunner advanced on defensive indifference.
+   Defensive indifference is a judgement call by the official scorer that the defense
+   did not try to stop the runner from stealing a base. This usually happens
+   when the defense has a lead late in the game.
+{% enddocs %}
+
+{% docs advances_on_errors %}
+    Number of times a baserunner advanced on an error.
+{% enddocs %}
+
+{% docs plate_appearances_while_on_base %}
+    Number of plate appearances in which the baserunner started on 1st, 2nd, or 3rd base.
+{% enddocs %}
+
+{% docs balls_in_play_while_running %}
+    Number of balls in play while either batting or on base.
+{% enddocs %}
+
+{% docs balls_in_play_while_on_base %}
+    Number of balls in play in which the baserunner started on 1st, 2nd, or 3rd base.
+{% enddocs %}
+
+{% docs batter_total_bases_while_running %}
+    Number of total bases accumulated by the batter while the baserunner was running, including the batter.
+{% enddocs %}
+
+{% docs batter_total_bases_while_on_base %}
+    Number of total bases accumulated by the batter while the baserunner was on base, excluding the batter.
+{% enddocs %}
+
+{% docs extra_base_advance_attempts %}
+    Number of times a baserunner tried to advance by a greater number of bases than the batter.
+{% enddocs %}
+
+{% docs bases_advanced %}
+    Number of bases advanced by a baserunner, including the batter.
+{% enddocs %}
+
+{% docs bases_advanced_on_balls_in_play %}
+    Number of bases advanced by a baserunner on a ball in play, including the batter.
+{% enddocs %}
+
+{% docs surplus_bases_advanced_on_balls_in_play %}
+    Number of bases advanced by a baserunner on a ball in play minus the number of total bases
+    accumulated by the batter on the same play. For example, if a runner goes from first to third
+    on a single, this number is 1 (3 - 2). If a runner only goes from second to third on a double,
+    this number is -1 (1 - 2).
+{% enddocs %}
+
+{% docs outs_on_extra_base_advance_attempts %}
+    Number of times a baserunner was out attempting to advance
+    by a greater number of bases than the batter. This includes
+    batters who were put out trying to stretch a hit to the next base.
+{% enddocs %}
+
+{% docs pitches %}
+    Number of pitches thrown.
+{% enddocs %}
+
+{% docs swings %}
+    Number of pitches that were swung at.
+{% enddocs %}
+
+{% docs swings_with_contact %}
+    Number of pitches that were swung at and made contact.
+{% enddocs %}
+
+{% docs strikes %}
+    Number of pitches that were called or swinging strikes.
+{% enddocs %}
+
+{% docs strikes_called %}
+    Number of pitches that were called strikes.
+{% enddocs %}
+
+{% docs strikes_swinging %}
+    Number of pitches that were swung on and missed (mutually exclusive
+    with `swings_with_contact`, which also count as strikes).
+{% enddocs %}
+
+{% docs strikes_foul %}
+    Number of pitches that were fouled off.
+{% enddocs %}
+
+{% docs strikes_foul_tip %}
+    Number of pitches that were fouled off and caught by the catcher for strike three.
+{% enddocs %}
+
+{% docs strikes_in_play %}
+    Number of pitches that were swung on and batted into play.
+{% enddocs %}
+
+{% docs strikes_unknown %}
+    Number of pitches that we know were strikes, but don't know what kind.
+{% enddocs %}
+
+{% docs balls %}
+    Number of pitches that were called balls.
+{% enddocs %}
+
+{% docs balls_called %}
+    Number of pitches that were called balls (as opposed to automatic balls that were
+    not actually thrown).
+{% enddocs %}
+
+{% docs balls_intentional %}
+    Number of pitches that were called balls as part of an intentional walk.
+{% enddocs %}
+
+{% docs balls_automatic %}
+    Number of pitches that were called balls on an automatic walk or a delay penalty.
+{% enddocs %}
+
+{% docs unknown_pitches %}
+    Number of pitches that were thrown without any other information recorded.
+{% enddocs %}
+
+{% docs pitchouts %}
+    Number of pitches that were thrown as pitchouts. A pitchout is a pitch that is thrown
+    intentionally very far outside in order to make it easier for the catcher to throw out
+    a baserunner who is likely to steal.
+{% enddocs %}
+
+{% docs pitcher_pickoff_attempts %}
+    Number of times the pitcher attempted to pick off a baserunner.
+{% enddocs %}
+
+{% docs catcher_pickoff_attempts %}
+    Number of times the catcher attempted to pick off a baserunner.
+{% enddocs %}
+
+{% docs pitches_blocked_by_catcher %}
+    Number of pitches that were blocked by the catcher.
+{% enddocs %}
+
+{% docs pitches_with_runners_going %}
+    Number of pitches that were thrown while a baserunner was on the move
+    (as part of a steal or hit-and-run).
+{% enddocs %}
+
+{% docs passed_balls %}
+    (PB) Number of passed balls.
+{% enddocs %}
+
+{% docs wild_pitches %}
+    (WP) Number of wild pitches.
+{% enddocs %}
+
+{% docs balks %}
+    (BK) Number of balks.
+{% enddocs %}
+
+{% docs left_on_base %}
+    (LOB) At an individual level, the number of baserunners that a batter failed to advance during a plate appearance.
+    At a team level, the number of baserunners remaining on base at the end of an inning. In order to count, baserunners
+    must not have scored or been put out.
+{% enddocs %}
+
+{% docs left_on_base_with_two_outs %}
+    (LOB) At an individual level, the number of baserunners that remain on base (unscored and not out) after a plate appearance that ends with the third out recorded. At a team level, this is interchangable with `left_on_base`.
+{% enddocs %}
+
+{% docs games_started %}
+    (GS) Number of games started by a player.
+{% enddocs %}
+
+{% docs innings_pitched %}
+    (IP) Number of innings pitched by a pitcher. Fractional innings are given by .33 and .67 here,
+    but they are often formatted as .1 and .2 elsewhere.
+{% enddocs %}
+
+{% docs inherited_runners %}
+    (IR) Number of runners on base when a pitcher entered the game.
+{% enddocs %}
+
+{% docs bequeathed_runners %}
+    Number of runners on base when a pitcher left the game.
+{% enddocs %}
+
+{% docs games_relieved %}
+    Number of games in which a pitcher entered the game in relief.
+{% enddocs %}
+
+{% docs games_finished %}
+    (GF) Number of games in which a pitcher entered the game in relief and finished the game.
+{% enddocs %}
+
+{% docs save_situations_entered %}
+    Number of games in which a pitcher entered the game in a save situation. A save situation is defined
+    as when the pitcher enters the game ineligible to get the win with one of the following conditions:
+
+    - A lead of three runs or less and ineligible to get the win
+    - Any lead with the tying run on base, at bat, or on deck
+
+    If a pitcher pitches the final three innings of a game with any lead, they are credited with a save
+    but are not considered to have entered a save situation unless one of the above conditions is met.
+    Note the difference between this field and `save_opportunities`, which does not count games in which
+    the pitcher exited without completing or blowing the save.
+{% enddocs %}
+
+{% docs holds %}
+    (HLD, H) Number of holds recorded by a pitcher. A hold is defined as a relief appearance in which
+    the pitcher enters the game in a save situation, records at least one out, and leaves the game
+    with the lead intact.
+{% enddocs %}
+
+{% docs blown_saves %}
+    (BS) Number of games in which a pitcher entered the game in a save situation and gave up the lead.
+    The status of inherited runners is irrelevant in determining who blew the save - it is entirely
+    a function of who was on the mount when the lead as lost.
+{% enddocs %}
+
+{% docs saves_by_rule %}
+    Number of games in which a pitcher earned a save according to the default rules.
+    This may be different than the actual number of saves, as the official scorer may award
+    the player a win instead of a save at their discretion in rare cases.
+{% enddocs %}
+
+{% docs save_opportunities %}
+    (SVO) The sum of saves and blown saves.
+{% enddocs %}
+
+{% docs wins %}
+    (W) Number of games in which a pitcher was credited with the win.
+{% enddocs %}
+
+{% docs losses %}
+    (L) Number of games in which a pitcher was debited with the loss.
+{% enddocs %}
+
+{% docs saves %}
+    (SV) Number of games in which a pitcher was credited with the save.
+{% enddocs %}
+
+{% docs earned_runs %}
+    (ER) Number of runs that are charged to a pitcher. This may include runs that scored after the pitcher
+    left the game (in the case of inherited runners), as well as runs that the scorekeeper deemed to be
+    the pitcher's responsibility in the absence of official inherited runner rules in the olden days.
+    Earned runs are only an official statistic at a game level: the earnedness of any given run is never
+    officially specified, only the total. It would be possible to make a very good guess algorithmically,
+    but that would be a huge pain for a stat that is not very useful in the first place.
+{% enddocs %}
+
+{% docs complete_games %}
+    (CG) Number of games in which a pitcher pitched the entire game, regardless of how long the game lasted.
+{% enddocs %}
+
+{% docs shutouts %}
+    (SHO) Number of games in which a pitcher recorded every out for his team and did not allow any runs,
+    earned or unearned, regardless of how long the game lasted. Note the subtle difference between the
+    definition of a shutout and a complete game: it is possible to pitch a shutout without a complete game
+    if the pitcher enters in relief when no outs have been recorded. The only apparent reason this distinction
+    exists is for us to remember the time that Babe Ruth walked a batter, got ejected, punched an umpire,
+    and then Ernie Shore came in and retired every batter he faced.
+{% enddocs %}
+
+{% docs quality_starts %}
+    Number of games in which a starting pitcher pitched at least six innings and allowed three or fewer earned runs.
+{% enddocs %}
+
+{% docs cheap_wins %}
+    Number of wins in which a starting pitcher did not record a quality start.
+{% enddocs %}
+
+{% docs tough_losses %}
+    Number of losses in which a starting pitcher record a quality start.
+{% enddocs %}
+
+{% docs no_decisions %}
+    Number of games in which a pitcher pitched but did not recieve a win or a loss.
+{% enddocs %}
+
+{% docs no_hitters %}
+    At an individual level, the number of games in which a pitcher was the only pitcher for their team and pitched a full-length game without allowing any hits. At a team level, the "only pitcher" requirement is dropped.
+{% enddocs %}
+
+{% docs perfect_games %}
+    Number of games in which a pitcher was the only pitcher for their team and pitched the entire game
+    without allowing any baserunners. At a team level, the "only pitcher" requirement is dropped.
+{% enddocs %}
+
+{% docs batter_faced %}
+    Number of batters faced by a pitcher, generally equivalent to plate appearances (in old box-score-only games, this may not match up perfectly).
+{% enddocs %}
+
+{% docs outs_recorded %}
+    Number of outs recorded by a pitcher.
+{% enddocs %}
+
+{% docs inherited_runners_scored %}
+    Number of inherited runners that scored while a pitcher was on the mound.
+{% enddocs %}
+
+{% docs bequeathed_runners_scored %}
+    Number of bequeathed runners that scored after a pitcher left the game.
+{% enddocs %}
+
+{% docs team_unearned_runs %}
+    Number of runs that are charged as earned to the pitcher, but unearned to the team.
+    This happens when a pitcher enters an inning which should have been over already because
+    of an error and then the pitcher allows a run to score without the help of any additional
+    errors. This is a rare occurence and it might seem unnecessary,
+    but it is absolutely essential that we track it in order to preserve the space-time continuum.
 {% enddocs %}

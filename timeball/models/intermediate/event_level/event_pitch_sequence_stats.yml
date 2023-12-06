@@ -22,117 +22,117 @@ models:
         description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: pitches
-        description: ""
+        description: "{{ doc('pitches') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: swings
-        description: ""
+        description: "{{ doc('swings') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: swings_with_contact
-        description: ""
+        description: "{{ doc('swings_with_contact') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes
-        description: ""
+        description: "{{ doc('strikes') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes_called
-        description: ""
+        description: "{{ doc('strikes_called') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes_swinging
-        description: ""
+        description: "{{ doc('strikes_swinging') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes_foul
-        description: ""
+        description: "{{ doc('strikes_foul') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes_foul_tip
-        description: ""
+        description: "{{ doc('strikes_foul_tip') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes_in_play
-        description: ""
+        description: "{{ doc('strikes_in_play') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: strikes_unknown
-        description: ""
+        description: "{{ doc('strikes_unknown') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: balls
-        description: ""
+        description: "{{ doc('balls') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: balls_called
-        description: ""
+        description: "{{ doc('balls_called') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: balls_intentional
-        description: ""
+        description: "{{ doc('balls_intentional') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: balls_automatic
-        description: ""
+        description: "{{ doc('balls_automatic') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: unknown_pitches
-        description: ""
+        description: "{{ doc('unknown_pitches') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: pitchouts
-        description: ""
+        description: "{{ doc('pitchouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: pitcher_pickoff_attempts
-        description: ""
+        description: "{{ doc('pitcher_pickoff_attempts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: catcher_pickoff_attempts
-        description: ""
+        description: "{{ doc('catcher_pickoff_attempts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: pitches_blocked_by_catcher
-        description: ""
+        description: "{{ doc('pitches_blocked_by_catcher') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: pitches_with_runners_going
-        description: ""
+        description: "{{ doc('pitches_with_runners_going') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: balks
-        description: ""
+        description: "{{ doc('balks') }}"
         data_type: utinyint
         constraints:
           - type: not_null

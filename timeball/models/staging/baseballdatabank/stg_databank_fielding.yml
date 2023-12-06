@@ -37,7 +37,7 @@ models:
         description: ""
         data_type: smallint
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: smallint
       - name: outs_played
         description: ""
@@ -55,16 +55,16 @@ models:
         description: "{{ doc('double_plays') }}"
         data_type: smallint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: smallint
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: smallint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: smallint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: smallint
       - name: fielding_position
         description: "{{ doc('fielding_position') }}"

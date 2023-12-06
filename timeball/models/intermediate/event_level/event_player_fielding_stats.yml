@@ -108,12 +108,12 @@ models:
         constraints:
           - type: not_null
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -123,7 +123,7 @@ models:
         constraints:
           - type: not_null
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: integer
         constraints:
           - type: not_null

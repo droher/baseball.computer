@@ -55,10 +55,10 @@ models:
         description: ""
         data_type: boolean
       - name: wins
-        description: ""
+        description: "{{ doc('wins') }}"
         data_type: integer
       - name: losses
-        description: ""
+        description: "{{ doc('losses') }}"
         data_type: integer
       - name: runs_scored
         description: ""
@@ -73,7 +73,7 @@ models:
         description: ""
         data_type: utinyint
       - name: left_on_base
-        description: ""
+        description: "{{ doc('left_on_base') }}"
         data_type: usmallint
       - name: at_bats
         description: "{{ doc('at_bats') }}"
@@ -109,10 +109,10 @@ models:
         description: "{{ doc('strikeouts') }}"
         data_type: usmallint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: usmallint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: usmallint
       - name: grounded_into_double_plays
         description: "{{ doc('grounded_into_double_plays') }}"
@@ -121,7 +121,7 @@ models:
         description: "{{ doc('reached_on_interferences') }}"
         data_type: usmallint
       - name: innings_pitched
-        description: ""
+        description: "{{ doc('innings_pitched') }}"
         data_type: decimal(6,4)
       - name: individual_earned_runs_allowed
         description: ""
@@ -130,10 +130,10 @@ models:
         description: ""
         data_type: utinyint
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: usmallint
       - name: balks
-        description: ""
+        description: "{{ doc('balks') }}"
         data_type: usmallint
       - name: putouts
         description: ""
@@ -142,7 +142,7 @@ models:
         description: ""
         data_type: utinyint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: utinyint
       - name: double_plays_turned
         description: ""

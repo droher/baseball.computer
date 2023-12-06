@@ -37,10 +37,10 @@ models:
         description: ""
         data_type: varchar
       - name: wins
-        description: ""
+        description: "{{ doc('wins') }}"
         data_type: hugeint
       - name: losses
-        description: ""
+        description: "{{ doc('losses') }}"
         data_type: hugeint
       - name: win_percentage
         description: ""

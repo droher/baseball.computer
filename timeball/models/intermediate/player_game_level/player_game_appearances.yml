@@ -28,7 +28,7 @@ models:
         description: "{{ doc('side') }}"
         data_type: side
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: utinyint
         constraints:
           - type: not_null

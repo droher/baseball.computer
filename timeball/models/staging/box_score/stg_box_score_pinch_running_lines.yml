@@ -30,11 +30,11 @@ models:
         constraints:
           - type: not_null
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: bigint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: bigint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: bigint

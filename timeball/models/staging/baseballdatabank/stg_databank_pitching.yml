@@ -34,34 +34,34 @@ models:
         description: ""
         data_type: varchar
       - name: wins
-        description: ""
+        description: "{{ doc('wins') }}"
         data_type: smallint
       - name: losses
-        description: ""
+        description: "{{ doc('losses') }}"
         data_type: smallint
       - name: games
         description: ""
         data_type: smallint
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: smallint
       - name: complete_games
-        description: ""
+        description: "{{ doc('complete_games') }}"
         data_type: smallint
       - name: shutouts
-        description: ""
+        description: "{{ doc('shutouts') }}"
         data_type: smallint
       - name: saves
-        description: ""
+        description: "{{ doc('saves') }}"
         data_type: smallint
       - name: outs_recorded
-        description: ""
+        description: "{{ doc('outs_recorded') }}"
         data_type: smallint
       - name: hits
         description: "{{ doc('hits') }}"
         data_type: smallint
       - name: earned_runs
-        description: ""
+        description: "{{ doc('earned_runs') }}"
         data_type: smallint
       - name: home_runs
         description: "{{ doc('home_runs') }}"
@@ -82,22 +82,22 @@ models:
         description: "{{ doc('intentional_walks') }}"
         data_type: smallint
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: smallint
       - name: hit_by_pitches
         description: "{{ doc('hit_by_pitches') }}"
         data_type: smallint
       - name: balks
-        description: ""
+        description: "{{ doc('balks') }}"
         data_type: smallint
       - name: batters_faced
         description: ""
         data_type: smallint
       - name: games_finished
-        description: ""
+        description: "{{ doc('games_finished') }}"
         data_type: smallint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: smallint
       - name: sacrifice_hits
         description: "{{ doc('sacrifice_hits') }}"

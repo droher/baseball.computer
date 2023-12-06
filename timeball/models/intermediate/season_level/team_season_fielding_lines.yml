@@ -47,13 +47,13 @@ models:
         constraints:
           - type: not_null
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: usmallint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: usmallint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: usmallint
       - name: plate_appearances_in_field
         description: ""

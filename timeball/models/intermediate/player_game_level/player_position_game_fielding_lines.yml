@@ -33,7 +33,7 @@ models:
         constraints:
           - type: not_null
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -101,16 +101,16 @@ models:
         description: ""
         data_type: utinyint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: utinyint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
         tests:
           - dbt_utils.not_null_proportion:
               at_least: .93
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
         tests:
           - dbt_utils.not_null_proportion:

@@ -28,34 +28,34 @@ models:
         description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: innings_pitched
-        description: ""
+        description: "{{ doc('innings_pitched') }}"
         data_type: decimal(6,4)
       - name: wins
-        description: ""
+        description: "{{ doc('wins') }}"
         data_type: utinyint
       - name: losses
-        description: ""
+        description: "{{ doc('losses') }}"
         data_type: utinyint
       - name: saves
-        description: ""
+        description: "{{ doc('saves') }}"
         data_type: utinyint
       - name: earned_runs
-        description: ""
+        description: "{{ doc('earned_runs') }}"
         data_type: utinyint
       - name: batters_faced
         description: ""
         data_type: utinyint
       - name: outs_recorded
-        description: ""
+        description: "{{ doc('outs_recorded') }}"
         data_type: utinyint
       - name: inherited_runners_scored
-        description: ""
+        description: "{{ doc('inherited_runners_scored') }}"
         data_type: utinyint
       - name: bequeathed_runners_scored
-        description: ""
+        description: "{{ doc('bequeathed_runners_scored') }}"
         data_type: utinyint
       - name: team_unearned_runs
-        description: ""
+        description: "{{ doc('team_unearned_runs') }}"
         data_type: utinyint
       - name: at_bats
         description: "{{ doc('at_bats') }}"
@@ -169,269 +169,269 @@ models:
         description: "{{ doc('bunts') }}"
         data_type: utinyint
       - name: batted_distance_plate
-        description: ""
+        description: "{{ doc('batted_distance_plate') }}"
         data_type: utinyint
       - name: batted_distance_infield
-        description: ""
+        description: "{{ doc('batted_distance_infield') }}"
         data_type: utinyint
       - name: batted_distance_outfield
-        description: ""
+        description: "{{ doc('batted_distance_outfield') }}"
         data_type: utinyint
       - name: batted_distance_unknown
-        description: ""
+        description: "{{ doc('batted_distance_unknown') }}"
         data_type: utinyint
       - name: batted_distance_known
-        description: ""
+        description: "{{ doc('batted_distance_known') }}"
         data_type: utinyint
       - name: fielded_by_battery
-        description: ""
+        description: "{{ doc('fielded_by_battery') }}"
         data_type: utinyint
       - name: fielded_by_infielder
-        description: ""
+        description: "{{ doc('fielded_by_infielder') }}"
         data_type: utinyint
       - name: fielded_by_outfielder
-        description: ""
+        description: "{{ doc('fielded_by_outfielder') }}"
         data_type: utinyint
       - name: fielded_by_known
-        description: ""
+        description: "{{ doc('fielded_by_known') }}"
         data_type: utinyint
       - name: fielded_by_unknown
-        description: ""
+        description: "{{ doc('fielded_by_unknown') }}"
         data_type: utinyint
       - name: batted_angle_left
-        description: ""
+        description: "{{ doc('batted_angle_left') }}"
         data_type: utinyint
       - name: batted_angle_right
-        description: ""
+        description: "{{ doc('batted_angle_right') }}"
         data_type: utinyint
       - name: batted_angle_middle
-        description: ""
+        description: "{{ doc('batted_angle_middle') }}"
         data_type: utinyint
       - name: batted_angle_unknown
-        description: ""
+        description: "{{ doc('batted_angle_unknown') }}"
         data_type: utinyint
       - name: batted_angle_known
-        description: ""
+        description: "{{ doc('batted_angle_known') }}"
         data_type: utinyint
       - name: batted_location_plate
-        description: ""
+        description: "{{ doc('batted_location_plate') }}"
         data_type: utinyint
       - name: batted_location_right_infield
-        description: ""
+        description: "{{ doc('batted_location_right_infield') }}"
         data_type: utinyint
       - name: batted_location_middle_infield
-        description: ""
+        description: "{{ doc('batted_location_middle_infield') }}"
         data_type: utinyint
       - name: batted_location_left_infield
-        description: ""
+        description: "{{ doc('batted_location_left_infield') }}"
         data_type: utinyint
       - name: batted_location_left_field
-        description: ""
+        description: "{{ doc('batted_location_left_field') }}"
         data_type: utinyint
       - name: batted_location_center_field
-        description: ""
+        description: "{{ doc('batted_location_center_field') }}"
         data_type: utinyint
       - name: batted_location_right_field
-        description: ""
+        description: "{{ doc('batted_location_right_field') }}"
         data_type: utinyint
       - name: batted_location_unknown
-        description: ""
+        description: "{{ doc('batted_location_unknown') }}"
         data_type: utinyint
       - name: batted_location_known
-        description: ""
+        description: "{{ doc('batted_location_known') }}"
         data_type: utinyint
       - name: batted_balls_pulled
-        description: ""
+        description: "{{ doc('batted_balls_pulled') }}"
         data_type: utinyint
       - name: batted_balls_opposite_field
-        description: ""
+        description: "{{ doc('batted_balls_opposite_field') }}"
         data_type: utinyint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: utinyint
       - name: times_reached_base
-        description: ""
+        description: "{{ doc('times_reached_base') }}"
         data_type: utinyint
       - name: stolen_bases
-        description: ""
+        description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
       - name: caught_stealing
-        description: ""
+        description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
       - name: picked_off
-        description: ""
+        description: "{{ doc('picked_off') }}"
         data_type: utinyint
       - name: picked_off_caught_stealing
-        description: ""
+        description: "{{ doc('picked_off_caught_stealing') }}"
         data_type: utinyint
       - name: outs_on_basepaths
-        description: ""
+        description: "{{ doc('outs_on_basepaths') }}"
         data_type: utinyint
       - name: unforced_outs_on_basepaths
-        description: ""
+        description: "{{ doc('unforced_outs_on_basepaths') }}"
         data_type: utinyint
       - name: outs_avoided_on_errors
-        description: ""
+        description: "{{ doc('outs_avoided_on_errors') }}"
         data_type: utinyint
       - name: advances_on_wild_pitches
-        description: ""
+        description: "{{ doc('advances_on_wild_pitches') }}"
         data_type: utinyint
       - name: advances_on_passed_balls
-        description: ""
+        description: "{{ doc('advances_on_passed_balls') }}"
         data_type: utinyint
       - name: advances_on_balks
-        description: ""
+        description: "{{ doc('advances_on_balks') }}"
         data_type: utinyint
       - name: advances_on_unspecified_plays
-        description: ""
+        description: "{{ doc('advances_on_unspecified_plays') }}"
         data_type: utinyint
       - name: advances_on_defensive_indifference
-        description: ""
+        description: "{{ doc('advances_on_defensive_indifference') }}"
         data_type: utinyint
       - name: advances_on_errors
-        description: ""
+        description: "{{ doc('advances_on_errors') }}"
         data_type: utinyint
       - name: extra_base_advance_attempts
-        description: ""
+        description: "{{ doc('extra_base_advance_attempts') }}"
         data_type: utinyint
       - name: bases_advanced
-        description: ""
+        description: "{{ doc('bases_advanced') }}"
         data_type: smallint
       - name: bases_advanced_on_balls_in_play
-        description: ""
+        description: "{{ doc('bases_advanced_on_balls_in_play') }}"
         data_type: smallint
       - name: surplus_bases_advanced_on_balls_in_play
-        description: ""
+        description: "{{ doc('surplus_bases_advanced_on_balls_in_play') }}"
         data_type: smallint
       - name: outs_on_extra_base_advance_attempts
-        description: ""
+        description: "{{ doc('outs_on_extra_base_advance_attempts') }}"
         data_type: utinyint
       - name: pitches
-        description: ""
+        description: "{{ doc('pitches') }}"
         data_type: usmallint
       - name: swings
-        description: ""
+        description: "{{ doc('swings') }}"
         data_type: utinyint
       - name: swings_with_contact
-        description: ""
+        description: "{{ doc('swings_with_contact') }}"
         data_type: utinyint
       - name: strikes
-        description: ""
+        description: "{{ doc('strikes') }}"
         data_type: utinyint
       - name: strikes_called
-        description: ""
+        description: "{{ doc('strikes_called') }}"
         data_type: utinyint
       - name: strikes_swinging
-        description: ""
+        description: "{{ doc('strikes_swinging') }}"
         data_type: utinyint
       - name: strikes_foul
-        description: ""
+        description: "{{ doc('strikes_foul') }}"
         data_type: utinyint
       - name: strikes_foul_tip
-        description: ""
+        description: "{{ doc('strikes_foul_tip') }}"
         data_type: utinyint
       - name: strikes_in_play
-        description: ""
+        description: "{{ doc('strikes_in_play') }}"
         data_type: utinyint
       - name: strikes_unknown
-        description: ""
+        description: "{{ doc('strikes_unknown') }}"
         data_type: utinyint
       - name: balls
-        description: ""
+        description: "{{ doc('balls') }}"
         data_type: utinyint
       - name: balls_called
-        description: ""
+        description: "{{ doc('balls_called') }}"
         data_type: utinyint
       - name: balls_intentional
-        description: ""
+        description: "{{ doc('balls_intentional') }}"
         data_type: utinyint
       - name: balls_automatic
-        description: ""
+        description: "{{ doc('balls_automatic') }}"
         data_type: utinyint
       - name: unknown_pitches
-        description: ""
+        description: "{{ doc('unknown_pitches') }}"
         data_type: utinyint
       - name: pitchouts
-        description: ""
+        description: "{{ doc('pitchouts') }}"
         data_type: utinyint
       - name: pitcher_pickoff_attempts
-        description: ""
+        description: "{{ doc('pitcher_pickoff_attempts') }}"
         data_type: utinyint
       - name: catcher_pickoff_attempts
-        description: ""
+        description: "{{ doc('catcher_pickoff_attempts') }}"
         data_type: utinyint
       - name: pitches_blocked_by_catcher
-        description: ""
+        description: "{{ doc('pitches_blocked_by_catcher') }}"
         data_type: usmallint
       - name: pitches_with_runners_going
-        description: ""
+        description: "{{ doc('pitches_with_runners_going') }}"
         data_type: usmallint
       - name: passed_balls
-        description: ""
+        description: "{{ doc('passed_balls') }}"
         data_type: utinyint
       - name: wild_pitches
-        description: ""
+        description: "{{ doc('wild_pitches') }}"
         data_type: utinyint
       - name: balks
-        description: ""
+        description: "{{ doc('balks') }}"
         data_type: utinyint
       - name: left_on_base
-        description: ""
+        description: "{{ doc('left_on_base') }}"
         data_type: utinyint
       - name: left_on_base_with_two_outs
-        description: ""
+        description: "{{ doc('left_on_base_with_two_outs') }}"
         data_type: utinyint
       - name: games_started
-        description: ""
+        description: "{{ doc('games_started') }}"
         data_type: utinyint
       - name: inherited_runners
-        description: ""
+        description: "{{ doc('inherited_runners') }}"
         data_type: utinyint
       - name: bequeathed_runners
-        description: ""
+        description: "{{ doc('bequeathed_runners') }}"
         data_type: utinyint
       - name: games_relieved
-        description: ""
+        description: "{{ doc('games_relieved') }}"
         data_type: utinyint
       - name: games_finished
-        description: ""
+        description: "{{ doc('games_finished') }}"
         data_type: utinyint
       - name: save_situations_entered
-        description: ""
+        description: "{{ doc('save_situations_entered') }}"
         data_type: utinyint
       - name: holds
-        description: ""
+        description: "{{ doc('holds') }}"
         data_type: utinyint
       - name: blown_saves
-        description: ""
+        description: "{{ doc('blown_saves') }}"
         data_type: utinyint
       - name: saves_by_rule
-        description: ""
+        description: "{{ doc('saves_by_rule') }}"
         data_type: utinyint
       - name: save_opportunities
-        description: ""
+        description: "{{ doc('save_opportunities') }}"
         data_type: utinyint
       - name: complete_games
-        description: ""
+        description: "{{ doc('complete_games') }}"
         data_type: utinyint
       - name: shutouts
-        description: ""
+        description: "{{ doc('shutouts') }}"
         data_type: utinyint
       - name: quality_starts
-        description: ""
+        description: "{{ doc('quality_starts') }}"
         data_type: utinyint
       - name: cheap_wins
-        description: ""
+        description: "{{ doc('cheap_wins') }}"
         data_type: utinyint
       - name: tough_losses
-        description: ""
+        description: "{{ doc('tough_losses') }}"
         data_type: utinyint
       - name: no_decisions
-        description: ""
+        description: "{{ doc('no_decisions') }}"
         data_type: utinyint
       - name: no_hitters
-        description: ""
+        description: "{{ doc('no_hitters') }}"
         data_type: utinyint
       - name: perfect_games
-        description: ""
+        description: "{{ doc('perfect_games') }}"
         data_type: utinyint

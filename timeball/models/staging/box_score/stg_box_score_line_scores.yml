@@ -28,5 +28,5 @@ models:
         description: "{{ doc('inning') }}"
         data_type: bigint
       - name: runs
-        description: ""
+        description: "{{ doc('runs') }}"
         data_type: bigint
