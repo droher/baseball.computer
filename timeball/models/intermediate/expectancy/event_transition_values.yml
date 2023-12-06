@@ -53,7 +53,7 @@ models:
         description: "{{ doc('game_type') }}"
         data_type: game_type
       - name: inning_start
-        description: ""
+        description: "{{ doc('inning_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -73,17 +73,17 @@ models:
         constraints:
           - type: not_null
       - name: base_state_start
-        description: ""
+        description: "{{ doc('base_state_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: outs_start
-        description: ""
+        description: "{{ doc('outs_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: inning_end
-        description: ""
+        description: "{{ doc('inning_end') }}"
         data_type: utinyint
       - name: frame_end
         description: "{{ doc('frame_end') }}"
@@ -92,10 +92,10 @@ models:
         description: ""
         data_type: tinyint
       - name: base_state_end
-        description: ""
+        description: "{{ doc('base_state_end') }}"
         data_type: utinyint
       - name: outs_end
-        description: ""
+        description: "{{ doc('outs_end') }}"
         data_type: utinyint
       - name: runs_on_play
         description: "{{ doc('runs_on_play') }}"
@@ -103,7 +103,7 @@ models:
         constraints:
           - type: not_null
       - name: game_end_flag
-        description: ""
+        description: "{{ doc('game_end_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null

@@ -22,22 +22,22 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: lineup_map_away
-        description: ""
+        description: "{{ doc('lineup_map_away') }}"
         data_type: map(utinyint, varchar)
         constraints:
           - type: not_null
       - name: fielding_map_away
-        description: ""
+        description: "{{ doc('fielding_map_away') }}"
         data_type: map(utinyint, varchar)
         constraints:
           - type: not_null
       - name: lineup_map_home
-        description: ""
+        description: "{{ doc('lineup_map_home') }}"
         data_type: map(utinyint, varchar)
         constraints:
           - type: not_null
       - name: fielding_map_home
-        description: ""
+        description: "{{ doc('fielding_map_home') }}"
         data_type: map(utinyint, varchar)
         constraints:
           - type: not_null

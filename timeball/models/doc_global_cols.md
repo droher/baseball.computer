@@ -360,3 +360,192 @@
     a pitcher could be explicitly noted as the one charged with a runner. When
     this is present, it overrides the pitcher from `charge_event_id`.
 {% enddocs %}
+
+{% docs charge_event_key %}
+    `event_key` corresponding to `charge_event_id`, see that field
+    for more detail.
+{% enddocs %}
+
+{% docs reached_on_event_key %}
+    `event_key` corresponding to `reached_on_event_id`, see that field
+    for more detail.
+{% enddocs %}
+
+{% docs inning_start %}
+    The inning at the start of the event.
+{% enddocs %}
+
+{% docs inning_end %}
+    The inning at the end of the event.
+{% enddocs %}
+
+{% docs inning_in_outs_start %}
+    The inning at the start of the event, expressed in outs.
+    ((Inning * 3 - 1) + outs in current innning)
+    For example, 2 outs in the second inning would be 5.
+{% enddocs %}
+
+{% docs outs_start %}
+    The number of outs at the start of the event.
+{% enddocs %}
+
+{% docs outs_end %}
+    The number of outs at the end of the event.
+{% enddocs %}
+
+{% docs is_gidp_eligible %}
+    Whether or not the event started with a runner on first and less than two outs.
+{% enddocs %}
+
+{% docs base_state_start %}
+    The base state at the start of the event, a base-10 representation of a binary number. See `base_state` for more info.
+{% enddocs %}
+
+{% docs runner_first_id_start %}
+    The Retrosheet person ID of the runner on first base at the start of the event.
+{% enddocs %}
+
+{% docs runner_second_id_start %}
+    The Retrosheet person ID of the runner on second base at the start of the event.
+{% enddocs %}
+
+{% docs runner_third_id_start %}
+    The Retrosheet person ID of the runner on third base at the start of the event.
+{% enddocs %}
+
+{% docs runners_count_start %}
+    The number of runners on base at the start of the event.
+{% enddocs %}
+
+{% docs base_state_end %}
+    The base state at the end of the event, a base-10 representation of a binary number. See `base_state` for more info.
+{% enddocs %}
+
+{% docs runner_first_id_end %}
+    The Retrosheet person ID of the runner on first base at the end of the event.
+{% enddocs %}
+
+{% docs runner_second_id_end %}
+    The Retrosheet person ID of the runner on second base at the end of the event.
+{% enddocs %}
+
+{% docs runner_third_id_end %}
+    The Retrosheet person ID of the runner on third base at the end of the event.
+{% enddocs %}
+
+{% docs runners_count_end %}
+    The number of runners on base at the end of the event.
+{% enddocs %}
+
+{% docs score_home_start %}
+    The home team's score at the start of the event.
+{% enddocs %}
+
+{% docs score_away_start %}
+    The away team's score at the start of the event.
+{% enddocs %}
+
+{% docs score_home_end %}
+    The home team's score at the end of the event.
+{% enddocs %}
+
+{% docs score_away_end %}
+    The away team's score at the end of the event.
+{% enddocs %}
+
+{% docs frame_start_flag %}
+    Whether the event was the first event of the half-inning.
+{% enddocs %}
+
+{% docs frame_end_flag %}
+    Whether the event was the last event of the half-inning.
+{% enddocs %}
+
+{% docs truncated_frame_flag %}
+    Whether the event was the last of the half-inning, but there were fewer
+    than three outs recorded, e.g. a walk-off home run or a rain-shortened-game.
+{% enddocs %}
+
+{% docs game_start_flag %}
+    Whether the event was the first event of the game.
+{% enddocs %}
+
+{% docs game_end_flag %}
+    Whether the event was the last event of the game.
+{% enddocs %}
+
+{% docs home_starting_pitcher_id %}
+    The Retrosheet person ID of the starting pitcher for the home team in this game.
+{% enddocs %}
+
+{% docs away_starting_pitcher_id %}
+    The Retrosheet person ID of the starting pitcher for the away team in this game.
+{% enddocs %}
+
+{% docs is_regular_season %}
+    Indicates whether the game is a regular season game.
+{% enddocs %}
+
+{% docs is_postseason %}
+    Indicates whether the game is a postseason game.
+{% enddocs %}
+
+{% docs away_franchise_id %}
+    The Retrosheet franchise ID of the away team in this game.
+    Franchise ID connects team_ids that are associated with the same franchise
+    over time. See `seed_franchises` for more info.
+{% enddocs %}
+
+{% docs home_franchise_id %}
+    The Retrosheet franchise ID of the home team in this game.
+    Franchise ID connects team_ids that are associated with the same franchise
+    over time. See `seed_franchises` for more info.
+{% enddocs %}
+
+{% docs away_league %}
+    The league of the away team in this game.
+{% enddocs %}
+
+{% docs home_league %}
+    The league of the home team in this game.
+{% enddocs %}
+
+{% docs away_division %}
+    The division of the away team in this game. Null if the team is not associated
+    with a divsion (e.g. any game prior to 1969).
+{% enddocs %}
+
+{% docs home_division %}
+    The division of the home team in this game. Null if the team is not associated
+    with a divsion (e.g. any game prior to 1969).
+{% enddocs %}
+
+{% docs away_team_name %}
+    The name of the away team in this game (city and nickname).
+{% enddocs %}
+
+{% docs home_team_name %}
+    The name of the home team in this game (city and nickname).
+{% enddocs %}
+
+{% docs is_interleague %}
+    Indicates whether the game is an interleague game. Defined as
+    a game played in any context between two teams who are defined at the time
+    as being in different leagues (if one of the teams is not in a league, this is false).
+{% enddocs %}
+
+{% docs lineup_map_away %}
+    A dictionary that maps starting lineup positions (1-10) to player IDs for the away team.
+{% enddocs %}
+
+{% docs lineup_map_home %}
+    A dictionary that maps starting lineup positions (1-10) to player IDs for the home team.
+{% enddocs %}
+
+{% docs fielding_map_away %}
+    A dictionary that maps starting fielding positions (1-10) to player IDs for the away team.
+{% enddocs %}
+
+{% docs fielding_map_home %}
+    A dictionary that maps starting fielding positions (1-10) to player IDs for the home team.
+{% enddocs %}

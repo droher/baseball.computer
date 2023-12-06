@@ -40,7 +40,7 @@ models:
         description: "{{ doc('league') }}"
         data_type: varchar
       - name: is_interleague
-        description: ""
+        description: "{{ doc('is_interleague') }}"
         data_type: boolean
         constraints:
           - type: not_null
@@ -75,7 +75,7 @@ models:
         constraints:
           - type: not_null
       - name: inning_start
-        description: ""
+        description: "{{ doc('inning_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -85,17 +85,17 @@ models:
         constraints:
           - type: not_null
       - name: outs_start
-        description: ""
+        description: "{{ doc('outs_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: inning_in_outs_start
-        description: ""
+        description: "{{ doc('inning_in_outs_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: is_gidp_eligible
-        description: ""
+        description: "{{ doc('is_gidp_eligible') }}"
         data_type: boolean
         constraints:
           - type: not_null
@@ -110,12 +110,12 @@ models:
         constraints:
           - type: not_null
       - name: score_home_start
-        description: ""
+        description: "{{ doc('score_home_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_away_start
-        description: ""
+        description: "{{ doc('score_away_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -174,28 +174,28 @@ models:
         constraints:
           - type: not_null
       - name: base_state_start
-        description: ""
+        description: "{{ doc('base_state_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: runners_count_start
-        description: ""
+        description: "{{ doc('runners_count_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: frame_start_flag
-        description: ""
+        description: "{{ doc('frame_start_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: runner_first_id_start
-        description: ""
+        description: "{{ doc('runner_first_id_start') }}"
         data_type: varchar
       - name: runner_second_id_start
-        description: ""
+        description: "{{ doc('runner_second_id_start') }}"
         data_type: varchar
       - name: runner_third_id_start
-        description: ""
+        description: "{{ doc('runner_third_id_start') }}"
         data_type: varchar
       - name: count_balls
         description: ""
@@ -204,7 +204,7 @@ models:
         description: ""
         data_type: utinyint
       - name: inning_end
-        description: ""
+        description: "{{ doc('inning_end') }}"
         data_type: utinyint
       - name: frame_end
         description: "{{ doc('frame_end') }}"
@@ -215,10 +215,10 @@ models:
         constraints:
           - type: not_null
       - name: outs_end
-        description: ""
+        description: "{{ doc('outs_end') }}"
         data_type: utinyint
       - name: base_state_end
-        description: ""
+        description: "{{ doc('base_state_end') }}"
         data_type: utinyint
       - name: runs_on_play
         description: "{{ doc('runs_on_play') }}"
@@ -226,12 +226,12 @@ models:
         constraints:
           - type: not_null
       - name: score_home_end
-        description: ""
+        description: "{{ doc('score_home_end') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_away_end
-        description: ""
+        description: "{{ doc('score_away_end') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -246,15 +246,15 @@ models:
         constraints:
           - type: not_null
       - name: frame_end_flag
-        description: ""
+        description: "{{ doc('frame_end_flag') }}"
         data_type: boolean
       - name: truncated_frame_flag
-        description: ""
+        description: "{{ doc('truncated_frame_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: game_end_flag
-        description: ""
+        description: "{{ doc('game_end_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null

@@ -52,7 +52,7 @@ models:
         description: ""
         data_type: bigint
       - name: is_interleague
-        description: ""
+        description: "{{ doc('is_interleague') }}"
         data_type: boolean
       - name: wins
         description: "{{ doc('wins') }}"

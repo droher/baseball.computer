@@ -135,18 +135,18 @@ models:
         description: "{{ doc('filename') }}"
         data_type: varchar
       - name: home_starting_pitcher_id
-        description: ""
+        description: "{{ doc('home_starting_pitcher_id') }}"
         data_type: varchar
       - name: away_starting_pitcher_id
-        description: ""
+        description: "{{ doc('away_starting_pitcher_id') }}"
         data_type: varchar
       - name: is_regular_season
-        description: ""
+        description: "{{ doc('is_regular_season') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: is_postseason
-        description: ""
+        description: "{{ doc('is_postseason') }}"
         data_type: boolean
         constraints:
           - type: not_null
@@ -173,51 +173,51 @@ models:
           Whether or not this was a non-Negro-League game before MLB was integrated in 1947.
         data_type: boolean
       - name: away_franchise_id
-        description: ""
+        description: "{{ doc('away_franchise_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
       - name: home_franchise_id
-        description: ""
+        description: "{{ doc('home_franchise_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
       - name: away_league
-        description: ""
+        description: "{{ doc('away_league') }}"
         data_type: varchar
       - name: home_league
-        description: ""
+        description: "{{ doc('home_league') }}"
         data_type: varchar
       - name: away_division
-        description: ""
+        description: "{{ doc('away_division') }}"
         data_type: varchar
       - name: home_division
-        description: ""
+        description: "{{ doc('home_division') }}"
         data_type: varchar
       - name: away_team_name
-        description: ""
+        description: "{{ doc('away_team_name') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: home_team_name
-        description: ""
+        description: "{{ doc('home_team_name') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: is_interleague
-        description: ""
+        description: "{{ doc('is_interleague') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: lineup_map_away
-        description: ""
+        description: "{{ doc('lineup_map_away') }}"
         data_type: map(utinyint, varchar)
       - name: lineup_map_home
-        description: ""
+        description: "{{ doc('lineup_map_home') }}"
         data_type: map(utinyint, varchar)
       - name: fielding_map_away
-        description: ""
+        description: "{{ doc('fielding_map_away') }}"
         data_type: map(utinyint, varchar)
       - name: fielding_map_home
-        description: ""
+        description: "{{ doc('fielding_map_home') }}"
         data_type: map(utinyint, varchar)

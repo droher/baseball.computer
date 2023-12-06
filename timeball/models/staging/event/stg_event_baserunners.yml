@@ -114,12 +114,10 @@ models:
         constraints:
           - type: not_null
       - name: reached_on_event_key
-        description: "`event_key` corresponding to `reached_on_event_id`, see that
-          field for more detail"
+        description: "{{ doc('reached_on_event_key') }}"
         data_type: uinteger
       - name: charge_event_key
-        description: "`event_key` corresponding to `charge_event_id`, see that field
-          for more detail"
+        description: "{{ doc('charge_event_key') }}"
         data_type: uinteger
         constraints:
           - type: not_null

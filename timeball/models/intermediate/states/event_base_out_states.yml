@@ -3,8 +3,13 @@ version: 2
 
 models:
   - name: event_base_out_states
-    description: ""
-
+    description: |
+      This model provides event-level information about the state of the game
+      in terms of bases and outs. It combines data from the 'stg_events' and 'stg_event_baserunners' tables
+      to calculate various metrics such as the number of outs at the start and end of each event, the number
+      of runs scored on each play, the base state at the start and end of each event, and the IDs of the
+      baserunners at the start and end of each event. Additionally, it includes flags to indicate the 
+      start and end of innings, frames, and games, as well as flags for truncated frames.
 
     config:
       contract:
@@ -22,12 +27,12 @@ models:
         description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: inning_start
-        description: ""
+        description: "{{ doc('inning_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: inning_end
-        description: ""
+        description: "{{ doc('inning_end') }}"
         data_type: utinyint
       - name: frame_start
         description: "{{ doc('frame_start') }}"
@@ -36,17 +41,17 @@ models:
         description: "{{ doc('frame_end') }}"
         data_type: frame
       - name: inning_in_outs_start
-        description: ""
+        description: "{{ doc('inning_in_outs_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: outs_start
-        description: ""
+        description: "{{ doc('outs_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: outs_end
-        description: ""
+        description: "{{ doc('outs_end') }}"
         data_type: utinyint
       - name: outs_on_play
         description: "{{ doc('outs_on_play') }}"
@@ -54,61 +59,61 @@ models:
         constraints:
           - type: not_null
       - name: is_gidp_eligible
-        description: ""
+        description: "{{ doc('is_gidp_eligible') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: base_state_start
-        description: ""
+        description: "{{ doc('base_state_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: runner_first_id_start
-        description: ""
+        description: "{{ doc('runner_first_id_start') }}"
         data_type: varchar
       - name: runner_second_id_start
-        description: ""
+        description: "{{ doc('runner_second_id_start') }}"
         data_type: varchar
       - name: runner_third_id_start
-        description: ""
+        description: "{{ doc('runner_third_id_start') }}"
         data_type: varchar
       - name: runners_count_start
-        description: ""
+        description: "{{ doc('runners_count_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: base_state_end
-        description: ""
+        description: "{{ doc('base_state_end') }}"
         data_type: utinyint
       - name: runners_count_end
-        description: ""
+        description: "{{ doc('runners_count_end') }}"
         data_type: utinyint
       - name: runner_first_id_end
-        description: ""
+        description: "{{ doc('runner_first_id_end') }}"
         data_type: varchar
       - name: runner_second_id_end
-        description: ""
+        description: "{{ doc('runner_second_id_end') }}"
         data_type: varchar
       - name: runner_third_id_end
-        description: ""
+        description: "{{ doc('runner_third_id_end') }}"
         data_type: varchar
       - name: score_home_start
-        description: ""
+        description: "{{ doc('score_home_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_away_start
-        description: ""
+        description: "{{ doc('score_away_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_home_end
-        description: ""
+        description: "{{ doc('score_home_end') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_away_end
-        description: ""
+        description: "{{ doc('score_away_end') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -118,27 +123,27 @@ models:
         constraints:
           - type: not_null
       - name: frame_start_flag
-        description: ""
+        description: "{{ doc('frame_start_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: frame_end_flag
-        description: ""
+        description: "{{ doc('frame_end_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: truncated_frame_flag
-        description: ""
+        description: "{{ doc('truncated_frame_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: game_start_flag
-        description: ""
+        description: "{{ doc('game_start_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null
       - name: game_end_flag
-        description: ""
+        description: "{{ doc('game_end_flag') }}"
         data_type: boolean
         constraints:
           - type: not_null

@@ -44,10 +44,10 @@ models:
         description: "1-9 lineup position of the baserunner"
         data_type: utinyint
       - name: reached_on_event_key
-        description: ""
+        description: "{{ doc('reached_on_event_key') }}"
         data_type: uinteger
       - name: charge_event_key
-        description: ""
+        description: "{{ doc('charge_event_key') }}"
         data_type: uinteger
       - name: explicit_charged_pitcher_id
         description: "{{ doc('explicit_charged_pitcher_id') }}"

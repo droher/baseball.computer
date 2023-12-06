@@ -133,10 +133,10 @@ models:
         description: "{{ doc('filename') }}"
         data_type: varchar
       - name: is_regular_season
-        description: ""
+        description: "{{ doc('is_regular_season') }}"
         data_type: boolean
       - name: is_postseason
-        description: ""
+        description: "{{ doc('is_postseason') }}"
         data_type: boolean
       - name: is_integrated
         description: ""
@@ -148,25 +148,25 @@ models:
         description: ""
         data_type: boolean
       - name: away_franchise_id
-        description: ""
+        description: "{{ doc('away_franchise_id') }}"
         data_type: team_id
       - name: home_franchise_id
-        description: ""
+        description: "{{ doc('home_franchise_id') }}"
         data_type: team_id
       - name: is_interleague
-        description: ""
+        description: "{{ doc('is_interleague') }}"
         data_type: boolean
       - name: lineup_map_away
-        description: ""
+        description: "{{ doc('lineup_map_away') }}"
         data_type: map(utinyint, varchar)
       - name: lineup_map_home
-        description: ""
+        description: "{{ doc('lineup_map_home') }}"
         data_type: map(utinyint, varchar)
       - name: fielding_map_away
-        description: ""
+        description: "{{ doc('fielding_map_away') }}"
         data_type: map(utinyint, varchar)
       - name: fielding_map_home
-        description: ""
+        description: "{{ doc('fielding_map_home') }}"
         data_type: map(utinyint, varchar)
       - name: series_id
         description: ""

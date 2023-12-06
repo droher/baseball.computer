@@ -22,22 +22,22 @@ models:
         description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: score_home_start
-        description: ""
+        description: "{{ doc('score_home_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_away_start
-        description: ""
+        description: "{{ doc('score_away_start') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_home_end
-        description: ""
+        description: "{{ doc('score_home_end') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: score_away_end
-        description: ""
+        description: "{{ doc('score_away_end') }}"
         data_type: utinyint
         constraints:
           - type: not_null

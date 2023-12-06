@@ -74,10 +74,10 @@ models:
         description: "{{ doc('umpire_third_id') }}"
         data_type: varchar
       - name: away_starting_pitcher_id
-        description: ""
+        description: "{{ doc('away_starting_pitcher_id') }}"
         data_type: varchar
       - name: home_starting_pitcher_id
-        description: ""
+        description: "{{ doc('home_starting_pitcher_id') }}"
         data_type: varchar
       - name: additional_info
         description: ""
