@@ -23,14 +23,13 @@ assist_tracker AS (
     WINDOW w AS (PARTITION BY event_key, group_id)
 ),
 
--- Used to distinguish batted balls
-add_strikeout_info AS (
+add_batted_ball AS (
     SELECT
-        a.*,
-        e.plate_appearance_result = 'StrikeOut' AS is_strikeout,
+        assist_tracker.*,
+        e.batted_location_general IS NOT NULL as is_batted_ball,
     FROM assist_tracker
     INNER JOIN {{ ref('stg_events') }} AS e USING (event_key)
-)
+),
 
 final AS (
     SELECT
@@ -44,7 +43,7 @@ final AS (
         COUNT(DISTINCT CASE WHEN fielding_play = 'Assist' THEN group_id END)::UTINYINT AS assists,
         COUNT(*) FILTER (WHERE fielding_play = 'Error')::UTINYINT AS errors,
         COUNT(*) FILTER (WHERE fielding_play = 'FieldersChoice')::UTINYINT AS fielders_choices,
-        COUNT(*) FILTER (WHERE sequence_id = 1 AND fielding_play != 'Error' AND NOT is_strikeout)::UTINYINT AS plays_started,
+        COUNT(*) FILTER (WHERE sequence_id = 1 AND fielding_play != 'Error' AND is_batted_ball)::UTINYINT AS plays_started,
         -- An "unassisted putout" often refers specifically to ground balls, which we don't always know about.
         -- We also don't know if a putout by an unknown fielder was assisted or not (see below).
         -- So we'll just track when putouts are explicitly assisted
@@ -57,7 +56,7 @@ final AS (
         -- unknown assists (0 or more). So it just makes sense to count the total number of events
         -- where an unknown assist may have occurred.
         BOOL_OR(fielding_position = 0)::UTINYINT AS incomplete_events,
-    FROM assist_tracker
+    FROM add_batted_ball
     GROUP BY 1, 2
 )
 

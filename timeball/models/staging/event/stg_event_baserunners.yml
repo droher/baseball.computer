@@ -57,26 +57,15 @@ models:
         constraints:
           - type: not_null
       - name: charge_event_id
-        description: |
-          The event ID that this baserunner is charged to,
-          for the purpose of keeping tracked of inherited/bequeathed runners.
-          The pitcher/catcher present at the charge_event_id are on the hook
-          for the earned run. This doesn't necessarily remain constant
-          throughout a baserunning apperance, as force-outs can change
-          the inheritance of a particular runner.
+        description: ""
         data_type: uinteger
         constraints:
           - type: not_null
       - name: reached_on_event_id
-        description: |
-          Event id on which this baserunner originally reached base,
-          if applicable.
+        description: ""
         data_type: uinteger
       - name: explicit_charged_pitcher_id
-        description: |
-          For some games prior to the establishment of official inherited runner rules,
-          a pitcher could be explicitly noted as the one charged with a runner. When
-          this is present, it overrides the pitcher from `charge_event_id`.
+        description: ""
         data_type: varchar
       - name: attempted_advance_to_base
         description: |

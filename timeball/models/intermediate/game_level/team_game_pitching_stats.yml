@@ -435,3 +435,42 @@ models:
       - name: individual_earned_runs
         description: ""
         data_type: usmallint
+      - name: stolen_bases_second
+        description: "{{ doc('stolen_bases_second') }}"
+        data_type: usmallint
+      - name: stolen_bases_third
+        description: "{{ doc('stolen_bases_third') }}"
+        data_type: usmallint
+      - name: stolen_bases_home
+        description: "{{ doc('stolen_bases_home') }}"
+        data_type: usmallint
+      - name: caught_stealing_second
+        description: "{{ doc('caught_stealing_second') }}"
+        data_type: usmallint
+      - name: caught_stealing_third
+        description: "{{ doc('caught_stealing_third') }}"
+        data_type: usmallint
+      - name: caught_stealing_home
+        description: "{{ doc('caught_stealing_home') }}"
+        data_type: usmallint
+      - name: stolen_base_opportunities
+        description: "{{ doc('stolen_base_opportunities') }}"
+        data_type: usmallint
+      - name: stolen_base_opportunities_second
+        description: "{{ doc('stolen_base_opportunities_second') }}"
+        data_type: usmallint
+      - name: stolen_base_opportunities_third
+        description: "{{ doc('stolen_base_opportunities_third') }}"
+        data_type: usmallint
+      - name: stolen_base_opportunities_home
+        description: "{{ doc('stolen_base_opportunities_home') }}"
+        data_type: usmallint
+      - name: picked_off_first
+        description: "{{ doc('picked_off_first') }}"
+        data_type: usmallint
+      - name: picked_off_second
+        description: "{{ doc('picked_off_second') }}"
+        data_type: usmallint
+      - name: picked_off_third
+        description: "{{ doc('picked_off_third') }}"
+        data_type: usmallint

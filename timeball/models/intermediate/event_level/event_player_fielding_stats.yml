@@ -65,7 +65,7 @@ models:
         constraints:
           - type: not_null
       - name: fielding_plays
-        description: ""
+        description: "{{ doc('fielding_plays') }}"
         data_type: utinyint
         constraints:
           - type: not_null

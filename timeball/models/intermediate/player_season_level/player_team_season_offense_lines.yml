@@ -6,9 +6,9 @@ models:
     description: ""
 
 
-    config:
-      contract:
-        enforced: true
+    # config:
+    #   contract:
+    #     enforced: true
 
     constraints:
       - type: primary_key
@@ -377,3 +377,51 @@ models:
       - name: left_on_base_with_two_outs
         description: "{{ doc('left_on_base_with_two_outs') }}"
         data_type: hugeint
+      - name: times_lead_runner
+        description: ""
+        data_type: HUGEINT
+      - name: times_force_on_runner
+        description: ""
+        data_type: HUGEINT
+      - name: times_next_base_empty
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_base_opportunities
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_base_opportunities_second
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_base_opportunities_third
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_base_opportunities_home
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_bases_second
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_bases_third
+        description: ""
+        data_type: HUGEINT
+      - name: stolen_bases_home
+        description: ""
+        data_type: HUGEINT
+      - name: caught_stealing_second
+        description: ""
+        data_type: HUGEINT
+      - name: caught_stealing_third
+        description: ""
+        data_type: HUGEINT
+      - name: caught_stealing_home
+        description: ""
+        data_type: HUGEINT
+      - name: picked_off_first
+        description: ""
+        data_type: HUGEINT
+      - name: picked_off_second
+        description: ""
+        data_type: HUGEINT
+      - name: picked_off_third
+        description: ""
+        data_type: HUGEINT

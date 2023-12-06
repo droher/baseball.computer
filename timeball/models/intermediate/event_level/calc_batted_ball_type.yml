@@ -4,7 +4,7 @@ version: 2
 models:
   - name: calc_batted_ball_type
     description: |
-      This model contains one row for each event that ended in a batted ball.
+      This table contains one row for each event that ended in a batted ball.
       It supplements the raw trajectory and location data with
       additional information based on inference and additional metadata.
       For millions of plays in the database without batted ball info,

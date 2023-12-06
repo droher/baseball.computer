@@ -356,16 +356,91 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     Number of times a batter ended a plate appearance on base, even if it was through a fielder's choice, error, etc.
 {% enddocs %}
 
+{% docs times_lead_runner %}
+    Number of events that a runner was the lead runner on a play
+    (the runner who is furthest along the basepaths).
+    Batter is never counted as the lead runner. No-play events excluded,
+    but events without plate appearances are included.
+{% enddocs %}
+
+{% docs times_force_on_runner %}
+    Number of events that a force existed on the runner's next base.
+    The batter is counted as having a force on them (at first).
+    No-play events excluded, but events without plate appearances are included.
+{% enddocs %}
+
+{% docs times_next_base_empty %}
+    Number of events that the runner's next base was empty.
+    The batter is counted on events where first base is empty.
+    No-play events excluded, but events without plate appearances are included.
+{% enddocs %}
+
+{% docs stolen_base_opportunities %}
+    Number of events in which a runner had an opportunity to steal a base as the
+    lead basestealer OR the runner recorded a SB/CS in any situation.
+    "Opportunity" is defined as a situation in which the next base
+    was empty at the start of the event (not including the batter).
+    No-play events excluded, but events without plate appearances are included.
+{% enddocs %}
+
+{% docs stolen_base_opportunities_second %}
+    Number of opportunities to steal second base (see `stolen_base_opportunities` for detailed criteria).
+{% enddocs %}
+
+{% docs stolen_base_opportunities_third %}
+    Number of opportunities to steal third base (see `stolen_base_opportunities` for detailed criteria).
+{% enddocs %}
+
+{% docs stolen_base_opportunities_home %}
+    Number of opportunities to steal home (see `stolen_base_opportunities` for detailed criteria).
+{% enddocs %}
+
 {% docs stolen_bases %}
     (SB) Number of successful stolen bases.
+{% enddocs %}
+
+{% docs stolen_bases_second %}
+    Number of successful steals of second base.
+{% enddocs %}
+
+{% docs stolen_bases_third %}
+    Number of successful steals of third base.
+{% enddocs %}
+
+{% docs stolen_bases_home %}
+    Number of successful steals of home.
 {% enddocs %}
 
 {% docs caught_stealing %}
     (CS) Number of times a runner was caught stealing.
 {% enddocs %}
 
+{% docs caught_stealing_second %}
+    Number of times a runner was caught stealing second base.
+{% enddocs %}
+
+{% docs caught_stealing_third %}
+    Number of times a runner was caught stealing third base.
+{% enddocs %}
+
+{% docs caught_stealing_home %}
+    Number of times a runner was caught stealing home.
+{% enddocs %}
+
 {% docs picked_off %}
     (PO) Number of times a runner was picked off.
+{% enddocs %}
+
+{% docs picked_off_first %}
+    Number of times a runner was picked off first base.
+{% enddocs %}
+
+{% docs picked_off_second %}
+    Number of times a runner was picked off second base.
+{% enddocs %}
+
+{% docs picked_off_third %}
+    Number of times a runner was picked off third base.
 {% enddocs %}
 
 {% docs picked_off_caught_stealing %}
@@ -786,4 +861,8 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 
 {% docs incomplete_events %}
     Number of events in which at least one known fielding play was made by an unknown fielder.
+{% enddocs %}
+
+{% docs fielding_plays %}
+    The total number of fielding plays of any kind, as determined by the raw count from `stg_event_fielding_plays`.
 {% enddocs %}

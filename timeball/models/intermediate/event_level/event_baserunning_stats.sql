@@ -61,6 +61,7 @@ WITH joined AS (
         ON b.baserunner = baserunner_meta.baserunner
     LEFT JOIN {{ ref('seed_bases_info') }} AS bases_meta
         ON b.attempted_advance_to_base = bases_meta.base
+    WHERE NOT e.no_play_flag
 ),
 
 final AS (
@@ -83,23 +84,24 @@ final AS (
         (is_lead_runner)::UTINYINT AS times_lead_runner,
         (is_force_on_runner)::UTINYINT AS times_force_on_runner,
         (is_next_base_empty)::UTINYINT AS times_next_base_empty,
-        (is_next_base_empty AND is_on_base)::UTINYINT AS stolen_base_opportunities,
-        (is_next_base_empty AND baserunner = 'First')::UTINYINT AS stolen_base_opportunities_second,
-        (is_next_base_empty AND baserunner = 'Second')::UTINYINT AS stolen_base_opportunities_third,
-        (is_next_base_empty AND baserunner = 'Third')::UTINYINT AS stolen_base_opportunities_home,
         (baserunning_play_type = 'StolenBase')::UTINYINT AS stolen_bases,
-        (baserunning_play_type = 'StolenBase' AND baserunner = 'First')::UTINYINT AS stolen_bases_second,
-        (baserunning_play_type = 'StolenBase' AND baserunner = 'Second')::UTINYINT AS stolen_bases_third,
-        (baserunning_play_type = 'StolenBase' AND baserunner = 'Third')::UTINYINT AS stolen_bases_home,
+        (stolen_bases > 0 AND baserunner = 'First')::UTINYINT AS stolen_bases_second,
+        (stolen_bases > 0 AND baserunner = 'Second')::UTINYINT AS stolen_bases_third,
+        (stolen_bases > 0 AND baserunner = 'Third')::UTINYINT AS stolen_bases_home,
         (baserunning_play_type LIKE '%CaughtStealing')::UTINYINT AS caught_stealing,
-        (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'First')::UTINYINT AS caught_stealing_second,
-        (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'Second')::UTINYINT AS caught_stealing_third,
-        (baserunning_play_type LIKE '%CaughtStealing' AND baserunner = 'Third')::UTINYINT AS caught_stealing_home,
-        -- Todo: verify whether pickoff errors count as pickoffs
+        (caught_stealing > 0 AND baserunner = 'First')::UTINYINT AS caught_stealing_second,
+        (caught_stealing > 0 AND baserunner = 'Second')::UTINYINT AS caught_stealing_third,
+        (caught_stealing > 0 AND baserunner = 'Third')::UTINYINT AS caught_stealing_home,
+        (stolen_bases + caught_stealing > 0 
+            OR is_next_base_empty AND is_on_base
+        )::UTINYINT AS stolen_base_opportunities,
+        (stolen_base_opportunities > 0 AND baserunner = 'First')::UTINYINT AS stolen_base_opportunities_second,
+        (stolen_base_opportunities > 0 AND baserunner = 'Second')::UTINYINT AS stolen_base_opportunities_third,
+        (stolen_base_opportunities > 0 AND baserunner = 'Third')::UTINYINT AS stolen_base_opportunities_home,
         (baserunning_play_type LIKE 'PickedOff%' AND is_out)::UTINYINT AS picked_off,
-        (picked_off = 1 AND baserunner = 'First')::UTINYINT AS picked_off_first,
-        (picked_off = 1 AND baserunner = 'Second')::UTINYINT AS picked_off_second,
-        (picked_off = 1 AND baserunner = 'Third')::UTINYINT AS picked_off_third,
+        (picked_off > 0 AND baserunner = 'First')::UTINYINT AS picked_off_first,
+        (picked_off > 0 AND baserunner = 'Second')::UTINYINT AS picked_off_second,
+        (picked_off > 0 AND baserunner = 'Third')::UTINYINT AS picked_off_third,
         (baserunning_play_type = 'PickedOffCaughtStealing')::UTINYINT AS picked_off_caught_stealing,
 
         (baserunning_play_type = 'WildPitch' AND is_successful)::UTINYINT AS advances_on_wild_pitches,

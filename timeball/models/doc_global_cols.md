@@ -1,5 +1,6 @@
 {% docs game_id %}
     Retrosheet game ID, A 12-character string structured as follows:
+
     - Chars 1-3: Home team ID
     - Chars 4-11: Date (YYYYMMDD)
     - Char 12: Game number (0 if only one game was played on that day)
@@ -45,6 +46,19 @@
     that a franchise was playing as at a given time.
 {% enddocs %}
 
+{% docs person_id %}
+    Retrosheet 8-character person ID which consists of
+    the first four characters of the last name, the first character
+    of the first name, and then three digits to disambiguate between
+    players with the same five characters. The first of the three digits
+    designates the type of person (in their main role in MLB):
+    - 0 and 1: player
+    - 7: scorekeeper (not present in file but used in `scorer` field for newer games)
+    - 8: coach
+    - 9: umpire
+{% enddocs %}
+
+
 {% docs player_id %}
     Retrosheet 8-character person ID for a player, which consists of
     the first four characters of the last name, the first character
@@ -59,6 +73,11 @@
 
 {% docs pitcher_id %}
     Retrosheet 8-character person ID for the pitcher associated with the
+    entity.
+{% enddocs %}
+
+{% docs runner_id %}
+    Retrosheet 8-character person ID for the baserunner associated with the
     entity.
 {% enddocs %}
 
@@ -313,4 +332,31 @@
     and absent for all other types of events.
     It is an enum describing the result of the plate appearance, e.g. Single,
     InPlayOut, etc. See `seed_plate_appearance_results` for more info.
+{% enddocs %}
+
+
+{% docs charge_event_id %}
+    The event ID that this baserunner is charged to,
+    for the purpose of keeping tracked of inherited/bequeathed runners.
+    The pitcher/catcher present at the charge_event_id are on the hook
+    for the earned run. This doesn't necessarily remain constant
+    throughout a baserunning apperance, as force-outs can change
+    the inheritance of a particular runner.
+{% enddocs %}
+
+{% docs reached_on_event_id %}
+    Event id on which this baserunner originally reached base,
+    if applicable.
+{% enddocs %}
+
+{% docs explicit_charged_pitcher_id %}
+    For some games prior to the establishment of official inherited runner rules,
+    a pitcher could be explicitly noted as the one charged with a runner. When
+    this is present, it overrides the pitcher from `charge_event_id`.
+{% enddocs %}
+
+{% docs attempted_advance_to_base %}
+    For some games prior to the establishment of official inherited runner rules,
+    a pitcher could be explicitly noted as the one charged with a runner. When
+    this is present, it overrides the pitcher from `charge_event_id`.
 {% enddocs %}

@@ -33,10 +33,10 @@ renamed AS (
         park_id,
         temperature_fahrenheit,
         CASE
-            WHEN attendance = 0 AND year != 2020
+            WHEN attendance = 0 AND EXTRACT(YEAR FROM date) != 2020
                 THEN NULL
             ELSE attendance
-        END::USMALLINT AS attendance,
+        END::UINTEGER AS attendance,
         wind_speed_mph,
         use_dh,
         -- TODO: Change in source

@@ -89,7 +89,7 @@ models:
         data_type: tinyint
       - name: attendance
         description: "{{ doc('attendance') }}"
-        data_type: bigint
+        data_type: UINTEGER
       - name: wind_speed_mph
         description: "{{ doc('wind_speed_mph') }}"
         data_type: utinyint

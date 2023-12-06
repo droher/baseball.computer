@@ -12,12 +12,15 @@ models:
 
     constraints:
       - type: primary_key
-        columns: &pk [player_id]
+        columns: &pk [person_id]
 
     meta:
       primary_keys: *pk
 
     columns:
+      - name: person_id
+        description: "{{ doc('person_id') }}"
+        data_type: varchar
       - name: player_id
         description: "{{ doc('player_id') }}"
         data_type: varchar
