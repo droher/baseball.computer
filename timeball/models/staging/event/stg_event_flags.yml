@@ -27,7 +27,7 @@ models:
         description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: sequence_id
-        description: ""
+        description: "{{ doc('sequence_id') }}"
         data_type: utinyint
       - name: flag
         description: "Prettified version of the flag as it appeared in the raw play"

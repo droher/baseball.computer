@@ -3,7 +3,8 @@ version: 2
 
 models:
   - name: stg_databank_pitching
-    description: "Aggregate pitching statistics by player, season, and stint with a given team."
+    description: "Aggregate pitching statistics by player, season, and stint with
+      a given team."
 
 
     config:
@@ -25,13 +26,13 @@ models:
         description: "{{ doc('season') }}"
         data_type: smallint
       - name: stint
-        description: ""
+        description: "{{ doc('stint') }}"
         data_type: smallint
       - name: team_id
         description: "{{ doc('team_id') }}"
         data_type: varchar
       - name: league_id
-        description: ""
+        description: "{{ doc('league_id') }}"
         data_type: varchar
       - name: wins
         description: "{{ doc('wins') }}"
@@ -40,7 +41,7 @@ models:
         description: "{{ doc('losses') }}"
         data_type: smallint
       - name: games
-        description: ""
+        description: "{{ doc('games') }}"
         data_type: smallint
       - name: games_started
         description: "{{ doc('games_started') }}"
@@ -91,7 +92,7 @@ models:
         description: "{{ doc('balks') }}"
         data_type: smallint
       - name: batters_faced
-        description: ""
+        description: "{{ doc('batters_faced') }}"
         data_type: smallint
       - name: games_finished
         description: "{{ doc('games_finished') }}"

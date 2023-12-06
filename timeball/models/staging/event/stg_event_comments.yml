@@ -26,7 +26,7 @@ models:
               field: event_key
               to: ref('stg_events')
       - name: comment
-        description: ""
+        description: "{{ doc('comment') }}"
         data_type: varchar
         constraints:
           - type: not_null

@@ -37,7 +37,7 @@ models:
               field: event_key
               to: ref('stg_events')
       - name: sequence_id
-        description: ""
+        description: "{{ doc('sequence_id') }}"
         data_type: utinyint
       - name: fielding_position
         description: "{{ doc('fielding_position') }}"

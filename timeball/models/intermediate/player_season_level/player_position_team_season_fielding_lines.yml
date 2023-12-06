@@ -34,10 +34,10 @@ models:
         description: "{{ doc('game_type') }}"
         data_type: varchar
       - name: fielding_position_category
-        description: ""
+        description: "{{ doc('fielding_position_category') }}"
         data_type: varchar
       - name: games
-        description: ""
+        description: "{{ doc('games') }}"
         data_type: usmallint
       - name: games_started
         description: "{{ doc('games_started') }}"

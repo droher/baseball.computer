@@ -45,7 +45,7 @@ models:
           if he did not record an out in that inning.
         data_type: utinyint
       - name: batters_faced
-        description: ""
+        description: "{{ doc('batters_faced') }}"
         data_type: utinyint
       - name: hits
         description: "{{ doc('hits') }}"

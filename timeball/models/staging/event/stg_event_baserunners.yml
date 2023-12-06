@@ -42,7 +42,7 @@ models:
               field: event_key
               to: ref('stg_events')
       - name: baserunner
-        description: ""
+        description: "{{ doc('baserunner') }}"
         data_type: baserunner
         constraints:
           - type: not_null
@@ -119,15 +119,18 @@ models:
         constraints:
           - type: not_null
       - name: rbi_flag
-        description: "True if the runner scored and the batter was credited with the RBI"
+        description: "True if the runner scored and the batter was credited with the
+          RBI"
         data_type: boolean
         constraints:
           - type: not_null
       - name: reached_on_event_key
-        description: "`event_key` corresponding to `reached_on_event_id`, see that field for more detail"
+        description: "`event_key` corresponding to `reached_on_event_id`, see that
+          field for more detail"
         data_type: uinteger
       - name: charge_event_key
-        description: "`event_key` corresponding to `charge_event_id`, see that field for more detail"
+        description: "`event_key` corresponding to `charge_event_id`, see that field
+          for more detail"
         data_type: uinteger
         constraints:
           - type: not_null
@@ -137,7 +140,7 @@ models:
           - 1st: 1 (001)
           - 2nd: 2 (010)
           - 3rd: 4 (100)
-          
+
           This is a useful way to represent the runner's position
           because you can do a bitwise OR to get the full base state
           for the event.

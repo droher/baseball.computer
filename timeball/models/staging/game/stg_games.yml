@@ -163,22 +163,22 @@ models:
         constraints:
           - type: not_null
       - name: umpire_home_id
-        description: ""
+        description: "{{ doc('umpire_home_id') }}"
         data_type: varchar
       - name: umpire_first_id
-        description: ""
+        description: "{{ doc('umpire_first_id') }}"
         data_type: varchar
       - name: umpire_second_id
-        description: ""
+        description: "{{ doc('umpire_second_id') }}"
         data_type: varchar
       - name: umpire_third_id
-        description: ""
+        description: "{{ doc('umpire_third_id') }}"
         data_type: varchar
       - name: umpire_left_id
-        description: ""
+        description: "{{ doc('umpire_left_id') }}"
         data_type: varchar
       - name: umpire_right_id
-        description: ""
+        description: "{{ doc('umpire_right_id') }}"
         data_type: varchar
       - name: season
         description: "{{ doc('season') }}"

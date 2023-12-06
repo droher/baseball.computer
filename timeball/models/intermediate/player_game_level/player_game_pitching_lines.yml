@@ -43,7 +43,7 @@ models:
         description: "{{ doc('earned_runs') }}"
         data_type: utinyint
       - name: batters_faced
-        description: ""
+        description: "{{ doc('batters_faced') }}"
         data_type: utinyint
       - name: outs_recorded
         description: "{{ doc('outs_recorded') }}"

@@ -31,7 +31,7 @@ models:
         description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: baserunner
-        description: ""
+        description: "{{ doc('baserunner') }}"
         data_type: baserunner
       - name: plate_appearances
         description: "{{ doc('plate_appearances') }}"

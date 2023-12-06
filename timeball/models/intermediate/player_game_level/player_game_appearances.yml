@@ -53,7 +53,7 @@ models:
         constraints:
           - type: not_null
       - name: lineup_position
-        description: ""
+        description: "{{ doc('lineup_position') }}"
         data_type: utinyint
         constraints:
           - type: not_null

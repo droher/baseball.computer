@@ -28,7 +28,7 @@ models:
         description: "{{ doc('game_type') }}"
         data_type: varchar
       - name: games
-        description: ""
+        description: "{{ doc('games') }}"
         data_type: usmallint
         constraints:
           - type: not_null

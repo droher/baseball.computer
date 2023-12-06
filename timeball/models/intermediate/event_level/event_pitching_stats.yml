@@ -31,7 +31,7 @@ models:
         description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: batters_faced
-        description: ""
+        description: "{{ doc('batters_faced') }}"
         data_type: tinyint
       - name: outs_recorded
         description: "{{ doc('outs_recorded') }}"

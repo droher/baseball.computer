@@ -3,7 +3,8 @@ version: 2
 
 models:
   - name: stg_box_score_comments
-    description: "Comment lines from box score files, along with their associated game"
+    description: "Comment lines from box score files, along with their associated
+      game"
 
 
     config:
@@ -22,8 +23,8 @@ models:
         description: "{{ doc('game_id') }}"
         data_type: varchar
       - name: sequence_id
-        description: ""
+        description: "{{ doc('sequence_id') }}"
         data_type: bigint
       - name: comment
-        description: ""
+        description: "{{ doc('comment') }}"
         data_type: varchar

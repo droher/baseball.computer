@@ -25,7 +25,7 @@ models:
         description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: batters_faced
-        description: ""
+        description: "{{ doc('batters_faced') }}"
         data_type: usmallint
       - name: outs_recorded
         description: "{{ doc('outs_recorded') }}"

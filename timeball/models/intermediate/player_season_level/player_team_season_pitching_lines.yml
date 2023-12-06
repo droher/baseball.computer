@@ -34,10 +34,10 @@ models:
         description: "{{ doc('innings_pitched') }}"
         data_type: double
       - name: games
-        description: ""
+        description: "{{ doc('games') }}"
         data_type: hugeint
       - name: batters_faced
-        description: ""
+        description: "{{ doc('batters_faced') }}"
         data_type: hugeint
       - name: outs_recorded
         description: "{{ doc('outs_recorded') }}"

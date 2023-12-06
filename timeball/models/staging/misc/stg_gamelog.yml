@@ -62,16 +62,16 @@ models:
         description: "{{ doc('attendance') }}"
         data_type: integer
       - name: umpire_home_id
-        description: ""
+        description: "{{ doc('umpire_home_id') }}"
         data_type: varchar
       - name: umpire_first_id
-        description: ""
+        description: "{{ doc('umpire_first_id') }}"
         data_type: varchar
       - name: umpire_second_id
-        description: ""
+        description: "{{ doc('umpire_second_id') }}"
         data_type: varchar
       - name: umpire_third_id
-        description: ""
+        description: "{{ doc('umpire_third_id') }}"
         data_type: varchar
       - name: away_starting_pitcher_id
         description: ""

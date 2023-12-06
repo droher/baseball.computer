@@ -28,7 +28,7 @@ models:
         description: ""
         data_type: plate_appearance_result
       - name: batted_to_fielder
-        description: ""
+        description: "{{ doc('batted_to_fielder') }}"
         data_type: utinyint
       - name: trajectory
         description: ""

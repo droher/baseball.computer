@@ -37,7 +37,7 @@ models:
         description: ""
         data_type: varchar
       - name: baserunner
-        description: ""
+        description: "{{ doc('baserunner') }}"
         data_type: baserunner
       - name: runner_lineup_position
         description: ""

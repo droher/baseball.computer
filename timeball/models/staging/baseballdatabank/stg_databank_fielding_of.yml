@@ -28,7 +28,7 @@ models:
         description: "{{ doc('season') }}"
         data_type: smallint
       - name: stint
-        description: ""
+        description: "{{ doc('stint') }}"
         data_type: smallint
       - name: games_left_field
         description: "Total number of games played in left field"

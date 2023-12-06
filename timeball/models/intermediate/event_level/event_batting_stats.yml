@@ -118,7 +118,7 @@ models:
         description: "{{ doc('batting_outs') }}"
         data_type: utinyint
       - name: outs_on_play
-        description: ""
+        description: "{{ doc('outs_on_play') }}"
         data_type: utinyint
       - name: left_on_base
         description: "{{ doc('left_on_base') }}"

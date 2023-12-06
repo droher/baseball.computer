@@ -30,7 +30,7 @@ models:
         description: "{{ doc('game_type') }}"
         data_type: varchar
       - name: games
-        description: ""
+        description: "{{ doc('games') }}"
         data_type: hugeint
       - name: plate_appearances
         description: "{{ doc('plate_appearances') }}"

@@ -98,7 +98,7 @@ models:
         description: ""
         data_type: utinyint
       - name: runs_on_play
-        description: ""
+        description: "{{ doc('runs_on_play') }}"
         data_type: utinyint
         constraints:
           - type: not_null
