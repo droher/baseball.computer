@@ -3,8 +3,16 @@ version: 2
 
 models:
   - name: stg_event_pitch_sequences
-    description: ""
-
+    description: |
+      Pitch-by-pitch sequence for events where we have
+      pitch-level information. A pitch sequence includes ball/strike
+      info, as well as items that are not themselves pitches, such as
+      pickoff attempts and balls blocked in the dirt. Pitch data is
+      very well populated from the 90s on, but is spotty before that.
+      Presence of pitch data for one event does not guarantee that
+      it will be present for other events in the same game.
+      Non-pitch items have sporadic coverage, so their absence is
+      not necessarily an indicator of real-world absence.
 
     config:
       contract:
@@ -43,22 +51,22 @@ models:
         description: ""
         data_type: utinyint
       - name: sequence_item
-        description: ""
+        description: "See `seed_pitch_types` for metadata on each item"
         data_type: pitch_sequence_item
         constraints:
           - type: not_null
       - name: runners_going_flag
-        description: ""
+        description: "True if any runners are attempting to advance during the pitch"
         data_type: boolean
         constraints:
           - type: not_null
       - name: blocked_by_catcher_flag
-        description: ""
+        description: "True if the pitch was blocked by the catcher."
         data_type: boolean
         constraints:
           - type: not_null
       - name: catcher_pickoff_attempt_at_base
-        description: ""
+        description: "The base at which the catcher attempted a pickoff after the pitch, if applicable"
         data_type: base
       - name: date
         description: "{{ doc('date') }}"

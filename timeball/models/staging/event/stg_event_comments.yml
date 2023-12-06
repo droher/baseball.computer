@@ -3,8 +3,8 @@ version: 2
 
 models:
   - name: stg_event_comments
-    description: ""
-
+    description: |
+      Comment lines from event files, along with their associated event
 
     config:
       contract:

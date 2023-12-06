@@ -3,8 +3,10 @@ version: 2
 
 models:
   - name: stg_event_baserunners
-    description: ""
-
+    description: |
+      Event-level info for each baserunner present at an event.
+      This includes all baserunners present at the start of the event,
+      as well as the batter if they end up active on the bases during the play.
 
     config:
       contract:
@@ -45,73 +47,105 @@ models:
         constraints:
           - type: not_null
       - name: runner_lineup_position
-        description: ""
+        description: "{{ doc('lineup_position') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: runner_id
-        description: ""
+        description: "{{ doc('player_id') }}"
         data_type: varchar
         constraints:
           - type: not_null
       - name: charge_event_id
-        description: ""
+        description: |
+          The event ID that this baserunner is charged to,
+          for the purpose of keeping tracked of inherited/bequeathed runners.
+          The pitcher/catcher present at the charge_event_id are on the hook
+          for the earned run. This doesn't necessarily remain constant
+          throughout a baserunning apperance, as force-outs can change
+          the inheritance of a particular runner.
         data_type: uinteger
         constraints:
           - type: not_null
       - name: reached_on_event_id
-        description: ""
+        description: |
+          Event id on which this baserunner originally reached base,
+          if applicable.
         data_type: uinteger
       - name: explicit_charged_pitcher_id
-        description: ""
+        description: |
+          For some games prior to the establishment of official inherited runner rules,
+          a pitcher could be explicitly noted as the one charged with a runner. When
+          this is present, it overrides the pitcher from `charge_event_id`.
         data_type: varchar
       - name: attempted_advance_to_base
-        description: ""
+        description: |
+          Populated for events where the runner attempts to advance to a base.
+          In specific cases, this can be identical the initial base, such as when
+          a runner is picked off or otherwise put out after trying to get back to the bag.
         data_type: base
       - name: baserunning_play_type
-        description: ""
+        description: |
+          Populated for events that specifically have a baserunning play,
+          as opposed to an advance on a batting play. Some plays apply to
+          all runners present, while others apply to a specific runner.
+          See `seed_baserunning_play_types` for more info.
         data_type: baserunning_play
       - name: is_out
-        description: ""
+        description: "Whether or not the runner is out at the end of the play"
         data_type: boolean
         constraints:
           - type: not_null
       - name: base_end
-        description: ""
+        description: "The runner's base at the end of the play, if applicable"
         data_type: base
       - name: advanced_on_error_flag
-        description: ""
+        description: |
+          True if the runner advanced on an error specifically associated
+          with a play on this runner, as opposed to a play on the batter.
         data_type: boolean
         constraints:
           - type: not_null
       - name: explicit_out_flag
-        description: ""
+        description: |
+          True if the raw data specifically described the runner as out
+          on an advance.
         data_type: boolean
         constraints:
           - type: not_null
       - name: run_scored_flag
-        description: ""
+        description: "True if the runner scored on the play"
         data_type: boolean
         constraints:
           - type: not_null
       - name: rbi_flag
-        description: ""
+        description: "True if the runner scored and the batter was credited with the RBI"
         data_type: boolean
         constraints:
           - type: not_null
       - name: reached_on_event_key
-        description: ""
+        description: "`event_key` corresponding to `reached_on_event_id`, see that field for more detail"
         data_type: uinteger
       - name: charge_event_key
-        description: ""
+        description: "`event_key` corresponding to `charge_event_id`, see that field for more detail"
         data_type: uinteger
         constraints:
           - type: not_null
       - name: baserunner_bit
-        description: ""
+        description: |
+          The bitwise representation of the runner's position:
+          - 1st: 1 (001)
+          - 2nd: 2 (010)
+          - 3rd: 4 (100)
+          
+          This is a useful way to represent the runner's position
+          because you can do a bitwise OR to get the full base state
+          for the event.
         data_type: integer
       - name: is_advance_attempt
-        description: ""
+        description: |
+          True if the runner attempted to advance on the play.
+          Includes plays where the runner is subject to a force play.
         data_type: boolean
         constraints:
           - type: not_null

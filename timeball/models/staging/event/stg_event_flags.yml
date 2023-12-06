@@ -3,7 +3,12 @@ version: 2
 
 models:
   - name: stg_event_flags
-    description: ""
+    description: |
+      Representation of flags that can appear on each event
+      in a Retrosheet file. They are helpful for identifying
+      plays like sacrifices, double plays, and other miscellany.
+      See the Retrosheet event file spec for more info:
+      https://www.retrosheet.org/eventfile.htm
 
 
     config:
@@ -25,7 +30,7 @@ models:
         description: ""
         data_type: utinyint
       - name: flag
-        description: ""
+        description: "Prettified version of the flag as it appeared in the raw play"
         data_type: varchar
         constraints:
           - type: not_null

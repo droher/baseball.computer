@@ -3,8 +3,10 @@ version: 2
 
 models:
   - name: stg_event_audit
-    description: "Connects each event to the raw Retrosheet data to enable QA/debugging."
-
+    description: |
+      Connects each event to the raw Retrosheet data to enable QA/debugging.
+      See the Retosheet event file spec for more info:
+      https://www.retrosheet.org/eventfile.htm
 
     config:
       contract:

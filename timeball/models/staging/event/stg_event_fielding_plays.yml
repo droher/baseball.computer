@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: stg_event_fielding_plays
-    description: ""
-
+    description: |
+      Each fielding play that occurs during an event,
+      in the order in which it occured.
 
     config:
       contract:
@@ -44,7 +45,7 @@ models:
         constraints:
           - type: not_null
       - name: fielding_play
-        description: ""
+        description: "Enum representation of the type of fielding play"
         data_type: varchar
         constraints:
           - type: not_null

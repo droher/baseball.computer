@@ -247,3 +247,29 @@
     details and trivia from the game, but they are also used as adhoc
     data structures for things like ejections.
 {% enddocs %}
+
+{% docs baserunner %}
+    Enum indicating the specific baserunner associated with the entity.
+    Baserunner is designated by the state at the start of an event.
+{% enddocs %}
+
+{% docs batted_to_fielder %}
+    The fielder who fielded the batted ball as a 1-byte integer, if applicable. This field is
+    *always* populated for plate appearances that end with a ball in play,
+    regardless of whether we know the fielder. It is filled with 0
+    in those cases where no fielder was recorded. On in-play outs,
+    this field has excellent historical coverage going back as far as we have data.
+    Hits have much spottier coverage, but there is still a large amount of data across
+    all years. For most of baseball history, this ends up being our best proxy
+    for batted ball location and trajectory.
+{% enddocs %}
+
+{% docs outs_on_play %}
+    The total number of outs that were recorded during the event.
+    Mutually exclusive with all other events.
+{% enddocs %}
+
+{% docs runs_on_play %}
+    The total number of runs that scored during the event.
+    Mutually exclusive with all other events.
+{% enddocs %}
