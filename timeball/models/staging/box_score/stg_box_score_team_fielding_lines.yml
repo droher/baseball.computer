@@ -30,13 +30,13 @@ models:
         description: ""
         data_type: bigint
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: utinyint
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: utinyint
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: utinyint
       - name: double_plays
         description: "{{ doc('double_plays') }}"

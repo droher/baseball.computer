@@ -36,13 +36,13 @@ models:
         description: ""
         data_type: usmallint
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: usmallint
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: usmallint
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: usmallint
         constraints:
           - type: not_null
@@ -62,7 +62,7 @@ models:
         description: ""
         data_type: usmallint
       - name: fielders_choices
-        description: ""
+        description: "{{ doc('fielders_choices') }}"
         data_type: usmallint
       - name: reaching_errors
         description: ""

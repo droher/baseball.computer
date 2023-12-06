@@ -273,3 +273,44 @@
     The total number of runs that scored during the event.
     Mutually exclusive with all other events.
 {% enddocs %}
+
+{% docs batted_location_general %}
+    Timeball's parser interprets Retrosheet's hit location codes as having
+    a general location followed by modifiers that add specificity. This field
+    contains the general location, which correspond to each fielding position
+    as well as the gaps between each position, e.g. Third and ThirdShortstop.
+
+    Note that the for air balls, the location is defined according to where the
+    ball was fielded or landed. For ground balls, the location is defined according
+    to where the ball was fielded by an infielder, or where the ball left the infield
+    if it made it through to the outfield.
+{% enddocs %}
+
+{% docs batted_location_depth %}
+    Refers to the depth of the batted ball within the area of the general location
+    (as opposed to the depth of the general location itself). The data here can
+    be difficult to interpret, as 'Default' can either mean the ball was hit to the
+    medium depth of the general location, or that the detaial was not recorded.
+{% enddocs %}
+
+{% docs batted_location_angle %}
+    Refers to the angle of the batted ball within the area of the general location,
+    either towards the foul line or the middle of the field. Only a few of the
+    general locations have this modifier. The data here can
+    be difficult to interpret, as 'Default' can either mean the ball was hit to the
+    middle of the general location, or that the detaial was not recorded.
+{% enddocs %}
+
+{% docs batted_contact_strength %}
+    A modifier indicating that the ball was sharply or softly hit. Prior to the Statcast era,
+    this detail is rarely specified and does not have any standard definition.
+    In the Statcast era, hard-hit balls are explicitly defined as 95+ miles per hour
+    exit velocity, and soft-hit balls are explicitly defined as 59- miles per hour.
+{% enddocs %}
+
+{% docs plate_appearance_result %}
+    This field is present for all events in which a plate appearance finished,
+    and absent for all other types of events.
+    It is an enum describing the result of the plate appearance, e.g. Single,
+    InPlayOut, etc. See `seed_plate_appearance_results` for more info.
+{% enddocs %}

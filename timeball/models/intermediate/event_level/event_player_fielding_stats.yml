@@ -70,27 +70,27 @@ models:
         constraints:
           - type: not_null
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: fielders_choices
-        description: ""
+        description: "{{ doc('fielders_choices') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: assisted_putouts
-        description: ""
+        description: "{{ doc('assisted_putouts') }}"
         data_type: utinyint
       - name: in_play_putouts
         description: ""

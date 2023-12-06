@@ -55,22 +55,22 @@ models:
         description: "{{ doc('batted_to_fielder') }}"
         data_type: utinyint
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         constraints:
           - type: not_null
         data_type: utinyint
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: fielders_choices
-        description: ""
+        description: "{{ doc('fielders_choices') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -80,7 +80,7 @@ models:
         constraints:
           - type: not_null
       - name: assisted_putouts
-        description: ""
+        description: "{{ doc('assisted_putouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -140,12 +140,12 @@ models:
         constraints:
           - type: not_null
       - name: unknown_putouts
-        description: ""
+        description: "{{ doc('unknown_putouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: incomplete_events
-        description: ""
+        description: "{{ doc('incomplete_events') }}"
         data_type: utinyint
         constraints:
           - type: not_null

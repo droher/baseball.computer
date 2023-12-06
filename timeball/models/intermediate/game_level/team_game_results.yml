@@ -70,7 +70,7 @@ models:
         description: "{{ doc('hits') }}"
         data_type: usmallint
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: utinyint
       - name: left_on_base
         description: "{{ doc('left_on_base') }}"
@@ -136,10 +136,10 @@ models:
         description: "{{ doc('balks') }}"
         data_type: usmallint
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: utinyint
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: utinyint
       - name: passed_balls
         description: "{{ doc('passed_balls') }}"

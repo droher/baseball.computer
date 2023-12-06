@@ -37,13 +37,13 @@ models:
         description: "{{ doc('balls_in_play') }}"
         data_type: hugeint
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: hugeint
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: hugeint
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: hugeint
       - name: reached_on_errors_percentage
         description: ""

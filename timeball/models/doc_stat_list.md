@@ -177,22 +177,22 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 
 {% docs trajectory_unknown %}
     Number of plate appearances ending in a batted ball whose trajectory was not recorded and cannot
-    be reliably inferred from context. This number includes balls that we know were hit in the air,
+    be reliably deduced from context. This number includes balls that we know were hit in the air,
     but do not know which kind of air ball (FB/PU/LD) they were (see trajectory_broad_classification_unknown
     for a number that does not include those balls). The strong majority of batted balls prior to 1988
     fall into this category, especially hits.
 {% enddocs %}
 
 {% docs trajectory_known %}
-    Number of plate appearances ending in a batted ball whose trajectory was recorded or was reliably inferred
-    from the context. An example of reliable inference is an at-bat with the fielding play 6-3, which
+    Number of plate appearances ending in a batted ball whose trajectory was recorded or was reliably deduced
+    from the context. An example of reliable deduction is an at-bat with the fielding play 6-3, which
     almost always is a ground ball fielded by the shortstop and thrown to the first baseman. See
-    `calc_batted_ball_type` for the inference logic.
+    `calc_batted_ball_type` for the deduction logic.
 {% enddocs %}
 
 {% docs trajectory_broad_type_air_ball %}
     Number of plate appearances that ended in an air ball (a fly ball, line drive, or pop-up).
-    Because it is much easier to infer that a ball was hit in the air than it is to infer the exact
+    Because it is much easier to deduce that a ball was hit in the air than it is to deduce the exact
     trajectory, this number field is more reliably populated than any of its three consituent parts.
 {% enddocs %}
 
@@ -202,14 +202,14 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 
 {% docs trajectory_broad_type_unknown %}
     Number of plate appearances ending in a batted ball whose trajectory was not recorded and cannot
-    be reliably inferred from context, even to the extent of knowing whether it was a ground ball or an air ball.
+    be reliably deduced from context, even to the extent of knowing whether it was a ground ball or an air ball.
     This will include a disproportionate number of hits, which are more likely to be missing trajectory data
-    and harder to make inferences about.
+    and harder to make deductions about.
 {% enddocs %}
 
 {% docs trajectory_broad_type_known %}
     Number of plate appearances ending in a batted ball whose ground/air status was recorded or
-    reliably inferred from the context. This is the sum of `trajectory_broad_type_air_ball` and
+    reliably deduced from the context. This is the sum of `trajectory_broad_type_air_ball` and
     `trajectory_broad_type_ground_ball`. Outs in play have excellent coverage historically here,
     even for older games.
 {% enddocs %}
@@ -234,12 +234,12 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 
 {% docs batted_distance_unknown %}
     Number of plate appearances in which the ball was hit, but the distance was not recorded
-    and cannot be reliably inferred from context.
+    and cannot be reliably deduced from context.
 {% enddocs %}
 
 {% docs batted_distance_known %}
     Number of plate appearances in which the ball was hit, and the distance was either
-    recorded or reliably inferred from context.
+    recorded or reliably deduced from context.
 {% enddocs %}
 
 {% docs fielded_by_battery %}
@@ -712,4 +712,78 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     of an error and then the pitcher allows a run to score without the help of any additional
     errors. This is a rare occurrence and it might seem unnecessary to track,
     but it is absolutely essential that we do so in order to preserve the space-time continuum.
+{% enddocs %}
+
+---- Fielding -----
+
+{% docs putouts %}
+    (PO) Outs credited to fielder based on who physically made the out, either by:
+        - Catching a ball on the fly
+        - Tagging a runner out
+        - Forcing a runner out
+        - Catching a called third strike
+        - Being the nearest fielder to a baserunner who is called out for interference
+
+    Putouts have been an important baseball statistic longer than MLB has been around,
+    so it has excellent historical coverage. Unassisted
+    putouts are very important in determining the location of batted balls.
+    
+    In modern baseball rules, each out in the game is credited as a putout, and at the play/event
+    level this will always be the case. However, in older games for which we only have box score or season-level
+    data, rare plays like baserunner interference may not be assigned to a specific fielder.
+    Every play-by-play out has a putout, but the fielder who gets the putout may be unknown.
+{% enddocs %}
+
+{% docs assists %}
+    (A) Number of outs in which a fielder touched the ball before anothber fielder recorded a putout.
+    This is almost always a throw to another fielder, but it can also be a deflection.
+
+    Assists have excellent historical data coverage, and they are particularly useful in determining
+    the location of ground balls. The data is present in almost all season-level and game-level accounts.
+    However, individual plays with unknown-fielder putouts are likely to be missing assists entirely.
+{% enddocs %}
+
+{% docs errors %}
+    (E) Number of errors recorded by a fielder. This is recorded when a fielder either fails to make an out
+    that an average fielder should have made or makes a bad play that allows a baserunner to advance.
+    Errors are awarded at the scorekeeper's discretion, making them more subjective than the other two main
+    fielding stats.
+    
+    Errors used to be a much larger component of evaluating fielder quality.
+    When the stat was invented, routine plays were completed much less frequently than they are today.
+    As baseball evolved, routine plays became truly routine, and a fielder's ability to get to the ball
+    became more relevant than their ability
+    to reliably convert the out once they got there. While plenty of people as early as the 19th century were
+    aware of this, statistics mostly failed to reflect it until the 1980s, when Bill James and others
+    developed Range Factor and other stats that attempted to measure a fielder's ability to create chances.
+{% enddocs %}
+
+{% docs fielders_choices %}
+    (FC) Number of times a fielder who fielded the ball attempted to put out a baserunner other than the batter.
+    A fielder's choice can be assigned when the attempt fails, even if there was no error on the play.
+
+    Fielder's choices are only available on play-by-play data and tend to be recorded when the attempt was
+    a tag and not a force. Force plays are explicitly noted and have little overlap with fielder's choices.
+{% enddocs %}
+
+{% docs plays_started %}
+    Number of times that a fielder made the first play on a prospective batted-ball-out and did not immediately record an error.
+    Hits without any putouts are not included, but assists made on plays that had errors or failed fielder's choices do count.
+{% enddocs %}
+
+{% docs assisted_putouts %}
+    Number of putouts by the fielder that had at least one recorded, associated assist. For older games, this may be a subset
+    of the true total assisted putouts, as unknown-fielder putouts almost never have recorded assists.
+{% enddocs %}
+
+{% docs first_errors %}
+    Number of events in which a fielder made an error that was the first attempted out on the play.
+{% enddocs %}
+
+{% docs unknown_putouts %}
+    Number of putouts that were recorded, but without a specified fielder.
+{% enddocs %}
+
+{% docs incomplete_events %}
+    Number of events in which at least one known fielding play was made by an unknown fielder.
 {% enddocs %}

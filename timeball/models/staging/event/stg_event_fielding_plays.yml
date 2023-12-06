@@ -7,6 +7,10 @@ models:
       Each fielding play that occurs during an event,
       in the order in which it occured.
 
+      Unless you have a specific interest in the order in which the plays occurred on an event,
+      it is recommended that you use `calc_fielding_play_agg` table instead, as there are some quirks
+      in the way that some metrics are calculated that require knowledge of other parts of the event (most 
+      notably that a player can be credited with at most one assist on any given putout).
     config:
       contract:
         enforced: true

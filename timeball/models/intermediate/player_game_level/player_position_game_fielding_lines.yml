@@ -44,19 +44,19 @@ models:
           - dbt_utils.not_null_proportion:
               at_least: .995
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: utinyint
         tests:
           - dbt_utils.not_null_proportion:
               at_least: .995
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         tests:
           - dbt_utils.not_null_proportion:
               at_least: .995
         data_type: utinyint
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: utinyint
         tests:
           - dbt_utils.not_null_proportion:
@@ -83,10 +83,10 @@ models:
         description: ""
         data_type: utinyint
       - name: fielders_choices
-        description: ""
+        description: "{{ doc('fielders_choices') }}"
         data_type: utinyint
       - name: assisted_putouts
-        description: ""
+        description: "{{ doc('assisted_putouts') }}"
         data_type: utinyint
       - name: in_play_putouts
         description: ""

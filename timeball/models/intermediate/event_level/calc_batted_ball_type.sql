@@ -44,7 +44,7 @@ inference AS (
         CASE WHEN batted_ball.plate_appearance_result NOT IN ('HomeRun', 'GroundRuleDouble')
                 THEN batted_ball.batted_to_fielder
         END AS batted_to_fielder,
-        batted_ball.batted_trajectory AS recorded_contact,
+        batted_ball.batted_trajectory AS recorded_trajectory,
         batted_ball.batted_location_general AS recorded_location,
         batted_ball.batted_location_depth AS recorded_location_depth,
         batted_ball.batted_location_angle AS recorded_location_angle,
@@ -52,7 +52,7 @@ inference AS (
         location_info.category_side,
         location_info.category_edge,
         (
-            (recorded_contact != 'GroundBall' AND putouts.unassisted_putouts > 0)
+            (recorded_trajectory != 'GroundBall' AND putouts.unassisted_putouts > 0)
             OR batted_ball.plate_appearance_result = 'HomeRun'
             -- 2000-2002 seasons have a lot of shallow outfield flies that are actually
             -- ground balls, and no metadata to isolate faulty sources.
@@ -63,8 +63,8 @@ inference AS (
                 THEN 'GroundBall'
             ELSE 'Unknown'
         END AS inferred_contact,
-        CASE WHEN recorded_contact = 'Unknown' THEN inferred_contact
-            ELSE recorded_contact
+        CASE WHEN recorded_trajectory = 'Unknown' THEN inferred_contact
+            ELSE recorded_trajectory
         END AS batted_trajectory,
     FROM {{ ref('stg_events') }} AS batted_ball
     LEFT JOIN putouts USING (event_key)
@@ -79,8 +79,8 @@ final AS (
         inference.plate_appearance_result,
         inference.batted_to_fielder,
         inference.batted_trajectory::trajectory AS trajectory,
-        inference.recorded_contact,
-        inference.batted_trajectory != inference.recorded_contact AS is_trajectory_inferred,
+        inference.recorded_trajectory,
+        inference.batted_trajectory != inference.recorded_trajectory AS is_trajectory_deduced,
         CASE WHEN inference.is_inferred_air_ball
                 THEN 'AirBall'
             ELSE trajectory_info.broad_classification

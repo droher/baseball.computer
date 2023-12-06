@@ -18,10 +18,23 @@ models:
       but an event never contains more than one plate appearance.
       No-plays serve as markers in the data to place substitutions.
       In cases where multiple baserunning plays or substitutions occur
-      over 
+      over a single plate apperance, the PA is split across those events,
+      but is considered to have occurred on the final event. In the case
+      of a baserunning play ending an inning, it is also possible that a plate
+      appearance to not occur at all.
 
-      See the Retrosheet event file spec for more info:
+      `stg_events` has the following information:
+      - The game state (inning, frame, outs, runners on, batter up, etc.)
+      - The plate appearance result (if applicable)
+      - The batted ball information (if applicable)
+      - Basic results of the event (runs scored, outs recorded)
+      - Other rare miscellaneous information (e.g. the batter batting from an unusual side)
+
+      See the Retrosheet event file spec:
       https://www.retrosheet.org/eventfile.htm
+
+      As well as the batted ball location diagram:
+      https://www.retrosheet.org/location.htm
 
 
     config:
@@ -67,7 +80,7 @@ models:
         constraints:
           - type: not_null
       - name: batter_lineup_position
-        description: ""
+        description: "{{ doc('lineup_position') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -82,12 +95,12 @@ models:
         constraints:
           - type: not_null
       - name: batting_team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
       - name: fielding_team_id
-        description: ""
+        description: "{{ doc('team_id') }}"
         data_type: team_id
         constraints:
           - type: not_null
@@ -151,11 +164,7 @@ models:
           the final pitcher is the one who is credited.
         data_type: varchar
       - name: plate_appearance_result
-        description: |
-          This field is present for all events in which a plate appearance finished,
-          and absent for all other types of events.
-          It is an enum describing the result of the plate appearance, e.g. Single,
-          InPlayOut, etc. See `seed_plate_appearance_results` for more info.
+        description: "{{ doc('plate_appearance_result') }}"
         data_type: plate_appearance_result
       - name: batted_trajectory
         description: |
@@ -163,22 +172,22 @@ models:
           *always* populated for plate appearances that end in a batted ball,
           regardless of whether we know the trajectory. It is filled with `Unknown`
           in those cases where no trajectory was recorded. This data is sparse prior
-          to 1988, but many of the missing values can be inferred based on other details.
+          to 1988, but many of the missing values can be deduced based on other details.
         data_type: trajectory
       - name: batted_to_fielder
         description: "{{ doc('batted_to_fielder') }}"
         data_type: utinyint
       - name: batted_location_general
-        description: ""
+        description: "{{ doc('batted_location_general') }}"
         data_type: location_general
       - name: batted_location_depth
-        description: ""
+        description: "{{ doc('batted_location_depth') }}"
         data_type: location_depth
       - name: batted_location_angle
-        description: ""
+        description: "{{ doc('batted_location_angle') }}"
         data_type: location_angle
       - name: batted_contact_strength
-        description: ""
+        description: "{{ doc('batted_contact_strength') }}"
         data_type: varchar
       - name: outs_on_play
         description: "{{ doc('outs_on_play') }}"

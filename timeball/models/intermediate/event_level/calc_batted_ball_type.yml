@@ -3,9 +3,41 @@ version: 2
 
 models:
   - name: calc_batted_ball_type
-    description: ""
+    description: |
+      This model contains one row for each event that ended in a batted ball.
+      It supplements the raw trajectory and location data with
+      additional information based on inference and additional metadata.
+      For millions of plays in the database without batted ball info,
+      at least part of the information can be deduced from other data points,
+      particularly fielding data. For example, if a plate appearance is recorded as a putout
+      to the center fielder, we can deduce that the trajectory of the batted ball was an
+      air ball, and the location was to center field. Both of these deductions are less precise
+      and less accurate than explicit batted ball information, but they are much better than nothing.
+      They also provide support for additional inference in statistical or deep learning models.
 
+      In addition to these deductions, we also have additional ontologies for batted ball
+      data (see `seeds`) that allow us to make other useful classifications,
+      particularly for location. The raw data divides the field into a few dozen separate zones
+      (http://www.retrosheet.org/location.htm)
+      but we can categorize each of those zones according to angle, depth, etc.
 
+      Trajectory inference rules (only valid for batted balls without trajectory type):
+      1. Unassisted putouts are air balls (unassisted GB putouts should already be explicit grounders)
+      2. Balls with an outfield location are air balls
+      2. Home runs are air balls
+      4. Balls fielded by infielders with an assisted putout are ground balls
+      Many exceptions are possible, but they are some combination
+      of rare and likely to be explicitly noted when they do occur.
+
+      Location inference rules (applies to batted balls without location):
+      1. Ground balls fielded by outfielders have infield depth
+      2. All other depth/side cases are dictated by the fielder's position
+          via the `seed_batted_to_fielder_categories` table
+      3. If there is no fielder, we go by the explicit location
+      (which is rarely available, especially when there is no fielder).
+      The explicit location data is better than the fielder data in a vacuum,
+      but fielder-based location is far more consistently available.
+      Choosing it as the default makes the data more precise (in the sense of self-consistency).
     config:
       contract:
         enforced: true
@@ -25,58 +57,73 @@ models:
         description: "{{ doc('event_key') }}"
         data_type: uinteger
       - name: plate_appearance_result
-        description: ""
+        description: "{{ doc('plate_appearance_result') }}"
         data_type: plate_appearance_result
       - name: batted_to_fielder
         description: "{{ doc('batted_to_fielder') }}"
         data_type: utinyint
       - name: trajectory
-        description: ""
+        description: "The trajectory of the batted ball, either as recorded or deduced."
         data_type: trajectory
         constraints:
           - type: not_null
-      - name: recorded_contact
-        description: ""
+      - name: recorded_trajectory
+        description: "The trajectory of the batted ball as recorded."
         data_type: trajectory
         constraints:
           - type: not_null
-      - name: is_trajectory_inferred
-        description: ""
+      - name: is_trajectory_deduced
+        description: "Whether the trajectory was deduced from other data. This is
+          false if the trajectory was recorded or if it remains unknown after attempting
+          deduction."
         data_type: boolean
         constraints:
           - type: not_null
       - name: trajectory_broad_classification
-        description: ""
+        description: "Deduced trajectory classification that groups fly balls, pop-ups,
+          and line drives together as air balls. Generally speaking, it is much easier
+          to deduce that a batted ball was an air ball than to deduce a particular
+          kind of air ball."
         data_type: varchar
         constraints:
           - type: not_null
       - name: recorded_location
-        description: ""
+        description: "The recorded general location of the batted ball. See `batted_location_general`
+          in `stg_events` for more information."
         data_type: location_general
         constraints:
           - type: not_null
       - name: recorded_location_depth
-        description: ""
+        description: "The recorded depth of the batted ball. See `batted_location_depth`
+          in `stg_events` for more information."
         data_type: location_depth
         constraints:
           - type: not_null
       - name: recorded_location_angle
-        description: ""
+        description: "The recorded angle of the batted ball. See `batted_location_angle`
+          in `stg_events` for more information."
         data_type: location_angle
         constraints:
           - type: not_null
       - name: location_depth
-        description: ""
+        description: "The *overall* depth category of the batted ball. This is either
+          the plate, the infield, or the outfield."
         data_type: varchar
         constraints:
           - type: not_null
       - name: location_side
-        description: ""
+        description: "The side of the field that the batted ball was hit to. This
+          is either left, center, or right."
         data_type: varchar
         constraints:
           - type: not_null
       - name: location_edge
-        description: ""
+        description: "The edge of the area that the batted ball was hit to, relative
+          to `location_side`. This is currently not deduced and only appears on rows
+          with recorded locations."
         data_type: varchar
         constraints:
           - type: not_null
+        tests:
+          - accepted_values:
+              values: [Left, Middle, Right, Unknown]

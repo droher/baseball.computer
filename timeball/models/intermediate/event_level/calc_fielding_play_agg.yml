@@ -3,8 +3,12 @@ version: 2
 
 models:
   - name: calc_fielding_play_agg
-    description: ""
-
+    description: |
+      Table containing one row for each fielder who made at least one
+      fielding play on a given event. It serves as the canonical way to
+      calculate fielding data for each fielder on each event. For the most
+      part, the definitions involve conditions based on each individual fielding play,
+      but some definitions require aggregate knowledge of the event as a whole.
 
     config:
       contract:
@@ -37,47 +41,47 @@ models:
         constraints:
           - type: not_null
       - name: putouts
-        description: ""
+        description: "{{ doc('putouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: assists
-        description: ""
+        description: "{{ doc('assists') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: errors
-        description: ""
+        description: "{{ doc('errors') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: fielders_choices
-        description: ""
+        description: "{{ doc('fielders_choices') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: plays_started
-        description: ""
+        description: "{{ doc('plays_started') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: assisted_putouts
-        description: ""
+        description: "{{ doc('assisted_putouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: first_errors
-        description: ""
+        description: "{{ doc('first_errors') }}"
         data_type: bigint
         constraints:
           - type: not_null
       - name: unknown_putouts
-        description: ""
+        description: "{{ doc('unknown_putouts') }}"
         data_type: bigint
         constraints:
           - type: not_null
       - name: incomplete_events
-        description: ""
+        description: "{{ doc('incomplete_events') }}"
         data_type: utinyint
         constraints:
           - type: not_null
