@@ -31,10 +31,11 @@ models:
         description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: runner_id
-        description: ""
+        description: "{{ doc('runner_id') }}"
         data_type: varchar
       - name: current_pitcher_id
-        description: "Retrosheet person ID of the pitcher on the mount at the end of the event"
+        description: "Retrosheet person ID of the pitcher on the mount at the end
+          of the event"
         data_type: varchar
       - name: baserunner
         description: "{{ doc('baserunner') }}"
@@ -49,7 +50,7 @@ models:
         description: ""
         data_type: uinteger
       - name: explicit_charged_pitcher_id
-        description: ""
+        description: "{{ doc('explicit_charged_pitcher_id') }}"
         data_type: varchar
       - name: runs
         description: "{{ doc('runs') }}"
@@ -61,61 +62,61 @@ models:
         description: "{{ doc('times_reached_base') }}"
         data_type: utinyint
       - name: times_lead_runner
-        description: ""
+        description: "{{ doc('times_lead_runner') }}"
         data_type: utinyint
       - name: times_force_on_runner
-        description: ""
+        description: "{{ doc('times_force_on_runner') }}"
         data_type: utinyint
       - name: times_next_base_empty
-        description: ""
+        description: "{{ doc('times_next_base_empty') }}"
         data_type: utinyint
       - name: stolen_base_opportunities
-        description: ""
+        description: "{{ doc('stolen_base_opportunities') }}"
         data_type: utinyint
       - name: stolen_base_opportunities_second
-        description: ""
+        description: "{{ doc('stolen_base_opportunities_second') }}"
         data_type: utinyint
       - name: stolen_base_opportunities_third
-        description: ""
+        description: "{{ doc('stolen_base_opportunities_third') }}"
         data_type: utinyint
       - name: stolen_base_opportunities_home
-        description: ""
+        description: "{{ doc('stolen_base_opportunities_home') }}"
         data_type: utinyint
       - name: stolen_bases
         description: "{{ doc('stolen_bases') }}"
         data_type: utinyint
       - name: stolen_bases_second
-        description: ""
+        description: "{{ doc('stolen_bases_second') }}"
         data_type: utinyint
       - name: stolen_bases_third
-        description: ""
+        description: "{{ doc('stolen_bases_third') }}"
         data_type: utinyint
       - name: stolen_bases_home
-        description: ""
+        description: "{{ doc('stolen_bases_home') }}"
         data_type: utinyint
       - name: caught_stealing
         description: "{{ doc('caught_stealing') }}"
         data_type: utinyint
       - name: caught_stealing_second
-        description: ""
+        description: "{{ doc('caught_stealing_second') }}"
         data_type: utinyint
       - name: caught_stealing_third
-        description: ""
+        description: "{{ doc('caught_stealing_third') }}"
         data_type: utinyint
       - name: caught_stealing_home
-        description: ""
+        description: "{{ doc('caught_stealing_home') }}"
         data_type: utinyint
       - name: picked_off
         description: "{{ doc('picked_off') }}"
         data_type: utinyint
       - name: picked_off_first
-        description: ""
+        description: "{{ doc('picked_off_first') }}"
         data_type: utinyint
       - name: picked_off_second
-        description: ""
+        description: "{{ doc('picked_off_second') }}"
         data_type: utinyint
       - name: picked_off_third
-        description: ""
+        description: "{{ doc('picked_off_third') }}"
         data_type: utinyint
       - name: picked_off_caught_stealing
         description: "{{ doc('picked_off_caught_stealing') }}"

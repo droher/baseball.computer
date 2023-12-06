@@ -369,3 +369,51 @@ models:
       - name: left_on_base_with_two_outs
         description: "{{ doc('left_on_base_with_two_outs') }}"
         data_type: usmallint
+      - name: times_lead_runner
+        description: "{{ doc('times_lead_runner') }}"
+        data_type: USMALLINT
+      - name: times_force_on_runner
+        description: "{{ doc('times_force_on_runner') }}"
+        data_type: USMALLINT
+      - name: times_next_base_empty
+        description: "{{ doc('times_next_base_empty') }}"
+        data_type: USMALLINT
+      - name: stolen_base_opportunities
+        description: "{{ doc('stolen_base_opportunities') }}"
+        data_type: USMALLINT
+      - name: stolen_base_opportunities_second
+        description: "{{ doc('stolen_base_opportunities_second') }}"
+        data_type: USMALLINT
+      - name: stolen_base_opportunities_third
+        description: "{{ doc('stolen_base_opportunities_third') }}"
+        data_type: USMALLINT
+      - name: stolen_base_opportunities_home
+        description: "{{ doc('stolen_base_opportunities_home') }}"
+        data_type: USMALLINT
+      - name: stolen_bases_second
+        description: "{{ doc('stolen_bases_second') }}"
+        data_type: USMALLINT
+      - name: stolen_bases_third
+        description: "{{ doc('stolen_bases_third') }}"
+        data_type: USMALLINT
+      - name: stolen_bases_home
+        description: "{{ doc('stolen_bases_home') }}"
+        data_type: USMALLINT
+      - name: caught_stealing_second
+        description: "{{ doc('caught_stealing_second') }}"
+        data_type: USMALLINT
+      - name: caught_stealing_third
+        description: "{{ doc('caught_stealing_third') }}"
+        data_type: USMALLINT
+      - name: caught_stealing_home
+        description: "{{ doc('caught_stealing_home') }}"
+        data_type: USMALLINT
+      - name: picked_off_first
+        description: "{{ doc('picked_off_first') }}"
+        data_type: USMALLINT
+      - name: picked_off_second
+        description: "{{ doc('picked_off_second') }}"
+        data_type: USMALLINT
+      - name: picked_off_third
+        description: "{{ doc('picked_off_third') }}"
+        data_type: USMALLINT

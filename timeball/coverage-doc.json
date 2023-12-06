@@ -1,14 +1,14 @@
 {
   "cov_type": "doc",
-  "covered": 1411,
-  "total": 2125,
-  "coverage": 0.664,
+  "covered": 1402,
+  "total": 2087,
+  "coverage": 0.6717776712985146,
   "tables": [
     {
       "name": "main_models.calc_batted_ball_type",
-      "covered": 3,
+      "covered": 14,
       "total": 14,
-      "coverage": 0.21428571428571427,
+      "coverage": 1.0,
       "columns": [
         {
           "name": "game_id",
@@ -24,9 +24,9 @@
         },
         {
           "name": "plate_appearance_result",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "batted_to_fielder",
@@ -36,71 +36,71 @@
         },
         {
           "name": "trajectory",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
-          "name": "recorded_contact",
-          "covered": 0,
+          "name": "recorded_trajectory",
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "is_trajectory_deduced",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "trajectory_broad_classification",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "recorded_location",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "recorded_location_depth",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "recorded_location_angle",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "location_depth",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "location_side",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "location_edge",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         }
       ]
     },
     {
       "name": "main_models.calc_fielding_play_agg",
-      "covered": 3,
+      "covered": 13,
       "total": 13,
-      "coverage": 0.23076923076923078,
+      "coverage": 1.0,
       "columns": [
         {
           "name": "event_key",
@@ -122,63 +122,63 @@
         },
         {
           "name": "fielding_plays",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "plays_started",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assisted_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "first_errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "unknown_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "incomplete_events",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         }
       ]
     },
@@ -679,6 +679,68 @@
       ]
     },
     {
+      "name": "main_models.calc_park_factor_trajectory_outs",
+      "covered": 3,
+      "total": 9,
+      "coverage": 0.3333333333333333,
+      "columns": [
+        {
+          "name": "park_id",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "season",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "league",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "sqrt_sample_size",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "trajectory_broad_type_air_ball_park_factor",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "trajectory_ground_ball_park_factor",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "trajectory_fly_ball_park_factor",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "trajectory_line_drive_park_factor",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "trajectory_pop_fly_park_factor",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        }
+      ]
+    },
+    {
       "name": "main_models.calc_park_factors_advanced",
       "covered": 3,
       "total": 24,
@@ -881,74 +943,6 @@
       ]
     },
     {
-      "name": "main_models.calc_season_range_factor",
-      "covered": 5,
-      "total": 10,
-      "coverage": 0.5,
-      "columns": [
-        {
-          "name": "season",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "hits_in_play",
-          "covered": 0,
-          "total": 1,
-          "coverage": 0.0
-        },
-        {
-          "name": "strikeouts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "reached_on_errors",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "outs_recorded",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls_in_play",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "putouts",
-          "covered": 0,
-          "total": 1,
-          "coverage": 0.0
-        },
-        {
-          "name": "assists",
-          "covered": 0,
-          "total": 1,
-          "coverage": 0.0
-        },
-        {
-          "name": "errors",
-          "covered": 0,
-          "total": 1,
-          "coverage": 0.0
-        },
-        {
-          "name": "reached_on_errors_percentage",
-          "covered": 0,
-          "total": 1,
-          "coverage": 0.0
-        }
-      ]
-    },
-    {
       "name": "main_models.event_base_out_states",
       "covered": 5,
       "total": 30,
@@ -1138,9 +1132,9 @@
     },
     {
       "name": "main_models.event_baserunning_stats",
-      "covered": 28,
+      "covered": 32,
       "total": 52,
-      "coverage": 0.5384615384615384,
+      "coverage": 0.6153846153846154,
       "columns": [
         {
           "name": "event_key",
@@ -1156,15 +1150,15 @@
         },
         {
           "name": "batting_team_id",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielding_team_id",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "runner_id",
@@ -1174,9 +1168,9 @@
         },
         {
           "name": "current_pitcher_id",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "baserunner",
@@ -1186,9 +1180,9 @@
         },
         {
           "name": "runner_lineup_position",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "reached_on_event_key",
@@ -2284,9 +2278,9 @@
     },
     {
       "name": "main_models.event_fielding_stats",
-      "covered": 10,
+      "covered": 18,
       "total": 27,
-      "coverage": 0.37037037037037035,
+      "coverage": 0.6666666666666666,
       "columns": [
         {
           "name": "event_key",
@@ -2338,39 +2332,39 @@
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielding_plays",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assisted_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "double_plays",
@@ -2440,22 +2434,22 @@
         },
         {
           "name": "unknown_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "incomplete_events",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         }
       ]
     },
     {
       "name": "main_models.event_offense_stats",
-      "covered": 120,
-      "total": 120,
+      "covered": 136,
+      "total": 136,
       "coverage": 1.0,
       "columns": [
         {
@@ -3177,6 +3171,102 @@
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "times_force_on_runner",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "times_lead_runner",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "times_next_base_empty",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
         }
       ]
     },
@@ -3488,8 +3578,8 @@
     },
     {
       "name": "main_models.event_pitching_stats",
-      "covered": 117,
-      "total": 117,
+      "covered": 130,
+      "total": 130,
       "coverage": 1.0,
       "columns": [
         {
@@ -4193,14 +4283,92 @@
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
         }
       ]
     },
     {
       "name": "main_models.event_player_fielding_stats",
-      "covered": 10,
+      "covered": 16,
       "total": 28,
-      "coverage": 0.35714285714285715,
+      "coverage": 0.5714285714285714,
       "columns": [
         {
           "name": "event_key",
@@ -4264,39 +4432,39 @@
         },
         {
           "name": "fielding_plays",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assisted_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "in_play_putouts",
@@ -6546,10 +6714,16 @@
     },
     {
       "name": "main_models.people",
-      "covered": 1,
-      "total": 14,
-      "coverage": 0.07142857142857142,
+      "covered": 2,
+      "total": 15,
+      "coverage": 0.13333333333333333,
       "columns": [
+        {
+          "name": "person_id",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
         {
           "name": "player_id",
           "covered": 1,
@@ -6928,8 +7102,8 @@
     },
     {
       "name": "main_models.player_game_offense_lines",
-      "covered": 118,
-      "total": 118,
+      "covered": 134,
+      "total": 134,
       "coverage": 1.0,
       "columns": [
         {
@@ -7639,13 +7813,109 @@
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "times_force_on_runner",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "times_lead_runner",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "times_next_base_empty",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
         }
       ]
     },
     {
       "name": "main_models.player_game_pitching_lines",
-      "covered": 139,
-      "total": 139,
+      "covered": 152,
+      "total": 152,
       "coverage": 1.0,
       "columns": [
         {
@@ -8220,6 +8490,84 @@
         },
         {
           "name": "outs_on_extra_base_advance_attempts",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_third",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -8486,9 +8834,9 @@
     },
     {
       "name": "main_models.player_position_game_fielding_lines",
-      "covered": 10,
+      "covered": 15,
       "total": 26,
-      "coverage": 0.38461538461538464,
+      "coverage": 0.5769230769230769,
       "columns": [
         {
           "name": "game_id",
@@ -8528,21 +8876,21 @@
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "double_plays",
@@ -8576,15 +8924,15 @@
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assisted_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "in_play_putouts",
@@ -8650,9 +8998,9 @@
     },
     {
       "name": "main_models.player_position_team_season_fielding_lines",
-      "covered": 13,
+      "covered": 17,
       "total": 26,
-      "coverage": 0.5,
+      "coverage": 0.6538461538461539,
       "columns": [
         {
           "name": "season",
@@ -8722,27 +9070,27 @@
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "reaching_errors",
@@ -8815,8 +9163,8 @@
     {
       "name": "main_models.player_team_season_offense_lines",
       "covered": 120,
-      "total": 120,
-      "coverage": 1.0,
+      "total": 136,
+      "coverage": 0.8823529411764706,
       "columns": [
         {
           "name": "season",
@@ -9251,10 +9599,70 @@
           "coverage": 1.0
         },
         {
+          "name": "times_lead_runner",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "times_force_on_runner",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "times_next_base_empty",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
           "name": "stolen_bases",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
         },
         {
           "name": "caught_stealing",
@@ -9263,10 +9671,46 @@
           "coverage": 1.0
         },
         {
+          "name": "caught_stealing_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
           "name": "picked_off",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "picked_off_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
         },
         {
           "name": "picked_off_caught_stealing",
@@ -9541,860 +9985,6 @@
       ]
     },
     {
-      "name": "main_models.player_team_season_pitching_lines",
-      "covered": 141,
-      "total": 141,
-      "coverage": 1.0,
-      "columns": [
-        {
-          "name": "season",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "team_id",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "player_id",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "game_type",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "innings_pitched",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "games",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batters_faced",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "outs_recorded",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "inherited_runners_scored",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "bequeathed_runners_scored",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "team_unearned_runs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "at_bats",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "hits",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "singles",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "doubles",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "triples",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "home_runs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "total_bases",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikeouts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "walks",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "intentional_walks",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "hit_by_pitches",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "sacrifice_hits",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "sacrifice_flies",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "reached_on_errors",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "reached_on_interferences",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "inside_the_park_home_runs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "ground_rule_doubles",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "infield_hits",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "on_base_opportunities",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "on_base_successes",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "grounded_into_double_plays",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "double_plays",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "triple_plays",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batting_outs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls_in_play",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls_batted",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_fly_ball",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_ground_ball",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_line_drive",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_pop_fly",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_known",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_broad_type_air_ball",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_broad_type_ground_ball",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_broad_type_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "trajectory_broad_type_known",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "bunts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_distance_plate",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_distance_infield",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_distance_outfield",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_distance_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_distance_known",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "fielded_by_battery",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "fielded_by_infielder",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "fielded_by_outfielder",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "fielded_by_known",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "fielded_by_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_angle_left",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_angle_right",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_angle_middle",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_angle_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_angle_known",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_plate",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_right_infield",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_middle_infield",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_left_infield",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_left_field",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_center_field",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_right_field",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_location_known",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_balls_pulled",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "batted_balls_opposite_field",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "runs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "times_reached_base",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "stolen_bases",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "caught_stealing",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "picked_off",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "picked_off_caught_stealing",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "outs_on_basepaths",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "unforced_outs_on_basepaths",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "outs_avoided_on_errors",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "advances_on_wild_pitches",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "advances_on_passed_balls",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "advances_on_balks",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "advances_on_unspecified_plays",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "advances_on_defensive_indifference",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "advances_on_errors",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "extra_base_advance_attempts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "bases_advanced",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "bases_advanced_on_balls_in_play",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "surplus_bases_advanced_on_balls_in_play",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "outs_on_extra_base_advance_attempts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "pitches",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "swings",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "swings_with_contact",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes_called",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes_swinging",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes_foul",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes_foul_tip",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes_in_play",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "strikes_unknown",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls_called",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls_intentional",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balls_automatic",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "unknown_pitches",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "pitchouts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "pitcher_pickoff_attempts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "catcher_pickoff_attempts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "pitches_blocked_by_catcher",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "pitches_with_runners_going",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "passed_balls",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "wild_pitches",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "balks",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "left_on_base",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "left_on_base_with_two_outs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "games_started",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "inherited_runners",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "bequeathed_runners",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "games_relieved",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "games_finished",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "save_situations_entered",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "holds",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "blown_saves",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "saves_by_rule",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "save_opportunities",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "wins",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "losses",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "saves",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "earned_runs",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "complete_games",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "shutouts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "quality_starts",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "cheap_wins",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "tough_losses",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "no_decisions",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "no_hitters",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        },
-        {
-          "name": "perfect_games",
-          "covered": 1,
-          "total": 1,
-          "coverage": 1.0
-        }
-      ]
-    },
-    {
       "name": "main_models.run_expectancy_matrix",
       "covered": 0,
       "total": 8,
@@ -10452,9 +10042,9 @@
     },
     {
       "name": "main_models.team_game_fielding_stats",
-      "covered": 8,
+      "covered": 15,
       "total": 23,
-      "coverage": 0.34782608695652173,
+      "coverage": 0.6521739130434783,
       "columns": [
         {
           "name": "season",
@@ -10482,33 +10072,33 @@
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assisted_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "in_play_putouts",
@@ -10584,23 +10174,23 @@
         },
         {
           "name": "unknown_putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "incomplete_events",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         }
       ]
     },
     {
       "name": "main_models.team_game_offense_stats",
       "covered": 117,
-      "total": 117,
-      "coverage": 1.0,
+      "total": 133,
+      "coverage": 0.8796992481203008,
       "columns": [
         {
           "name": "game_id",
@@ -11017,10 +10607,70 @@
           "coverage": 1.0
         },
         {
+          "name": "times_lead_runner",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "times_force_on_runner",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "times_next_base_empty",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
           "name": "stolen_bases",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
         },
         {
           "name": "caught_stealing",
@@ -11029,10 +10679,46 @@
           "coverage": 1.0
         },
         {
+          "name": "caught_stealing_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
           "name": "picked_off",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
+        },
+        {
+          "name": "picked_off_third",
+          "covered": 0,
+          "total": 1,
+          "coverage": 0.0
         },
         {
           "name": "picked_off_caught_stealing",
@@ -11308,9 +10994,9 @@
     },
     {
       "name": "main_models.team_game_pitching_stats",
-      "covered": 138,
-      "total": 139,
-      "coverage": 0.9928057553956835,
+      "covered": 151,
+      "total": 152,
+      "coverage": 0.993421052631579,
       "columns": [
         {
           "name": "game_id",
@@ -12145,14 +11831,92 @@
           "covered": 0,
           "total": 1,
           "coverage": 0.0
+        },
+        {
+          "name": "stolen_bases_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_bases_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "caught_stealing_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "stolen_base_opportunities_home",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_first",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_second",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
+        },
+        {
+          "name": "picked_off_third",
+          "covered": 1,
+          "total": 1,
+          "coverage": 1.0
         }
       ]
     },
     {
       "name": "main_models.team_game_results",
-      "covered": 28,
+      "covered": 31,
       "total": 92,
-      "coverage": 0.30434782608695654,
+      "coverage": 0.33695652173913043,
       "columns": [
         {
           "name": "season",
@@ -12258,9 +12022,9 @@
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "left_on_base",
@@ -12390,15 +12154,15 @@
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "passed_balls",
@@ -13042,9 +12806,9 @@
     },
     {
       "name": "main_models.team_season_fielding_lines",
-      "covered": 9,
+      "covered": 13,
       "total": 19,
-      "coverage": 0.47368421052631576,
+      "coverage": 0.6842105263157895,
       "columns": [
         {
           "name": "season",
@@ -13078,21 +12842,21 @@
         },
         {
           "name": "putouts",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "assists",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "errors",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "passed_balls",
@@ -13126,9 +12890,9 @@
         },
         {
           "name": "fielders_choices",
-          "covered": 0,
+          "covered": 1,
           "total": 1,
-          "coverage": 0.0
+          "coverage": 1.0
         },
         {
           "name": "reaching_errors",

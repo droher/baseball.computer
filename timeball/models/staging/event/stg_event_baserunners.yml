@@ -57,15 +57,15 @@ models:
         constraints:
           - type: not_null
       - name: charge_event_id
-        description: ""
+        description: "{{ doc('charge_event_id') }}"
         data_type: uinteger
         constraints:
           - type: not_null
       - name: reached_on_event_id
-        description: ""
+        description: "{{ doc('reached_on_event_id') }}"
         data_type: uinteger
       - name: explicit_charged_pitcher_id
-        description: ""
+        description: "{{ doc('explicit_charged_pitcher_id') }}"
         data_type: varchar
       - name: attempted_advance_to_base
         description: |

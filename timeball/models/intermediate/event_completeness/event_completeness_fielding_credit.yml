@@ -1,0 +1,32 @@
+version: 2
+
+
+models:
+  - name: event_completeness_fielding_credit
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: &pk []
+
+    # meta:
+    #   primary_keys: *pk
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: has_fielder_putouts
+        description: ""
+        data_type: boolean
+      - name: has_fielder_assists
+        description: ""
+        data_type: boolean
+      - name: has_fielder_errors
+        description: ""
+        data_type: boolean

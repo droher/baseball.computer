@@ -20,7 +20,7 @@ models:
         description: ""
         data_type: varchar
       - name: runner_id
-        description: ""
+        description: "{{ doc('runner_id') }}"
         data_type: varchar
       - name: pitcher_id
         description: "{{ doc('pitcher_id') }}"
