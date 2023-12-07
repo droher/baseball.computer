@@ -520,12 +520,21 @@
     with a divsion (e.g. any game prior to 1969).
 {% enddocs %}
 
+{% docs division %}
+    The team's division within the league. Null if the team is not associated
+    with a divsion (e.g. any game prior to 1969).
+{% enddocs %}
+
 {% docs away_team_name %}
-    The name of the away team in this game (city and nickname).
+    The name of the away team in this game (location and nickname).
 {% enddocs %}
 
 {% docs home_team_name %}
-    The name of the home team in this game (city and nickname).
+    The name of the home team in this game (location and nickname).
+{% enddocs %}
+
+{% docs team_name %}
+    Team name, both city and nickname.
 {% enddocs %}
 
 {% docs is_interleague %}

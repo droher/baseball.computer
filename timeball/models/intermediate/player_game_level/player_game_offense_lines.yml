@@ -129,17 +129,17 @@ models:
       - name: trajectory_known
         description: "{{ doc('trajectory_known') }}"
         data_type: utinyint
-      - name: trajectory_broad_type_air_ball
-        description: "{{ doc('trajectory_broad_type_air_ball') }}"
+      - name: trajectory_broad_air_ball
+        description: "{{ doc('trajectory_broad_air_ball') }}"
         data_type: utinyint
-      - name: trajectory_broad_type_ground_ball
-        description: "{{ doc('trajectory_broad_type_ground_ball') }}"
+      - name: trajectory_broad_ground_ball
+        description: "{{ doc('trajectory_broad_ground_ball') }}"
         data_type: utinyint
-      - name: trajectory_broad_type_unknown
-        description: "{{ doc('trajectory_broad_type_unknown') }}"
+      - name: trajectory_broad_unknown
+        description: "{{ doc('trajectory_broad_unknown') }}"
         data_type: utinyint
-      - name: trajectory_broad_type_known
-        description: "{{ doc('trajectory_broad_type_known') }}"
+      - name: trajectory_broad_known
+        description: "{{ doc('trajectory_broad_known') }}"
         data_type: utinyint
       - name: bunts
         description: "{{ doc('bunts') }}"

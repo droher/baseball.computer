@@ -31,13 +31,13 @@ models:
         description: ""
         data_type: varchar
       - name: division
-        description: ""
+        description: "{{ doc('division') }}"
         data_type: varchar
       - name: opponent_division
         description: ""
         data_type: varchar
       - name: team_name
-        description: ""
+        description: "{{ doc('team_name') }}"
         data_type: varchar
       - name: opponent_name
         description: ""

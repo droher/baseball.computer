@@ -41,7 +41,8 @@ final AS (
         baserunner,
         {% for stat in event_level_offense_stats() -%}
             COALESCE({{ stat }}, 0)::INT1 AS {{ stat }},
-        {% endfor %}
+        {% endfor %},
+        hits + walks + hit_by_pitches - grounded_into_double_plays)
     FROM unioned
 )
 

@@ -4,9 +4,9 @@ WITH overall_rates AS (
         team_id,
         COUNT(*) AS total_singles,
         COUNT_IF(batted_location_known)/total_singles AS total_singles_location_rate,
-        COUNT_IF(trajectory_broad_type_known)/total_singles AS total_singles_trajectory_rate,
-        COUNT_IF(trajectory_ground_ball)/COUNT_IF(trajectory_broad_type_known) AS total_ground_ball_rate,
-        COUNT_IF(trajectory_line_drive)/COUNT_IF(trajectory_broad_type_air_ball) AS total_line_drive_rate,
+        COUNT_IF(trajectory_broad_known)/total_singles AS total_singles_trajectory_rate,
+        COUNT_IF(trajectory_ground_ball)/COUNT_IF(trajectory_broad_known) AS total_ground_ball_rate,
+        COUNT_IF(trajectory_line_drive)/COUNT_IF(trajectory_broad_air_ball) AS total_line_drive_rate,
     FROM {{ ref('event_offense_stats') }} e
     WHERE singles = 1
         AND bunts = 0
@@ -21,9 +21,9 @@ final AS (
         o.team_id,
         COUNT(*) AS hits_in_play,
         COUNT_IF(batted_location_known)/hits_in_play AS hits_location_rate,
-        COUNT_IF(trajectory_broad_type_known)/hits_in_play AS hits_trajectory_rate,
-        COUNT_IF(trajectory_ground_ball)/COUNT_IF(trajectory_broad_type_known) AS ground_ball_rate,
-        COUNT_IF(trajectory_line_drive)/COUNT_IF(trajectory_broad_type_air_ball) AS line_drive_rate,
+        COUNT_IF(trajectory_broad_known)/hits_in_play AS hits_trajectory_rate,
+        COUNT_IF(trajectory_ground_ball)/COUNT_IF(trajectory_broad_known) AS ground_ball_rate,
+        COUNT_IF(trajectory_line_drive)/COUNT_IF(trajectory_broad_air_ball) AS line_drive_rate,
         hits_location_rate - ANY_VALUE(total_singles_location_rate) AS location_rate_diff,
         hits_trajectory_rate - ANY_VALUE(total_singles_trajectory_rate) AS trajectory_rate_diff,
         ground_ball_rate - ANY_VALUE(total_ground_ball_rate) AS ground_ball_rate_diff,

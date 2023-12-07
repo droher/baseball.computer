@@ -40,7 +40,7 @@ models:
         description: "{{ doc('league') }}"
         data_type: varchar
       - name: division
-        description: ""
+        description: "{{ doc('division') }}"
         data_type: varchar
       - name: opponent_league
         description: ""

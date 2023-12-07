@@ -190,27 +190,27 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     `calc_batted_ball_type` for the deduction logic.
 {% enddocs %}
 
-{% docs trajectory_broad_type_air_ball %}
+{% docs trajectory_broad_air_ball %}
     Number of plate appearances that ended in an air ball (a fly ball, line drive, or pop-up).
     Because it is much easier to deduce that a ball was hit in the air than it is to deduce the exact
     trajectory, this number field is more reliably populated than any of its three consituent parts.
 {% enddocs %}
 
-{% docs trajectory_broad_type_ground_ball %}
+{% docs trajectory_broad_ground_ball %}
     Same as `trajectory_ground_ball`.
 {% enddocs %}
 
-{% docs trajectory_broad_type_unknown %}
+{% docs trajectory_broad_unknown %}
     Number of plate appearances ending in a batted ball whose trajectory was not recorded and cannot
     be reliably deduced from context, even to the extent of knowing whether it was a ground ball or an air ball.
     This will include a disproportionate number of hits, which are more likely to be missing trajectory data
     and harder to make deductions about.
 {% enddocs %}
 
-{% docs trajectory_broad_type_known %}
+{% docs trajectory_broad_known %}
     Number of plate appearances ending in a batted ball whose ground/air status was recorded or
-    reliably deduced from the context. This is the sum of `trajectory_broad_type_air_ball` and
-    `trajectory_broad_type_ground_ball`. Outs in play have excellent coverage historically here,
+    reliably deduced from the context. This is the sum of `trajectory_broad_air_ball` and
+    `trajectory_broad_ground_ball`. Outs in play have excellent coverage historically here,
     even for older games.
 {% enddocs %}
 

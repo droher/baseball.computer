@@ -16,14 +16,14 @@ WITH batted_ball AS (
             WHEN COALESCE(trajectory, 'Unknown') = 'Unknown' THEN 1 ELSE 0
         END::UTINYINT AS trajectory_unknown,
         (1 - trajectory_unknown)::UTINYINT AS trajectory_known,
-        CASE WHEN trajectory_broad_classification = 'AirBall' THEN 1 ELSE 0 END::UTINYINT AS trajectory_broad_type_air_ball,
+        CASE WHEN trajectory_broad_classification = 'AirBall' THEN 1 ELSE 0 END::UTINYINT AS trajectory_broad_air_ball,
         CASE
             WHEN trajectory_broad_classification = 'GroundBall' THEN 1 ELSE 0
-        END::UTINYINT AS trajectory_broad_type_ground_ball,
+        END::UTINYINT AS trajectory_broad_ground_ball,
         CASE
             WHEN COALESCE(trajectory_broad_classification, 'Unknown') = 'Unknown' THEN 1 ELSE 0
-        END::UTINYINT AS trajectory_broad_type_unknown,
-        (1 - trajectory_broad_type_unknown)::UTINYINT AS trajectory_broad_type_known,
+        END::UTINYINT AS trajectory_broad_unknown,
+        (1 - trajectory_broad_unknown)::UTINYINT AS trajectory_broad_known,
         CASE WHEN trajectory_broad_classification = 'Bunt' THEN 1 ELSE 0 END::UTINYINT AS bunts,
         -- Distances,
         CASE WHEN location_depth = 'Plate' THEN 1 ELSE 0 END::UTINYINT AS batted_distance_plate,

@@ -28,89 +28,96 @@ models:
         description: "{{ doc('league') }}"
         data_type: varchar
       - name: division
-        description: ""
+        description: "{{ doc('division') }}"
         data_type: varchar
       - name: team_id
         description: "{{ doc('team_id') }}"
         data_type: team_id
       - name: team_name
-        description: ""
+        description: "{{ doc('team_name') }}"
         data_type: varchar
       - name: wins
-        description: "{{ doc('wins') }}"
+        description: "Number of games won by the team to date."
         data_type: hugeint
       - name: losses
-        description: "{{ doc('losses') }}"
+        description: "Number of games lost by the team to date."
         data_type: hugeint
       - name: win_percentage
-        description: ""
+        description: "Percentage of games won by the team to date."
         data_type: double
       - name: games_behind
-        description: ""
+        description: "Number of games the team is behind the division leader to date."
         data_type: double
       - name: pythagorean_win_percentage
-        description: ""
+        description: "Expected winning percentage based on runs scored and runs allowed
+          to date."
         data_type: double
       - name: average_run_differential
-        description: ""
+        description: "Average per-game difference in runs scored and runs allowed."
         data_type: double
       - name: win_streak_length
-        description: ""
+        description: "Number of consecutive games won by the team to date."
         data_type: bigint
       - name: loss_streak_length
-        description: ""
+        description: "Number of consecutive games lost by the team to date."
         data_type: bigint
       - name: runs_scored
-        description: ""
+        description: "Number of runs scored by the team to date."
         data_type: hugeint
       - name: runs_allowed
-        description: ""
+        description: "Number of runs allowed by the team to date."
         data_type: hugeint
       - name: home_wins
-        description: ""
+        description: "Number of games won by the team at home to date."
         data_type: hugeint
       - name: home_losses
-        description: ""
+        description: "Number of games lost by the team at home to date."
         data_type: hugeint
       - name: away_wins
-        description: ""
+        description: "Number of games won by the team on the road to date."
         data_type: hugeint
       - name: away_losses
-        description: ""
+        description: "Number of games lost by the team on the road to date."
         data_type: hugeint
       - name: interleague_wins
-        description: ""
+        description: "Number of games won by the team in interleague play to date."
         data_type: hugeint
       - name: interleague_losses
-        description: ""
+        description: "Number of games lost by the team in interleague play to date."
         data_type: hugeint
       - name: east_wins
-        description: ""
+        description: "Number of games won by the team against eastern division opponents
+          within their league to date."
         data_type: hugeint
       - name: east_losses
-        description: ""
+        description: "Number of games lost by the team against eastern division opponents
+          within their league to date."
         data_type: hugeint
       - name: central_wins
-        description: ""
+        description: "Number of games won by the team against central division opponents
+          within their league to date."
         data_type: hugeint
       - name: central_losses
-        description: ""
+        description: "Number of games lost by the team against central division opponents
+          within their league to date."
         data_type: hugeint
       - name: west_wins
-        description: ""
+        description: "Number of games won by the team against western division opponents
+          within their league to date."
         data_type: hugeint
       - name: west_losses
-        description: ""
+        description: "Number of games lost by the team against western division opponents
+          within their league to date."
         data_type: hugeint
       - name: one_run_wins
-        description: ""
+        description: "Number of games won by the team by one run to date."
         data_type: hugeint
       - name: one_run_losses
-        description: ""
+        description: "Number of games lost by the team by one run to date."
         data_type: hugeint
       - name: last_10_wins
-        description: ""
+        description: "Number of games won by the team in their last 10 games."
         data_type: hugeint
       - name: last_10_losses
-        description: ""
+        description: "Number of games lost by the team in their last 10 games."
         data_type: hugeint

@@ -23,7 +23,7 @@ WITH final AS (
         SUM((batted_to_fielder = 7)::int * hits) / SUM(fielded_by_outfielder * hits) AS known_fielded_by_left_fielder_rate,
         SUM((batted_to_fielder = 8)::int * hits) / SUM(fielded_by_outfielder * hits) AS known_fielded_by_center_fielder_rate,
         SUM((batted_to_fielder = 9)::int * hits) / SUM(fielded_by_outfielder * hits) AS known_fielded_by_right_fielder_rate,
-        SUM(trajectory_ground_ball * batted_location_known * fielded_by_outfielder * hits) / SUM(trajectory_broad_type_known * batted_location_known * fielded_by_outfielder * hits) AS outfield_hit_ground_ball_rate,
+        SUM(trajectory_ground_ball * batted_location_known * fielded_by_outfielder * hits) / SUM(trajectory_broad_known * batted_location_known * fielded_by_outfielder * hits) AS outfield_hit_ground_ball_rate,
         SUM(batted_balls_pulled * batted_location_known * hits) / SUM(batted_location_known * hits) AS known_location_pulled_rate,
         SUM(batted_balls_opposite_field * batted_location_known * hits) / SUM(batted_location_known * hits) AS known_location_opposite_field_rate,
         SUM(batted_distance_outfield * fielded_by_unknown * hits) / SUM(batted_distance_known * fielded_by_unknown * hits) AS unknown_fielder_hit_in_outfield_rate,
