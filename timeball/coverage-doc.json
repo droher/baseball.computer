@@ -285,7 +285,7 @@
           "coverage": 0.0
         },
         {
-          "name": "trajectory_pop_fly_park_factor",
+          "name": "trajectory_pop_up_park_factor",
           "covered": 0,
           "total": 1,
           "coverage": 0.0
@@ -935,7 +935,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -2111,7 +2111,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -3253,7 +3253,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -6099,7 +6099,7 @@
           "coverage": 0.0
         },
         {
-          "name": "trajectory_pop_fly_park_factor",
+          "name": "trajectory_pop_up_park_factor",
           "covered": 0,
           "total": 1,
           "coverage": 0.0
@@ -6753,7 +6753,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -7613,7 +7613,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -8825,7 +8825,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -9833,7 +9833,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0
@@ -10657,7 +10657,7 @@
           "coverage": 1.0
         },
         {
-          "name": "trajectory_pop_fly",
+          "name": "trajectory_pop_up",
           "covered": 1,
           "total": 1,
           "coverage": 1.0

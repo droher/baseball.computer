@@ -166,9 +166,9 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     as line drives are by far the most likely type of batted ball to result in a hit (even when they are not hit very hard).
 {% enddocs %}
 
-{% docs trajectory_pop_fly %}
-    (sometimes PU)  Number of plate appearances that ended in a pop fly, also called a pop-up.
-    Pop flies are distinguished from fly balls in that they are hit at a higher angle, tend to be
+{% docs trajectory_pop_up %}
+    (sometimes PU)  Number of plate appearances that ended in a pop-up, also called a pop fly.
+    Pop-ups are distinguished from fly balls in that they are hit at a higher angle, tend to be
     hit with less exit velocity, and (as a result) end up in the infield or shallow outfield. Before
     Statcast-era standardization, the distinction between a fly ball and a pop-up was a matter of
     scorerkeeper judgement, and many unofficial scorekeepers did not distinguish between the two.
@@ -428,7 +428,7 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 {% enddocs %}
 
 {% docs picked_off %}
-    (PO) Number of times a runner was picked off.
+    (PO, at risk of confusion with putouts) Number of times a runner was picked off.
 {% enddocs %}
 
 {% docs picked_off_first %}
@@ -735,7 +735,7 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     earned or unearned, regardless of how long the game lasted. Note the subtle difference between the
     definition of a shutout and a complete game: it is possible to pitch a shutout without a complete game
     if the pitcher enters in relief when no outs have been recorded. AFAIK, the only reason this distinction
-    exists is for us to remember the time that Babe Ruth walked a batter, yelled at the umpire,
+    exists is for us to remember the time that Babe Ruth started a game, walked a batter, yelled at the umpire,
     got ejected, punched the umpire, and then Ernie Shore came in and retired every batter he faced,
     which is good enough for me.
 {% enddocs %}
@@ -806,6 +806,7 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     In modern baseball rules, each out in the game is credited as a putout, and at the play/event
     level this will always be the case. However, in older games for which we only have box score or season-level
     data, rare plays like baserunner interference may not be assigned to a specific fielder.
+    
     Every play-by-play out has a putout, but the fielder who gets the putout may be unknown.
 {% enddocs %}
 

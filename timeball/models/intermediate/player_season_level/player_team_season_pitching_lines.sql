@@ -46,7 +46,7 @@ retrosheet AS (
         stats.team_id,
         stats.player_id,
         games.game_type,
-        COUNT(*) AS games,
+        COUNT(*)::INT AS games,
         {% for stat in event_level_pitching_stats() + game_level_pitching_stats() -%}
             SUM({{ stat }})::INT AS {{ stat }},
         {% endfor %}

@@ -132,8 +132,8 @@ models:
       - name: trajectory_line_drive
         description: "{{ doc('trajectory_line_drive') }}"
         data_type: tinyint
-      - name: trajectory_pop_fly
-        description: "{{ doc('trajectory_pop_fly') }}"
+      - name: trajectory_pop_up
+        description: "{{ doc('trajectory_pop_up') }}"
         data_type: tinyint
       - name: trajectory_unknown
         description: "{{ doc('trajectory_unknown') }}"

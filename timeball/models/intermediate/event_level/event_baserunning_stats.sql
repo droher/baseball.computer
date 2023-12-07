@@ -53,6 +53,13 @@ WITH joined AS (
                 THEN e.base_state = 7
             ELSE TRUE
         END AS is_force_on_runner,
+        CASE WHEN e.plate_appearance_result = 'Single'
+                THEN b.baserunner IN ('First', 'Second')
+            WHEN e.plate_appearance_result = 'Double'
+                THEN b.baserunner = 'First'
+            ELSE FALSE
+        END AS is_extra_base_chance,
+
     FROM {{ ref('stg_event_baserunners') }} AS b
     LEFT JOIN {{ ref('stg_events') }} AS e USING (event_key)
     LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS part
@@ -92,7 +99,8 @@ final AS (
         (caught_stealing > 0 AND baserunner = 'First')::UTINYINT AS caught_stealing_second,
         (caught_stealing > 0 AND baserunner = 'Second')::UTINYINT AS caught_stealing_third,
         (caught_stealing > 0 AND baserunner = 'Third')::UTINYINT AS caught_stealing_home,
-        (stolen_bases + caught_stealing > 0 
+        (
+            stolen_bases + caught_stealing > 0
             OR is_next_base_empty AND is_on_base
         )::UTINYINT AS stolen_base_opportunities,
         (stolen_base_opportunities > 0 AND baserunner = 'First')::UTINYINT AS stolen_base_opportunities_second,
@@ -125,7 +133,7 @@ final AS (
                 THEN batter_total_bases
             ELSE 0
         END::UTINYINT AS batter_total_bases_while_on_base,
-        CASE WHEN is_in_play AND number_base_to - number_base_from > batter_total_bases
+        CASE WHEN is_hit AND number_base_to - number_base_from > batter_total_bases
                 THEN 1
             ELSE 0
         END::UTINYINT AS extra_base_advance_attempts,
@@ -159,6 +167,9 @@ final AS (
                 OR is_hit
             )
         )::UTINYINT AS unforced_outs_on_basepaths,
+
+        (is_extra_base_chance)::UTINYINT AS extra_base_chances,
+        (is_extra_base_chance AND extra_base_advance_attempts > 0 AND is_successful)::UTINYINT AS extra_bases_taken,
 
     FROM joined
 )

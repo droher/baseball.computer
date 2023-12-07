@@ -8,7 +8,7 @@ WITH t AS (SELECT
     SUM(trajectory_ground_ball)/SUM(trajectory_known) AS gb_rate,
     SUM(trajectory_broad_air_ball)/SUM(trajectory_known) AS air_ball_rate,
     SUM(trajectory_line_drive)/SUM(trajectory_broad_air_ball) AS ld_rate,
-    SUM(trajectory_pop_fly)/SUM(trajectory_broad_air_ball) AS pu_rate,
+    SUM(trajectory_pop_up)/SUM(trajectory_broad_air_ball) AS pu_rate,
     SUM(home_runs)/SUM(trajectory_broad_air_ball) AS hr_rate,
     k_rate / bb_rate AS kbb,
     SUM(trajectory_ground_ball * batted_balls_pulled)/gb AS pulled_gb,

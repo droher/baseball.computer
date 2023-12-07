@@ -5,7 +5,7 @@
 }}
 {% set stats = ["plate_appearances", "singles", "doubles", "triples", 
                 "home_runs", "strikeouts", "walks", "batting_outs", "runs", "balls_in_play",
-                "trajectory_fly_ball", "trajectory_ground_ball", "trajectory_line_drive", "trajectory_pop_fly",
+                "trajectory_fly_ball", "trajectory_ground_ball", "trajectory_line_drive", "trajectory_pop_up",
                 "trajectory_unknown", "batted_distance_infield", "batted_distance_outfield",
                 "batted_distance_unknown", "batted_angle_left", "batted_angle_right", "batted_angle_middle"] %}
 {% set rate_stats = stats[1:] %}
