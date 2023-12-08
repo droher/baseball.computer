@@ -417,3 +417,9 @@ models:
       - name: picked_off_third
         description: "{{ doc('picked_off_third') }}"
         data_type: USMALLINT
+      - name: extra_base_chances
+        description: ""
+        data_type: usmallint
+      - name: extra_bases_taken
+        description: ""
+        data_type: usmallint

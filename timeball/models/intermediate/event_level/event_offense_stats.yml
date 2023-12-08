@@ -426,3 +426,9 @@ models:
       - name: times_next_base_empty
         description: "{{ doc('times_next_base_empty') }}"
         data_type: tinyint
+      - name: extra_base_chances
+        description: ""
+        data_type: tinyint
+      - name: extra_bases_taken
+        description: ""
+        data_type: tinyint

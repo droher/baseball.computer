@@ -474,3 +474,9 @@ models:
       - name: perfect_games
         description: "{{ doc('perfect_games') }}"
         data_type: utinyint
+      - name: extra_base_chances
+        description: ""
+        data_type: utinyint
+      - name: extra_bases_taken
+        description: ""
+        data_type: utinyint
