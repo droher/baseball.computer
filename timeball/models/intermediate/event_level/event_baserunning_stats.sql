@@ -31,7 +31,7 @@ WITH joined AS (
         COALESCE(b.baserunning_play_type, 'None') AS baserunning_play_type,
         COALESCE(part.total_bases, 0)::UTINYINT AS batter_total_bases,
         CASE WHEN b.baserunner = 'Batter'
-                THEN e.base_state & 1 = 0 
+                THEN e.base_state & 1 = 0
             WHEN b.baserunner = 'First'
                 THEN e.base_state >> 1 & 1 = 0
             WHEN b.baserunner = 'Second'
