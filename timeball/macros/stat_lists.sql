@@ -188,7 +188,7 @@
     ]) }}
 {% endmacro %}
 
-{% macro fielding_stats %}
+{% macro fielding_stats() %}
 {{ return([
     "outs_played",
     "plate_apperances_in_field",

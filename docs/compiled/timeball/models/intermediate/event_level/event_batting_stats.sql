@@ -1,0 +1,76 @@
+
+WITH sacs AS (
+    -- TODO: Investigate single sac hit dedupe (BOS194606040-37)
+    SELECT DISTINCT event_key
+    FROM "timeball"."main_models"."stg_event_flags"
+    WHERE flag IN ('SacrificeFly', 'SacrificeHit')
+),
+
+final AS (
+    SELECT
+        pa.game_id,
+        pa.event_key,
+        CASE WHEN result_types.plate_appearance_result = 'StrikeOut'
+                THEN COALESCE(pa.strikeout_responsible_batter_id, pa.batter_id)
+            ELSE pa.batter_id
+        END AS batter_id,
+        CASE WHEN result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk')
+                THEN COALESCE(pa.walk_responsible_pitcher_id, pa.pitcher_id)
+            ELSE pa.pitcher_id
+        END AS pitcher_id,
+        pa.batting_team_id,
+        pa.fielding_team_id,
+        pa.batter_lineup_position,
+        1::UTINYINT AS plate_appearances,
+        (result_types.is_at_bat AND sacs.event_key IS NULL)::UTINYINT AS at_bats,
+        result_types.is_hit::UTINYINT AS hits,
+        (result_types.total_bases = 1)::UTINYINT AS singles,
+        (result_types.total_bases = 2)::UTINYINT AS doubles,
+        (result_types.total_bases = 3)::UTINYINT AS triples,
+        (result_types.total_bases = 4)::UTINYINT AS home_runs,
+        result_types.total_bases::UTINYINT AS total_bases,
+
+        CASE WHEN pa.batted_to_fielder BETWEEN 1 AND 6 THEN hits ELSE 0 END::UTINYINT AS infield_hits,
+
+        (result_types.plate_appearance_result = 'StrikeOut')::UTINYINT AS strikeouts,
+        (result_types.plate_appearance_result IN ('Walk', 'IntentionalWalk'))::UTINYINT AS walks,
+        (result_types.plate_appearance_result = 'IntentionalWalk')::UTINYINT AS intentional_walks,
+        (result_types.plate_appearance_result = 'HitByPitch')::UTINYINT AS hit_by_pitches,
+        (result_types.plate_appearance_result = 'SacrificeFly')::UTINYINT AS sacrifice_flies,
+        (result_types.plate_appearance_result = 'SacrificeHit')::UTINYINT AS sacrifice_hits,
+        (result_types.plate_appearance_result = 'ReachedOnError')::UTINYINT AS reached_on_errors,
+        (result_types.plate_appearance_result = 'Interference')::UTINYINT AS reached_on_interferences,
+        (result_types.plate_appearance_result = 'GroundRuleDouble')::UTINYINT AS ground_rule_doubles,
+        (result_types.plate_appearance_result = 'InsideTheParkHomeRun')::UTINYINT AS inside_the_park_home_runs,
+
+        result_types.is_on_base_opportunity::UTINYINT AS on_base_opportunities,
+        result_types.is_on_base_success::UTINYINT AS on_base_successes,
+        COALESCE(pa.runs_batted_in, 0)::UTINYINT AS runs_batted_in,
+        COALESCE(double_plays.is_ground_ball_double_play, 0)::UTINYINT AS grounded_into_double_plays,
+        COALESCE(double_plays.is_double_play, 0)::UTINYINT AS double_plays,
+        COALESCE(double_plays.is_triple_play, 0)::UTINYINT AS triple_plays,
+        -- The extra out from GIDPs is attributed to the batter,
+        -- but for other types of double plays, the other out
+        -- is considered to be a baserunning out (for now)
+        result_types.is_batting_out::UTINYINT + grounded_into_double_plays AS batting_outs,
+        pa.outs_on_play,
+        -- We're assuming that ROEs and similar plays do not count as stranding runners
+        -- Also require it to be an AB to leave out sac flies and bunts
+        CASE WHEN result_types.is_batting_out AND pa.outs_on_play > 0 AND result_types.is_at_bat
+                THEN pa.runners_count - pa.outs_on_play - pa.runs_on_play + 1
+            ELSE 0
+        END::UTINYINT AS left_on_base,
+        CASE WHEN pa.outs + pa.outs_on_play = 3
+                THEN left_on_base
+            ELSE 0
+        END::UTINYINT AS left_on_base_with_two_outs,
+
+    FROM "timeball"."main_models"."stg_events" AS pa
+    INNER JOIN "timeball"."main_seeds"."seed_plate_appearance_result_types" AS result_types
+        USING (plate_appearance_result)
+    LEFT JOIN "timeball"."main_models"."event_double_plays" AS double_plays USING (event_key)
+    LEFT JOIN sacs USING (event_key)
+    WHERE pa.plate_appearance_result IS NOT NULL
+)
+
+SELECT * FROM final
