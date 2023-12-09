@@ -35,11 +35,6 @@ models:
         data_type: varchar
         constraints:
           - type: not_null
-      - name: fielding_plays
-        description: "{{ doc('fielding_plays') }}"
-        data_type: utinyint
-        constraints:
-          - type: not_null
       - name: putouts
         description: "{{ doc('putouts') }}"
         data_type: utinyint
@@ -85,3 +80,6 @@ models:
         data_type: utinyint
         constraints:
           - type: not_null
+      - name: fielding_plays
+        description: ""
+        data_type: utinyint

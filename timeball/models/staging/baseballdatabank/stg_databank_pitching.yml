@@ -77,7 +77,7 @@ models:
         description: ""
         data_type: double
       - name: earned_run_average
-        description: ""
+        description: "{{ doc('earned_run_average') }}"
         data_type: double
       - name: intentional_walks
         description: "{{ doc('intentional_walks') }}"

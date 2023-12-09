@@ -414,3 +414,6 @@ models:
       - name: extra_bases_taken
         description: ""
         data_type: tinyint
+      - name: plate_appearances
+        description: "{{ doc('plate_appearances') }}"
+        data_type: tinyint

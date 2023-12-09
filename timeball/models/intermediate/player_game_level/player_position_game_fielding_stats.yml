@@ -124,3 +124,15 @@ models:
       - name: surplus_box_errors
         description: ""
         data_type: tinyint
+      - name: unknown_putouts_while_fielding
+        description: ""
+        data_type: utinyint
+      - name: pickoffs
+        description: ""
+        data_type: utinyint
+      - name: double_plays_started
+        description: ""
+        data_type: utinyint
+      - name: ground_ball_double_plays_started
+        description: ""
+        data_type: utinyint

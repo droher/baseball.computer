@@ -96,3 +96,24 @@ models:
       - name: games_right_field
         description: ""
         data_type: usmallint
+      - name: unknown_putouts_while_fielding
+        description: ""
+        data_type: usmallint
+      - name: assisted_putouts
+        description: "{{ doc('assisted_putouts') }}"
+        data_type: usmallint
+      - name: in_play_putouts
+        description: ""
+        data_type: usmallint
+      - name: in_play_assists
+        description: ""
+        data_type: usmallint
+      - name: pickoffs
+        description: ""
+        data_type: usmallint
+      - name: double_plays_started
+        description: ""
+        data_type: usmallint
+      - name: ground_ball_double_plays_started
+        description: ""
+        data_type: usmallint

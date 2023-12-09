@@ -1,0 +1,107 @@
+version: 2
+
+
+models:
+  - name: metrics_player_season_league_fielding
+    description: ""
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: &pk []
+
+    # meta:
+    #   primary_keys: *pk
+
+    columns:
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: outs_played
+        description: ""
+        data_type: integer
+      - name: plate_appearances_in_field
+        description: ""
+        data_type: integer
+      - name: plate_appearances_in_field_with_ball_in_play
+        description: ""
+        data_type: integer
+      - name: unknown_putouts_while_fielding
+        description: ""
+        data_type: integer
+      - name: balls_hit_to
+        description: ""
+        data_type: integer
+      - name: putouts
+        description: "{{ doc('putouts') }}"
+        data_type: integer
+      - name: assists
+        description: "{{ doc('assists') }}"
+        data_type: integer
+      - name: errors
+        description: "{{ doc('errors') }}"
+        data_type: integer
+      - name: fielders_choices
+        description: "{{ doc('fielders_choices') }}"
+        data_type: integer
+      - name: assisted_putouts
+        description: "{{ doc('assisted_putouts') }}"
+        data_type: integer
+      - name: in_play_putouts
+        description: ""
+        data_type: integer
+      - name: in_play_assists
+        description: ""
+        data_type: integer
+      - name: reaching_errors
+        description: ""
+        data_type: integer
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: integer
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: integer
+      - name: pickoffs
+        description: ""
+        data_type: integer
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: integer
+      - name: double_plays
+        description: "{{ doc('double_plays') }}"
+        data_type: integer
+      - name: triple_plays
+        description: "{{ doc('triple_plays') }}"
+        data_type: integer
+      - name: ground_ball_double_plays
+        description: ""
+        data_type: integer
+      - name: double_plays_started
+        description: ""
+        data_type: integer
+      - name: ground_ball_double_plays_started
+        description: ""
+        data_type: integer
+      - name: fielding_percentage
+        description: ""
+        data_type: double
+      - name: range_factor
+        description: ""
+        data_type: double
+      - name: innings_played
+        description: ""
+        data_type: double
+      - name: event_coverage_rate
+        description: ""
+        data_type: double

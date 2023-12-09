@@ -106,7 +106,7 @@
             {{ key }},
         {%- endfor -%}
         {%- for col in filtered_cols %}
-            basic_stats.{{ col.name }},
+            basic_stats.{{ col.name }}::INT AS {{ col.name }},
         {%- endfor -%}
         {%- for col in basic_metric_dict %}
             basic_stats.{{ col }},
