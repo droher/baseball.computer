@@ -2,7 +2,7 @@ version: 2
 
 
 models:
-  - name: player_game_pitching_lines
+  - name: player_game_pitching_stats
     description: ""
 
 

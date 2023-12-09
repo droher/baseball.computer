@@ -9,28 +9,28 @@ WITH databank AS (
         bat.team_id,
         people.retrosheet_player_id AS player_id,
         'RegularSeason' AS game_type,
-        SUM(bat.games) AS games,
-        SUM(bat.at_bats) AS at_bats,
-        SUM(bat.runs) AS runs,
-        SUM(bat.hits) AS hits,
-        SUM(bat.doubles) AS doubles,
-        SUM(bat.triples) AS triples,
-        SUM(bat.home_runs) AS home_runs,
-        SUM(bat.runs_batted_in) AS runs_batted_in,
-        SUM(bat.stolen_bases) AS stolen_bases,
-        SUM(bat.caught_stealing) AS caught_stealing,
-        SUM(bat.walks) AS walks,
-        SUM(bat.strikeouts) AS strikeouts,
-        SUM(bat.intentional_walks) AS intentional_walks,
-        SUM(bat.hit_by_pitches) AS hit_by_pitches,
-        SUM(bat.sacrifice_hits) AS sacrifice_hits,
-        SUM(bat.sacrifice_flies) AS sacrifice_flies,
-        SUM(bat.grounded_into_double_plays) AS grounded_into_double_plays,
-        SUM(bat.singles) AS singles,
-        SUM(bat.total_bases) AS total_bases,
-        SUM(bat.plate_appearances) AS plate_appearances,
-        SUM(bat.on_base_opportunities) AS on_base_opportunities,
-        SUM(bat.on_base_successes) AS on_base_successes,
+        SUM(bat.games)::SMALLINT AS games,
+        SUM(bat.at_bats)::SMALLINT AS at_bats,
+        SUM(bat.runs)::SMALLINT AS runs,
+        SUM(bat.hits)::SMALLINT AS hits,
+        SUM(bat.doubles)::SMALLINT AS doubles,
+        SUM(bat.triples)::SMALLINT AS triples,
+        SUM(bat.home_runs)::SMALLINT AS home_runs,
+        SUM(bat.runs_batted_in)::SMALLINT AS runs_batted_in,
+        SUM(bat.stolen_bases)::SMALLINT AS stolen_bases,
+        SUM(bat.caught_stealing)::SMALLINT AS caught_stealing,
+        SUM(bat.walks)::SMALLINT AS walks,
+        SUM(bat.strikeouts)::SMALLINT AS strikeouts,
+        SUM(bat.intentional_walks)::SMALLINT AS intentional_walks,
+        SUM(bat.hit_by_pitches)::SMALLINT AS hit_by_pitches,
+        SUM(bat.sacrifice_hits)::SMALLINT AS sacrifice_hits,
+        SUM(bat.sacrifice_flies)::SMALLINT AS sacrifice_flies,
+        SUM(bat.grounded_into_double_plays)::SMALLINT AS grounded_into_double_plays,
+        SUM(bat.singles)::SMALLINT AS singles,
+        SUM(bat.total_bases)::SMALLINT AS total_bases,
+        SUM(bat.plate_appearances)::SMALLINT AS plate_appearances,
+        SUM(bat.on_base_opportunities)::SMALLINT AS on_base_opportunities,
+        SUM(bat.on_base_successes)::SMALLINT AS on_base_successes,
     FROM {{ ref('stg_databank_batting') }} AS bat
     INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
     WHERE bat.season NOT IN (SELECT DISTINCT season FROM {{ ref('stg_games') }})
@@ -42,10 +42,11 @@ databank_running AS (
         season,
         player_id,
         team_id,
-        SUM(stolen_bases) AS stolen_bases,
-        SUM(caught_stealing) AS caught_stealing,
+        SUM(stolen_bases)::SMALLINT AS stolen_bases,
+        SUM(caught_stealing)::SMALLINT AS caught_stealing,
     FROM {{ ref('stg_databank_batting') }}
     -- TODO: Add var to indicate final databank override year
+    WHERE season < 1920
     GROUP BY 1, 2, 3
 ),
 
@@ -57,10 +58,10 @@ retrosheet AS (
         games.game_type,
         COUNT(*) AS games,
         {% for stat in event_level_offense_stats() -%}
-            SUM({{ stat }}) AS {{ stat }},
+            SUM({{ stat }})::SMALLINT AS {{ stat }},
         {% endfor %}
     FROM {{ ref('stg_games') }} AS games
-    INNER JOIN {{ ref('player_game_offense_lines') }} AS stats USING (game_id)
+    INNER JOIN {{ ref('player_game_offense_stats') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
 ),
 

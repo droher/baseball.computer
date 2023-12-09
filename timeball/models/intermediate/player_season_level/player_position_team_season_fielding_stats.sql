@@ -77,7 +77,7 @@ game_agg AS (
         COUNT_IF(stats.fielding_position = 8)::USMALLINT AS games_center_field,
         COUNT_IF(stats.fielding_position = 9)::USMALLINT AS games_right_field,
     FROM {{ ref('stg_games') }} AS games
-    INNER JOIN {{ ref('player_position_game_fielding_lines') }} AS stats USING (game_id)
+    INNER JOIN {{ ref('player_position_game_fielding_stats') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4, 5
 ),
 

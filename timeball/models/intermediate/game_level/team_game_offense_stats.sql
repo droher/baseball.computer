@@ -11,7 +11,7 @@ WITH initial_sum AS (
             {% set dtype = "INT1" if stat.startswith("surplus") else "USMALLINT" %}
             SUM({{ stat }})::{{ dtype }} AS {{ stat }},
         {% endfor %}
-    FROM {{ ref('player_game_offense_lines') }}
+    FROM {{ ref('player_game_offense_stats') }}
     GROUP BY 1, 2
 ),
 

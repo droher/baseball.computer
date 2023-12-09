@@ -89,7 +89,7 @@ players AS (
         SUM(in_play_putouts)::UTINYINT AS in_play_putouts,
         SUM(in_play_assists)::UTINYINT AS in_play_assists,
         SUM(passed_balls)::UTINYINT AS passed_balls,
-    FROM {{ ref('player_position_game_fielding_lines') }}
+    FROM {{ ref('player_position_game_fielding_stats') }}
     GROUP BY 1, 2
 ),
 

@@ -29,7 +29,7 @@ databank AS (
         -- appear for catchers, not pitchers
         SUM(f.stolen_bases)::USMALLINT AS stolen_bases,
         SUM(f.caught_stealing)::USMALLINT AS caught_stealing,
-    FROM {{ ref('player_position_team_season_fielding_lines') }} AS f
+    FROM {{ ref('player_position_team_season_fielding_stats') }} AS f
     INNER JOIN game_agg USING (season, team_id)
     WHERE f.season NOT IN (SELECT DISTINCT season FROM {{ ref('game_start_info') }})
     GROUP BY 1, 2

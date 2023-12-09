@@ -1,18 +1,22 @@
-{% macro metric_table_generator(kind, grouping_keys, player_agg=True, regular_season_only=True) %}
+{% macro metric_table_generator(kind, grouping_keys, agg_type, regular_season_only=True) %}
+    {%- set player_agg = agg_type == "player" -%}
+    {%- if agg_type not in ("player", "team", "league") -%}
+        {{ exceptions.raise_compiler_error("Invalid agg_type - must be one of player, team, league. Got " ~ agg_type ) }}
+    {%- endif -%}
     {%- if kind == "offense" -%}
         {%- set event_model = "event_offense_stats" -%}
-        {%- set game_model = "player_game_offense_lines" if player_agg else "team_game_offense_stats" -%}
-        {%- set season_model = "player_team_season_offense_lines" if player_agg else "team_season_offense_stats" -%}
+        {%- set game_model = "player_game_offense_stats" if player_agg else "team_game_offense_stats" -%}
+        {%- set season_model = "player_team_season_offense_stats" if player_agg else "team_season_offense_stats" -%}
         {%- set basic_metric_dict = basic_rate_stats_offense() -%}
     {%- elif kind == "pitching" -%}
         {%- set event_model = "event_pitching_stats" -%}
-        {%- set game_model = "player_game_pitching_lines" if player_agg else "team_game_pitching_stats" -%}
-        {%- set season_model = "player_team_season_pitching_lines" if player_agg else "team_season_pitching_stats" -%}
+        {%- set game_model = "player_game_pitching_stats" if player_agg else "team_game_pitching_stats" -%}
+        {%- set season_model = "player_team_season_pitching_stats" if player_agg else "team_season_pitching_stats" -%}
         {%- set basic_metric_dict = basic_rate_stats_pitching() -%}
     {%- elif kind == "fielding" -%}
-        {%- set event_model = "event_player_fielding_lines" if player_agg else "event_fielding_stats"  -%}
-        {%- set game_model = "player_game_fielding_lines" if player_agg else "team_game_fielding_stats" -%}
-        {%- set season_model = "player_team_season_fielding_lines" if player_agg else "team_season_fielding_stats" -%}
+        {%- set event_model = "event_player_fielding_stats" if player_agg else "event_fielding_stats"  -%}
+        {%- set game_model = "player_game_fielding_stats" if player_agg else "team_game_fielding_stats" -%}
+        {%- set season_model = "player_team_season_fielding_stats" if player_agg else "team_season_fielding_stats" -%}
         {%- set basic_metric_dict = basic_rate_stats_fielding() -%}
     {%- else -%}
         {{ exceptions.raise_compiler_error("Invalid kind - must be one of offense, pitching, fielding. Got " ~ kind ) }}
@@ -34,7 +38,7 @@
     {%- endfor -%}
 
     -- Need to use the season table for basic stats/metrics to ensure full coverage...
-    WITH basic_stats AS (
+    basic_stats AS (
         SELECT
         {%- for key in grouping_keys %}
             {{ key }},

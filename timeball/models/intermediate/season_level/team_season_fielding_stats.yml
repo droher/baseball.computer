@@ -2,7 +2,7 @@ version: 2
 
 
 models:
-  - name: team_season_fielding_lines
+  - name: team_season_fielding_stats
     description: ""
 
 

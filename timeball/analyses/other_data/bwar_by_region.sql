@@ -49,7 +49,7 @@ t AS (
         MIN(season // 10 * 10) AS debut_decade,
         MAX(season) - ANY_VALUE(birth_year) AS retirement_age,
         SUM(CASE WHEN fielding_position = 1 THEN outs_played ELSE outs_played / 3 END) AS outs_played
-    FROM {{ ref('player_position_team_season_fielding_lines') }} f
+    FROM {{ ref('player_position_team_season_fielding_stats') }} f
     LEFT JOIN {{ ref('people') }} p USING (player_id)
     LEFT JOIN {{ ref('seed_us_states_regions') }} r ON r.state = p.birth_state
     LEFT JOIN {{ ref('seed_country_regions') }} c USING (birth_country)

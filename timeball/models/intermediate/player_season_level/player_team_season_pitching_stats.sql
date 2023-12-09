@@ -51,7 +51,7 @@ retrosheet AS (
             SUM({{ stat }})::INT AS {{ stat }},
         {% endfor %}
     FROM {{ ref('stg_games') }} AS games
-    INNER JOIN {{ ref('player_game_pitching_lines') }} AS stats USING (game_id)
+    INNER JOIN {{ ref('player_game_pitching_stats') }} AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
 ),
 

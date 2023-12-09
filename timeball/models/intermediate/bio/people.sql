@@ -8,9 +8,9 @@ WITH roster_files AS (
 ),
 
 box_files AS (
-      SELECT DISTINCT batter_id AS player_id FROM box_score.box_score_batting_lines
+      SELECT DISTINCT batter_id AS player_id FROM {{ ref('stg_box_score_batting_lines') }}
       UNION
-      SELECT DISTINCT fielder_id AS player_id FROM box_score.box_score_fielding_lines
+      SELECT DISTINCT fielder_id AS player_id FROM {{ ref('stg_box_score_fielding_lines') }}
 ),
 
 joined AS (

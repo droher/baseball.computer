@@ -2,7 +2,7 @@ version: 2
 
 
 models:
-  - name: player_position_game_fielding_lines
+  - name: player_position_game_fielding_stats
     description: ""
 
 

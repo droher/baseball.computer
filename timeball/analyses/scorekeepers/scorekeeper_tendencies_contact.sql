@@ -2,7 +2,7 @@ WITH final AS (
     SELECT
         cleaned_scorer AS scorer,
         substring(game_id, 4, 4)::int // 10 * 10 AS decade,
-        SUM(game_share) AS plays,
+        SUM(hits) AS n,
         SUM(trajectory_broad_known * hits) AS hits_trajectory_known,
         SUM(trajectory_broad_unknown * hits) AS hits_trajectory_unknown,
         hits_trajectory_known / COUNT_IF(hits) AS trajectory_known_hit_rate,

@@ -22,7 +22,7 @@ t AS (
         SUM(ABS(surplus_box_errors)) AS error_discrepancy,
         putout_discrepancy + assist_discrepancy + error_discrepancy AS total,
         ANY_VALUE(COALESCE(i.unknown_putouts, 0)) AS unknown_putouts
-    FROM {{ ref('player_position_game_fielding_lines') }}
+    FROM {{ ref('player_position_game_fielding_stats') }}
     LEFT JOIN incomplete_games i USING (game_id)
     GROUP BY 1, 2
     HAVING total > 0

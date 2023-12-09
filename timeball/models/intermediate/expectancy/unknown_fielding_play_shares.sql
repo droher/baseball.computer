@@ -33,7 +33,7 @@ team_totals AS (
         GREATEST(SUM(CASE WHEN fielding_position > 6 THEN surplus_box_putouts END), 0) AS surplus_of_putouts,
         GREATEST(SUM(CASE WHEN fielding_position < 6 THEN surplus_box_assists END), 0) AS surplus_if_assists,
         GREATEST(total_surplus_putouts - surplus_of_putouts - surplus_if_assists, 0) AS surplus_if_unassisted_putouts
-    FROM {{ ref('player_position_game_fielding_lines') }}
+    FROM {{ ref('player_position_game_fielding_stats') }}
     INNER JOIN incomplete_games USING (game_id, team_id)
     GROUP BY 1, 2
 ),
@@ -70,7 +70,7 @@ calc_shares AS (
             END, 0
         ) AS estimated_unknown_plays_assists,
         estimated_unknown_plays_putouts + estimated_unknown_plays_assists AS estimated_unknown_plays
-    FROM {{ ref('player_position_game_fielding_lines') }} AS p
+    FROM {{ ref('player_position_game_fielding_stats') }} AS p
     INNER JOIN team_totals AS t USING (game_id, team_id)
     INNER JOIN unassisted_putout_rates AS r USING (fielding_position)
     WINDOW w AS (PARTITION BY game_id, team_id)
