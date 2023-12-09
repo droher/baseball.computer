@@ -188,6 +188,36 @@
     ]) }}
 {% endmacro %}
 
+{% macro fielding_stats %}
+{{ return([
+    "outs_played",
+    "plate_apperances_in_field",
+    "plate_appearances_in_field_with_ball_in_play",
+    "putouts",
+    "assists",
+    "errors",
+    "fielders_choices",
+    "reaching_errors",
+    "double_plays",
+    "triple_plays",
+    "ground_ball_double_plays",
+    "passed_balls",
+    "balls_hit_to",
+    "stolen_bases",
+    "caught_stealing",
+    "games_left_field",
+    "games_center_field",
+    "games_right_field",
+    "unknown_putouts_while_fielding",
+    "assisted_putouts",
+    "in_play_putouts",
+    "in_play_assists",
+    "pickoffs",
+    "double_plays_started",
+    "ground_ball_double_plays_started",
+]) }}
+{% endmacro %}
+
 {% macro remove_items(my_list, values_to_remove) %}
   {% set new_list = [] %}
   {% for item in my_list if item not in values_to_remove %}

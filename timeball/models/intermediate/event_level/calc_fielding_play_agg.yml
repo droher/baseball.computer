@@ -80,6 +80,3 @@ models:
         data_type: utinyint
         constraints:
           - type: not_null
-      - name: fielding_plays
-        description: ""
-        data_type: utinyint

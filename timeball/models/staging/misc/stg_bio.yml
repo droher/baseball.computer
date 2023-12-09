@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: stg_bio
-    description: ""
-
+    description: |
+      Staging table for Retrosheet's `bio.csv` file, which contains basic demographic
+      information about players, managers, coaches, and umpires.
 
     config:
       contract:

@@ -461,6 +461,15 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     runner by default in those contexts.
 {% enddocs %}
 
+{% docs extra_base_chances %}
+    Number of hits where a runner on base had an opportunity to advance by a greater
+    number of bases than the batter.
+{% enddocs %}
+
+{% docs extra_bases_taken %}
+    Number of hits where a runner on base advanced by a greater number of bases than the batter.
+{% enddocs %}
+
 {% docs outs_avoided_on_errors %}
     Number of times that a baserunner would have been out, but an error allowed them to remain
     on the basepaths (either staying put or advancing).
@@ -865,4 +874,92 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 
 {% docs incomplete_events %}
     Number of events in which at least one known fielding play was made by an unknown fielder.
+{% enddocs %}
+
+{% docs outs_played %}
+    Total amount of time played in the field, expressed in the total
+    number of outs recorded while the fielder was playing. This has
+    close to 100% coverage for all years.
+{% enddocs %}
+
+{% docs plate_appearances_in_field %}
+    Total amount of time played in the field, expressed in the total
+    number of plate appearances that ended while the fielder was playing.
+    This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs plate_appearances_in_field_with_ball_in_play %}
+    Total number of plate appearances that ended in a ball in play while the fielder was playing.
+    This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs reaching_errors %}
+    Total number of errors made by a fielder that allowed the batter to reach base
+    when they would otherwise have been out. Only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs ground_ball_double_plays %}
+    Total number of ground ball double plays in which the fielder was involved.
+    This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs balls_hit_to %}
+    Total number of balls hit to the fielder, as determined by the `batted_to_fielder`
+    field in `stg_events`. This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs games_left_field %}
+    Total number of games in which the player appeared in left field. This is
+    an important distinction for years with only season-level player data, because
+    stats are only aggregated at the outfield level without distinguishing
+    between left, center, and right field.
+{% enddocs %}
+
+{% docs games_center_field %}
+    Total number of games in which the player appeared in center field. This is
+    an important distinction for years with only season-level player data, because
+    stats are only aggregated at the outfield level without distinguishing
+    between left, center, and right field.
+{% enddocs %}
+
+{% docs games_right_field %}
+    Total number of games in which the player appeared in right field. This is
+    an important distinction for years with only season-level player data, because
+    stats are only aggregated at the outfield level without distinguishing
+    between left, center, and right field.
+{% enddocs %}
+
+{% docs unknown_putouts_while_fielding %}
+    Total number of putouts that happened while a player was on the field in which
+    no data is available for which player made the putout. This is an especially important
+    number for years with relatively high unknown-fielder rates in their play-by-play data.
+    If this number is 0, then you can trust that all of the player's putouts are accounted for
+    at the event level (or that there's no event data at all). If the number is non-zero,
+    then player putout/assist data is only valid at the game level and higher.
+{% enddocs %}
+
+{% docs in_play_putouts %}
+    Total number of putouts made by the player on balls in play (as opposed to strikeouts
+    and other non-batted-ball outs). This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs in_play_assists %}
+    Total number of assists made by the player on balls in play (as opposed to strikeouts
+    and other non-batted-ball outs). This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs pickoffs %}
+    Total number of outs recorded by throwing over to a base either before (for pitchers)
+    or immediately after (for catchers) a pitch was was thrown. The pickoff is credited to the
+    player who makes the throw.
+{% enddocs %}
+
+{% docs double_plays_started %}
+    Number of double plays in which the fielder fielded the ball (and did not make an error).
+    This is only populated for games with play-by-play data.
+{% enddocs %}
+
+{% docs ground_ball_double_plays_started %}
+    Number of ground ball double plays in which the fielder fielded the ball
+    (and did not make an error). This is only populated for games with play-by-play data.
 {% enddocs %}

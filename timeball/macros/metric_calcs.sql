@@ -24,7 +24,7 @@
         "strikeouts_per_9_innings": "SUM(strikeouts) * 9 / SUM(outs_recorded * 3)",
         "home_runs_per_9_innings": "SUM(home_runs) * 9 / SUM(outs_recorded * 3)",
         "hits_per_9_innings": "SUM(hits) * 9 / SUM(outs_recorded * 3)",
-        "walks_and_hits_per_inning_pitched": "(SUM(walks) + SUM(hits)) / SUM(outs_recorded * 3)",
+        "walks_and_hits_per_innings_pitched": "(SUM(walks) + SUM(hits)) / SUM(outs_recorded * 3)",
         "strikeout_to_walk_ratio": "SUM(strikeouts) / SUM(walks)",
         "walk_rate": "SUM(walks) / SUM(batters_faced)",
         "strikeout_rate": "SUM(strikeouts) / SUM(batters_faced)",

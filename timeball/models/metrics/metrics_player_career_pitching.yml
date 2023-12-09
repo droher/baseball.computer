@@ -426,7 +426,7 @@ models:
       - name: hits_per_9_innings
         description: "{{ doc('hits_per_9_innings') }}"
         data_type: double
-      - name: walks_and_hits_per_inning_pitched
+      - name: walks_and_hits_per_innings_pitched
         description: ""
         data_type: double
       - name: strikeout_to_walk_ratio
