@@ -1,0 +1,17 @@
+version: 2
+seeds:
+  - name: seed_country_regions
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: birth_country
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: country_region
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null

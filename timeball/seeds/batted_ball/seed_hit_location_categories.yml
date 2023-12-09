@@ -1,0 +1,32 @@
+version: 2
+seeds:
+  - name: seed_hit_location_categories
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: batted_location_general
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: category_depth
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: category_side
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: category_edge
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: is_mid_position
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null

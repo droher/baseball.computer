@@ -1,0 +1,18 @@
+version: 2
+seeds:
+  - name: seed_bases_info
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: base
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: numeric_value
+        description: ''
+        data_type: integer
+        constraints:
+          - type: unique
+          - type: not_null

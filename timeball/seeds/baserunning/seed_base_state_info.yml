@@ -1,0 +1,51 @@
+version: 2
+seeds:
+  - name: seed_base_state_info
+    config:
+      contracts:
+        enforced: true
+      column_types:
+        base_state_string: varchar
+  
+    columns:
+      - name: base_state
+        description: ''
+        data_type: integer
+        constraints:
+          - type: primary_key
+      - name: base_state_string
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: unique
+          - type: not_null
+      - name: is_runner_on_first
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_runner_on_second
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_runner_on_third
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_force_on_second
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_force_on_third
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_force_on_home
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null

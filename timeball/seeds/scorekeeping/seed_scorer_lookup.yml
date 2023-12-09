@@ -1,0 +1,17 @@
+version: 2
+seeds:
+  - name: seed_scorer_lookup
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: scorer
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: normalized_scorer
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null

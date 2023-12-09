@@ -1,0 +1,28 @@
+version: 2
+seeds:
+  - name: seed_baserunning_play_types
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: baserunning_play_type
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: result_category_out
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: result_category_safe
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: priority
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
+          - type: unique

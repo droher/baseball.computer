@@ -1,0 +1,27 @@
+version: 2
+seeds:
+  - name: seed_hit_location_angles
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: general_location
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: angle
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: theta_start
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: theta_end
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null

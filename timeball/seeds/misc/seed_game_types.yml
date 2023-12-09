@@ -1,0 +1,22 @@
+version: 2
+seeds:
+  - name: seed_game_types
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: game_type
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: is_regular_season
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_postseason
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null

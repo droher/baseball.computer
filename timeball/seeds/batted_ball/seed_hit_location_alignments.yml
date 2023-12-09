@@ -1,0 +1,27 @@
+version: 2
+seeds:
+  - name: seed_hit_location_alignments
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: infield_location
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: infield_angle
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: outfield_location
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: outfield_angle
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null

@@ -1,0 +1,22 @@
+version: 2
+seeds:
+  - name: seed_scorer_numerical_ranges
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: start
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: end
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: group_id
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
