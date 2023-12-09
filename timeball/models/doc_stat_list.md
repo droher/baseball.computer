@@ -866,7 +866,3 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 {% docs incomplete_events %}
     Number of events in which at least one known fielding play was made by an unknown fielder.
 {% enddocs %}
-
-{% docs fielding_plays %}
-    The total number of fielding plays of any kind, as determined by the raw count from `stg_event_fielding_plays`.
-{% enddocs %}

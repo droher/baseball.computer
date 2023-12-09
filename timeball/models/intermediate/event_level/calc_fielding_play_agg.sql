@@ -36,7 +36,6 @@ final AS (
         event_key,
         fielding_position,
         ANY_VALUE(game_id) AS game_id,
-        COUNT(*)::UTINYINT AS fielding_plays,
         COUNT(*) FILTER (WHERE fielding_play = 'Putout')::UTINYINT AS putouts,
         -- A fielder can appear multiple times in one segment (on a rundown)
         -- but is only credited with one assist per putout

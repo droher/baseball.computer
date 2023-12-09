@@ -1,0 +1,1 @@
+{{  metric_table_generator("offense", ["team_id", "season"], agg_type="player", regular_season_only=True)  }}

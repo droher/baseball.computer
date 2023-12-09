@@ -22,7 +22,6 @@ WITH final AS (
         e.plate_appearances_in_field_with_ball_in_play,
         e.unknown_putouts AS unknown_putouts_while_fielding,
         CASE WHEN e.batted_to_fielder = p.fielding_position THEN 1 ELSE 0 END::UTINYINT AS balls_hit_to,
-        COALESCE(fp.fielding_plays, 0)::UTINYINT AS fielding_plays,
         COALESCE(fp.putouts, 0)::UTINYINT AS putouts,
         COALESCE(fp.assists, 0)::UTINYINT AS assists,
         COALESCE(fp.errors, 0)::UTINYINT AS errors,

@@ -1,0 +1,1 @@
+{{  metric_table_generator("fielding", ["team_id", "season"], agg_type="player", regular_season_only=True)  }}

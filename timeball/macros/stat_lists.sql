@@ -138,7 +138,6 @@
 
 {% macro event_level_pitching_stats() %}
     {% set non_pitching_stats = [
-        "plate_appearances",
         "runs_batted_in",
         "plate_appearances_while_on_base",
         "balls_in_play_while_running",

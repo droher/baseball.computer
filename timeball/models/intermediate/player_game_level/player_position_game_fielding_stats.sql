@@ -45,6 +45,9 @@ event_agg AS (
         SUM(passed_balls)::UTINYINT AS passed_balls,
         SUM(balls_hit_to)::UTINYINT AS balls_hit_to,
         SUM(reaching_errors)::UTINYINT AS reaching_errors,
+        SUM(pickoffs)::UTINYINT AS pickoffs,
+        SUM(double_plays_started)::UTINYINT AS double_plays_started,
+        SUM(ground_ball_double_plays_started)::UTINYINT AS ground_ball_double_plays_started,
         SUM(unknown_putouts_while_fielding)::UTINYINT AS unknown_putouts_while_fielding
     FROM {{ ref('event_player_fielding_stats') }}
     GROUP BY 1, 2, 3
@@ -71,23 +74,23 @@ final AS (
         -- Otherwise, if there is there is a box score account with data for that field, use it
         -- If the box score account exists but is missing data for that particular field, leave it empty
         -- If there is an event account but no box score account, use events
-        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding = 0
                 THEN event_agg.putouts
             ELSE box_agg.putouts
         END::UTINYINT AS putouts,
-        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding = 0
                 THEN event_agg.assists
             ELSE box_agg.assists
         END::UTINYINT AS assists,
-        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding = 0
                 THEN event_agg.errors
             ELSE box_agg.errors
         END::UTINYINT AS errors,
-        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding = 0
                 THEN event_agg.double_plays
             ELSE box_agg.double_plays
         END::UTINYINT AS double_plays,
-        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding > 0
+        CASE WHEN box_agg.game_id IS NULL OR event_agg.unknown_putouts_while_fielding = 0
                 THEN event_agg.triple_plays
             ELSE box_agg.triple_plays
         END::UTINYINT AS triple_plays,
@@ -103,6 +106,10 @@ final AS (
         COALESCE(box_agg.passed_balls, event_agg.passed_balls)::UTINYINT AS passed_balls,
         event_agg.stolen_bases,
         event_agg.caught_stealing,
+        event_agg.unknown_putouts_while_fielding,
+        event_agg.pickoffs,
+        event_agg.double_plays_started,
+        event_agg.ground_ball_double_plays_started,
         (box_agg.putouts - event_agg.putouts)::TINYINT AS surplus_box_putouts,
         (box_agg.assists - event_agg.assists)::TINYINT AS surplus_box_assists,
         (box_agg.errors - event_agg.errors)::TINYINT AS surplus_box_errors,
