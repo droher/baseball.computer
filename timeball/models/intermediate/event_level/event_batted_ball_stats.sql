@@ -11,7 +11,7 @@ WITH batted_ball AS (
         CASE WHEN trajectory = 'Fly' THEN 1 ELSE 0 END::UTINYINT AS trajectory_fly_ball,
         CASE WHEN trajectory = 'GroundBall' THEN 1 ELSE 0 END::UTINYINT AS trajectory_ground_ball,
         CASE WHEN trajectory = 'LineDrive' THEN 1 ELSE 0 END::UTINYINT AS trajectory_line_drive,
-        CASE WHEN trajectory = 'PopFly' THEN 1 ELSE 0 END::UTINYINT AS trajectory_pop_up,
+        CASE WHEN trajectory = 'PopUp' THEN 1 ELSE 0 END::UTINYINT AS trajectory_pop_up,
         CASE
             WHEN COALESCE(trajectory, 'Unknown') = 'Unknown' THEN 1 ELSE 0
         END::UTINYINT AS trajectory_unknown,

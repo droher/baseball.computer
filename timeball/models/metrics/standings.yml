@@ -50,7 +50,12 @@ models:
         data_type: double
       - name: pythagorean_win_percentage
         description: "Expected winning percentage based on runs scored and runs allowed
-          to date."
+          to date. Invented by Bill James, pythagorean expectation is probably the most
+          fundamental sabermetric concept because of how clearly it connects the process
+          of scoring runs to the outcome of winning games. Ironically, 'pythagorean' ended
+          up applying much better as a descriptor of its centrality to the discipline than
+          it did as a means of describing the formula itself, which has nothing to do with
+          the Pythagorean theorem."
         data_type: double
       - name: average_run_differential
         description: "Average per-game difference in runs scored and runs allowed."

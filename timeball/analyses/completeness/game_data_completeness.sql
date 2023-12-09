@@ -16,7 +16,7 @@ fielding_credit AS (
         BOOL_AND(fc.has_fielder_assists) AS has_fielder_assists,
         BOOL_AND(fc.has_fielder_errors) AS has_fielder_errors,
     FROM {{ ref('stg_events') }} AS events
-    LEFT JOIN {{ ref('event_completeness_fielding_credit') }} AS fc USING (event_key)
+    {# LEFT JOIN {{ ref('event_completeness_fielding_credit') }} AS fc USING (event_key) #}
     GROUP BY 1
 ),
 
@@ -30,7 +30,7 @@ pitches AS (
         BOOL_AND(p.has_pitch_results) AS has_pitch_results,
         BOOL_AND(p.has_strike_types) AS has_pitch_strike_types,
     FROM {{ ref('stg_events') }} AS events
-    LEFT JOIN {{ ref('event_completeness_pitches') }} AS p USING (event_key)
+    {# LEFT JOIN {{ ref('event_completeness_pitches') }} AS p USING (event_key) #}
     GROUP BY 1
 ),
 

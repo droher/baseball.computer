@@ -24,7 +24,11 @@ renamed AS (
         start_time,
         doubleheader_status,
         time_of_day,
-        game_type,
+        -- TODO: Fix all-star games without game type in raw data
+        CASE WHEN REGEXP_FULL_MATCH(game_type, '\d{4}AS.EVE')
+                THEN 'AllStarGame'
+            ELSE game_type
+        END AS game_type,
         bat_first_side,
         sky,
         field_condition,

@@ -757,12 +757,14 @@ The descriptions for the official stats here are in part adapted from MLB's offi
 {% enddocs %}
 
 {% docs no_hitters %}
-    At an individual level, the number of games in which a pitcher was the only pitcher for their team and pitched a full-length game without allowing any hits. At a team level, the "only pitcher" requirement is dropped.
+    At an individual level, the number of games in which a pitcher was the only pitcher for their team and pitched a full-length game without allowing any hits.
+    At a team level, the "only pitcher" requirement is dropped.
 {% enddocs %}
 
 {% docs perfect_games %}
     Number of games in which a pitcher was the only pitcher for their team and pitched the entire game
     without allowing any baserunners. At a team level, the "only pitcher" requirement is dropped.
+    Generally considered the most impressive single-game pitching accomplishment.
 {% enddocs %}
 
 {% docs batters_faced %}
@@ -786,7 +788,8 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     This happens when a pitcher enters an inning which should have been over already because
     of an error and then the pitcher allows a run to score without the help of any additional
     errors. This is a rare occurrence and it might seem unnecessary to track,
-    but it is absolutely essential that we do so in order to preserve the space-time continuum.
+    but it is absolutely essential that we do so in order to preserve the space-time continuu-
+    T͕hę̊͆͜ yͪͣẽ̡̓̎a͇r͕͐͜͝ i͚̤̺̻̓̔͛s 20̮̿89̪̊ an̫̫̦̅͞ḏ̿ͩ E͔̰̠͑͡sͭͦt͙͑͝ẽ͒̐b͙́ͮa͙̰̰̠̐́͡nͯ͒͟ Y̪̘̑â̜ͬ̚͜͠ͅn̄́̉ h̔̆͜a͙̝̾̈́͑͟͡s̸͟ fu̦̮ͭ̏̆̍l̺͇͉̑͌̅̃l̝̏̈ͪ̿ͅy̲͇̒̓͋ͮ m̦̊ͣe̠̥ͥ͊ͧrg͇ͦ̀ẻ̹̜̟͓̱̙ḑ̱ wi͎̇th̛ͦͭ͘͡ t̨̝͂͢͝͞h̶̞̭̙͗͟e̢̡̯̊ ẁ̩̬̉o͉ͭŗ̧̑ͧͪͬ͠m̜͌.
 {% enddocs %}
 
 ---- Fielding -----

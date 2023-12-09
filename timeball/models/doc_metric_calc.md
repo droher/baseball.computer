@@ -1,8 +1,7 @@
-Doc blocks for each of these vars: ['batting_average', 'on_base_percentage', 'slugging_percentage', 'on_base_plus_slugging', 'isolated_power', 'secondary_average', 'batting_average_on_balls_in_play', 'home_run_rate', 'walk_rate', 'strikeout_rate', 'stolen_base_percentage', 'earned_run_average', 'run_average', 'walks_per_9', 'strikeouts_per_9', 'home_runs_per_9', 'hits_per_9', 'strikeout_to_walk_ratio', 'walk_rate', 'strikeout_rate', 'home_run_rate', 'batting_average_against', 'on_base_percentage_against', 'slugging_percentage_against', 'on_base_plus_slugging_against', 'batting_average_on_balls_in_play', 'known_trajectory_rate_outs', 'known_trajectory_rate_hits', 'known_trajectory_rate', 'known_trajectory_broad_rate_outs', 'known_trajectory_broad_rate_hits', 'known_trajectory_broad_rate', 'known_trajectory_out_hit_ratio', 'known_trajectory_broad_out_hit_ratio', 'air_ball_rate_outs', 'ground_ball_rate_outs', 'ground_air_out_ratio', 'air_ball_hit_rate', 'ground_ball_hit_rate', 'ground_air_hit_ratio', 'fly_ball_rate', 'line_drive_rate', 'pop_up_rate', 'ground_ball_rate', 'coverage_weighted_air_ball_batting_average', 'coverage_weighted_ground_ball_batting_average', 'coverage_weighted_fly_ball_batting_average', 'coverage_weighted_line_drive_batting_average', 'coverage_weighted_pop_up_batting_average', 'known_angle_rate_outs', 'known_angle_rate_hits', 'known_angle_rate', 'known_angle_out_hit_ratio', 'angle_left_rate_outs', 'angle_left_rate_hits', 'angle_left_rate', 'coverage_weighted_angle_left_batting_average', 'angle_right_rate_outs', 'angle_right_rate_hits', 'angle_right_rate', 'coverage_weighted_angle_right_batting_average', 'angle_middle_rate_outs', 'angle_middle_rate_hits', 'angle_middle_rate', 'coverage_weighted_angle_middle_batting_average', 'pulled_rate_outs', 'pulled_rate_hits', 'pulled_rate', 'coverage_weighted_pulled_batting_average', 'opposite_field_rate_outs', 'opposite_field_rate_hits', 'opposite_field_rate', 'coverage_weighted_opposite_field_batting_average', 'stolen_base_attempt_rate_second', 'stolen_base_attempt_rate_third', 'stolen_base_attempt_rate_home', 'unforced_out_rate', 'pitch_strike_rate', 'pitch_contact_rate', 'pitch_swing_rate', 'pitch_ball_rate', 'pitch_swing_and_miss_rate', 'pitch_foul_rate', 'pitched_called_strike_rate', 'pitch_data_coverage_rate']
-
 {% docs batting_average %}
     (AVG, BA) Hits divided by at bats. Historically speaking, the single most well-known hitting statistic.
-    It retains much of its popularity and cultural significance today, if not its importance.
+    It retains much of its popularity and cultural significance today, if not its importance: the
+    "batting title" goes to the player with the highest batting average.
     While batting average is rightly maligned for the limited picture it captures of a player's offensive
     contribution, it's still a nice object of study when learning about statistical inference.
 {% enddocs %}
@@ -53,6 +52,9 @@ Doc blocks for each of these vars: ['batting_average', 'on_base_percentage', 'sl
     their ability to beat out grounders for infield hits, and generally have more control over the quality of contact they
     make. BABIP can also be misleading for hitters because it excludes home runs, so Barry Bonds ends up having a lower BABIP
     even though there were occasional eyewitness reports of his making solid contact.
+
+    BABIP was invented by Voros McCracken around the turn of the millenium, and it remains the most prominent
+    example of a statistic that tracks player luck as opposed to skill or performance.
 {% enddocs %}
 
 {% docs home_run_rate %}
@@ -88,38 +90,38 @@ Doc blocks for each of these vars: ['batting_average', 'on_base_percentage', 'sl
     starting point for some implementations of WAR (such as Baseball Reference's).
 {% enddocs %}
 
-{% docs walks_per_9 %}
-    Walks allowed by the pitcher per nine innings. Probably the statistic most 
+{% docs walks_per_9_innings %}
+    (BB/9) Walks allowed by the pitcher per nine innings. Probably the statistic most 
     frequently used to describe a pitcher's control. One of the three main "peripheral"
     stats that describe a pitcher's performance on outcomes over which they have the most control.
 {% enddocs %}
 
-{% docs strikeouts_per_9 %}
-    Strikeouts recorded by the pitcher per nine innings. One of the three main "peripheral"
+{% docs strikeouts_per_9_innings %}
+    (K/9) Strikeouts recorded by the pitcher per nine innings. One of the three main "peripheral"
     stats that describe a pitcher's performance on outcomes over which they have the most control.
 {% enddocs %}
 
-{% docs home_runs_per_9 %}
-    Home runs allowed by the pitcher per nine innings. One of the three main "peripheral"
+{% docs home_runs_per_9_innings %}
+    (HR/9) Home runs allowed by the pitcher per nine innings. One of the three main "peripheral"
     stats that describe a pitcher's performance on outcomes over which they have the most control,
     although the lower frequency of home runs gives it a much higher relative variance than the other two.
 {% enddocs %}
 
-{% docs hits_per_9 %}
-    Hits allowed by the pitcher per nine innings.
+{% docs hits_per_9_innings %}
+    (H/9) Hits allowed by the pitcher per nine innings.
 {% enddocs %}
 
 {% docs walks_and_hits_per_innings_pitched %}
     (WHIP) Describes the rate at which pitchers allow baserunners. It is calculated as (BB + H)/IP.
 {% enddocs %}
 
-
 {% docs strikeout_to_walk_ratio %}
     (K/BB) Ratio of strikeouts to walks, almost always appearing as a pitching statistic even though it
-    can be expressed for hitters. A simple and useful way to describe pitching performance
-    on non-at-bat outcomes. Also a bit more robust when comparing across eras than most
+    can also be expressed for hitters. A simple and useful way to describe pitching performance
+    on non-at-bat outcomes. Also a bit more robust when comparing across time periods than most
     unadjusted strikeout-related statistics. Leaders in this stat tend to be a mix
-    of the most dominant pitchers in the league and contact-oriented control freaks.
+    of the most dominant pitchers in the league and contact-oriented control freaks,
+    e.g. Pedro Martinez and Phil Hughes (respectively or not, who's to say).
 {% enddocs %}
 
 {% docs batting_average_against %}

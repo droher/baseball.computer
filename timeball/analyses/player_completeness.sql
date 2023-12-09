@@ -12,6 +12,6 @@ SELECT
     COUNT_IF(has_pitches) AS pitches,
     COUNT_IF(has_pitch_results) AS pitch_results,
     COUNT_IF(has_pitch_strike_types) AS pitch_strike_types
-FROM {{ ref('player_game_data_completeness') }}
+{# FROM {{ ref('player_game_data_completeness') }} #}
 GROUP BY 1, 2
 ORDER BY total_games DESC

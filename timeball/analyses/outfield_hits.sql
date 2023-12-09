@@ -6,7 +6,7 @@ WITH t AS (
         e.total_bases,
         COUNT(*) AS hits,
         SUM(trajectory_ground_ball)/COUNT(*) AS hit_gb_rate
-FROM {{ ref('game_data_completeness') }} AS g
+{# FROM {{ ref('game_data_completeness') }} AS g #}
 INNER JOIN {{ ref('calc_batted_ball_type') }} AS c USING (game_id)
 INNER JOIN {{ ref('event_offense_stats') }} AS e USING (event_key)
 INNER JOIN {{ ref('event_states_full') }} p USING (event_key)

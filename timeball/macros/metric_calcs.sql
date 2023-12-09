@@ -20,10 +20,10 @@
     {{ return ({
         "earned_run_average": "SUM(earned_runs) * 9 / SUM(outs_recorded * 3)",
         "run_average": "SUM(runs) * 9 / SUM(outs_recorded * 3)",
-        "walks_per_9": "SUM(walks) * 9 / SUM(outs_recorded * 3)",
-        "strikeouts_per_9": "SUM(strikeouts) * 9 / SUM(outs_recorded * 3)",
-        "home_runs_per_9": "SUM(home_runs) * 9 / SUM(outs_recorded * 3)",
-        "hits_per_9": "SUM(hits) * 9 / SUM(outs_recorded * 3)",
+        "walks_per_9_innings": "SUM(walks) * 9 / SUM(outs_recorded * 3)",
+        "strikeouts_per_9_innings": "SUM(strikeouts) * 9 / SUM(outs_recorded * 3)",
+        "home_runs_per_9_innings": "SUM(home_runs) * 9 / SUM(outs_recorded * 3)",
+        "hits_per_9_innings": "SUM(hits) * 9 / SUM(outs_recorded * 3)",
         "walks_and_hits_per_inning_pitched": "(SUM(walks) + SUM(hits)) / SUM(outs_recorded * 3)",
         "strikeout_to_walk_ratio": "SUM(strikeouts) / SUM(walks)",
         "walk_rate": "SUM(walks) / SUM(batters_faced)",
@@ -37,10 +37,17 @@
     }) }}
 {% endmacro %}
 
+{% macro basic_rate_stats_fielding() %}
+    {{ return ({
+        "fielding_percentage": "SUM(putouts + assists) / SUM(putouts + assists + errors)",
+        "range_factor": "(SUM(putouts) + SUM(assists)) * 9 / SUM(outs_played * 3)",
+    }) }}
+{% endmacro %}
+
 {% macro batted_ball_stats() %}
     {% set trajectory_stats = {
         "known_trajectory_rate_outs": "SUM(trajectory_known * balls_batted * (at_bats - hits)) / SUM(balls_batted * (at_bats - hits))",
-        "known_trajectory_rate_hits": "SUM(trajectory_known * balls_batted * hits) / SUM(batted_balls * hits)",
+        "known_trajectory_rate_hits": "SUM(trajectory_known * balls_batted * hits) / SUM(balls_batted * hits)",
         "known_trajectory_rate": "SUM(trajectory_known * balls_batted) / SUM(balls_batted)",
         "known_trajectory_broad_rate_outs": "SUM(trajectory_broad_known * balls_batted * (at_bats - hits)) / SUM(balls_batted * (at_bats - hits))",
         "known_trajectory_broad_rate_hits": "SUM(trajectory_broad_known * balls_batted * hits) / SUM(balls_batted * hits)",
@@ -50,20 +57,20 @@
 
         "air_ball_rate_outs": "SUM(trajectory_broad_air_ball * (at_bats - hits)) / SUM(trajectory_broad_known * (at_bats - hits))",
         "ground_ball_rate_outs": "SUM(trajectory_broad_ground_ball * (at_bats - hits)) / SUM(trajectory_broad_known * (at_bats - hits))",
-        "ground_air_out_ratio": "air_ball_out_rate / ground_ball_out_rate",
+        "ground_air_out_ratio": "ground_ball_rate_outs / air_ball_rate_outs",
         "air_ball_hit_rate": "SUM(trajectory_broad_air_ball * hits) / SUM(trajectory_broad_known * hits)",
         "ground_ball_hit_rate": "SUM(trajectory_broad_ground_ball * hits) / SUM(trajectory_broad_known * hits)",
-        "ground_air_hit_ratio": "air_ball_hit_rate / ground_ball_hit_rate",
+        "ground_air_hit_ratio": "ground_ball_hit_rate / air_ball_hit_rate",
         "fly_ball_rate": "SUM(trajectory_fly_ball) / SUM(trajectory_known)",
         "line_drive_rate": "SUM(trajectory_line_drive) / SUM(trajectory_known)",
         "pop_up_rate": "SUM(trajectory_pop_up) / SUM(trajectory_known)",
         "ground_ball_rate": "SUM(trajectory_ground_ball) / SUM(trajectory_broad_known)",
         
-        "coverage_weighted_air_ball_batting_average": "SUM(trajectory_air_ball * hits * known_trajectory_broad_out_hit_ratio) / SUM(trajectory_broad_air_ball * ((hits * known_trajectory_broad_out_hit_ratio) + (at_bats - hits))",
-        "coverage_weighted_ground_ball_batting_average": "SUM(trajectory_ground_ball * hits * known_trajectory_out_hit_ratio) / SUM(trajectory_ground_ball * ((hits * known_trajectory_out_hit_ratio) + (at_bats - hits))",
-        "coverage_weighted_fly_ball_batting_average": "SUM(trajectory_fly_ball * hits * known_trajectory_out_hit_ratio) / SUM(trajectory_fly_ball * ((hits * known_trajectory_out_hit_ratio) + (at_bats - hits))",
-        "coverage_weighted_line_drive_batting_average": "SUM(trajectory_line_drive * hits * known_trajectory_out_hit_ratio) / SUM(trajectory_line_drive * ((hits * known_trajectory_out_hit_ratio) + (at_bats - hits))",
-        "coverage_weighted_pop_up_batting_average": "SUM(trajectory_pop_up * hits * known_trajectory_out_hit_ratio) / SUM(trajectory_pop_up * ((hits * known_trajectory_out_hit_ratio) + (at_bats - hits))",
+        "coverage_weighted_air_ball_batting_average": "SUM(trajectory_broad_air_ball * hits) * known_trajectory_broad_out_hit_ratio / (SUM(trajectory_broad_air_ball * hits) * known_trajectory_broad_out_hit_ratio + SUM(trajectory_broad_air_ball * (at_bats - hits)))",
+        "coverage_weighted_ground_ball_batting_average": "SUM(trajectory_ground_ball * hits) * known_trajectory_broad_out_hit_ratio / (SUM(trajectory_ground_ball * hits) * known_trajectory_broad_out_hit_ratio + SUM(trajectory_ground_ball * (at_bats - hits)))",
+        "coverage_weighted_fly_ball_batting_average": "SUM(trajectory_fly_ball * hits) * known_trajectory_out_hit_ratio / (SUM(trajectory_fly_ball * hits) * known_trajectory_out_hit_ratio + SUM(trajectory_fly_ball * (at_bats - hits)))",
+        "coverage_weighted_line_drive_batting_average": "SUM(trajectory_line_drive * hits) * known_trajectory_out_hit_ratio / (SUM(trajectory_line_drive * hits) * known_trajectory_out_hit_ratio + SUM(trajectory_line_drive * (at_bats - hits)))",
+        "coverage_weighted_pop_up_batting_average": "SUM(trajectory_pop_up * hits) * known_trajectory_out_hit_ratio / (SUM(trajectory_pop_up * hits) * known_trajectory_out_hit_ratio + SUM(trajectory_pop_up * (at_bats - hits)))",
     } %}
 
 
@@ -71,7 +78,7 @@
     {% set directions = ["pulled", "opposite_field"] %}
 
     {% set angle_stats = {
-        "known_angle_rate_outs": "SUM(batted_angle_known * (at_bats - hits)) / SUM(at_bats - hits)",
+        "known_angle_rate_outs": "SUM(batted_angle_known * (at_bats - hits)) / SUM(balls_batted * (at_bats - hits))",
         "known_angle_rate_hits": "SUM(batted_angle_known * hits) / SUM(hits)",
         "known_angle_rate": "SUM(batted_angle_known) / SUM(balls_batted)",
         "known_angle_out_hit_ratio": "known_angle_rate_outs / known_angle_rate_hits"
@@ -82,7 +89,7 @@
             "angle_" ~ a ~ "_rate_outs": "SUM(batted_angle_" ~ a ~ " * (at_bats - hits)) / SUM(batted_angle_known * (at_bats - hits))",
             "angle_" ~ a ~ "_rate_hits": "SUM(batted_angle_" ~ a ~ " * hits) / SUM(batted_angle_known * hits)",
             "angle_" ~ a ~ "_rate": "SUM(batted_angle_" ~ a ~ ") / SUM(batted_angle_known)",
-            "coverage_weighted_angle_" ~ a ~ "_batting_average": "SUM(batted_angle_" ~ a ~ " * hits * known_angle_out_hit_ratio) / SUM(batted_angle_" ~ a ~ " * ((hits * known_angle_out_hit_ratio) + (at_bats - hits))"
+            "coverage_weighted_angle_" ~ a ~ "_batting_average": "SUM(batted_angle_" ~ a ~ " * hits) * known_angle_out_hit_ratio / (SUM(batted_angle_" ~ a ~ " * hits) * known_angle_out_hit_ratio + SUM(batted_angle_" ~ a ~ " * (at_bats - hits)))",
         }) }}
     {% endfor %}
 
@@ -92,7 +99,7 @@
             direction ~ "_rate_outs": "SUM(batted_balls_" ~ direction ~ " * (at_bats - hits)) / SUM(batted_angle_known * (at_bats - hits))",
             direction ~ "_rate_hits": "SUM(batted_balls_" ~ direction ~ " * hits) / SUM(batted_angle_known * hits)",
             direction ~ "_rate": "SUM(batted_balls_" ~ direction ~ ") / SUM(batted_angle_known)",
-            "coverage_weighted_" ~ direction ~ "_batting_average": "SUM(batted_balls_" ~ direction ~ " * hits * known_angle_out_hit_ratio) / SUM(batted_balls_" ~ direction ~ " * ((hits * known_angle_out_hit_ratio) + (at_bats - hits))"
+            "coverage_weighted_" ~ direction ~ "_batting_average": "SUM(batted_balls_" ~ direction ~ " * hits) * known_angle_out_hit_ratio / (SUM(batted_balls_" ~ direction ~ " * hits) * known_angle_out_hit_ratio + SUM(batted_balls_" ~ direction ~ " * (at_bats - hits)))",
         }) }}
     {% endfor %}
 
@@ -122,7 +129,7 @@
         "pitch_ball_rate": "SUM(balls) / SUM(pitches)",
         "pitch_swing_and_miss_rate": "SUM(strikes_swinging) / SUM(pitches)",
         "pitch_foul_rate": "SUM(strikes_foul) / SUM(pitches)",
-        "pitched_called_strike_rate": "SUM(called_strikes) / SUM(pitches)",
+        "pitched_called_strike_rate": "SUM(strikes_called) / SUM(pitches)",
         "pitch_data_coverage_rate": "COUNT_IF(pitches > 0) / SUM(plate_appearances)",
     }) }}
 {% endmacro %}

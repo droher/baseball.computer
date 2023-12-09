@@ -45,7 +45,7 @@ pitches AS (
         BOOL_AND(p.has_pitch_results) AS has_pitch_results,
         BOOL_AND(p.has_strike_types) AS has_pitch_strike_types,
     FROM events
-    LEFT JOIN {{ ref('event_completeness_pitches') }} AS p USING (event_key)
+    {# LEFT JOIN {{ ref('event_completeness_pitches') }} AS p USING (event_key) #}
     GROUP BY 1, 2, 3
 ),
 
