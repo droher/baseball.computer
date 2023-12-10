@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "timeball"
+name = "baseball.compuer"
 version = "0.1.0"
 description = ""
 authors = ["David Roher <davidroher@davids-air.home>"]

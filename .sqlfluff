@@ -15,5 +15,5 @@ allow_implicit_indents = True
 apply_dbt_builtins = True
 
 [sqlfluff:templater:dbt]
-project_dir = ./timeball
+project_dir = ./bc
 profiles_dir = ~/.dbt

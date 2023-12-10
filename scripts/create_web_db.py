@@ -17,7 +17,7 @@ def upload_to_r2(file_name, bucket_name, prefix):
     aws_secret_access_key = secret_access_key
     )
     s3.meta.client.upload_file(file_name, bucket_name, f"{prefix}/{file_name}")
-    url = f'https://baseball.computer/{prefix}/{file_name}'
+    url = f'https://data.baseball.computer/{prefix}/{file_name}'
     return url
 
 def create_view_with_url(new_conn, schema_name, view_name, url):
@@ -26,7 +26,7 @@ def create_view_with_url(new_conn, schema_name, view_name, url):
     new_conn.execute(query)
 
 def main():
-    original_db_path = 'timeball.db'
+    original_db_path = 'bc.db'
     new_db_path = 'new_db.duckdb'
     bucket_name = 'timeball'
     prefix = 'dbt'

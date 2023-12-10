@@ -44,8 +44,8 @@ def generate_yaml_for_seed(seed_file, columns):
         print(f'YAML for seed already exists: {yaml_file_name}')
 
 def main():
-    metadata_file = 'timeball/metadata.csv'
-    seeds_dir = 'timeball/seeds'
+    metadata_file = 'bc/metadata.csv'
+    seeds_dir = 'bc/seeds'
 
     metadata = read_metadata(metadata_file)
 

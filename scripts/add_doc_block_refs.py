@@ -36,8 +36,8 @@ def update_yaml_files(docs, models_dir):
                     yaml.dump(data, f)
 
 def main():
-    manifest_path = 'timeball/target/manifest.json'
-    models_dir = 'timeball/models'
+    manifest_path = 'bc/target/manifest.json'
+    models_dir = 'bc/models'
 
     manifest = load_manifest(manifest_path)
     docs = find_docs_in_manifest(manifest)

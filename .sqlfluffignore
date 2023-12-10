@@ -1,4 +1,4 @@
-timeball/dbt_packages/
-timeball/macros/
-timeball/target/
-timeball/analyses
+bc/dbt_packages/
+bc/macros/
+bc/target/
+bc/analyses
