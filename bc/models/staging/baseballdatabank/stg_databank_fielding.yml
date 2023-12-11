@@ -17,6 +17,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_databank_fielding.parquet'
 
     columns:
       - name: databank_player_id
@@ -41,7 +42,7 @@ models:
         description: "{{ doc('games_started') }}"
         data_type: smallint
       - name: outs_played
-        description: ""
+        description: "{{ doc('outs_played') }}"
         data_type: smallint
       - name: putouts
         description: "{{ doc('putouts') }}"

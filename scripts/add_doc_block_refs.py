@@ -26,6 +26,8 @@ def update_yaml_files(docs, models_dir):
 
                 if data and 'models' in data:
                     for model in data['models']:
+                        if 'meta' in model:
+                            model["meta"]["download_parquet"] = f"https://data.baseball.computer/dbt/main_models_{model['name']}.parquet"
                         if 'columns' in model:
                             for column in model['columns']:
                                 if column['name'] in docs and ('description' not in column or not column['description']):

@@ -38,7 +38,7 @@ models:
           position"
         data_type: utinyint
       - name: outs_played
-        description: ""
+        description: "{{ doc('outs_played') }}"
         data_type: utinyint
       - name: putouts
         description: "{{ doc('putouts') }}"

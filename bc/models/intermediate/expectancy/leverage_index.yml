@@ -16,6 +16,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_leverage_index.parquet'
 
     columns:
       - name: win_expectancy_start_key

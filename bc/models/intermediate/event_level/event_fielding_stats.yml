@@ -17,6 +17,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_fielding_stats.parquet'
 
     columns:
       - name: event_key
@@ -43,12 +44,12 @@ models:
         constraints:
           - type: not_null
       - name: outs_played
-        description: ""
+        description: "{{ doc('outs_played') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: plate_appearances_in_field
-        description: ""
+        description: "{{ doc('plate_appearances_in_field') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -91,7 +92,7 @@ models:
         constraints:
           - type: not_null
       - name: ground_ball_double_plays
-        description: ""
+        description: "{{ doc('ground_ball_double_plays') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -106,7 +107,7 @@ models:
         constraints:
           - type: not_null
       - name: pickoffs
-        description: ""
+        description: "{{ doc('pickoffs') }}"
         data_type: utinyint
         constraints:
           - type: not_null
@@ -116,22 +117,22 @@ models:
         constraints:
           - type: not_null
       - name: plate_appearances_in_field_with_ball_in_play
-        description: ""
+        description: "{{ doc('plate_appearances_in_field_with_ball_in_play') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: in_play_putouts
-        description: ""
+        description: "{{ doc('in_play_putouts') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: in_play_assists
-        description: ""
+        description: "{{ doc('in_play_assists') }}"
         data_type: utinyint
         constraints:
           - type: not_null
       - name: reaching_errors
-        description: ""
+        description: "{{ doc('reaching_errors') }}"
         data_type: utinyint
         constraints:
           - type: not_null

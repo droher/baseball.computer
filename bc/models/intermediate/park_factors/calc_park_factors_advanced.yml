@@ -17,6 +17,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_calc_park_factors_advanced.parquet'
 
     columns:
       - name: park_id

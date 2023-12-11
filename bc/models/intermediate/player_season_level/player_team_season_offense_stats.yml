@@ -15,6 +15,7 @@ models:
         columns: &pk [season, team_id, player_id, game_type]
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_player_team_season_offense_stats.parquet'
 
     columns:
       - name: season
@@ -426,8 +427,8 @@ models:
         description: "{{ doc('picked_off_third') }}"
         data_type: smallint
       - name: extra_base_chances
-        description: ""
+        description: "{{ doc('extra_base_chances') }}"
         data_type: smallint
       - name: extra_bases_taken
-        description: ""
+        description: "{{ doc('extra_bases_taken') }}"
         data_type: smallint

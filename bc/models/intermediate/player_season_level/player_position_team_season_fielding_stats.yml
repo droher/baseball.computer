@@ -16,6 +16,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_player_position_team_season_fielding_stats.parquet'
 
     columns:
       - name: season
@@ -43,13 +44,13 @@ models:
         description: "{{ doc('games_started') }}"
         data_type: usmallint
       - name: outs_played
-        description: ""
+        description: "{{ doc('outs_played') }}"
         data_type: usmallint
       - name: plate_appearances_in_field
-        description: ""
+        description: "{{ doc('plate_appearances_in_field') }}"
         data_type: usmallint
       - name: plate_appearances_in_field_with_ball_in_play
-        description: ""
+        description: "{{ doc('plate_appearances_in_field_with_ball_in_play') }}"
         data_type: usmallint
       - name: putouts
         description: "{{ doc('putouts') }}"
@@ -64,7 +65,7 @@ models:
         description: "{{ doc('fielders_choices') }}"
         data_type: usmallint
       - name: reaching_errors
-        description: ""
+        description: "{{ doc('reaching_errors') }}"
         data_type: usmallint
       - name: double_plays
         description: "{{ doc('double_plays') }}"
@@ -73,13 +74,13 @@ models:
         description: "{{ doc('triple_plays') }}"
         data_type: usmallint
       - name: ground_ball_double_plays
-        description: ""
+        description: "{{ doc('ground_ball_double_plays') }}"
         data_type: usmallint
       - name: passed_balls
         description: "{{ doc('passed_balls') }}"
         data_type: usmallint
       - name: balls_hit_to
-        description: ""
+        description: "{{ doc('balls_hit_to') }}"
         data_type: usmallint
       - name: stolen_bases
         description: "{{ doc('stolen_bases') }}"
@@ -88,32 +89,32 @@ models:
         description: "{{ doc('caught_stealing') }}"
         data_type: usmallint
       - name: games_left_field
-        description: ""
+        description: "{{ doc('games_left_field') }}"
         data_type: usmallint
       - name: games_center_field
-        description: ""
+        description: "{{ doc('games_center_field') }}"
         data_type: usmallint
       - name: games_right_field
-        description: ""
+        description: "{{ doc('games_right_field') }}"
         data_type: usmallint
       - name: unknown_putouts_while_fielding
-        description: ""
+        description: "{{ doc('unknown_putouts_while_fielding') }}"
         data_type: usmallint
       - name: assisted_putouts
         description: "{{ doc('assisted_putouts') }}"
         data_type: usmallint
       - name: in_play_putouts
-        description: ""
+        description: "{{ doc('in_play_putouts') }}"
         data_type: usmallint
       - name: in_play_assists
-        description: ""
+        description: "{{ doc('in_play_assists') }}"
         data_type: usmallint
       - name: pickoffs
-        description: ""
+        description: "{{ doc('pickoffs') }}"
         data_type: usmallint
       - name: double_plays_started
-        description: ""
+        description: "{{ doc('double_plays_started') }}"
         data_type: usmallint
       - name: ground_ball_double_plays_started
-        description: ""
+        description: "{{ doc('ground_ball_double_plays_started') }}"
         data_type: usmallint

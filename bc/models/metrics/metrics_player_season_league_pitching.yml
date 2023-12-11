@@ -18,6 +18,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_metrics_player_season_league_pitching.parquet'
 
     columns:
       - name: player_id
@@ -321,13 +322,13 @@ models:
         description: "{{ doc('advances_on_errors') }}"
         data_type: integer
       - name: extra_base_chances
-        description: ""
+        description: "{{ doc('extra_base_chances') }}"
         data_type: integer
       - name: extra_base_advance_attempts
         description: "{{ doc('extra_base_advance_attempts') }}"
         data_type: integer
       - name: extra_bases_taken
-        description: ""
+        description: "{{ doc('extra_bases_taken') }}"
         data_type: integer
       - name: bases_advanced
         description: "{{ doc('bases_advanced') }}"
@@ -435,7 +436,7 @@ models:
         description: "{{ doc('hits_per_9_innings') }}"
         data_type: double
       - name: walks_and_hits_per_innings_pitched
-        description: ""
+        description: "{{ doc('walks_and_hits_per_innings_pitched') }}"
         data_type: double
       - name: strikeout_to_walk_ratio
         description: "{{ doc('strikeout_to_walk_ratio') }}"

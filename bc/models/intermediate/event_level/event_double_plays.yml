@@ -17,6 +17,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_double_plays.parquet'
 
     columns:
       - name: event_key

@@ -16,6 +16,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_personnel_lookup.parquet'
 
     columns:
       - name: game_id

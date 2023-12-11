@@ -19,6 +19,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_databank_fielding_of.parquet'
 
     columns:
       - name: databank_player_id

@@ -18,25 +18,26 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_metrics_player_career_fielding.parquet'
 
     columns:
       - name: player_id
         description: "{{ doc('player_id') }}"
         data_type: varchar
       - name: outs_played
-        description: ""
+        description: "{{ doc('outs_played') }}"
         data_type: integer
       - name: plate_appearances_in_field
-        description: ""
+        description: "{{ doc('plate_appearances_in_field') }}"
         data_type: integer
       - name: plate_appearances_in_field_with_ball_in_play
-        description: ""
+        description: "{{ doc('plate_appearances_in_field_with_ball_in_play') }}"
         data_type: integer
       - name: unknown_putouts_while_fielding
-        description: ""
+        description: "{{ doc('unknown_putouts_while_fielding') }}"
         data_type: integer
       - name: balls_hit_to
-        description: ""
+        description: "{{ doc('balls_hit_to') }}"
         data_type: integer
       - name: putouts
         description: "{{ doc('putouts') }}"
@@ -54,13 +55,13 @@ models:
         description: "{{ doc('assisted_putouts') }}"
         data_type: integer
       - name: in_play_putouts
-        description: ""
+        description: "{{ doc('in_play_putouts') }}"
         data_type: integer
       - name: in_play_assists
-        description: ""
+        description: "{{ doc('in_play_assists') }}"
         data_type: integer
       - name: reaching_errors
-        description: ""
+        description: "{{ doc('reaching_errors') }}"
         data_type: integer
       - name: stolen_bases
         description: "{{ doc('stolen_bases') }}"
@@ -69,7 +70,7 @@ models:
         description: "{{ doc('caught_stealing') }}"
         data_type: integer
       - name: pickoffs
-        description: ""
+        description: "{{ doc('pickoffs') }}"
         data_type: integer
       - name: passed_balls
         description: "{{ doc('passed_balls') }}"
@@ -81,13 +82,13 @@ models:
         description: "{{ doc('triple_plays') }}"
         data_type: integer
       - name: ground_ball_double_plays
-        description: ""
+        description: "{{ doc('ground_ball_double_plays') }}"
         data_type: integer
       - name: double_plays_started
-        description: ""
+        description: "{{ doc('double_plays_started') }}"
         data_type: integer
       - name: ground_ball_double_plays_started
-        description: ""
+        description: "{{ doc('ground_ball_double_plays_started') }}"
         data_type: integer
       - name: fielding_percentage
         description: ""

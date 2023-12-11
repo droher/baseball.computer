@@ -18,6 +18,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_box_score_team_fielding_lines.parquet'
 
     columns:
       - name: game_id
@@ -27,7 +28,7 @@ models:
         description: "{{ doc('side') }}"
         data_type: varchar
       - name: outs_played
-        description: ""
+        description: "{{ doc('outs_played') }}"
         data_type: bigint
       - name: putouts
         description: "{{ doc('putouts') }}"

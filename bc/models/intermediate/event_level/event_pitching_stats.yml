@@ -18,6 +18,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_pitching_stats.parquet'
 
     columns:
       - name: game_id
@@ -411,10 +412,10 @@ models:
         description: "{{ doc('picked_off_third') }}"
         data_type: tinyint
       - name: extra_base_chances
-        description: ""
+        description: "{{ doc('extra_base_chances') }}"
         data_type: tinyint
       - name: extra_bases_taken
-        description: ""
+        description: "{{ doc('extra_bases_taken') }}"
         data_type: tinyint
       - name: plate_appearances
         description: "{{ doc('plate_appearances') }}"

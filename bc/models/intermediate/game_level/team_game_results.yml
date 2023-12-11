@@ -18,6 +18,7 @@ models:
 
     meta:
       primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_team_game_results.parquet'
 
     columns:
       - name: season
