@@ -25,17 +25,17 @@ The metrics tables are currently the most useful tables in the database for gett
 There are currently 9 of these tables:
 
 #### Player career
-- [metrics_player_career_offense]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_career_offense')
-- [metrics_player_career_pitching]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_career_pitching')
-- [metrics_player_career_fielding]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_career_fielding')
+- [metrics_player_career_offense](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_career_offense)
+- [metrics_player_career_pitching](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_career_pitching)
+- [metrics_player_career_fielding](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_career_fielding)
 #### Player season (separated by league)
-- [metrics_player_season_league_offense]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_season_league_offense')
-- [metrics_player_season_league_pitching]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_season_league_pitching')
-- [metrics_player_season_league_fielding]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_season_league_fielding')
+- [metrics_player_season_league_offense](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_season_league_offense)
+- [metrics_player_season_league_pitching](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_season_league_pitching)
+- [metrics_player_season_league_fielding](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_player_season_league_fielding)
 #### Team season
-- [metrics_team_season_offense]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_team_season_offense')
-- [metrics_team_season_pitching]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_team_season_pitching')
-- [metrics_team_season_fielding]('https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_team_season_fielding')
+- [metrics_team_season_offense](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_team_season_offense)
+- [metrics_team_season_pitching](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_team_season_pitching)
+- [metrics_team_season_fielding](https://docs.baseball.computer/#!/model/model.baseball_computer.metrics_team_season_fielding)
 
 ### Event-level tables
 The following tables will be the most useful for doing your own aggregations of event-level data:
