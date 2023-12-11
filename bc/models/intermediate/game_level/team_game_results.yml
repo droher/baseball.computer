@@ -3,8 +3,10 @@ version: 2
 
 models:
   - name: team_game_results
-    description: ""
-
+    description: |
+      A version of `game_results` that includes one row for each team in each game.
+      Also includes additional statistics (traditional box score stats) for games
+      that have that information available.
 
     config:
       contract:

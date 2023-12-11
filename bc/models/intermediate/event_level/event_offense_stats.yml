@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: event_offense_stats
-    description: ""
-
+    description: |
+      Counting stats applicable to each batter/baserunner on each event.
+      Combines hitting, baserunning, pitch sequence, and batted ball data.
 
     config:
       contract:

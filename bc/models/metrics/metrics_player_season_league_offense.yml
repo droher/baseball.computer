@@ -3,19 +3,21 @@ version: 2
 
 models:
   - name: metrics_player_season_league_offense
-    description: ""
+    description: |
+      Aggregate offensive statistics and averages for each player-season,
+      split if the player played in multiple leagues that year. Regular season only.
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [player_id, season, league]
 
-    # meta:
-    #   primary_keys: *pk
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: player_id

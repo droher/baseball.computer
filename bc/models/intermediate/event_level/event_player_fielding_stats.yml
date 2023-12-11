@@ -3,8 +3,10 @@ version: 2
 
 models:
   - name: event_player_fielding_stats
-    description: ""
-
+    description: |
+      Fielding statistics for each player in each event, regardless of whether
+      the fielder was involved in the play. This is the largest table in the database
+      by number of rows, so exercise caution when querying it.
 
     config:
       contract:

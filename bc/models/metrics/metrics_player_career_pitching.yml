@@ -3,19 +3,20 @@ version: 2
 
 models:
   - name: metrics_player_career_pitching
-    description: ""
+    description: |
+      Aggregate pitching statistics and averages over player careers.
+      Regular season only.
 
+    config:
+      contract:
+        enforced: true
 
-    # config:
-    #   contract:
-    #     enforced: true
+    constraints:
+      - type: primary_key
+        columns: &pk [player_id]
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
-
-    # meta:
-    #   primary_keys: *pk
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: player_id

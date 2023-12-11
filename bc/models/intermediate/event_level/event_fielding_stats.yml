@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: event_fielding_stats
-    description: ""
-
+    description: |
+      Fielding statistics for each event, aggregated at the event level. This allows the inclusion
+      of fielding statistics for events where the specific fielder is unknown.
 
     config:
       contract:

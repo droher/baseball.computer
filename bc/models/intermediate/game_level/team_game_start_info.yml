@@ -3,7 +3,8 @@ version: 2
 
 models:
   - name: team_game_start_info
-    description: ""
+    description: |
+      A version of `game_start_info` that includes one row for each team in each game.
 
 
     config:

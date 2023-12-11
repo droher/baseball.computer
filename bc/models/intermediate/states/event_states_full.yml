@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: event_states_full
-    description: ""
-
+    description: A catch-all table for information describing the state of the event
+      both before and after it occurred. Includes information about the score, the
+      base-out state, and the players involved in the event.
 
     config:
       contract:

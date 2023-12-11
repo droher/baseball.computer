@@ -3,7 +3,11 @@ version: 2
 
 models:
   - name: game_start_info
-    description: ""
+    description: |
+      Key table for information about every game in the database.
+      Only information that is known at the time of the game's start is included.
+      For example, the final score is not included here, but the starting lineups are.
+      For information about the results of the game, see the `game_results` table.
 
     config:
       contract:

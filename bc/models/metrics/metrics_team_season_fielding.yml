@@ -3,19 +3,21 @@ version: 2
 
 models:
   - name: metrics_team_season_fielding
-    description: ""
+    description: |
+      Aggregate fielding statistics and averages for each team-season.
+      Regular season only.
 
 
-    # config:
-    #   contract:
-    #     enforced: true
+    config:
+      contract:
+        enforced: true
 
-    # constraints:
-    #   - type: primary_key
-    #     columns: &pk []
+    constraints:
+      - type: primary_key
+        columns: &pk [team_id, season]
 
-    # meta:
-    #   primary_keys: *pk
+    meta:
+      primary_keys: *pk
 
     columns:
       - name: team_id

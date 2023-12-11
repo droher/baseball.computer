@@ -3,8 +3,9 @@ version: 2
 
 models:
   - name: people
-    description: ""
-
+    description: |
+      Table containing biographical data on each player, coach, umpire, or manager
+      for whom we have data.
 
     config:
       contract:

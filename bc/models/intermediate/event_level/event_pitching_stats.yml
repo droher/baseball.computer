@@ -3,8 +3,10 @@ version: 2
 
 models:
   - name: event_pitching_stats
-    description: ""
-
+    description: |
+      Event-level counting stats for each pitcher involved in each event.
+      This includes both the pitcher on the mound and, if applicable, the pitcher
+      being charged with the run(s) on the event.
 
     config:
       contract:
