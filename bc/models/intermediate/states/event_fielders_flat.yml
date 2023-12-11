@@ -1,0 +1,84 @@
+version: 2
+
+
+models:
+  - name: event_fielders_flat
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_fielders_flat.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+        constraints:
+          - type: not_null
+      - name: personnel_fielding_key
+        description: ""
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: catcher_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: first_base_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: second_base_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: third_base_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: shortstop_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: left_field_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: center_field_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: right_field_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null

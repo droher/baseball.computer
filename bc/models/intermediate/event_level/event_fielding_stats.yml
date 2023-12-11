@@ -1,0 +1,148 @@
+version: 2
+
+
+models:
+  - name: event_fielding_stats
+    description: |
+      Fielding statistics for each event, aggregated at the event level. This allows the inclusion
+      of fielding statistics for events where the specific fielder is unknown.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_fielding_stats.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: personnel_fielding_key
+        description: ""
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: outs_played
+        description: "{{ doc('outs_played') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: plate_appearances_in_field
+        description: "{{ doc('plate_appearances_in_field') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: batted_to_fielder
+        description: "{{ doc('batted_to_fielder') }}"
+        data_type: utinyint
+      - name: putouts
+        description: "{{ doc('putouts') }}"
+        constraints:
+          - type: not_null
+        data_type: utinyint
+      - name: assists
+        description: "{{ doc('assists') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: errors
+        description: "{{ doc('errors') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: fielders_choices
+        description: "{{ doc('fielders_choices') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: assisted_putouts
+        description: "{{ doc('assisted_putouts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: double_plays
+        description: "{{ doc('double_plays') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: triple_plays
+        description: "{{ doc('triple_plays') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: ground_ball_double_plays
+        description: "{{ doc('ground_ball_double_plays') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: pickoffs
+        description: "{{ doc('pickoffs') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: plate_appearances_in_field_with_ball_in_play
+        description: "{{ doc('plate_appearances_in_field_with_ball_in_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: in_play_putouts
+        description: "{{ doc('in_play_putouts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: in_play_assists
+        description: "{{ doc('in_play_assists') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: reaching_errors
+        description: "{{ doc('reaching_errors') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: unknown_putouts
+        description: "{{ doc('unknown_putouts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: incomplete_events
+        description: "{{ doc('incomplete_events') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null

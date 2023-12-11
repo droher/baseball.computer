@@ -1,0 +1,79 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_team_batting_lines
+    description: |
+      Team-level batting lines from box score accounts.
+      These are generally rare and are only present in certain files.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, side]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_box_score_team_batting_lines.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: side
+        description: "{{ doc('side') }}"
+        data_type: varchar
+      - name: at_bats
+        description: "{{ doc('at_bats') }}"
+        data_type: bigint
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: bigint
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: bigint
+      - name: doubles
+        description: "{{ doc('doubles') }}"
+        data_type: bigint
+      - name: triples
+        description: "{{ doc('triples') }}"
+        data_type: bigint
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: bigint
+      - name: rbi
+        description: ""
+        data_type: bigint
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: bigint
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: bigint
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: bigint
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: bigint
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: bigint
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: integer
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: bigint
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: bigint
+      - name: grounded_into_double_plays
+        description: "{{ doc('grounded_into_double_plays') }}"
+        data_type: bigint
+      - name: reached_on_interference
+        description: ""
+        data_type: bigint

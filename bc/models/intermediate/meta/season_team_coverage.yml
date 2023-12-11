@@ -1,0 +1,33 @@
+version: 2
+
+
+models:
+  - name: season_team_coverage
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [season, team_id, league]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_season_team_coverage.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: least_granular_source_type
+        description: ""
+        data_type: varchar

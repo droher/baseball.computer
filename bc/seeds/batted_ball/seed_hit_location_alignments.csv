@@ -1,0 +1,4 @@
+infield_location,infield_angle,outfield_location,outfield_angle
+First,Default,Right,FoulLine
+FirstSecond,Default,Right,Default
+Second,Default,RightCenter,Default

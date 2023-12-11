@@ -1,0 +1,56 @@
+version: 2
+
+
+models:
+  - name: personnel_fielding_states
+    description: ""
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [personnel_fielding_key, fielding_position]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_personnel_fielding_states.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: fielding_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: fielding_side
+        description: ""
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: personnel_fielding_key
+        description: ""
+        data_type: bigint
+      - name: start_event_id
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: end_event_id
+        description: ""
+        data_type: uinteger
+        constraints:
+          - type: not_null
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: fielding_position
+        description: "{{ doc('fielding_position') }}"
+        data_type: utinyint

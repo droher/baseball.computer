@@ -1,0 +1,128 @@
+version: 2
+
+
+models:
+  - name: event_transition_values
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_transition_values.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: run_expectancy_start_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: run_expectancy_end_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: win_expectancy_start_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: win_expectancy_end_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+      - name: inning_start
+        description: "{{ doc('inning_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: frame_start
+        description: "{{ doc('frame_start') }}"
+        data_type: frame
+        constraints:
+          - type: not_null
+      - name: truncated_home_margin_start
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: base_state_start
+        description: "{{ doc('base_state_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: outs_start
+        description: "{{ doc('outs_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: inning_end
+        description: "{{ doc('inning_end') }}"
+        data_type: utinyint
+      - name: frame_end
+        description: "{{ doc('frame_end') }}"
+        data_type: frame
+      - name: truncated_home_margin_end
+        description: ""
+        data_type: tinyint
+      - name: base_state_end
+        description: "{{ doc('base_state_end') }}"
+        data_type: utinyint
+      - name: outs_end
+        description: "{{ doc('outs_end') }}"
+        data_type: utinyint
+      - name: runs_on_play
+        description: "{{ doc('runs_on_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: game_end_flag
+        description: "{{ doc('game_end_flag') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: expected_runs_change
+        description: ""
+        data_type: decimal(18,3)
+        tests:
+          - dbt_utils.not_null_proportion:
+              at_least: .999
+      - name: expected_home_win_change
+        description: ""
+        data_type: decimal(14,3)
+        tests:
+          - dbt_utils.not_null_proportion:
+              at_least: .999
+      - name: expected_batting_win_change
+        description: ""
+        data_type: decimal(14,3)
+        tests:
+          - dbt_utils.not_null_proportion:
+              at_least: .999

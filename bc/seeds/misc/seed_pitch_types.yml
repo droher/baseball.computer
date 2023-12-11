@@ -1,0 +1,47 @@
+version: 2
+seeds:
+  - name: seed_pitch_types
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: sequence_item
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: is_pitch
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_strike
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_in_play
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: can_be_strike_three
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_swing
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_contact
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: category
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null

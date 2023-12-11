@@ -1,0 +1,58 @@
+version: 2
+
+
+models:
+  - name: unknown_fielding_play_shares
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, player_id, fielding_position]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_unknown_fielding_play_shares.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: fielding_position
+        description: "{{ doc('fielding_position') }}"
+        data_type: utinyint
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+      - name: estimated_unknown_plays
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: estimated_unknown_plays_team
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: play_share
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: play_share_subset_assists
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: play_share_subset_putouts
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null

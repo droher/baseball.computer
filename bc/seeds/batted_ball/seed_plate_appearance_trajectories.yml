@@ -1,0 +1,17 @@
+version: 2
+seeds:
+  - name: seed_plate_appearance_trajectories
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: batted_trajectory
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: broad_classification
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null

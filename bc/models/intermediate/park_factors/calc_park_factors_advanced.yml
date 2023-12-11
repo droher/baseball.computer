@@ -1,0 +1,94 @@
+version: 2
+
+
+models:
+  - name: calc_park_factors_advanced
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [park_id, season, league]
+
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_calc_park_factors_advanced.parquet'
+
+    columns:
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: sqrt_sample_size
+        description: ""
+        data_type: double
+      - name: singles_park_factor
+        description: ""
+        data_type: double
+      - name: doubles_park_factor
+        description: ""
+        data_type: double
+      - name: triples_park_factor
+        description: ""
+        data_type: double
+      - name: home_runs_park_factor
+        description: ""
+        data_type: double
+      - name: strikeouts_park_factor
+        description: ""
+        data_type: double
+      - name: walks_park_factor
+        description: ""
+        data_type: double
+      - name: batting_outs_park_factor
+        description: ""
+        data_type: double
+      - name: runs_park_factor
+        description: ""
+        data_type: double
+      - name: balls_in_play_park_factor
+        description: ""
+        data_type: double
+      - name: trajectory_fly_ball_park_factor
+        description: ""
+        data_type: double
+      - name: trajectory_ground_ball_park_factor
+        description: ""
+        data_type: double
+      - name: trajectory_line_drive_park_factor
+        description: ""
+        data_type: double
+      - name: trajectory_pop_up_park_factor
+        description: ""
+        data_type: double
+      - name: trajectory_unknown_park_factor
+        description: ""
+        data_type: double
+      - name: batted_distance_infield_park_factor
+        description: ""
+        data_type: double
+      - name: batted_distance_outfield_park_factor
+        description: ""
+        data_type: double
+      - name: batted_distance_unknown_park_factor
+        description: ""
+        data_type: double
+      - name: batted_angle_left_park_factor
+        description: ""
+        data_type: double
+      - name: batted_angle_right_park_factor
+        description: ""
+        data_type: double
+      - name: batted_angle_middle_park_factor
+        description: ""
+        data_type: double

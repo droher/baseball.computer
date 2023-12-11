@@ -1,0 +1,40 @@
+version: 2
+
+
+models:
+  - name: event_double_plays
+    description: |
+      A small helper table designed to flag double and triple plays.
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_double_plays.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: is_double_play
+        description: "Whether the event is a double play."
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_triple_play
+        description: "Whether the event is a triple play."
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_ground_ball_double_play
+        description: "Whether the event is a ground ball double play."
+        data_type: boolean
+        constraints:
+          - type: not_null

@@ -1,0 +1,52 @@
+version: 2
+
+
+models:
+  - name: stg_parks
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [park_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_parks.parquet'
+
+    columns:
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+      - name: name
+        description: ""
+        data_type: varchar
+      - name: aka
+        description: ""
+        data_type: varchar
+      - name: city
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: state
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: start_date
+        description: ""
+        data_type: varchar
+      - name: end_date
+        description: ""
+        data_type: varchar
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: notes
+        description: ""
+        data_type: varchar

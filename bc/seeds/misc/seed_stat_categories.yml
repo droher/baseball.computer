@@ -1,0 +1,33 @@
+version: 2
+seeds:
+  - name: seed_stat_categories
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: name
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: abbreviation
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+          - type: unique
+      - name: is_batting
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_pitching
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_fielding
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null

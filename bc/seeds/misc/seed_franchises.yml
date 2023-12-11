@@ -1,0 +1,46 @@
+version: 2
+seeds:
+  - name: seed_franchises
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: franchise_id
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: team_id
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: league
+        description: ''
+        data_type: varchar
+      - name: division
+        description: ''
+        data_type: varchar
+      - name: location
+        description: ''
+        data_type: varchar
+      - name: nickname
+        description: ''
+        data_type: varchar
+      - name: alternative_nicknames
+        description: ''
+        data_type: varchar
+      - name: date_start
+        description: ''
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: date_end
+        description: ''
+        data_type: date
+      - name: city
+        description: ''
+        data_type: varchar
+      - name: state
+        description: ''
+        data_type: varchar

@@ -1,0 +1,67 @@
+version: 2
+
+
+models:
+  - name: people
+    description: |
+      Table containing biographical data on each player, coach, umpire, or manager
+      for whom we have data.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [person_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_people.parquet'
+
+    columns:
+      - name: person_id
+        description: "{{ doc('person_id') }}"
+        data_type: varchar
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+      - name: baseball_reference_player_id
+        description: ""
+        data_type: varchar
+      - name: first_name
+        description: ""
+        data_type: varchar
+      - name: last_name
+        description: ""
+        data_type: varchar
+      - name: bats
+        description: ""
+        data_type: varchar
+      - name: throws
+        description: ""
+        data_type: varchar
+      - name: birth_year
+        description: ""
+        data_type: smallint
+      - name: official_name
+        description: ""
+        data_type: varchar
+      - name: birth_date
+        description: ""
+        data_type: varchar
+      - name: birth_city
+        description: ""
+        data_type: varchar
+      - name: birth_state
+        description: ""
+        data_type: varchar
+      - name: birth_country
+        description: ""
+        data_type: varchar
+      - name: height_inches
+        description: ""
+        data_type: double
+      - name: weight_pounds
+        description: ""
+        data_type: varchar

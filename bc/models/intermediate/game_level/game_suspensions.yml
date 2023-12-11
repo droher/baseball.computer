@@ -1,0 +1,50 @@
+version: 2
+
+
+models:
+  - name: game_suspensions
+    description: "Information about games that were suspended and resumed at a later
+      date."
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_suspensions.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: event_key_at_suspension
+        description: ""
+        data_type: uinteger
+        constraints:
+          - type: not_null
+      - name: date_resumed
+        description: ""
+        data_type: date
+      - name: new_park_id
+        description: ""
+        data_type: park_id
+      - name: away_score_at_suspension
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: home_score_at_suspension
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: game_outs_recorded_at_suspension
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null

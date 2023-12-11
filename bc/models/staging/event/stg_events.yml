@@ -1,0 +1,240 @@
+version: 2
+
+
+models:
+  - name: stg_events
+    description: |
+      The single most important staging table in the database,
+      `stg_events` has one row for each event in the Retrosheet play-by-play data.
+
+      An "event" has no inherent meaning in baseball, but is instead a
+      Retrosheet-specific concept that represents discrete sets of plays.
+      An event can be categorized into one of three types:
+      - Plate appearance result
+      - Baserunning-only play(s)
+      - No play
+
+      A plate appearance result can also include baserunning plays,
+      but an event never contains more than one plate appearance.
+      No-plays serve as markers in the data to place substitutions.
+      In cases where multiple baserunning plays or substitutions occur
+      over a single plate apperance, the PA is split across those events,
+      but is considered to have occurred on the final event. In the case
+      of a baserunning play ending an inning, it is also possible that a plate
+      appearance to not occur at all.
+
+      `stg_events` has the following information:
+      - The game state (inning, frame, outs, runners on, batter up, etc.)
+      - The plate appearance result (if applicable)
+      - The batted ball information (if applicable)
+      - Basic results of the event (runs scored, outs recorded)
+      - Other rare miscellaneous information (e.g. the batter batting from an unusual side)
+
+      See the Retrosheet event file spec:
+      https://www.retrosheet.org/eventfile.htm
+
+      As well as the batted ball location diagram:
+      https://www.retrosheet.org/location.htm
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_events.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+        tests:
+          - relationships:
+              field: game_id
+              to: ref('stg_games')
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_type: utinyint
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: inning
+        description: "{{ doc('inning') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: frame
+        description: "{{ doc('frame') }}"
+        data_type: frame
+        constraints:
+          - type: not_null
+      - name: batter_lineup_position
+        description: "{{ doc('lineup_position') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: batter_id
+        description: "{{ doc('batter_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: batting_team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: fielding_team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: outs
+        description: "The number of outs at the start of the event."
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: count_balls
+        description: |
+          The number of balls at the time that the event occurred.
+        data_type: utinyint
+      - name: count_strikes
+        description: The number of strikes at the time that the event occurred.
+        data_type: utinyint
+      - name: base_state
+        description: |
+          A binary representation of the baserunners present at the start of the event,
+          represented as a 0-7 base 10 integer:
+          ```
+          0 - Bases empty (000)
+          1 - Runner on 1st (001)
+          2 - Runner on 2nd (010)
+          3 - Runner on 1st and 2nd (011)
+          4 - Runner on 3rd (100)
+          5 - Runner on 1st and 3rd (101)
+          6 - Runner on 2nd and 3rd (110)
+          7 - Bases loaded (111)
+          ```
+
+          Representing the base state this way might seem counterintuitive at first,
+          but it ends up being very useful and easier to work with in many cases. It's
+          also a common convention.
+          See `seed_base_state` for more info.
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: specified_batter_hand
+        description: |
+          A rare data point that indicates the batter batted from a different side
+          than he would normally. In all other cases, roster/bio data is more authoritative.
+        data_type: hand
+      - name: specified_pitcher_hand
+        description: |
+          A rare data point that indicates the pitcher threw from a different side
+          than he would normally. In all other cases, roster/bio data is more authoritative.
+          This is mostly just Pat Venditte against switch hitters.
+        data_type: hand
+      - name: strikeout_responsible_batter_id
+        description: |
+          This is the batter who, if the plate appearance ends in a strikeout, is charged with the strikeout.
+          This is only applicable for mid-plate-appearance substitutions. There is a specific set of
+          cases in which the original batter is charged with the strikeout. For all other statistics,
+          the final batter is the one who is credited.
+        data_type: varchar
+      - name: walk_responsible_pitcher_id
+        description: |
+          This is the pitcher who, if the plate appearance ends in a walk, is charged with the walk.
+          This is only applicable for mid-plate-appearance substitutions. There is a specific set of
+          cases in which the original pitcher is charged with the walk. For all other statistics,
+          the final pitcher is the one who is credited.
+        data_type: varchar
+      - name: plate_appearance_result
+        description: "{{ doc('plate_appearance_result') }}"
+        data_type: plate_appearance_result
+      - name: batted_trajectory
+        description: |
+          An enum indicating the trajectory of the batted ball. This field is
+          *always* populated for plate appearances that end in a batted ball,
+          regardless of whether we know the trajectory. It is filled with `Unknown`
+          in those cases where no trajectory was recorded. This data is sparse prior
+          to 1988, but many of the missing values can be deduced based on other details.
+        data_type: trajectory
+      - name: batted_to_fielder
+        description: "{{ doc('batted_to_fielder') }}"
+        data_type: utinyint
+      - name: batted_location_general
+        description: "{{ doc('batted_location_general') }}"
+        data_type: location_general
+      - name: batted_location_depth
+        description: "{{ doc('batted_location_depth') }}"
+        data_type: location_depth
+      - name: batted_location_angle
+        description: "{{ doc('batted_location_angle') }}"
+        data_type: location_angle
+      - name: batted_contact_strength
+        description: "{{ doc('batted_contact_strength') }}"
+        data_type: varchar
+      - name: outs_on_play
+        description: "{{ doc('outs_on_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: runs_on_play
+        description: "{{ doc('runs_on_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: runs_batted_in
+        description: "{{ doc('runs_batted_in') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: team_unearned_runs
+        description: "{{ doc('team_unearned_runs') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: no_play_flag
+        description: |
+          True if nothing happened on the play.
+          This will be false in the specific case of an error on a foul ball,
+          which is marked as a no-play in the Retrosheet data but is not treated
+          that way for our purposes. This field is a useful way to filter out
+          unneeded events, especially in the context of determining the personnel
+          in a game.
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: runners_count
+        description: |
+          The total number of runners on base at the start of the event.
+          Redundant with `base_state`, but provided for convenience.
+        data_type: tinyint
+        constraints:
+          - type: not_null

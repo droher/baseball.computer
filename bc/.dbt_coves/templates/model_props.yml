@@ -1,0 +1,26 @@
+version: 2
+
+
+models:
+  - name: {{ model.lower() }}
+    description: ""
+    
+{{"""
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: &pk []
+
+    # meta:
+    #   primary_keys: *pk
+"""
+    }}
+    columns:
+{%- for col in columns %}
+      - name: {{ col['id'] }}
+        description: "{{ col['description'] }}"
+        data_type: {{ col['type'] }}
+{%- endfor %}

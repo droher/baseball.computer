@@ -1,0 +1,35 @@
+version: 2
+
+
+models:
+  - name: game_forfeits
+    description: |
+      The full set of forfeited games in MLB history.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_forfeits.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: event_key_at_forfeit
+        description: ""
+        data_type: uinteger
+      - name: winning_side
+        description: "Home or Away if a winner was declared, Tie if not."
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: price_of_beer_dollars
+        description: "What could go wrong?"
+        data_type: decimal(2,2)

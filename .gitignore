@@ -1,10 +1,11 @@
 target/
 dbt_packages/
 logs/
-timeball*.db*
+bc*.db*
 parquet/
 .python-version
 scratch.sql
-sratch.ipynb
+scratch.ipynb
 profile.log
 .ipynb_checkpoints/
+docs/compiled/

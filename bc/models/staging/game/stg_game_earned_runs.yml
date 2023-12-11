@@ -1,0 +1,38 @@
+version: 2
+
+
+models:
+  - name: stg_game_earned_runs
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, player_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_game_earned_runs.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        tests:
+          - relationships:
+              to: ref('stg_games')
+              field: game_id
+        data_type: varchar
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: earned_runs
+        description: "{{ doc('earned_runs') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null

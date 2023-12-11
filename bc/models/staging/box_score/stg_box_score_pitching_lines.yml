@@ -1,0 +1,112 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_pitching_lines
+    description: |
+      Aggregate pitching data for each player in each game,
+      derived from Retroshet box score data.
+
+
+    # TODO: Resolve dupes in raw data
+    # config:
+    #   contract:
+    #     enforced: true
+
+    # constraints:
+    #   - type: primary_key
+    #     columns: &pk [game_id, side, nth_pitcher]
+
+    # meta:
+    #   primary_keys: *pk
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+      - name: side
+        description: "{{ doc('side') }}"
+        data_type: side
+      - name: nth_pitcher
+        description: |
+          Nth player to pitch for this team in this game.
+          Differentiates appearances by the same player who switches between pitcher and other
+          positions.
+        data_type: utinyint
+      - name: outs_recorded
+        description: "{{ doc('outs_recorded') }}"
+        data_type: utinyint
+      - name: no_out_batters
+        description: |
+          Number of batters faced by this pitcher in his final inning of work,
+          if he did not record an out in that inning.
+        data_type: utinyint
+      - name: batters_faced
+        description: "{{ doc('batters_faced') }}"
+        data_type: utinyint
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: utinyint
+      - name: doubles
+        description: "{{ doc('doubles') }}"
+        data_type: utinyint
+      - name: triples
+        description: "{{ doc('triples') }}"
+        data_type: utinyint
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: utinyint
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: utinyint
+      - name: earned_runs
+        description: "{{ doc('earned_runs') }}"
+        data_type: utinyint
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: utinyint
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: utinyint
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: utinyint
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: utinyint
+      - name: wild_pitches
+        description: "{{ doc('wild_pitches') }}"
+        data_type: utinyint
+      - name: balks
+        description: "{{ doc('balks') }}"
+        data_type: utinyint
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: utinyint
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: utinyint
+      - name: singles
+        description: "{{ doc('singles') }}"
+        data_type: utinyint
+      - name: total_bases
+        description: "{{ doc('total_bases') }}"
+        data_type: integer
+      - name: on_base_opportunities
+        description: "{{ doc('on_base_opportunities') }}"
+        data_type: integer
+      - name: on_base_successes
+        description: "{{ doc('on_base_successes') }}"
+        data_type: integer
+      - name: games_started
+        description: "{{ doc('games_started') }}"
+        data_type: integer
+      - name: games_relieved
+        description: "{{ doc('games_relieved') }}"
+        data_type: integer
+      - name: games_finished
+        description: "{{ doc('games_finished') }}"
+        data_type: integer

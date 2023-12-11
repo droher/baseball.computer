@@ -1,0 +1,13 @@
+version: 2
+seeds:
+  - name: seed_us_states_regions
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: state
+        description: ''
+        data_type: varchar
+      - name: region
+        description: ''
+        data_type: varchar

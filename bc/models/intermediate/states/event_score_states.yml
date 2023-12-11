@@ -1,0 +1,49 @@
+version: 2
+
+
+models:
+  - name: event_score_states
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_score_states.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: score_home_start
+        description: "{{ doc('score_home_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: score_away_start
+        description: "{{ doc('score_away_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: score_home_end
+        description: "{{ doc('score_home_end') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: score_away_end
+        description: "{{ doc('score_away_end') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: runs_on_play
+        description: "{{ doc('runs_on_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null

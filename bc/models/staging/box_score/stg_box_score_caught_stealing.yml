@@ -1,0 +1,33 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_caught_stealing
+    description: |
+      Individually noted caught stealing events from box score accounts,
+      with varying degrees of detail.
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: running_side
+        description: ""
+        data_type: varchar
+      - name: runner_id
+        description: "{{ doc('runner_id') }}"
+        data_type: varchar
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+      - name: catcher_id
+        description: ""
+        data_type: varchar
+      - name: inning
+        description: "{{ doc('inning') }}"
+        data_type: bigint

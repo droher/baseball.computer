@@ -1,0 +1,27 @@
+version: 2
+seeds:
+  - name: seed_outfield_hit_inference
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: batter_hand
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: batted_to_fielder
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: total_bases
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: gb_rate
+        description: ''
+        data_type: double
+        constraints:
+          - type: not_null

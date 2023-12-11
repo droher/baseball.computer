@@ -1,0 +1,637 @@
+version: 2
+
+
+models:
+  - name: metrics_player_career_offense
+    description: |
+      Aggregate offensive statistics and averages over player careers.
+      Regular season only.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [player_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_metrics_player_career_offense.parquet'
+
+    columns:
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+      - name: plate_appearances
+        description: "{{ doc('plate_appearances') }}"
+        data_type: integer
+      - name: at_bats
+        description: "{{ doc('at_bats') }}"
+        data_type: integer
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: integer
+      - name: singles
+        description: "{{ doc('singles') }}"
+        data_type: integer
+      - name: doubles
+        description: "{{ doc('doubles') }}"
+        data_type: integer
+      - name: triples
+        description: "{{ doc('triples') }}"
+        data_type: integer
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: integer
+      - name: total_bases
+        description: "{{ doc('total_bases') }}"
+        data_type: integer
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: integer
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: integer
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: integer
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: integer
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: integer
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: integer
+      - name: reached_on_errors
+        description: "{{ doc('reached_on_errors') }}"
+        data_type: integer
+      - name: reached_on_interferences
+        description: "{{ doc('reached_on_interferences') }}"
+        data_type: integer
+      - name: inside_the_park_home_runs
+        description: "{{ doc('inside_the_park_home_runs') }}"
+        data_type: integer
+      - name: ground_rule_doubles
+        description: "{{ doc('ground_rule_doubles') }}"
+        data_type: integer
+      - name: infield_hits
+        description: "{{ doc('infield_hits') }}"
+        data_type: integer
+      - name: on_base_opportunities
+        description: "{{ doc('on_base_opportunities') }}"
+        data_type: integer
+      - name: on_base_successes
+        description: "{{ doc('on_base_successes') }}"
+        data_type: integer
+      - name: runs_batted_in
+        description: "{{ doc('runs_batted_in') }}"
+        data_type: integer
+      - name: grounded_into_double_plays
+        description: "{{ doc('grounded_into_double_plays') }}"
+        data_type: integer
+      - name: double_plays
+        description: "{{ doc('double_plays') }}"
+        data_type: integer
+      - name: triple_plays
+        description: "{{ doc('triple_plays') }}"
+        data_type: integer
+      - name: batting_outs
+        description: "{{ doc('batting_outs') }}"
+        data_type: integer
+      - name: balls_in_play
+        description: "{{ doc('balls_in_play') }}"
+        data_type: integer
+      - name: balls_batted
+        description: "{{ doc('balls_batted') }}"
+        data_type: integer
+      - name: trajectory_fly_ball
+        description: "{{ doc('trajectory_fly_ball') }}"
+        data_type: integer
+      - name: trajectory_ground_ball
+        description: "{{ doc('trajectory_ground_ball') }}"
+        data_type: integer
+      - name: trajectory_line_drive
+        description: "{{ doc('trajectory_line_drive') }}"
+        data_type: integer
+      - name: trajectory_pop_up
+        description: "{{ doc('trajectory_pop_up') }}"
+        data_type: integer
+      - name: trajectory_unknown
+        description: "{{ doc('trajectory_unknown') }}"
+        data_type: integer
+      - name: trajectory_known
+        description: "{{ doc('trajectory_known') }}"
+        data_type: integer
+      - name: trajectory_broad_air_ball
+        description: "{{ doc('trajectory_broad_air_ball') }}"
+        data_type: integer
+      - name: trajectory_broad_ground_ball
+        description: "{{ doc('trajectory_broad_ground_ball') }}"
+        data_type: integer
+      - name: trajectory_broad_unknown
+        description: "{{ doc('trajectory_broad_unknown') }}"
+        data_type: integer
+      - name: trajectory_broad_known
+        description: "{{ doc('trajectory_broad_known') }}"
+        data_type: integer
+      - name: bunts
+        description: "{{ doc('bunts') }}"
+        data_type: integer
+      - name: batted_distance_plate
+        description: "{{ doc('batted_distance_plate') }}"
+        data_type: integer
+      - name: batted_distance_infield
+        description: "{{ doc('batted_distance_infield') }}"
+        data_type: integer
+      - name: batted_distance_outfield
+        description: "{{ doc('batted_distance_outfield') }}"
+        data_type: integer
+      - name: batted_distance_unknown
+        description: "{{ doc('batted_distance_unknown') }}"
+        data_type: integer
+      - name: batted_distance_known
+        description: "{{ doc('batted_distance_known') }}"
+        data_type: integer
+      - name: fielded_by_battery
+        description: "{{ doc('fielded_by_battery') }}"
+        data_type: integer
+      - name: fielded_by_infielder
+        description: "{{ doc('fielded_by_infielder') }}"
+        data_type: integer
+      - name: fielded_by_outfielder
+        description: "{{ doc('fielded_by_outfielder') }}"
+        data_type: integer
+      - name: fielded_by_known
+        description: "{{ doc('fielded_by_known') }}"
+        data_type: integer
+      - name: fielded_by_unknown
+        description: "{{ doc('fielded_by_unknown') }}"
+        data_type: integer
+      - name: batted_angle_left
+        description: "{{ doc('batted_angle_left') }}"
+        data_type: integer
+      - name: batted_angle_right
+        description: "{{ doc('batted_angle_right') }}"
+        data_type: integer
+      - name: batted_angle_middle
+        description: "{{ doc('batted_angle_middle') }}"
+        data_type: integer
+      - name: batted_angle_unknown
+        description: "{{ doc('batted_angle_unknown') }}"
+        data_type: integer
+      - name: batted_angle_known
+        description: "{{ doc('batted_angle_known') }}"
+        data_type: integer
+      - name: batted_location_plate
+        description: "{{ doc('batted_location_plate') }}"
+        data_type: integer
+      - name: batted_location_right_infield
+        description: "{{ doc('batted_location_right_infield') }}"
+        data_type: integer
+      - name: batted_location_middle_infield
+        description: "{{ doc('batted_location_middle_infield') }}"
+        data_type: integer
+      - name: batted_location_left_infield
+        description: "{{ doc('batted_location_left_infield') }}"
+        data_type: integer
+      - name: batted_location_left_field
+        description: "{{ doc('batted_location_left_field') }}"
+        data_type: integer
+      - name: batted_location_center_field
+        description: "{{ doc('batted_location_center_field') }}"
+        data_type: integer
+      - name: batted_location_right_field
+        description: "{{ doc('batted_location_right_field') }}"
+        data_type: integer
+      - name: batted_location_unknown
+        description: "{{ doc('batted_location_unknown') }}"
+        data_type: integer
+      - name: batted_location_known
+        description: "{{ doc('batted_location_known') }}"
+        data_type: integer
+      - name: batted_balls_pulled
+        description: "{{ doc('batted_balls_pulled') }}"
+        data_type: integer
+      - name: batted_balls_opposite_field
+        description: "{{ doc('batted_balls_opposite_field') }}"
+        data_type: integer
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: integer
+      - name: times_reached_base
+        description: "{{ doc('times_reached_base') }}"
+        data_type: integer
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: integer
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: integer
+      - name: picked_off
+        description: "{{ doc('picked_off') }}"
+        data_type: integer
+      - name: picked_off_caught_stealing
+        description: "{{ doc('picked_off_caught_stealing') }}"
+        data_type: integer
+      - name: outs_on_basepaths
+        description: "{{ doc('outs_on_basepaths') }}"
+        data_type: integer
+      - name: unforced_outs_on_basepaths
+        description: "{{ doc('unforced_outs_on_basepaths') }}"
+        data_type: integer
+      - name: outs_avoided_on_errors
+        description: "{{ doc('outs_avoided_on_errors') }}"
+        data_type: integer
+      - name: advances_on_wild_pitches
+        description: "{{ doc('advances_on_wild_pitches') }}"
+        data_type: integer
+      - name: advances_on_passed_balls
+        description: "{{ doc('advances_on_passed_balls') }}"
+        data_type: integer
+      - name: advances_on_balks
+        description: "{{ doc('advances_on_balks') }}"
+        data_type: integer
+      - name: advances_on_unspecified_plays
+        description: "{{ doc('advances_on_unspecified_plays') }}"
+        data_type: integer
+      - name: advances_on_defensive_indifference
+        description: "{{ doc('advances_on_defensive_indifference') }}"
+        data_type: integer
+      - name: advances_on_errors
+        description: "{{ doc('advances_on_errors') }}"
+        data_type: integer
+      - name: plate_appearances_while_on_base
+        description: "{{ doc('plate_appearances_while_on_base') }}"
+        data_type: integer
+      - name: balls_in_play_while_running
+        description: "{{ doc('balls_in_play_while_running') }}"
+        data_type: integer
+      - name: balls_in_play_while_on_base
+        description: "{{ doc('balls_in_play_while_on_base') }}"
+        data_type: integer
+      - name: batter_total_bases_while_running
+        description: "{{ doc('batter_total_bases_while_running') }}"
+        data_type: integer
+      - name: batter_total_bases_while_on_base
+        description: "{{ doc('batter_total_bases_while_on_base') }}"
+        data_type: integer
+      - name: extra_base_advance_attempts
+        description: "{{ doc('extra_base_advance_attempts') }}"
+        data_type: integer
+      - name: bases_advanced
+        description: "{{ doc('bases_advanced') }}"
+        data_type: integer
+      - name: bases_advanced_on_balls_in_play
+        description: "{{ doc('bases_advanced_on_balls_in_play') }}"
+        data_type: integer
+      - name: surplus_bases_advanced_on_balls_in_play
+        description: "{{ doc('surplus_bases_advanced_on_balls_in_play') }}"
+        data_type: integer
+      - name: outs_on_extra_base_advance_attempts
+        description: "{{ doc('outs_on_extra_base_advance_attempts') }}"
+        data_type: integer
+      - name: pitches
+        description: "{{ doc('pitches') }}"
+        data_type: integer
+      - name: swings
+        description: "{{ doc('swings') }}"
+        data_type: integer
+      - name: swings_with_contact
+        description: "{{ doc('swings_with_contact') }}"
+        data_type: integer
+      - name: strikes
+        description: "{{ doc('strikes') }}"
+        data_type: integer
+      - name: strikes_called
+        description: "{{ doc('strikes_called') }}"
+        data_type: integer
+      - name: strikes_swinging
+        description: "{{ doc('strikes_swinging') }}"
+        data_type: integer
+      - name: strikes_foul
+        description: "{{ doc('strikes_foul') }}"
+        data_type: integer
+      - name: strikes_foul_tip
+        description: "{{ doc('strikes_foul_tip') }}"
+        data_type: integer
+      - name: strikes_in_play
+        description: "{{ doc('strikes_in_play') }}"
+        data_type: integer
+      - name: strikes_unknown
+        description: "{{ doc('strikes_unknown') }}"
+        data_type: integer
+      - name: balls
+        description: "{{ doc('balls') }}"
+        data_type: integer
+      - name: balls_called
+        description: "{{ doc('balls_called') }}"
+        data_type: integer
+      - name: balls_intentional
+        description: "{{ doc('balls_intentional') }}"
+        data_type: integer
+      - name: balls_automatic
+        description: "{{ doc('balls_automatic') }}"
+        data_type: integer
+      - name: unknown_pitches
+        description: "{{ doc('unknown_pitches') }}"
+        data_type: integer
+      - name: pitchouts
+        description: "{{ doc('pitchouts') }}"
+        data_type: integer
+      - name: pitcher_pickoff_attempts
+        description: "{{ doc('pitcher_pickoff_attempts') }}"
+        data_type: integer
+      - name: catcher_pickoff_attempts
+        description: "{{ doc('catcher_pickoff_attempts') }}"
+        data_type: integer
+      - name: pitches_blocked_by_catcher
+        description: "{{ doc('pitches_blocked_by_catcher') }}"
+        data_type: integer
+      - name: pitches_with_runners_going
+        description: "{{ doc('pitches_with_runners_going') }}"
+        data_type: integer
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: integer
+      - name: wild_pitches
+        description: "{{ doc('wild_pitches') }}"
+        data_type: integer
+      - name: balks
+        description: "{{ doc('balks') }}"
+        data_type: integer
+      - name: left_on_base
+        description: "{{ doc('left_on_base') }}"
+        data_type: integer
+      - name: left_on_base_with_two_outs
+        description: "{{ doc('left_on_base_with_two_outs') }}"
+        data_type: integer
+      - name: stolen_bases_second
+        description: "{{ doc('stolen_bases_second') }}"
+        data_type: integer
+      - name: stolen_bases_third
+        description: "{{ doc('stolen_bases_third') }}"
+        data_type: integer
+      - name: stolen_bases_home
+        description: "{{ doc('stolen_bases_home') }}"
+        data_type: integer
+      - name: caught_stealing_second
+        description: "{{ doc('caught_stealing_second') }}"
+        data_type: integer
+      - name: caught_stealing_third
+        description: "{{ doc('caught_stealing_third') }}"
+        data_type: integer
+      - name: caught_stealing_home
+        description: "{{ doc('caught_stealing_home') }}"
+        data_type: integer
+      - name: stolen_base_opportunities
+        description: "{{ doc('stolen_base_opportunities') }}"
+        data_type: integer
+      - name: stolen_base_opportunities_second
+        description: "{{ doc('stolen_base_opportunities_second') }}"
+        data_type: integer
+      - name: stolen_base_opportunities_third
+        description: "{{ doc('stolen_base_opportunities_third') }}"
+        data_type: integer
+      - name: stolen_base_opportunities_home
+        description: "{{ doc('stolen_base_opportunities_home') }}"
+        data_type: integer
+      - name: picked_off_first
+        description: "{{ doc('picked_off_first') }}"
+        data_type: integer
+      - name: picked_off_second
+        description: "{{ doc('picked_off_second') }}"
+        data_type: integer
+      - name: picked_off_third
+        description: "{{ doc('picked_off_third') }}"
+        data_type: integer
+      - name: times_force_on_runner
+        description: "{{ doc('times_force_on_runner') }}"
+        data_type: integer
+      - name: times_lead_runner
+        description: "{{ doc('times_lead_runner') }}"
+        data_type: integer
+      - name: times_next_base_empty
+        description: "{{ doc('times_next_base_empty') }}"
+        data_type: integer
+      - name: extra_base_chances
+        description: "{{ doc('extra_base_chances') }}"
+        data_type: integer
+      - name: extra_bases_taken
+        description: "{{ doc('extra_bases_taken') }}"
+        data_type: integer
+      - name: batting_average
+        description: "{{ doc('batting_average') }}"
+        data_type: double
+      - name: on_base_percentage
+        description: "{{ doc('on_base_percentage') }}"
+        data_type: double
+      - name: slugging_percentage
+        description: "{{ doc('slugging_percentage') }}"
+        data_type: double
+      - name: on_base_plus_slugging
+        description: "{{ doc('on_base_plus_slugging') }}"
+        data_type: double
+      - name: isolated_power
+        description: "{{ doc('isolated_power') }}"
+        data_type: double
+      - name: secondary_average
+        description: "{{ doc('secondary_average') }}"
+        data_type: double
+      - name: batting_average_on_balls_in_play
+        description: "{{ doc('batting_average_on_balls_in_play') }}"
+        data_type: double
+      - name: home_run_rate
+        description: "{{ doc('home_run_rate') }}"
+        data_type: double
+      - name: walk_rate
+        description: "{{ doc('walk_rate') }}"
+        data_type: double
+      - name: strikeout_rate
+        description: "{{ doc('strikeout_rate') }}"
+        data_type: double
+      - name: stolen_base_percentage
+        description: "{{ doc('stolen_base_percentage') }}"
+        data_type: double
+      - name: event_coverage_rate
+        description: ""
+        data_type: double
+      - name: known_trajectory_rate_outs
+        description: "{{ doc('known_trajectory_rate_outs') }}"
+        data_type: double
+      - name: known_trajectory_rate_hits
+        description: "{{ doc('known_trajectory_rate_hits') }}"
+        data_type: double
+      - name: known_trajectory_rate
+        description: "{{ doc('known_trajectory_rate') }}"
+        data_type: double
+      - name: known_trajectory_broad_rate_outs
+        description: "{{ doc('known_trajectory_broad_rate_outs') }}"
+        data_type: double
+      - name: known_trajectory_broad_rate_hits
+        description: "{{ doc('known_trajectory_broad_rate_hits') }}"
+        data_type: double
+      - name: known_trajectory_broad_rate
+        description: "{{ doc('known_trajectory_broad_rate') }}"
+        data_type: double
+      - name: known_trajectory_out_hit_ratio
+        description: "{{ doc('known_trajectory_out_hit_ratio') }}"
+        data_type: double
+      - name: known_trajectory_broad_out_hit_ratio
+        description: "{{ doc('known_trajectory_broad_out_hit_ratio') }}"
+        data_type: double
+      - name: air_ball_rate_outs
+        description: "{{ doc('air_ball_rate_outs') }}"
+        data_type: double
+      - name: ground_ball_rate_outs
+        description: "{{ doc('ground_ball_rate_outs') }}"
+        data_type: double
+      - name: ground_air_out_ratio
+        description: "{{ doc('ground_air_out_ratio') }}"
+        data_type: double
+      - name: air_ball_hit_rate
+        description: "{{ doc('air_ball_hit_rate') }}"
+        data_type: double
+      - name: ground_ball_hit_rate
+        description: "{{ doc('ground_ball_hit_rate') }}"
+        data_type: double
+      - name: ground_air_hit_ratio
+        description: "{{ doc('ground_air_hit_ratio') }}"
+        data_type: double
+      - name: fly_ball_rate
+        description: "{{ doc('fly_ball_rate') }}"
+        data_type: double
+      - name: line_drive_rate
+        description: "{{ doc('line_drive_rate') }}"
+        data_type: double
+      - name: pop_up_rate
+        description: "{{ doc('pop_up_rate') }}"
+        data_type: double
+      - name: ground_ball_rate
+        description: "{{ doc('ground_ball_rate') }}"
+        data_type: double
+      - name: coverage_weighted_air_ball_batting_average
+        description: "{{ doc('coverage_weighted_air_ball_batting_average') }}"
+        data_type: double
+      - name: coverage_weighted_ground_ball_batting_average
+        description: "{{ doc('coverage_weighted_ground_ball_batting_average') }}"
+        data_type: double
+      - name: coverage_weighted_fly_ball_batting_average
+        description: "{{ doc('coverage_weighted_fly_ball_batting_average') }}"
+        data_type: double
+      - name: coverage_weighted_line_drive_batting_average
+        description: "{{ doc('coverage_weighted_line_drive_batting_average') }}"
+        data_type: double
+      - name: coverage_weighted_pop_up_batting_average
+        description: "{{ doc('coverage_weighted_pop_up_batting_average') }}"
+        data_type: double
+      - name: known_angle_rate_outs
+        description: "{{ doc('known_angle_rate_outs') }}"
+        data_type: double
+      - name: known_angle_rate_hits
+        description: "{{ doc('known_angle_rate_hits') }}"
+        data_type: double
+      - name: known_angle_rate
+        description: "{{ doc('known_angle_rate') }}"
+        data_type: double
+      - name: known_angle_out_hit_ratio
+        description: "{{ doc('known_angle_out_hit_ratio') }}"
+        data_type: double
+      - name: angle_left_rate_outs
+        description: "{{ doc('angle_left_rate_outs') }}"
+        data_type: double
+      - name: angle_left_rate_hits
+        description: "{{ doc('angle_left_rate_hits') }}"
+        data_type: double
+      - name: angle_left_rate
+        description: "{{ doc('angle_left_rate') }}"
+        data_type: double
+      - name: coverage_weighted_angle_left_batting_average
+        description: "{{ doc('coverage_weighted_angle_left_batting_average') }}"
+        data_type: double
+      - name: angle_right_rate_outs
+        description: "{{ doc('angle_right_rate_outs') }}"
+        data_type: double
+      - name: angle_right_rate_hits
+        description: "{{ doc('angle_right_rate_hits') }}"
+        data_type: double
+      - name: angle_right_rate
+        description: "{{ doc('angle_right_rate') }}"
+        data_type: double
+      - name: coverage_weighted_angle_right_batting_average
+        description: "{{ doc('coverage_weighted_angle_right_batting_average') }}"
+        data_type: double
+      - name: angle_middle_rate_outs
+        description: "{{ doc('angle_middle_rate_outs') }}"
+        data_type: double
+      - name: angle_middle_rate_hits
+        description: "{{ doc('angle_middle_rate_hits') }}"
+        data_type: double
+      - name: angle_middle_rate
+        description: "{{ doc('angle_middle_rate') }}"
+        data_type: double
+      - name: coverage_weighted_angle_middle_batting_average
+        description: "{{ doc('coverage_weighted_angle_middle_batting_average') }}"
+        data_type: double
+      - name: pulled_rate_outs
+        description: "{{ doc('pulled_rate_outs') }}"
+        data_type: double
+      - name: pulled_rate_hits
+        description: "{{ doc('pulled_rate_hits') }}"
+        data_type: double
+      - name: pulled_rate
+        description: "{{ doc('pulled_rate') }}"
+        data_type: double
+      - name: coverage_weighted_pulled_batting_average
+        description: "{{ doc('coverage_weighted_pulled_batting_average') }}"
+        data_type: double
+      - name: opposite_field_rate_outs
+        description: "{{ doc('opposite_field_rate_outs') }}"
+        data_type: double
+      - name: opposite_field_rate_hits
+        description: "{{ doc('opposite_field_rate_hits') }}"
+        data_type: double
+      - name: opposite_field_rate
+        description: "{{ doc('opposite_field_rate') }}"
+        data_type: double
+      - name: coverage_weighted_opposite_field_batting_average
+        description: "{{ doc('coverage_weighted_opposite_field_batting_average') }}"
+        data_type: double
+      - name: stolen_base_attempt_rate_second
+        description: "{{ doc('stolen_base_attempt_rate_second') }}"
+        data_type: double
+      - name: stolen_base_attempt_rate_third
+        description: "{{ doc('stolen_base_attempt_rate_third') }}"
+        data_type: double
+      - name: stolen_base_attempt_rate_home
+        description: "{{ doc('stolen_base_attempt_rate_home') }}"
+        data_type: double
+      - name: unforced_out_rate
+        description: "{{ doc('unforced_out_rate') }}"
+        data_type: double
+      - name: pitch_strike_rate
+        description: "{{ doc('pitch_strike_rate') }}"
+        data_type: double
+      - name: pitch_contact_rate
+        description: "{{ doc('pitch_contact_rate') }}"
+        data_type: double
+      - name: pitch_swing_rate
+        description: "{{ doc('pitch_swing_rate') }}"
+        data_type: double
+      - name: pitch_ball_rate
+        description: "{{ doc('pitch_ball_rate') }}"
+        data_type: double
+      - name: pitch_swing_and_miss_rate
+        description: "{{ doc('pitch_swing_and_miss_rate') }}"
+        data_type: double
+      - name: pitch_foul_rate
+        description: "{{ doc('pitch_foul_rate') }}"
+        data_type: double
+      - name: pitched_called_strike_rate
+        description: "{{ doc('pitched_called_strike_rate') }}"
+        data_type: double
+      - name: pitch_data_coverage_rate
+        description: "{{ doc('pitch_data_coverage_rate') }}"
+        data_type: double

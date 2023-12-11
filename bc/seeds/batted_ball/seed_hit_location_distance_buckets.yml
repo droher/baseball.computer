@@ -1,0 +1,22 @@
+version: 2
+seeds:
+  - name: seed_hit_location_distance_buckets
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: general_location
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: depth
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: distance_bucket
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null

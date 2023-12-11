@@ -1,0 +1,57 @@
+version: 2
+seeds:
+  - name: seed_plate_appearance_result_types
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: plate_appearance_result
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: result_category
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: is_at_bat
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_on_base_opportunity
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_on_base_success
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_batting_out
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_batted
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_hit
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_in_play
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: total_bases
+        description: ''
+        data_type: integer
+        constraints:
+          - type: not_null

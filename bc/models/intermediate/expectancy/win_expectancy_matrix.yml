@@ -1,0 +1,54 @@
+version: 2
+
+
+models:
+  - name: win_expectancy_matrix
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [win_expectancy_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_win_expectancy_matrix.parquet'
+
+    columns:
+      - name: win_expectancy_key
+        description: ""
+        data_type: varchar
+      - name: inning
+        description: "{{ doc('inning') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: frame
+        description: "{{ doc('frame') }}"
+        data_type: frame
+        constraints:
+          - type: not_null
+      - name: truncated_home_margin
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: outs
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: base_state
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: home_win_rate
+        description: ""
+        data_type: decimal(4,3)
+        constraints:
+          - type: not_null

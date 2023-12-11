@@ -1,0 +1,56 @@
+version: 2
+
+
+models:
+  - name: stg_game_lineup_appearances
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, player_id, lineup_position, start_event_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_game_lineup_appearances.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        tests:
+          - relationships:
+              field: game_id
+              to: ref('stg_games')
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+        tests:
+          - relationships:
+              field: player_id
+              to: ref('stg_bio')
+      - name: side
+        description: "{{ doc('side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: lineup_position
+        description: "{{ doc('lineup_position') }}"
+        data_type: utinyint
+      - name: entered_game_as
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: start_event_id
+        description: ""
+        data_type: utinyint
+      - name: end_event_id
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null

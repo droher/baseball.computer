@@ -1,0 +1,308 @@
+version: 2
+
+
+models:
+  - name: event_states_full
+    description: A catch-all table for information describing the state of the event
+      both before and after it occurred. Includes information about the score, the
+      base-out state, and the players involved in the event.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_states_full.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: is_interleague
+        description: "{{ doc('is_interleague') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+        constraints:
+          - type: not_null
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+        constraints:
+          - type: not_null
+      - name: bat_first_side
+        description: "{{ doc('bat_first_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: time_of_day
+        description: "{{ doc('time_of_day') }}"
+        data_type: time_of_day
+        constraints:
+          - type: not_null
+      - name: pitching_team_starting_pitcher_id
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: inning_start
+        description: "{{ doc('inning_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: frame_start
+        description: "{{ doc('frame_start') }}"
+        data_type: frame
+        constraints:
+          - type: not_null
+      - name: outs_start
+        description: "{{ doc('outs_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: inning_in_outs_start
+        description: "{{ doc('inning_in_outs_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: is_gidp_eligible
+        description: "{{ doc('is_gidp_eligible') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: fielding_side
+        description: ""
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: score_home_start
+        description: "{{ doc('score_home_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: score_away_start
+        description: "{{ doc('score_away_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: home_margin_start
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: batting_team_margin_start
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: batter_lineup_position
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: batter_fielding_position
+        description: ""
+        data_type: utinyint
+      - name: batter_hand
+        description: ""
+        data_type: hand
+      - name: pitcher_hand
+        description: ""
+        data_type: hand
+      - name: away_team_id
+        description: "{{ doc('away_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: home_team_id
+        description: "{{ doc('home_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: batting_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: fielding_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: batter_id
+        description: "{{ doc('batter_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: base_state_start
+        description: "{{ doc('base_state_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: runners_count_start
+        description: "{{ doc('runners_count_start') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: frame_start_flag
+        description: "{{ doc('frame_start_flag') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: runner_first_id_start
+        description: "{{ doc('runner_first_id_start') }}"
+        data_type: varchar
+      - name: runner_second_id_start
+        description: "{{ doc('runner_second_id_start') }}"
+        data_type: varchar
+      - name: runner_third_id_start
+        description: "{{ doc('runner_third_id_start') }}"
+        data_type: varchar
+      - name: count_balls
+        description: ""
+        data_type: utinyint
+      - name: count_strikes
+        description: ""
+        data_type: utinyint
+      - name: inning_end
+        description: "{{ doc('inning_end') }}"
+        data_type: utinyint
+      - name: frame_end
+        description: "{{ doc('frame_end') }}"
+        data_type: frame
+      - name: outs_on_play
+        description: "{{ doc('outs_on_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: outs_end
+        description: "{{ doc('outs_end') }}"
+        data_type: utinyint
+      - name: base_state_end
+        description: "{{ doc('base_state_end') }}"
+        data_type: utinyint
+      - name: runs_on_play
+        description: "{{ doc('runs_on_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: score_home_end
+        description: "{{ doc('score_home_end') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: score_away_end
+        description: "{{ doc('score_away_end') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: home_margin_end
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: batting_team_margin_end
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: frame_end_flag
+        description: "{{ doc('frame_end_flag') }}"
+        data_type: boolean
+      - name: truncated_frame_flag
+        description: "{{ doc('truncated_frame_flag') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: game_end_flag
+        description: "{{ doc('game_end_flag') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: league_group
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: season_group
+        description: ""
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: inning_group_start
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: inning_group_end
+        description: ""
+        data_type: varchar
+      - name: truncated_home_margin_start
+        description: ""
+        data_type: tinyint
+        constraints:
+          - type: not_null
+      - name: truncated_home_margin_end
+        description: ""
+        data_type: tinyint
+      - name: run_expectancy_start_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: run_expectancy_end_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: win_expectancy_start_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: win_expectancy_end_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null

@@ -1,0 +1,57 @@
+version: 2
+
+
+models:
+  - name: stg_schedule
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    columns:
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: timestamp
+        constraints:
+          - type: not_null
+      - name: double_header
+        description: ""
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: day_of_week
+        description: ""
+        data_type: varchar
+      - name: visiting_team
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: visiting_team_league
+        description: ""
+        data_type: varchar
+      - name: visiting_team_game_number
+        description: ""
+        data_type: smallint
+      - name: home_team
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: home_team_league
+        description: ""
+        data_type: varchar
+      - name: home_team_game_number
+        description: ""
+        data_type: integer
+      - name: day_night
+        description: ""
+        data_type: varchar
+      - name: postponement_indicator
+        description: ""
+        data_type: varchar
+      - name: makeup_dates
+        description: ""
+        data_type: varchar

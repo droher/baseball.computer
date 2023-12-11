@@ -1,0 +1,55 @@
+version: 2
+
+
+models:
+  - name: stg_event_audit
+    description: |
+      Connects each event to the raw Retrosheet data to enable QA/debugging.
+      See the Retosheet event file spec for more info:
+      https://www.retrosheet.org/eventfile.htm
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_event_audit.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: filename
+        description: "{{ doc('filename') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: line_number
+        description: "Line number of the file on which the event was found"
+        data_type: uinteger
+        constraints:
+          - type: not_null
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
+      - name: raw_play
+        description: "The string representation of the play"
+        data_type: varchar
+        constraints:
+          - type: not_null

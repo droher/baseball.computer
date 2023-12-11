@@ -1,0 +1,103 @@
+version: 2
+
+
+models:
+  - name: stg_databank_batting
+    description: "Aggregate batting statistics by player, season, and stint with a
+      given team."
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [databank_player_id, season, stint]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_databank_batting.parquet'
+
+    columns:
+      - name: databank_player_id
+        description: "{{ doc('databank_player_id') }}"
+        data_type: varchar
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: stint
+        description: "{{ doc('stint') }}"
+        data_type: smallint
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: varchar
+      - name: league_id
+        description: "{{ doc('league_id') }}"
+        data_type: varchar
+      - name: games
+        description: "Total number of games played"
+        data_type: usmallint
+      - name: at_bats
+        description: "{{ doc('at_bats') }}"
+        data_type: usmallint
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: usmallint
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: usmallint
+      - name: doubles
+        description: "{{ doc('doubles') }}"
+        data_type: usmallint
+      - name: triples
+        description: "{{ doc('triples') }}"
+        data_type: usmallint
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: usmallint
+      - name: runs_batted_in
+        description: "{{ doc('runs_batted_in') }}"
+        data_type: usmallint
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: usmallint
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: usmallint
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: usmallint
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: usmallint
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: usmallint
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: usmallint
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: usmallint
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: usmallint
+      - name: grounded_into_double_plays
+        description: "{{ doc('grounded_into_double_plays') }}"
+        data_type: usmallint
+      - name: singles
+        description: "{{ doc('singles') }}"
+        data_type: usmallint
+      - name: total_bases
+        description: "{{ doc('total_bases') }}"
+        data_type: integer
+      - name: plate_appearances
+        description: "{{ doc('plate_appearances') }}"
+        data_type: integer
+      - name: on_base_opportunities
+        description: "{{ doc('on_base_opportunities') }}"
+        data_type: integer
+      - name: on_base_successes
+        description: "{{ doc('on_base_successes') }}"
+        data_type: integer

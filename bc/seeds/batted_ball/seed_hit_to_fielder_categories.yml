@@ -1,0 +1,22 @@
+version: 2
+seeds:
+  - name: seed_hit_to_fielder_categories
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: batted_to_fielder
+        description: ''
+        data_type: integer
+        constraints:
+          - type: primary_key
+      - name: category_depth
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: category_side
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: not_null

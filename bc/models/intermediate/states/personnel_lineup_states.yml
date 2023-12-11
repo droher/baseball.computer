@@ -1,0 +1,59 @@
+version: 2
+
+
+models:
+  - name: personnel_lineup_states
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [personnel_lineup_key, lineup_position]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_personnel_lineup_states.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: batting_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: personnel_lineup_key
+        description: ""
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: start_event_id
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: end_event_id
+        description: ""
+        constraints:
+          - type: not_null
+        data_type: uinteger
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: lineup_position
+        description: "{{ doc('lineup_position') }}"
+        data_type: utinyint

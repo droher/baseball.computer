@@ -1,0 +1,44 @@
+version: 2
+
+
+models:
+  - name: event_personnel_lookup
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_personnel_lookup.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: event_id
+        description: "{{ doc('event_id') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: personnel_lineup_key
+        description: ""
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: personnel_fielding_key
+        description: ""
+        data_type: integer
+        constraints:
+          - type: not_null

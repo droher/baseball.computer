@@ -1,0 +1,228 @@
+version: 2
+
+
+models:
+  - name: game_start_info
+    description: |
+      Key table for information about every game in the database.
+      Only information that is known at the time of the game's start is included.
+      For example, the final score is not included here, but the starting lineups are.
+      For information about the results of the game, see the `game_results` table.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_start_info.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: start_time
+        description: "{{ doc('start_time') }}"
+        data_type: timestamp
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: home_team_id
+        description: "{{ doc('home_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: away_team_id
+        description: "{{ doc('away_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: doubleheader_status
+        description: ""
+        data_type: doubleheader_status
+        constraints:
+          - type: not_null
+      - name: time_of_day
+        description: "{{ doc('time_of_day') }}"
+        data_type: time_of_day
+        constraints:
+          - type: not_null
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+        constraints:
+          - type: not_null
+      - name: bat_first_side
+        description: "{{ doc('bat_first_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: sky
+        description: "{{ doc('sky') }}"
+        data_type: sky
+        constraints:
+          - type: not_null
+      - name: field_condition
+        description: "{{ doc('field_condition') }}"
+        data_type: field_condition
+        constraints:
+          - type: not_null
+      - name: precipitation
+        description: "{{ doc('precipitation') }}"
+        data_type: precipitation
+        constraints:
+          - type: not_null
+      - name: wind_direction
+        description: "{{ doc('wind_direction') }}"
+        constraints:
+          - type: not_null
+        data_type: wind_direction
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+        constraints:
+          - type: not_null
+      - name: temperature_fahrenheit
+        description: "{{ doc('temperature_fahrenheit') }}"
+        data_type: tinyint
+      - name: attendance
+        description: "{{ doc('attendance') }}"
+        data_type: uinteger
+      - name: wind_speed_mph
+        description: "{{ doc('wind_speed_mph') }}"
+        data_type: utinyint
+      - name: use_dh
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: scorer
+        description: ""
+        data_type: varchar
+      - name: scoring_method
+        description: ""
+        data_type: varchar
+      - name: source_type
+        description: "{{ doc('source_type') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: umpire_home_id
+        description: "{{ doc('umpire_home_id') }}"
+        data_type: varchar
+      - name: umpire_first_id
+        description: "{{ doc('umpire_first_id') }}"
+        data_type: varchar
+      - name: umpire_second_id
+        description: "{{ doc('umpire_second_id') }}"
+        data_type: varchar
+      - name: umpire_third_id
+        description: "{{ doc('umpire_third_id') }}"
+        data_type: varchar
+      - name: umpire_left_id
+        description: "{{ doc('umpire_left_id') }}"
+        data_type: varchar
+      - name: umpire_right_id
+        description: "{{ doc('umpire_right_id') }}"
+        data_type: varchar
+      - name: filename
+        description: "{{ doc('filename') }}"
+        data_type: varchar
+      - name: home_starting_pitcher_id
+        description: "{{ doc('home_starting_pitcher_id') }}"
+        data_type: varchar
+      - name: away_starting_pitcher_id
+        description: "{{ doc('away_starting_pitcher_id') }}"
+        data_type: varchar
+      - name: is_regular_season
+        description: "{{ doc('is_regular_season') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_postseason
+        description: "{{ doc('is_postseason') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_integrated
+        description: |
+          Whether or not this game took place in a racially integrated league/season.
+          This is defined as all AL/NL games from 1947 onward. Keep in mind that integration
+          status has nuances that go well beyond the scope of this field: specifically,
+          some teams had no Black players as late as 1958, and Black players were generally
+          underrepresented until the early 70s, especially in the AL. See Mark Armour's research
+          for more detail: https://sabr.org/journal/article/the-effects-of-integration-1947-1986/
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_negro_leagues
+        description: |
+          Whether or not this was a game with Negro League teams.
+          This includes exhibition/all-star games that featured Black and white teams.
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_segregated_white
+        description: |
+          Whether or not this was a non-Negro-League game before MLB was integrated in 1947.
+        data_type: boolean
+      - name: away_franchise_id
+        description: "{{ doc('away_franchise_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: home_franchise_id
+        description: "{{ doc('home_franchise_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: away_league
+        description: "{{ doc('away_league') }}"
+        data_type: varchar
+      - name: home_league
+        description: "{{ doc('home_league') }}"
+        data_type: varchar
+      - name: away_division
+        description: "{{ doc('away_division') }}"
+        data_type: varchar
+      - name: home_division
+        description: "{{ doc('home_division') }}"
+        data_type: varchar
+      - name: away_team_name
+        description: "{{ doc('away_team_name') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: home_team_name
+        description: "{{ doc('home_team_name') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: is_interleague
+        description: "{{ doc('is_interleague') }}"
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: lineup_map_away
+        description: "{{ doc('lineup_map_away') }}"
+        data_type: map(utinyint, varchar)
+      - name: lineup_map_home
+        description: "{{ doc('lineup_map_home') }}"
+        data_type: map(utinyint, varchar)
+      - name: fielding_map_away
+        description: "{{ doc('fielding_map_away') }}"
+        data_type: map(utinyint, varchar)
+      - name: fielding_map_home
+        description: "{{ doc('fielding_map_home') }}"
+        data_type: map(utinyint, varchar)

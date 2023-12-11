@@ -1,0 +1,83 @@
+version: 2
+
+
+models:
+  - name: calc_fielding_play_agg
+    description: |
+      Table containing one row for each fielder who made at least one
+      fielding play on a given event. It serves as the canonical way to
+      calculate fielding data for each fielder on each event. For the most
+      part, the definitions involve conditions based on each individual fielding play,
+      but some definitions require aggregate knowledge of the event as a whole.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key, fielding_position]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_calc_fielding_play_agg.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: fielding_position
+        description: "{{ doc('fielding_position') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: putouts
+        description: "{{ doc('putouts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: assists
+        description: "{{ doc('assists') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: errors
+        description: "{{ doc('errors') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: fielders_choices
+        description: "{{ doc('fielders_choices') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: plays_started
+        description: "{{ doc('plays_started') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: assisted_putouts
+        description: "{{ doc('assisted_putouts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: first_errors
+        description: "{{ doc('first_errors') }}"
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: unknown_putouts
+        description: "{{ doc('unknown_putouts') }}"
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: incomplete_events
+        description: "{{ doc('incomplete_events') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null

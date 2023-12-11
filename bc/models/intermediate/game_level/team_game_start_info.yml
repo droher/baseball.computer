@@ -1,0 +1,184 @@
+version: 2
+
+
+models:
+  - name: team_game_start_info
+    description: |
+      A version of `game_start_info` that includes one row for each team in each game.
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, team_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_team_game_start_info.parquet'
+
+    columns:
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: opponent_id
+        description: ""
+        data_type: team_id
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: opponent_league
+        description: ""
+        data_type: varchar
+      - name: division
+        description: "{{ doc('division') }}"
+        data_type: varchar
+      - name: opponent_division
+        description: ""
+        data_type: varchar
+      - name: team_name
+        description: "{{ doc('team_name') }}"
+        data_type: varchar
+      - name: opponent_name
+        description: ""
+        data_type: varchar
+      - name: starting_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: opponent_starting_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: team_side
+        description: ""
+        data_type: side
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+      - name: start_time
+        description: "{{ doc('start_time') }}"
+        data_type: timestamp
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: doubleheader_status
+        description: ""
+        data_type: doubleheader_status
+      - name: time_of_day
+        description: "{{ doc('time_of_day') }}"
+        data_type: time_of_day
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+      - name: bat_first_side
+        description: "{{ doc('bat_first_side') }}"
+        data_type: side
+      - name: sky
+        description: "{{ doc('sky') }}"
+        data_type: sky
+      - name: field_condition
+        description: "{{ doc('field_condition') }}"
+        data_type: field_condition
+      - name: precipitation
+        description: "{{ doc('precipitation') }}"
+        data_type: precipitation
+      - name: wind_direction
+        description: "{{ doc('wind_direction') }}"
+        data_type: wind_direction
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+      - name: temperature_fahrenheit
+        description: "{{ doc('temperature_fahrenheit') }}"
+        data_type: tinyint
+      - name: attendance
+        description: "{{ doc('attendance') }}"
+        data_type: uinteger
+      - name: wind_speed_mph
+        description: "{{ doc('wind_speed_mph') }}"
+        data_type: utinyint
+      - name: use_dh
+        description: ""
+        data_type: boolean
+      - name: scorer
+        description: ""
+        data_type: varchar
+      - name: scoring_method
+        description: ""
+        data_type: varchar
+      - name: source_type
+        description: "{{ doc('source_type') }}"
+        data_type: varchar
+      - name: umpire_home_id
+        description: "{{ doc('umpire_home_id') }}"
+        data_type: varchar
+      - name: umpire_first_id
+        description: "{{ doc('umpire_first_id') }}"
+        data_type: varchar
+      - name: umpire_second_id
+        description: "{{ doc('umpire_second_id') }}"
+        data_type: varchar
+      - name: umpire_third_id
+        description: "{{ doc('umpire_third_id') }}"
+        data_type: varchar
+      - name: umpire_left_id
+        description: "{{ doc('umpire_left_id') }}"
+        data_type: varchar
+      - name: umpire_right_id
+        description: "{{ doc('umpire_right_id') }}"
+        data_type: varchar
+      - name: filename
+        description: "{{ doc('filename') }}"
+        data_type: varchar
+      - name: is_regular_season
+        description: "{{ doc('is_regular_season') }}"
+        data_type: boolean
+      - name: is_postseason
+        description: "{{ doc('is_postseason') }}"
+        data_type: boolean
+      - name: is_integrated
+        description: ""
+        data_type: boolean
+      - name: is_negro_leagues
+        description: ""
+        data_type: boolean
+      - name: is_segregated_white
+        description: ""
+        data_type: boolean
+      - name: away_franchise_id
+        description: "{{ doc('away_franchise_id') }}"
+        data_type: team_id
+      - name: home_franchise_id
+        description: "{{ doc('home_franchise_id') }}"
+        data_type: team_id
+      - name: is_interleague
+        description: "{{ doc('is_interleague') }}"
+        data_type: boolean
+      - name: lineup_map_away
+        description: "{{ doc('lineup_map_away') }}"
+        data_type: map(utinyint, varchar)
+      - name: lineup_map_home
+        description: "{{ doc('lineup_map_home') }}"
+        data_type: map(utinyint, varchar)
+      - name: fielding_map_away
+        description: "{{ doc('fielding_map_away') }}"
+        data_type: map(utinyint, varchar)
+      - name: fielding_map_home
+        description: "{{ doc('fielding_map_home') }}"
+        data_type: map(utinyint, varchar)
+      - name: series_id
+        description: ""
+        data_type: varchar
+      - name: season_game_number
+        description: ""
+        data_type: bigint
+      - name: series_game_number
+        description: ""
+        data_type: bigint
+      - name: days_since_last_game
+        description: ""
+        data_type: bigint

@@ -1,0 +1,7 @@
+- Check that all referencd batters are in the game at the time of their PA
+- Smoke test for all-time HR leaders
+- Ranges for franchises/teams
+- Fix PGH/PHG typo in raw data
+- CAG194209072: radca101 appears on both sides
+- Dupes in box scsore lines - fielding: ("SLN193807150, Away, garmd101, 1") and pitching: ("CHA195010012, Home, 1")
+- 1960 ASGs are missing game_type

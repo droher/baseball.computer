@@ -1,0 +1,34 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_line_scores
+    description: |
+      Inning-by-inning run totals from box score accounts.
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, batting_side, inning]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_box_score_line_scores.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: varchar
+      - name: inning
+        description: "{{ doc('inning') }}"
+        data_type: bigint
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: bigint

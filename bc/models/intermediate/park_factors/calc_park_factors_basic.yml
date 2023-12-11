@@ -1,0 +1,42 @@
+version: 2
+
+
+models:
+  - name: calc_park_factors_basic
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [park_id, season, league]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_calc_park_factors_basic.parquet'
+
+    columns:
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: sqrt_sample_size
+        description: ""
+        data_type: double
+      - name: avg_this_runs_per_inning
+        description: ""
+        data_type: double
+      - name: avg_other_runs_per_inning
+        description: ""
+        data_type: double
+      - name: basic_park_factor
+        description: ""
+        data_type: double

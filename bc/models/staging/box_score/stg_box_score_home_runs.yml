@@ -1,0 +1,36 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_home_runs
+    description: |
+      Individually noted home run events from box score accounts,
+      with varying degrees of detail.
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: varchar
+      - name: batter_id
+        description: "{{ doc('batter_id') }}"
+        data_type: varchar
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+      - name: inning
+        description: "{{ doc('inning') }}"
+        data_type: bigint
+      - name: runners_on
+        description: ""
+        data_type: bigint
+      - name: outs
+        description: ""
+        data_type: bigint

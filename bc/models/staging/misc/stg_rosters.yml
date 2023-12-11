@@ -1,0 +1,49 @@
+version: 2
+
+
+models:
+  - name: stg_rosters
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [year, player_id, team_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_rosters.parquet'
+
+    columns:
+      - name: year
+        description: ""
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        constraints:
+          - type: not_null
+        data_type: varchar
+      - name: last_name
+        description: ""
+        data_type: varchar
+      - name: first_name
+        description: ""
+        data_type: varchar
+      - name: bats
+        description: ""
+        data_type: varchar
+      - name: throws
+        description: ""
+        data_type: varchar
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: position
+        description: ""
+        data_type: varchar

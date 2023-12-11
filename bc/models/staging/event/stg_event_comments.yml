@@ -1,0 +1,33 @@
+version: 2
+
+
+models:
+  - name: stg_event_comments
+    description: |
+      Comment lines from event files, along with their associated event
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key, comment]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_event_comments.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+        tests:
+          - relationships:
+              field: event_key
+              to: ref('stg_events')
+      - name: comment
+        description: "{{ doc('comment') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null

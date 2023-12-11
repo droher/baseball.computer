@@ -1,0 +1,54 @@
+version: 2
+
+
+models:
+  - name: game_line_scores
+    description: "Line scores for each game in various formats. One row per game."
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_line_scores.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: home_runs_scored
+        description: ""
+        data_type: hugeint
+        constraints:
+          - type: not_null
+      - name: away_runs_scored
+        description: ""
+        data_type: hugeint
+        constraints:
+          - type: not_null
+      - name: home_line_score
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: away_line_score
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: home_line_score_list
+        description: ""
+        data_type: utinyint[]
+        constraints:
+          - type: not_null
+      - name: away_line_score_list
+        description: ""
+        data_type: utinyint[]
+      - name: duration_outs
+        description: ""
+        data_type: utinyint

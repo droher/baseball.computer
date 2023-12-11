@@ -1,0 +1,61 @@
+version: 2
+
+
+models:
+  - name: run_expectancy_matrix
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [run_expectancy_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_run_expectancy_matrix.parquet'
+
+    columns:
+      - name: run_expectancy_key
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: league_group
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: season_group
+        description: ""
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: outs
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: base_state
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: avg_runs_scored
+        description: ""
+        data_type: decimal(18,3)
+        constraints:
+          - type: not_null
+      - name: variance_runs_scored
+        description: ""
+        data_type: decimal(18,3)
+        constraints:
+          - type: not_null
+      - name: sample_size
+        description: ""
+        data_type: bigint
+        constraints:
+          - type: not_null

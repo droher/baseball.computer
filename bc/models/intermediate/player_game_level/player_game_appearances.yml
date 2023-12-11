@@ -1,0 +1,66 @@
+version: 2
+
+
+models:
+  - name: player_game_appearances
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, player_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_player_game_appearances.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_type: varchar
+      - name: side
+        description: "{{ doc('side') }}"
+        data_type: side
+      - name: games_started
+        description: "{{ doc('games_started') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: games_pinch_hit
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: games_pinch_run
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: games_defensive_sub
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: games_ohtani_rule
+        description: ""
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: lineup_position
+        description: "{{ doc('lineup_position') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: first_fielding_position
+        description: ""
+        data_type: utinyint
+      - name: fielding_positions
+        description: ""
+        data_type: utinyint[]

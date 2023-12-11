@@ -1,0 +1,27 @@
+version: 2
+seeds:
+  - name: seed_double_play_flag_types
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: flag
+        description: ''
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: is_double_play
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_ground_ball_double_play
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_triple_play
+        description: ''
+        data_type: boolean
+        constraints:
+          - type: not_null

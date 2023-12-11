@@ -1,0 +1,139 @@
+version: 2
+
+
+models:
+  - name: event_pitch_sequence_stats
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_pitch_sequence_stats.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: pitches
+        description: "{{ doc('pitches') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: swings
+        description: "{{ doc('swings') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: swings_with_contact
+        description: "{{ doc('swings_with_contact') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes
+        description: "{{ doc('strikes') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes_called
+        description: "{{ doc('strikes_called') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes_swinging
+        description: "{{ doc('strikes_swinging') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes_foul
+        description: "{{ doc('strikes_foul') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes_foul_tip
+        description: "{{ doc('strikes_foul_tip') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes_in_play
+        description: "{{ doc('strikes_in_play') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: strikes_unknown
+        description: "{{ doc('strikes_unknown') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: balls
+        description: "{{ doc('balls') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: balls_called
+        description: "{{ doc('balls_called') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: balls_intentional
+        description: "{{ doc('balls_intentional') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: balls_automatic
+        description: "{{ doc('balls_automatic') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: unknown_pitches
+        description: "{{ doc('unknown_pitches') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: pitchouts
+        description: "{{ doc('pitchouts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: pitcher_pickoff_attempts
+        description: "{{ doc('pitcher_pickoff_attempts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: catcher_pickoff_attempts
+        description: "{{ doc('catcher_pickoff_attempts') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: pitches_blocked_by_catcher
+        description: "{{ doc('pitches_blocked_by_catcher') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: pitches_with_runners_going
+        description: "{{ doc('pitches_with_runners_going') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: wild_pitches
+        description: "{{ doc('wild_pitches') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: balks
+        description: "{{ doc('balks') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null

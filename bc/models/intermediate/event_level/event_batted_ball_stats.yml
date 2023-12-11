@@ -1,0 +1,141 @@
+version: 2
+
+
+models:
+  - name: event_batted_ball_stats
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_batted_ball_stats.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: balls_batted
+        description: "{{ doc('balls_batted') }}"
+        data_type: utinyint
+      - name: balls_in_play
+        description: "{{ doc('balls_in_play') }}"
+        data_type: utinyint
+      - name: trajectory_fly_ball
+        description: "{{ doc('trajectory_fly_ball') }}"
+        data_type: utinyint
+      - name: trajectory_ground_ball
+        description: "{{ doc('trajectory_ground_ball') }}"
+        data_type: utinyint
+      - name: trajectory_line_drive
+        description: "{{ doc('trajectory_line_drive') }}"
+        data_type: utinyint
+      - name: trajectory_pop_up
+        description: "{{ doc('trajectory_pop_up') }}"
+        data_type: utinyint
+      - name: trajectory_unknown
+        description: "{{ doc('trajectory_unknown') }}"
+        data_type: utinyint
+      - name: trajectory_known
+        description: "{{ doc('trajectory_known') }}"
+        data_type: utinyint
+      - name: trajectory_broad_air_ball
+        description: "{{ doc('trajectory_broad_air_ball') }}"
+        data_type: utinyint
+      - name: trajectory_broad_ground_ball
+        description: "{{ doc('trajectory_broad_ground_ball') }}"
+        data_type: utinyint
+      - name: trajectory_broad_unknown
+        description: "{{ doc('trajectory_broad_unknown') }}"
+        data_type: utinyint
+      - name: trajectory_broad_known
+        description: "{{ doc('trajectory_broad_known') }}"
+        data_type: utinyint
+      - name: bunts
+        description: "{{ doc('bunts') }}"
+        data_type: utinyint
+      - name: batted_distance_plate
+        description: "{{ doc('batted_distance_plate') }}"
+        data_type: utinyint
+      - name: batted_distance_infield
+        description: "{{ doc('batted_distance_infield') }}"
+        data_type: utinyint
+      - name: batted_distance_outfield
+        description: "{{ doc('batted_distance_outfield') }}"
+        data_type: utinyint
+      - name: batted_distance_unknown
+        description: "{{ doc('batted_distance_unknown') }}"
+        data_type: utinyint
+      - name: batted_distance_known
+        description: "{{ doc('batted_distance_known') }}"
+        data_type: utinyint
+      - name: fielded_by_battery
+        description: "{{ doc('fielded_by_battery') }}"
+        data_type: utinyint
+      - name: fielded_by_infielder
+        description: "{{ doc('fielded_by_infielder') }}"
+        data_type: utinyint
+      - name: fielded_by_outfielder
+        description: "{{ doc('fielded_by_outfielder') }}"
+        data_type: utinyint
+      - name: fielded_by_unknown
+        description: "{{ doc('fielded_by_unknown') }}"
+        data_type: utinyint
+      - name: fielded_by_known
+        description: "{{ doc('fielded_by_known') }}"
+        data_type: utinyint
+      - name: batted_angle_left
+        description: "{{ doc('batted_angle_left') }}"
+        data_type: utinyint
+      - name: batted_angle_right
+        description: "{{ doc('batted_angle_right') }}"
+        data_type: utinyint
+      - name: batted_angle_middle
+        description: "{{ doc('batted_angle_middle') }}"
+        data_type: utinyint
+      - name: batted_angle_unknown
+        description: "{{ doc('batted_angle_unknown') }}"
+        data_type: utinyint
+      - name: batted_angle_known
+        description: "{{ doc('batted_angle_known') }}"
+        data_type: utinyint
+      - name: batted_location_plate
+        description: "{{ doc('batted_location_plate') }}"
+        data_type: utinyint
+      - name: batted_location_right_infield
+        description: "{{ doc('batted_location_right_infield') }}"
+        data_type: utinyint
+      - name: batted_location_left_infield
+        description: "{{ doc('batted_location_left_infield') }}"
+        data_type: utinyint
+      - name: batted_location_middle_infield
+        description: "{{ doc('batted_location_middle_infield') }}"
+        data_type: utinyint
+      - name: batted_location_left_field
+        description: "{{ doc('batted_location_left_field') }}"
+        data_type: utinyint
+      - name: batted_location_center_field
+        description: "{{ doc('batted_location_center_field') }}"
+        data_type: utinyint
+      - name: batted_location_right_field
+        description: "{{ doc('batted_location_right_field') }}"
+        data_type: utinyint
+      - name: batted_location_unknown
+        description: "{{ doc('batted_location_unknown') }}"
+        data_type: utinyint
+      - name: batted_location_known
+        description: "{{ doc('batted_location_known') }}"
+        data_type: utinyint
+      - name: batted_balls_pulled
+        description: "{{ doc('batted_balls_pulled') }}"
+        data_type: integer
+      - name: batted_balls_opposite_field
+        description: "{{ doc('batted_balls_opposite_field') }}"
+        data_type: integer

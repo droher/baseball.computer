@@ -1,0 +1,188 @@
+version: 2
+
+
+models:
+  - name: stg_games
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_games.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: game_key
+        description: ""
+        data_type: uinteger
+        constraints:
+          - type: unique
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: start_time
+        description: "{{ doc('start_time') }}"
+        data_type: timestamp
+      - name: doubleheader_status
+        description: ""
+        data_type: doubleheader_status
+        constraints:
+          - type: not_null
+      - name: time_of_day
+        description: "{{ doc('time_of_day') }}"
+        data_type: time_of_day
+        constraints:
+          - type: not_null
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+        constraints:
+          - type: not_null
+      - name: bat_first_side
+        description: "{{ doc('bat_first_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: sky
+        description: "{{ doc('sky') }}"
+        data_type: sky
+        constraints:
+          - type: not_null
+      - name: field_condition
+        description: "{{ doc('field_condition') }}"
+        data_type: field_condition
+        constraints:
+          - type: not_null
+      - name: precipitation
+        description: "{{ doc('precipitation') }}"
+        data_type: precipitation
+        constraints:
+          - type: not_null
+      - name: wind_direction
+        description: "{{ doc('wind_direction') }}"
+        data_type: wind_direction
+        constraints:
+          - type: not_null
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+        tests:
+          - relationships:
+              field: park_id
+              to: ref('stg_parks')
+          - not_null:
+              config:
+                severity: warn
+      - name: temperature_fahrenheit
+        description: "{{ doc('temperature_fahrenheit') }}"
+        data_type: tinyint
+      - name: attendance
+        description: "{{ doc('attendance') }}"
+        data_type: UINTEGER
+      - name: wind_speed_mph
+        description: "{{ doc('wind_speed_mph') }}"
+        data_type: utinyint
+      - name: use_dh
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: winning_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: losing_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: save_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: game_winning_rbi_player_id
+        description: ""
+        data_type: varchar
+      - name: duration_minutes
+        description: ""
+        data_type: bigint
+      - name: protest_info
+        description: ""
+        data_type: integer
+      - name: completion_info
+        description: ""
+        data_type: integer
+      - name: scorer
+        description: ""
+        data_type: varchar
+      - name: scoring_method
+        description: ""
+        data_type: varchar
+      - name: inputter
+        description: ""
+        data_type: varchar
+      - name: translator
+        description: ""
+        data_type: varchar
+      - name: date_inputted
+        description: ""
+        data_type: timestamp
+      - name: date_edited
+        description: ""
+        data_type: integer
+      - name: account_type
+        description: ""
+        data_type: account_type
+        constraints:
+          - type: not_null
+      - name: filename
+        description: "{{ doc('filename') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: source_type
+        description: "{{ doc('source_type') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: away_team_id
+        description: "{{ doc('away_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: home_team_id
+        description: "{{ doc('home_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: umpire_home_id
+        description: "{{ doc('umpire_home_id') }}"
+        data_type: varchar
+      - name: umpire_first_id
+        description: "{{ doc('umpire_first_id') }}"
+        data_type: varchar
+      - name: umpire_second_id
+        description: "{{ doc('umpire_second_id') }}"
+        data_type: varchar
+      - name: umpire_third_id
+        description: "{{ doc('umpire_third_id') }}"
+        data_type: varchar
+      - name: umpire_left_id
+        description: "{{ doc('umpire_left_id') }}"
+        data_type: varchar
+      - name: umpire_right_id
+        description: "{{ doc('umpire_right_id') }}"
+        data_type: varchar
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null

@@ -1,0 +1,112 @@
+version: 2
+
+
+models:
+  - name: stg_databank_pitching
+    description: "Aggregate pitching statistics by player, season, and stint with
+      a given team."
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [databank_player_id, season, stint]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_databank_pitching.parquet'
+
+    columns:
+      - name: databank_player_id
+        description: "{{ doc('databank_player_id') }}"
+        data_type: varchar
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: stint
+        description: "{{ doc('stint') }}"
+        data_type: smallint
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: varchar
+      - name: league_id
+        description: "{{ doc('league_id') }}"
+        data_type: varchar
+      - name: wins
+        description: "{{ doc('wins') }}"
+        data_type: smallint
+      - name: losses
+        description: "{{ doc('losses') }}"
+        data_type: smallint
+      - name: games
+        description: "{{ doc('games') }}"
+        data_type: smallint
+      - name: games_started
+        description: "{{ doc('games_started') }}"
+        data_type: smallint
+      - name: complete_games
+        description: "{{ doc('complete_games') }}"
+        data_type: smallint
+      - name: shutouts
+        description: "{{ doc('shutouts') }}"
+        data_type: smallint
+      - name: saves
+        description: "{{ doc('saves') }}"
+        data_type: smallint
+      - name: outs_recorded
+        description: "{{ doc('outs_recorded') }}"
+        data_type: smallint
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: smallint
+      - name: earned_runs
+        description: "{{ doc('earned_runs') }}"
+        data_type: smallint
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: smallint
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: smallint
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: smallint
+      - name: opponent_batting_average
+        description: ""
+        data_type: double
+      - name: earned_run_average
+        description: "{{ doc('earned_run_average') }}"
+        data_type: double
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: smallint
+      - name: wild_pitches
+        description: "{{ doc('wild_pitches') }}"
+        data_type: smallint
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: smallint
+      - name: balks
+        description: "{{ doc('balks') }}"
+        data_type: smallint
+      - name: batters_faced
+        description: "{{ doc('batters_faced') }}"
+        data_type: smallint
+      - name: games_finished
+        description: "{{ doc('games_finished') }}"
+        data_type: smallint
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: smallint
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: smallint
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: smallint
+      - name: grounded_into_double_plays
+        description: "{{ doc('grounded_into_double_plays') }}"
+        data_type: smallint

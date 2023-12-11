@@ -1,0 +1,120 @@
+version: 2
+
+
+models:
+  - name: ml_features
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_ml_features.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: outcome_has_batting_bin
+        description: ""
+        data_type: utinyint
+      - name: outcome_is_in_play_bin
+        description: ""
+        data_type: utinyint
+      - name: outcome_batted_trajectory_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_batted_location_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_plate_appearance_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_baserunning_cat
+        description: ""
+        data_type: varchar
+      - name: outcome_runs_following_num
+        description: ""
+        data_type: float
+      - name: outcome_is_win_bin
+        description: ""
+        data_type: utinyint
+      - name: generic_sample_weight
+        description: ""
+        data_type: float
+      - name: plate_appearance_sample_weight
+        description: ""
+        data_type: float
+      - name: in_play_sample_weight
+        description: ""
+        data_type: float
+      - name: trajectory_sample_weight
+        description: ""
+        data_type: float
+      - name: location_sample_weight
+        description: ""
+        data_type: float
+      - name: baserunning_play_sample_weight
+        description: ""
+        data_type: float
+      - name: win_sample_weight
+        description: ""
+        data_type: float
+      - name: season_num
+        description: ""
+        data_type: float
+      - name: day_of_year_num
+        description: ""
+        data_type: float
+      - name: inning_num
+        description: ""
+        data_type: float
+      - name: frame_num
+        description: ""
+        data_type: float
+      - name: is_night_game_num
+        description: ""
+        data_type: float
+      - name: score_batting_team_num
+        description: ""
+        data_type: float
+      - name: score_fielding_team_num
+        description: ""
+        data_type: float
+      - name: park_cat
+        description: ""
+        data_type: park_id
+      - name: game_type_cat
+        description: ""
+        data_type: game_type
+      - name: league_cat
+        description: ""
+        data_type: varchar
+      - name: base_state_cat
+        description: ""
+        data_type: varchar
+      - name: batter_player
+        description: ""
+        data_type: varchar
+      - name: runner_first_player
+        description: ""
+        data_type: varchar
+      - name: runner_second_player
+        description: ""
+        data_type: varchar
+      - name: runner_third_player
+        description: ""
+        data_type: varchar
+      - name: pitcher_player
+        description: ""
+        data_type: varchar
+      - name: meta_train_test_split
+        description: ""
+        data_type: varchar

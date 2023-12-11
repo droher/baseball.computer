@@ -1,0 +1,71 @@
+version: 2
+
+
+models:
+  - name: linear_weights
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [season, league, play]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_linear_weights.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: play
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: play_category
+        description: ""
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: average_run_value
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: average_win_value
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: relative_run_value
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: std_dev_run_value
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: std_dev_win_value
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: is_imputed
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null

@@ -1,0 +1,24 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_double_plays
+    description: |
+      Individually noted double play events from box score accounts,
+      with varying degrees of detail.
+
+
+    # config:
+    #   contract:
+    #     enforced: true
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: defense_side
+        description: ""
+        data_type: varchar
+      - name: fielders
+        description: ""
+        data_type: varchar

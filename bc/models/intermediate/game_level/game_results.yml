@@ -1,0 +1,134 @@
+version: 2
+
+
+models:
+  - name: game_results
+    description: |
+      Includes the results of every completed, suspended, or forfeited game in the database.
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_results.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+        constraints:
+          - type: not_null
+      - name: game_finish_date
+        description: "This will always be the same as the game's `date` unless the
+          game was suspended and finished on a different day. Games that end after
+          midnight will still have the same value as the `date`."
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: home_team_id
+        description: "{{ doc('home_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: away_team_id
+        description: "{{ doc('away_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: winning_team_id
+        description: ""
+        data_type: varchar
+      - name: losing_team_id
+        description: ""
+        data_type: varchar
+      - name: winning_team_score
+        description: ""
+        data_type: utinyint
+      - name: losing_team_score
+        description: ""
+        data_type: utinyint
+      - name: winning_side
+        description: ""
+        data_type: side
+      - name: losing_side
+        description: ""
+        data_type: side
+      - name: forfeit_flag
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: suspension_flag
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: tie_flag
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: winning_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: losing_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: save_pitcher_id
+        description: ""
+        data_type: varchar
+      - name: game_winning_rbi_player_id
+        description: ""
+        data_type: varchar
+      - name: home_runs_scored
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: away_runs_scored
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: away_line_score
+        description: ""
+        data_type: varchar
+      - name: home_line_score
+        description: ""
+        data_type: varchar
+      - name: duration_minutes
+        description: ""
+        data_type: usmallint
+      - name: duration_outs
+        description: ""
+        data_type: utinyint
+      - name: is_nine_inning_game
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_extra_inning_game
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null
+      - name: is_shortened_game
+        description: ""
+        data_type: boolean
+        constraints:
+          - type: not_null

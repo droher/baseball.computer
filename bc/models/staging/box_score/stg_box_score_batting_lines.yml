@@ -1,0 +1,107 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_batting_lines
+    description: |
+      Aggregate offensive data for each player in each game,
+      derived from Retroshet box score data.
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, side, batter_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_box_score_batting_lines.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: batter_id
+        description: "{{ doc('batter_id') }}"
+        data_type: varchar
+      - name: side
+        description: "{{ doc('side') }}"
+        data_type: side
+      - name: lineup_position
+        description: "{{ doc('lineup_position') }}"
+        data_type: utinyint
+      - name: nth_player_at_position
+        description: "The nth player to occupy this spot in the order during the game"
+        data_type: utinyint
+      - name: at_bats
+        description: "{{ doc('at_bats') }}"
+        data_type: utinyint
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: utinyint
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: utinyint
+      - name: doubles
+        description: "{{ doc('doubles') }}"
+        data_type: utinyint
+      - name: triples
+        description: "{{ doc('triples') }}"
+        data_type: utinyint
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: utinyint
+      - name: runs_batted_in
+        description: "{{ doc('runs_batted_in') }}"
+        data_type: utinyint
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: utinyint
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: utinyint
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: utinyint
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: utinyint
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: utinyint
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: utinyint
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: utinyint
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: utinyint
+      - name: grounded_into_double_plays
+        description: "{{ doc('grounded_into_double_plays') }}"
+        data_type: utinyint
+      - name: reached_on_interferences
+        description: "{{ doc('reached_on_interferences') }}"
+        data_type: utinyint
+      - name: singles
+        description: "{{ doc('singles') }}"
+        data_type: utinyint
+      - name: total_bases
+        description: "{{ doc('total_bases') }}"
+        data_type: utinyint
+      - name: plate_appearances
+        description: "{{ doc('plate_appearances') }}"
+        data_type: utinyint
+      - name: on_base_opportunities
+        description: "{{ doc('on_base_opportunities') }}"
+        data_type: utinyint
+      - name: on_base_successes
+        description: "{{ doc('on_base_successes') }}"
+        data_type: utinyint
+      - name: batting_outs
+        description: "{{ doc('batting_outs') }}"
+        data_type: utinyint

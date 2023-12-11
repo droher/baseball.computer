@@ -1,0 +1,44 @@
+version: 2
+
+
+models:
+  - name: game_starting_lineups
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_starting_lineups.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: lineup_map_away
+        description: "{{ doc('lineup_map_away') }}"
+        data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null
+      - name: fielding_map_away
+        description: "{{ doc('fielding_map_away') }}"
+        data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null
+      - name: lineup_map_home
+        description: "{{ doc('lineup_map_home') }}"
+        data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null
+      - name: fielding_map_home
+        description: "{{ doc('fielding_map_home') }}"
+        data_type: map(utinyint, varchar)
+        constraints:
+          - type: not_null

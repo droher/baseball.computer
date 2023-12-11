@@ -1,0 +1,299 @@
+version: 2
+
+
+models:
+  - name: team_game_results
+    description: |
+      A version of `game_results` that includes one row for each team in each game.
+      Also includes additional statistics (traditional box score stats) for games
+      that have that information available.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, team_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_team_game_results.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: game_finish_date
+        description: ""
+        data_type: date
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+      - name: team_side
+        description: ""
+        data_type: side
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: division
+        description: "{{ doc('division') }}"
+        data_type: varchar
+      - name: opponent_league
+        description: ""
+        data_type: varchar
+      - name: opponent_division
+        description: ""
+        data_type: varchar
+      - name: season_game_number
+        description: ""
+        data_type: bigint
+      - name: is_interleague
+        description: "{{ doc('is_interleague') }}"
+        data_type: boolean
+      - name: wins
+        description: "{{ doc('wins') }}"
+        data_type: integer
+      - name: losses
+        description: "{{ doc('losses') }}"
+        data_type: integer
+      - name: runs_scored
+        description: ""
+        data_type: utinyint
+      - name: runs_allowed
+        description: ""
+        data_type: utinyint
+      - name: hits
+        description: "{{ doc('hits') }}"
+        data_type: usmallint
+      - name: errors
+        description: "{{ doc('errors') }}"
+        data_type: utinyint
+      - name: left_on_base
+        description: "{{ doc('left_on_base') }}"
+        data_type: usmallint
+      - name: at_bats
+        description: "{{ doc('at_bats') }}"
+        data_type: usmallint
+      - name: doubles
+        description: "{{ doc('doubles') }}"
+        data_type: usmallint
+      - name: triples
+        description: "{{ doc('triples') }}"
+        data_type: usmallint
+      - name: home_runs
+        description: "{{ doc('home_runs') }}"
+        data_type: usmallint
+      - name: runs_batted_in
+        description: "{{ doc('runs_batted_in') }}"
+        data_type: usmallint
+      - name: sacrifice_hits
+        description: "{{ doc('sacrifice_hits') }}"
+        data_type: usmallint
+      - name: sacrifice_flies
+        description: "{{ doc('sacrifice_flies') }}"
+        data_type: usmallint
+      - name: hit_by_pitches
+        description: "{{ doc('hit_by_pitches') }}"
+        data_type: usmallint
+      - name: walks
+        description: "{{ doc('walks') }}"
+        data_type: usmallint
+      - name: intentional_walks
+        description: "{{ doc('intentional_walks') }}"
+        data_type: usmallint
+      - name: strikeouts
+        description: "{{ doc('strikeouts') }}"
+        data_type: usmallint
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: usmallint
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: usmallint
+      - name: grounded_into_double_plays
+        description: "{{ doc('grounded_into_double_plays') }}"
+        data_type: usmallint
+      - name: reached_on_interferences
+        description: "{{ doc('reached_on_interferences') }}"
+        data_type: usmallint
+      - name: innings_pitched
+        description: "{{ doc('innings_pitched') }}"
+        data_type: decimal(6,4)
+      - name: individual_earned_runs_allowed
+        description: ""
+        data_type: usmallint
+      - name: earned_runs_allowed
+        description: ""
+        data_type: utinyint
+      - name: wild_pitches
+        description: "{{ doc('wild_pitches') }}"
+        data_type: usmallint
+      - name: balks
+        description: "{{ doc('balks') }}"
+        data_type: usmallint
+      - name: putouts
+        description: "{{ doc('putouts') }}"
+        data_type: utinyint
+      - name: assists
+        description: "{{ doc('assists') }}"
+        data_type: utinyint
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: utinyint
+      - name: double_plays_turned
+        description: ""
+        data_type: utinyint
+      - name: triple_plays_turned
+        description: ""
+        data_type: utinyint
+      - name: opponent_team_id
+        description: ""
+        data_type: team_id
+      - name: opponent_runs
+        description: ""
+        data_type: usmallint
+      - name: opponent_hits
+        description: ""
+        data_type: usmallint
+      - name: opponent_errors
+        description: ""
+        data_type: utinyint
+      - name: opponent_left_on_base
+        description: ""
+        data_type: usmallint
+      - name: opponent_at_bats
+        description: ""
+        data_type: usmallint
+      - name: opponent_doubles
+        description: ""
+        data_type: usmallint
+      - name: opponent_triples
+        description: ""
+        data_type: usmallint
+      - name: opponent_home_runs
+        description: ""
+        data_type: usmallint
+      - name: opponent_runs_batted_in
+        description: ""
+        data_type: usmallint
+      - name: opponent_sacrifice_hits
+        description: ""
+        data_type: usmallint
+      - name: opponent_sacrifice_flies
+        description: ""
+        data_type: usmallint
+      - name: opponent_hit_by_pitches
+        description: ""
+        data_type: usmallint
+      - name: opponent_walks
+        description: ""
+        data_type: usmallint
+      - name: opponent_intentional_walks
+        description: ""
+        data_type: usmallint
+      - name: opponent_strikeouts
+        description: ""
+        data_type: usmallint
+      - name: opponent_stolen_bases
+        description: ""
+        data_type: usmallint
+      - name: opponent_caught_stealing
+        description: ""
+        data_type: usmallint
+      - name: opponent_grounded_into_double_plays
+        description: ""
+        data_type: usmallint
+      - name: opponent_reached_on_interferences
+        description: ""
+        data_type: usmallint
+      - name: opponent_innings_pitched
+        description: ""
+        data_type: decimal(6,4)
+      - name: opponent_individual_earned_runs_allowed
+        description: ""
+        data_type: usmallint
+      - name: opponent_earned_runs_allowed
+        description: ""
+        data_type: utinyint
+      - name: opponent_wild_pitches
+        description: ""
+        data_type: usmallint
+      - name: opponent_balks
+        description: ""
+        data_type: usmallint
+      - name: opponent_putouts
+        description: ""
+        data_type: utinyint
+      - name: opponent_assists
+        description: ""
+        data_type: utinyint
+      - name: opponent_passed_balls
+        description: ""
+        data_type: utinyint
+      - name: opponent_double_plays
+        description: ""
+        data_type: utinyint
+      - name: opponent_triple_plays
+        description: ""
+        data_type: utinyint
+      - name: home_wins
+        description: ""
+        data_type: integer
+      - name: home_losses
+        description: ""
+        data_type: integer
+      - name: away_wins
+        description: ""
+        data_type: integer
+      - name: away_losses
+        description: ""
+        data_type: integer
+      - name: interleague_wins
+        description: ""
+        data_type: integer
+      - name: interleague_losses
+        description: ""
+        data_type: integer
+      - name: east_wins
+        description: ""
+        data_type: integer
+      - name: east_losses
+        description: ""
+        data_type: integer
+      - name: central_wins
+        description: ""
+        data_type: integer
+      - name: central_losses
+        description: ""
+        data_type: integer
+      - name: west_wins
+        description: ""
+        data_type: integer
+      - name: west_losses
+        description: ""
+        data_type: integer
+      - name: one_run_wins
+        description: ""
+        data_type: integer
+      - name: one_run_losses
+        description: ""
+        data_type: integer
+      - name: win_streak_id
+        description: ""
+        data_type: bigint
+      - name: loss_streak_id
+        description: ""
+        data_type: bigint
+      - name: win_streak_length
+        description: ""
+        data_type: bigint
+      - name: loss_streak_length
+        description: ""
+        data_type: bigint

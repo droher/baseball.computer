@@ -1,0 +1,59 @@
+version: 2
+
+
+models:
+  - name: event_run_assignment_stats
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_run_assignment_stats.parquet'
+
+    columns:
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: runs
+        description: "{{ doc('runs') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: team_unearned_runs
+        description: "{{ doc('team_unearned_runs') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: inherited_runners_scored
+        description: "{{ doc('inherited_runners_scored') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: bequeathed_runners_scored
+        description: "{{ doc('bequeathed_runners_scored') }}"
+        data_type: utinyint
+        constraints:
+          - type: not_null

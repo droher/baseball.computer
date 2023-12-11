@@ -1,0 +1,123 @@
+version: 2
+
+
+models:
+  - name: stg_gamelog
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_gamelog.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: doubleheader_status
+        description: ""
+        data_type: doubleheader_status
+        constraints:
+          - type: not_null
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: away_team_id
+        description: "{{ doc('away_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: home_team_id
+        description: "{{ doc('home_team_id') }}"
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: time_of_day
+        description: "{{ doc('time_of_day') }}"
+        data_type: time_of_day
+        constraints:
+          - type: not_null
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id
+        constraints:
+          - type: not_null
+      - name: attendance
+        description: "{{ doc('attendance') }}"
+        data_type: integer
+      - name: umpire_home_id
+        description: "{{ doc('umpire_home_id') }}"
+        data_type: varchar
+      - name: umpire_first_id
+        description: "{{ doc('umpire_first_id') }}"
+        data_type: varchar
+      - name: umpire_second_id
+        description: "{{ doc('umpire_second_id') }}"
+        data_type: varchar
+      - name: umpire_third_id
+        description: "{{ doc('umpire_third_id') }}"
+        data_type: varchar
+      - name: away_starting_pitcher_id
+        description: "{{ doc('away_starting_pitcher_id') }}"
+        data_type: varchar
+      - name: home_starting_pitcher_id
+        description: "{{ doc('home_starting_pitcher_id') }}"
+        data_type: varchar
+      - name: additional_info
+        description: ""
+        data_type: varchar
+      - name: bat_first_side
+        description: "{{ doc('bat_first_side') }}"
+        data_type: side
+      - name: use_dh
+        description: ""
+        data_type: boolean
+      - name: game_type
+        description: "{{ doc('game_type') }}"
+        data_type: game_type
+        constraints:
+          - type: not_null
+      - name: duration_minutes
+        description: ""
+        data_type: smallint
+      - name: away_line_score
+        description: ""
+        data_type: varchar
+      - name: home_line_score
+        description: ""
+        data_type: varchar
+      - name: away_runs_scored
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: home_runs_scored
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: forfeit_info
+        description: ""
+        data_type: varchar
+      - name: source_type
+        description: "{{ doc('source_type') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null

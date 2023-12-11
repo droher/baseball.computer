@@ -1,0 +1,72 @@
+version: 2
+
+
+models:
+  - name: game_scorekeeping
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, cleaned_scorer]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_game_scorekeeping.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+        constraints:
+          - type: not_null
+      - name: cleaned_scorer
+        description: ""
+        data_type: varchar
+      - name: raw_scorer
+        description: ""
+        data_type: varchar
+      - name: away_team_id
+        description: "{{ doc('away_team_id') }}"
+        data_type: team_id
+      - name: home_team_id
+        description: "{{ doc('home_team_id') }}"
+        data_type: team_id
+      - name: inputter
+        description: ""
+        data_type: varchar
+      - name: translator
+        description: ""
+        data_type: varchar
+      - name: game_share
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: scorer_game_count_raw
+        description: ""
+        data_type: bigint
+        constraints:
+          - type: not_null
+      - name: scorer_game_count_weighted
+        description: ""
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: scorer_more_common_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null

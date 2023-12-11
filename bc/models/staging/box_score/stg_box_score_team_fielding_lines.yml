@@ -1,0 +1,50 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_team_fielding_lines
+    description: |
+      Team-level fielding lines from box score accounts.
+      These are generally rare and are only present in certain files.
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, side]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_stg_box_score_team_fielding_lines.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: side
+        description: "{{ doc('side') }}"
+        data_type: varchar
+      - name: outs_played
+        description: "{{ doc('outs_played') }}"
+        data_type: bigint
+      - name: putouts
+        description: "{{ doc('putouts') }}"
+        data_type: utinyint
+      - name: assists
+        description: "{{ doc('assists') }}"
+        data_type: utinyint
+      - name: errors
+        description: "{{ doc('errors') }}"
+        data_type: utinyint
+      - name: double_plays
+        description: "{{ doc('double_plays') }}"
+        data_type: utinyint
+      - name: triple_plays
+        description: "{{ doc('triple_plays') }}"
+        data_type: utinyint
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: utinyint

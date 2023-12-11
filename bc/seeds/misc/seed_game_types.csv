@@ -1,0 +1,12 @@
+game_type,is_regular_season,is_postseason
+Preseason,false,false
+Exhibition,false,false
+RegularSeason,true,false
+TiebreakerPlayoff,true,false
+WildCardSeries,false,true
+DivisionSeries,false,true
+LeagueChampionshipSeries,false,true
+WorldSeries,false,true
+OtherChampionship,false,true
+AllStarGame,false,false
+Unknown,false,false

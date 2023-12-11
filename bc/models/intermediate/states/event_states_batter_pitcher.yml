@@ -1,0 +1,79 @@
+version: 2
+
+
+models:
+  - name: event_states_batter_pitcher
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [event_key]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_event_states_batter_pitcher.parquet'
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: event_key
+        description: "{{ doc('event_key') }}"
+        data_type: uinteger
+      - name: batting_side
+        description: "{{ doc('batting_side') }}"
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: fielding_side
+        description: ""
+        data_type: side
+        constraints:
+          - type: not_null
+      - name: batting_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: fielding_team_id
+        description: ""
+        data_type: team_id
+        constraints:
+          - type: not_null
+      - name: batter_id
+        description: "{{ doc('batter_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: batter_lineup_position
+        description: ""
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: batter_fielding_position
+        description: ""
+        data_type: utinyint
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: batter_hand
+        description: ""
+        data_type: hand
+      - name: pitcher_hand
+        description: ""
+        data_type: hand
+      - name: strikeout_responsible_batter_id
+        description: ""
+        data_type: varchar
+      - name: walk_responsible_pitcher_id
+        description: ""
+        data_type: varchar

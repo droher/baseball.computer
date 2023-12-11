@@ -1,0 +1,90 @@
+version: 2
+
+
+models:
+  - name: team_game_fielding_stats
+    description: ""
+
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [game_id, team_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_team_game_fielding_stats.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: smallint
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: outs_played
+        description: "{{ doc('outs_played') }}"
+        data_type: utinyint
+      - name: putouts
+        description: "{{ doc('putouts') }}"
+        data_type: utinyint
+      - name: assists
+        description: "{{ doc('assists') }}"
+        data_type: utinyint
+      - name: errors
+        description: "{{ doc('errors') }}"
+        data_type: utinyint
+      - name: fielders_choices
+        description: "{{ doc('fielders_choices') }}"
+        data_type: utinyint
+      - name: assisted_putouts
+        description: "{{ doc('assisted_putouts') }}"
+        data_type: utinyint
+      - name: in_play_putouts
+        description: "{{ doc('in_play_putouts') }}"
+        data_type: utinyint
+      - name: in_play_assists
+        description: "{{ doc('in_play_assists') }}"
+        data_type: utinyint
+      - name: passed_balls
+        description: "{{ doc('passed_balls') }}"
+        data_type: utinyint
+      - name: stolen_bases
+        description: "{{ doc('stolen_bases') }}"
+        data_type: utinyint
+      - name: caught_stealing
+        description: "{{ doc('caught_stealing') }}"
+        data_type: utinyint
+      - name: double_plays
+        description: "{{ doc('double_plays') }}"
+        data_type: utinyint
+      - name: triple_plays
+        description: "{{ doc('triple_plays') }}"
+        data_type: utinyint
+      - name: pickoffs
+        description: "{{ doc('pickoffs') }}"
+        data_type: utinyint
+      - name: plate_appearances_in_field
+        description: "{{ doc('plate_appearances_in_field') }}"
+        data_type: utinyint
+      - name: plate_appearances_in_field_with_ball_in_play
+        description: "{{ doc('plate_appearances_in_field_with_ball_in_play') }}"
+        data_type: utinyint
+      - name: ground_ball_double_plays
+        description: "{{ doc('ground_ball_double_plays') }}"
+        data_type: utinyint
+      - name: reaching_errors
+        description: "{{ doc('reaching_errors') }}"
+        data_type: utinyint
+      - name: unknown_putouts
+        description: "{{ doc('unknown_putouts') }}"
+        data_type: utinyint
+      - name: incomplete_events
+        description: "{{ doc('incomplete_events') }}"
+        data_type: utinyint

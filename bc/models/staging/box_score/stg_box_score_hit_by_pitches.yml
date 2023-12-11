@@ -1,0 +1,26 @@
+version: 2
+
+
+models:
+  - name: stg_box_score_hit_by_pitches
+    description: |
+      Individually noted hit by pitch events from box score accounts,
+      with varying degrees of detail.
+
+    config:
+      contract:
+        enforced: true
+
+    columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+        data_type: varchar
+      - name: pitching_side
+        description: ""
+        data_type: varchar
+      - name: pitcher_id
+        description: "{{ doc('pitcher_id') }}"
+        data_type: varchar
+      - name: batter_id
+        description: "{{ doc('batter_id') }}"
+        data_type: varchar

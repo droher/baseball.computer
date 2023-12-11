@@ -1,0 +1,129 @@
+version: 2
+
+
+models:
+  - name: standings
+    description: |
+      Daily snapshots of team standings.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [season, date, team_id]
+
+    meta:
+      primary_keys: *pk
+      download_parquet: 'https://data.baseball.computer/dbt/main_models_standings.parquet'
+
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_type: bigint
+      - name: date
+        description: "{{ doc('date') }}"
+        data_type: date
+      - name: league
+        description: "{{ doc('league') }}"
+        data_type: varchar
+      - name: division
+        description: "{{ doc('division') }}"
+        data_type: varchar
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_type: team_id
+      - name: team_name
+        description: "{{ doc('team_name') }}"
+        data_type: varchar
+      - name: wins
+        description: "Number of games won by the team to date."
+        data_type: hugeint
+      - name: losses
+        description: "Number of games lost by the team to date."
+        data_type: hugeint
+      - name: win_percentage
+        description: "Percentage of games won by the team to date."
+        data_type: double
+      - name: games_behind
+        description: "Number of games the team is behind the division leader to date."
+        data_type: double
+      - name: pythagorean_win_percentage
+        description: "Expected winning percentage based on runs scored and runs allowed
+          to date. Invented by Bill James, pythagorean expectation is probably the
+          most fundamental sabermetric concept because of how clearly it connects
+          the process of scoring runs to the outcome of winning games. Ironically,
+          'pythagorean' ended up applying much better as a descriptor of its centrality
+          to the discipline than it did as a means of describing the formula itself,
+          which has nothing to do with the Pythagorean theorem."
+        data_type: double
+      - name: average_run_differential
+        description: "Average per-game difference in runs scored and runs allowed."
+        data_type: double
+      - name: win_streak_length
+        description: "Number of consecutive games won by the team to date."
+        data_type: bigint
+      - name: loss_streak_length
+        description: "Number of consecutive games lost by the team to date."
+        data_type: bigint
+      - name: runs_scored
+        description: "Number of runs scored by the team to date."
+        data_type: hugeint
+      - name: runs_allowed
+        description: "Number of runs allowed by the team to date."
+        data_type: hugeint
+      - name: home_wins
+        description: "Number of games won by the team at home to date."
+        data_type: hugeint
+      - name: home_losses
+        description: "Number of games lost by the team at home to date."
+        data_type: hugeint
+      - name: away_wins
+        description: "Number of games won by the team on the road to date."
+        data_type: hugeint
+      - name: away_losses
+        description: "Number of games lost by the team on the road to date."
+        data_type: hugeint
+      - name: interleague_wins
+        description: "Number of games won by the team in interleague play to date."
+        data_type: hugeint
+      - name: interleague_losses
+        description: "Number of games lost by the team in interleague play to date."
+        data_type: hugeint
+      - name: east_wins
+        description: "Number of games won by the team against eastern division opponents
+          within their league to date."
+        data_type: hugeint
+      - name: east_losses
+        description: "Number of games lost by the team against eastern division opponents
+          within their league to date."
+        data_type: hugeint
+      - name: central_wins
+        description: "Number of games won by the team against central division opponents
+          within their league to date."
+        data_type: hugeint
+      - name: central_losses
+        description: "Number of games lost by the team against central division opponents
+          within their league to date."
+        data_type: hugeint
+      - name: west_wins
+        description: "Number of games won by the team against western division opponents
+          within their league to date."
+        data_type: hugeint
+      - name: west_losses
+        description: "Number of games lost by the team against western division opponents
+          within their league to date."
+        data_type: hugeint
+      - name: one_run_wins
+        description: "Number of games won by the team by one run to date."
+        data_type: hugeint
+      - name: one_run_losses
+        description: "Number of games lost by the team by one run to date."
+        data_type: hugeint
+      - name: last_10_wins
+        description: "Number of games won by the team in their last 10 games."
+        data_type: hugeint
+      - name: last_10_losses
+        description: "Number of games lost by the team in their last 10 games."
+        data_type: hugeint
