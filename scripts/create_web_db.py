@@ -2,6 +2,9 @@ import duckdb
 import boto3
 import os
 
+upcast_map = {
+    ""
+}
 
 def export_table_to_parquet(conn, schema_name, table_name, file_name):
     query = f"COPY (SELECT * FROM {schema_name}.{table_name}) TO '{file_name}' (FORMAT 'parquet', COMPRESSION 'ZSTD', ROW_GROUP_SIZE 1966080)"
