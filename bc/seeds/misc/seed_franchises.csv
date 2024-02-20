@@ -1,7 +1,6 @@
 franchise_id,team_id,league,division,location,nickname,alternative_nicknames,date_start,date_end,city,state
 ANA,LAA,AL,,Los Angeles,Angels,,1961-04-11,1964-10-04,Los Angeles,CA
-ANA,CAL,AL,,Los Angeles,Angels,,1965-04-12,1965-09-01,Anaheim,CA
-ANA,CAL,AL,,California,Angels,,1965-09-02,1968-09-29,Anaheim,CA
+ANA,CAL,AL,,California,Angels,,1965-04-12,1968-09-29,Anaheim,CA
 ANA,CAL,AL,W,California,Angels,,1969-04-08,1996-09-29,Anaheim,CA
 ANA,ANA,AL,W,Anaheim,Angels,,1997-04-02,2004-10-08,Anaheim,CA
 ANA,ANA,AL,W,Los Angeles,Angels,,2005-04-05,,Anaheim,CA

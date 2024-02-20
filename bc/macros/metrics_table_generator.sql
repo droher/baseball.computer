@@ -38,7 +38,7 @@
         {%- do filtered_cols.append(col) -%}
     {%- endfor -%}
 
-    -- Add extra context columns to get potential grouiping keys
+    -- Add extra context columns to get potential grouping keys
     WITH season AS (
         {%- set franchise_cols = dbt_utils.get_filtered_columns_in_relation(ref('seed_franchises'),
             except=dbt_utils.get_filtered_columns_in_relation(ref(season_model))) -%}
