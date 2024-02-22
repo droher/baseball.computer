@@ -37,7 +37,7 @@ WITH states AS (
         )
     -- Eliminate ties or games that lasted under 9 innings
     QUALIFY LAST(score_away_end::INT - score_home_end !=0) OVER rest_of_game
-        AND LAST(inning) OVER rest_of_game >= 9
+        AND LAST(inning::INT) OVER rest_of_game >= 9
 
 ),
 

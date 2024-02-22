@@ -39,7 +39,7 @@ WITH final AS (
         CASE WHEN p.fielding_position IN (1, 2) THEN e.stolen_bases ELSE 0 END::UTINYINT AS stolen_bases,
         CASE WHEN p.fielding_position IN (1, 2) THEN e.caught_stealing ELSE 0 END::UTINYINT AS caught_stealing,
         CASE WHEN p.fielding_position IN (1, 2) AND fp.assists > 0 THEN e.pickoffs ELSE 0 END::UTINYINT AS pickoffs,
-        CASE WHEN p.fielding_position = 2 THEN e.passed_balls ELSE 0 END AS passed_balls,
+        CASE WHEN p.fielding_position = 2 THEN e.passed_balls ELSE 0 END::UTINYINT AS passed_balls,
         -- Only count double plays for the fielder who made a putout
         -- or assist on the play
         CASE WHEN fp.putouts + fp.assists > 0

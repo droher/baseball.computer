@@ -64,4 +64,4 @@ models:
         data_type: double
       - name: weight_pounds
         description: ""
-        data_type: varchar
+        data_type: integer

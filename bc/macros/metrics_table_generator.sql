@@ -44,9 +44,10 @@
             except=dbt_utils.get_filtered_columns_in_relation(ref(season_model))) -%}
         SELECT 
             s.*,
-            {%- for f_col in franchise_cols %}
+            {%- for f_col in franchise_col if f_col != "league" %}
                 f.{{ f_col }},
             {%- endfor %}
+                COALESCE(f.league, 'N/A') AS league
         FROM {{ ref(season_model) }} AS s
         LEFT JOIN {{ ref('seed_franchises') }} AS f
             ON s.team_id = f.team_id

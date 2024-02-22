@@ -91,13 +91,13 @@ models:
         data_type: usmallint
       - name: total_bases
         description: "{{ doc('total_bases') }}"
-        data_type: integer
+        data_type: usmallint
       - name: plate_appearances
         description: "{{ doc('plate_appearances') }}"
-        data_type: integer
+        data_type: usmallint
       - name: on_base_opportunities
         description: "{{ doc('on_base_opportunities') }}"
-        data_type: integer
+        data_type: usmallint
       - name: on_base_successes
         description: "{{ doc('on_base_successes') }}"
-        data_type: integer
+        data_type: usmallint

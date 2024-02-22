@@ -116,7 +116,7 @@ final AS (
         offense_agg.games_pinch_hit,
         offense_agg.games_pinch_run,
         offense_agg.games_defensive_sub,
-        COALESCE(fielding_agg.games_ohtani_rule, 0) AS games_ohtani_rule,
+        COALESCE(fielding_agg.games_ohtani_rule, 0)::UTINYINT AS games_ohtani_rule,
         offense_agg.lineup_position,
         fielding_agg.fielding_positions[1] AS first_fielding_position,
         fielding_agg.fielding_positions,
