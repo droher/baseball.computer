@@ -8,8 +8,8 @@ authors = ["David Roher <davidroher@davids-air.home>"]
 python = "^3.11.0,<3.12"
 
 dbt-core = "~1.7.8"
-dbt-duckdb = "~1.7.1"
-duckdb = "~0.10.0"
+dbt-duckdb = "~1.7.2"
+duckdb = "~0.9.2"
 
 tensorflow = "~2.15.0"
 tensorflow-metal = {version = "~1.1.0", platform = "darwin", markers = "platform_machine=='arm64'" }

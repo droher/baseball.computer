@@ -93,14 +93,14 @@ WITH final AS (
         CASE WHEN base_out.inning_start < 10
                 THEN base_out.inning_start::VARCHAR
             WHEN g.season >= 2020 AND g.game_type = 'RegularSeason'
-                THEN 11
-            ELSE 10
+                THEN '11'
+            ELSE '10'
         END AS inning_group_start,
         CASE WHEN base_out.inning_start < 10
                 THEN base_out.inning_end::VARCHAR
             WHEN g.season >= 2020 AND g.game_type = 'RegularSeason'
-                THEN 11
-            ELSE 10
+                THEN '11'
+            ELSE '10'
         END AS inning_group_end,
         GREATEST(LEAST(home_margin_start, 10), -10)::INT1 AS truncated_home_margin_start,
         GREATEST(LEAST(home_margin_end, 10), -10)::INT1 AS truncated_home_margin_end,

@@ -66,13 +66,13 @@ final AS (
             WHEN hand.batter_hand = 'L'
                 THEN batted_ball.batted_angle_right
             ELSE 0
-        END AS batted_balls_pulled,
+        END::UTINYINT AS batted_balls_pulled,
         CASE WHEN hand.batter_hand = 'R'
                 THEN batted_ball.batted_angle_right
             WHEN hand.batter_hand = 'L'
                 THEN batted_ball.batted_angle_left
             ELSE 0
-        END AS batted_balls_opposite_field,
+        END::UTINYINT AS batted_balls_opposite_field,
 
     FROM batted_ball
     INNER JOIN {{ ref('event_states_batter_pitcher') }} AS hand USING (event_key)

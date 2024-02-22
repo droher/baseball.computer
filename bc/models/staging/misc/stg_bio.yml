@@ -91,7 +91,7 @@ models:
         data_type: integer
       - name: weight_pounds
         description: ""
-        data_type: varchar
+        data_type: integer
       - name: cemetery_name
         description: ""
         data_type: varchar

@@ -29,7 +29,7 @@ renamed AS (
         CASE WHEN height LIKE '%-%'
             THEN SPLIT_PART(height, '-', 1)::INT * 12 + SPLIT_PART(height, '-', 2)::INT
         END AS height_inches,
-        weight AS weight_pounds,
+        weight::INT AS weight_pounds,
         -- TODO: Fix spelling
         cemetary AS cemetery_name,
         ceme_city AS cemetery_city,

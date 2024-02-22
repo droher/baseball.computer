@@ -56,7 +56,7 @@ retrosheet AS (
         stats.team_id,
         stats.player_id,
         games.game_type,
-        COUNT(*) AS games,
+        COUNT(*)::SMALLINT AS games,
         {% for stat in event_level_offense_stats() -%}
             SUM({{ stat }})::SMALLINT AS {{ stat }},
         {% endfor %}

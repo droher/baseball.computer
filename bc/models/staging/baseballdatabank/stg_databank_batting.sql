@@ -28,13 +28,13 @@ renamed AS (
         sf AS sacrifice_flies,
         gidp AS grounded_into_double_plays,
         hits - home_runs - triples - doubles AS singles,
-        singles + doubles * 2 + triples * 3 + home_runs * 4 AS total_bases,
-        at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
-        + COALESCE(sacrifice_hits, 0)
+        (singles + doubles * 2 + triples * 3 + home_runs * 4)::USMALLINT AS total_bases,
+        (at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
+        + COALESCE(sacrifice_hits, 0))::USMALLINT
         AS plate_appearances,
-        at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
+        (at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0))::USMALLINT
         AS on_base_opportunities,
-        hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) AS on_base_successes,
+        (hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0))::USMALLINT AS on_base_successes,
     FROM source
 
 )

@@ -48,7 +48,7 @@ counts AS (
             WHEN dis_home.normalized_scorer IS NOT NULL
                 THEN dis_home.normalized_scorer
             WHEN num_range.group_id IS NOT NULL
-                THEN num_range.group_id
+                THEN num_range.group_id::VARCHAR
             WHEN f.scorer IN (LOWER(away.nickname), LOWER(f.away_team_id))
                 THEN LOWER(away.nickname)
             WHEN f.scorer IN (LOWER(home.nickname), LOWER(f.home_team_id))

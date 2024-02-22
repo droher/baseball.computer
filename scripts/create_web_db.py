@@ -2,6 +2,9 @@ import duckdb
 import boto3
 import os
 
+upcast_map = {
+    ""
+}
 
 def export_table_to_parquet(conn, schema_name, table_name, file_name):
     query = f"COPY (SELECT * FROM {schema_name}.{table_name}) TO '{file_name}' (FORMAT 'parquet', COMPRESSION 'ZSTD', ROW_GROUP_SIZE 1966080)"
@@ -40,7 +43,7 @@ def main():
 
     conn = duckdb.connect(original_db_path)
     new_conn = duckdb.connect(new_db_path)
-    conn.execute("SET memory_limit='20GB'")
+    conn.execute("SET memory_limit='25GB'")
 
     schema_query = "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('main', 'pg_catalog', 'information_schema')"
     # Retrieve list of schemas
@@ -58,7 +61,6 @@ def main():
 
             # Export table to Parquet
             export_table_to_parquet(conn, schema_name, table_name, parquet_file)
-    conn.close()
 
 
     for schema in schemas:
@@ -80,7 +82,8 @@ def main():
 
             # Clean up local file
             os.remove(parquet_file)
-
+    
+    conn.close()
     new_conn.close()
     url = upload_to_r2(new_db_path, bucket_name, prefix)
     print(f"URL: {url}")

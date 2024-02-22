@@ -135,7 +135,7 @@ models:
         data_type: utinyint
       - name: batted_balls_pulled
         description: "{{ doc('batted_balls_pulled') }}"
-        data_type: integer
+        data_type: utinyint
       - name: batted_balls_opposite_field
         description: "{{ doc('batted_balls_opposite_field') }}"
-        data_type: integer
+        data_type: utinyint
