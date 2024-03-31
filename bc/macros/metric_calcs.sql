@@ -40,7 +40,7 @@
 {% macro basic_rate_stats_fielding() %}
     {{ return ({
         "fielding_percentage": "SUM(putouts + assists) / SUM(putouts + assists + errors)",
-        "range_factor": "(SUM(putouts) + SUM(assists)) * 9 / SUM(outs_played * 3)",
+        "range_factor": "(SUM(putouts) + SUM(assists)) * 9 / SUM(outs_played / 3)",
         "innings_played": "ROUND(SUM(outs_played) / 3, 2)",
     }) }}
 {% endmacro %}
