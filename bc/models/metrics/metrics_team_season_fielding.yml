@@ -105,3 +105,6 @@ models:
       - name: event_coverage_rate
         description: ""
         data_type: double
+      - name: games_started
+        description: "{{ doc('games_started') }}"
+        data_type: integer
