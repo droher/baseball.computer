@@ -38,6 +38,9 @@ def create_view_with_url(new_conn, schema_name, view_name, url):
 def main():
     original_db_path = "bc.db"
     new_db_path = "bc_remote.db"
+    # Delete the new database if it exists
+    if os.path.exists(new_db_path):
+        os.remove(new_db_path)
     bucket_name = "timeball"
     prefix = "dbt"
 
