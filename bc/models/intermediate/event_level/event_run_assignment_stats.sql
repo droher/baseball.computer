@@ -13,8 +13,9 @@ WITH event_runs AS (
         run_stats.runs,
         events.team_unearned_runs
     FROM {{ ref('event_baserunning_stats') }} AS run_stats
-    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS charged_pitcher USING (event_key)
     INNER JOIN {{ ref('stg_events') }} AS events USING (event_key)
+    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS charged_pitcher
+        ON charged_pitcher.event_key = run_stats.charge_event_key
     WHERE run_stats.runs = 1
 ),
 

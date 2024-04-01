@@ -12,7 +12,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: &pk [event_key]
+        columns: &pk [event_key, pitcher_id]
 
     meta:
       primary_keys: *pk

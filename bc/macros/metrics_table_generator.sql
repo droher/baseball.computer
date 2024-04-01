@@ -30,10 +30,11 @@
         {%- do event_based_metrics.update(pitch_sequence_stats()) -%}
     {%- endif -%}
 
-    {%- set cols = adapter.get_columns_in_relation(ref(event_model)) -%}
+    {%- set cols = adapter.get_columns_in_relation(ref(game_model)) -%}
     {%- set filtered_cols = [] -%}
     {%- for col in cols if 'INT' in col.data_type 
-            and not (col.name.endswith('_id') or col.name.endswith('_key') or col.name.endswith('_position')) 
+            and not (col.name.endswith('_id') or col.name.endswith('_key')
+                     or col.name.endswith('_position') or col.name.startswith('surplus_box'))
             and col.name != "season" -%}
         {%- do filtered_cols.append(col) -%}
     {%- endfor -%}
@@ -64,7 +65,7 @@
         FROM {{ ref(event_model) }} AS e
         LEFT JOIN {{ ref('team_game_start_info') }} AS g USING (team_id, game_id)
     ),
-    -- Need to use the season table for basic stats/metrics to ensure full coverage...
+    -- Need to use the season table for basic stats/metrics to ensure full coverage and more efficient agg...
     basic_stats AS (
         SELECT
         {%- for key in grouping_keys %}

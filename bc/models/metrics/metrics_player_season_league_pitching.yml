@@ -645,3 +645,69 @@ models:
       - name: pitch_data_coverage_rate
         description: "{{ doc('pitch_data_coverage_rate') }}"
         data_type: double
+      - name: wins
+        description: "{{ doc('wins') }}"
+        data_type: integer
+      - name: losses
+        description: "{{ doc('losses') }}"
+        data_type: integer
+      - name: saves
+        description: "{{ doc('saves') }}"
+        data_type: integer
+      - name: earned_runs
+        description: "{{ doc('earned_runs') }}"
+        data_type: integer
+      - name: games_started
+        description: "{{ doc('games_started') }}"
+        data_type: integer
+      - name: inherited_runners
+        description: "{{ doc('inherited_runners') }}"
+        data_type: integer
+      - name: bequeathed_runners
+        description: "{{ doc('bequeathed_runners') }}"
+        data_type: integer
+      - name: games_relieved
+        description: "{{ doc('games_relieved') }}"
+        data_type: integer
+      - name: games_finished
+        description: "{{ doc('games_finished') }}"
+        data_type: integer
+      - name: save_situations_entered
+        description: "{{ doc('save_situations_entered') }}"
+        data_type: integer
+      - name: holds
+        description: "{{ doc('holds') }}"
+        data_type: integer
+      - name: blown_saves
+        description: "{{ doc('blown_saves') }}"
+        data_type: integer
+      - name: saves_by_rule
+        description: "{{ doc('saves_by_rule') }}"
+        data_type: integer
+      - name: save_opportunities
+        description: "{{ doc('save_opportunities') }}"
+        data_type: integer
+      - name: complete_games
+        description: "{{ doc('complete_games') }}"
+        data_type: integer
+      - name: shutouts
+        description: "{{ doc('shutouts') }}"
+        data_type: integer
+      - name: quality_starts
+        description: "{{ doc('quality_starts') }}"
+        data_type: integer
+      - name: cheap_wins
+        description: "{{ doc('cheap_wins') }}"
+        data_type: integer
+      - name: tough_losses
+        description: "{{ doc('tough_losses') }}"
+        data_type: integer
+      - name: no_decisions
+        description: "{{ doc('no_decisions') }}"
+        data_type: integer
+      - name: no_hitters
+        description: "{{ doc('no_hitters') }}"
+        data_type: integer
+      - name: perfect_games
+        description: "{{ doc('perfect_games') }}"
+        data_type: integer
