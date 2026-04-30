@@ -27,6 +27,9 @@ models:
   baseball_computer:
     +materialized: table
     +schema: models
+    intermediate:
+      machine_learning:
+        +enabled: false
 
 seeds:
   baseball_computer:

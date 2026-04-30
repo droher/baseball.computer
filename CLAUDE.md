@@ -27,7 +27,7 @@ uv run <cmd>           # run inside the env
 
 Python pinned `>=3.12,<3.13`. The upper bound exists because DuckDB 0.10.x has no Py 3.13 wheel and source-builds fail on the 3.13 C API; lift it once the DuckDB upgrade lands.
 
-Keras 3 defaults its backend to TensorFlow, which is not installed. Set `KERAS_BACKEND=jax` (env var or shell export) before any Keras import.
+**ML layer is disabled.** `bc/models/intermediate/machine_learning/` (`ml_event_outcomes`, `ml_features`) is excluded from `dbt run` via `+enabled: false` in `bc/dbt_project.yml`. The JAX/Keras dep stack was removed in the 2026 refresh (PLE-383/PLE-384). SQL kept in tree; re-enable by flipping the flag and reinstating the deps.
 
 ### dbt profile
 
@@ -101,7 +101,7 @@ intermediate/                -- the bulk of the logic
    ├─ flags/                 -- event_pitching_flags
    ├─ player_game_level/, player_season_level/, season_level/, game_level/
    ├─ bio/people.sql         -- player biographical data (Retrosheet + Baseball Databank)
-   └─ machine_learning/      -- ml_event_outcomes, ml_features (JAX/Keras — experimental)
+   └─ machine_learning/      -- ml_event_outcomes, ml_features (disabled; see Environment)
    │
    ▼
 metrics/                     -- 9 user-facing aggregate tables + standings
