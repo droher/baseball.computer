@@ -49,7 +49,7 @@ joined AS (
 
 final AS (
     SELECT
-        CASE WHEN person_id SIMILAR TO '[a-z]{5}[01][0-9]{2}' THEN person_id ELSE NULL END AS player_id,
+        CASE WHEN person_id SIMILAR TO '[-a-z]{5}[01][0-9]{2}' THEN person_id ELSE NULL END AS player_id,
         *
     FROM joined
 )
