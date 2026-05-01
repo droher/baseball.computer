@@ -1,18 +1,23 @@
 import duckdb
 import boto3
 import os
-
-upcast_map = {
-    ""
-}
+import time
 
 def export_table_to_parquet(conn, schema_name, table_name, file_name):
-    query = f"COPY (SELECT * FROM {schema_name}.{table_name}) TO '{file_name}' (FORMAT 'parquet', COMPRESSION 'ZSTD', ROW_GROUP_SIZE 1966080)"
+    row_group_size = 1966080 if table_name != "event_states_full" else 262144
+    compression = "ZSTD" if table_name != "event_states_full" else "GZIP"
+    query = f"COPY (SELECT * FROM {schema_name}.{table_name}) TO '{file_name}' (FORMAT 'parquet', COMPRESSION '{compression}', ROW_GROUP_SIZE {row_group_size})"
     conn.sql(query)
     print(f"Exported {schema_name}.{table_name} to {file_name}")
 
+def get_url(file_name, prefix, cache_bust=None):
+    name_only = file_name.split("/")[-1]
+    url = f"https://data.baseball.computer/{prefix}/{name_only}"
+    if cache_bust:
+        url = f"{url}?v={cache_bust}"
+    return url
 
-def upload_to_r2(file_name, bucket_name, prefix):
+def upload_to_r2(file_name, bucket_name, prefix, cache_bust=None):
     print(f"Uploading {file_name} to R2 bucket {bucket_name}")
     account_id = os.environ["R2_ACCOUNT_ID"]
     access_key_id = os.environ["R2_ACCESS_KEY_ID"]
@@ -25,13 +30,13 @@ def upload_to_r2(file_name, bucket_name, prefix):
     )
     name_only = file_name.split("/")[-1]
     s3.meta.client.upload_file(file_name, bucket_name, f"{prefix}/{name_only}")
-    url = f"https://data.baseball.computer/{prefix}/{name_only}"
-    return url
+    return get_url(file_name, prefix, cache_bust=cache_bust)
 
 
 def create_view_with_url(new_conn, schema_name, view_name, url):
     new_conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
     query = f"CREATE VIEW {schema_name}.{view_name} AS SELECT * FROM '{url}'"
+    print(query)
     new_conn.execute(query)
 
 
@@ -43,6 +48,7 @@ def main():
         os.remove(new_db_path)
     bucket_name = "timeball"
     prefix = "dbt"
+    cache_bust = str(int(time.time()))
 
     conn = duckdb.connect(original_db_path)
     new_conn = duckdb.connect(new_db_path)
@@ -76,8 +82,8 @@ def main():
             table_name = table[0]
             parquet_file = f"/tmp/{schema_name}_{table_name}.parquet"
 
-            # Upload to R2 and get URL
-            url = upload_to_r2(parquet_file, bucket_name, prefix)
+            # Upload to R2 and get URL (with cache-bust query so views read fresh past stale CF cache)
+            url = upload_to_r2(parquet_file, bucket_name, prefix, cache_bust=cache_bust)
             print(f"URL: {url}")
 
             # Create view in new database

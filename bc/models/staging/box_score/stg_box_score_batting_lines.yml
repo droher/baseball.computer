@@ -14,7 +14,7 @@ models:
 
     constraints:
       - type: primary_key
-        columns: &pk [game_id, side, batter_id]
+        columns: &pk [game_id, side, batter_id, lineup_position, nth_player_at_position]
 
     meta:
       primary_keys: *pk

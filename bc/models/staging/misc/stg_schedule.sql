@@ -15,7 +15,8 @@ renamed AS (
         home_team_game_number,
         day_night,
         postponement_indicator,
-        makeup_dates
+        makeup_dates,
+        park_id
 
     FROM source
 )

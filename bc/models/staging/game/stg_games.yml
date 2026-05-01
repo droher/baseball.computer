@@ -84,7 +84,7 @@ models:
               to: ref('stg_parks')
           - not_null:
               config:
-                severity: warn
+                where: "EXTRACT(year FROM date) >= 1875"
       - name: temperature_fahrenheit
         description: "{{ doc('temperature_fahrenheit') }}"
         data_type: tinyint

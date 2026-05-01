@@ -4,7 +4,7 @@ WITH source AS (
 
 renamed AS (
     SELECT
-        park_id,
+        park_id::park_id AS park_id,
         name,
         aka,
         city,

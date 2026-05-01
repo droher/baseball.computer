@@ -6,13 +6,13 @@ renamed AS (
     SELECT
         game_id,
         side,
-        outs_played,
-        putouts,
-        assists,
-        errors,
-        double_plays,
-        triple_plays,
-        passed_balls
+        outs_played::BIGINT AS outs_played,
+        putouts::UTINYINT AS putouts,
+        assists::UTINYINT AS assists,
+        errors::UTINYINT AS errors,
+        double_plays::UTINYINT AS double_plays,
+        triple_plays::UTINYINT AS triple_plays,
+        passed_balls::UTINYINT AS passed_balls
 
     FROM source
 )

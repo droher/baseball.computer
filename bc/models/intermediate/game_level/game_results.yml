@@ -52,10 +52,10 @@ models:
           - type: not_null
       - name: winning_team_id
         description: ""
-        data_type: varchar
+        data_type: team_id
       - name: losing_team_id
         description: ""
-        data_type: varchar
+        data_type: team_id
       - name: winning_team_score
         description: ""
         data_type: utinyint

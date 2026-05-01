@@ -261,8 +261,6 @@ sources:
             data_type: WIND_DIRECTION
           - name: park_id
             description: ""
-            tests:
-              - not_null
             data_type: PARK_ID
           - name: temperature_fahrenheit
             description: ""

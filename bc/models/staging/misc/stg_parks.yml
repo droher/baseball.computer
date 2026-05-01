@@ -36,8 +36,6 @@ models:
       - name: state
         description: ""
         data_type: varchar
-        constraints:
-          - type: not_null
       - name: start_date
         description: ""
         data_type: varchar

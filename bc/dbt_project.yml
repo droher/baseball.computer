@@ -8,6 +8,12 @@ config-version: 2
 # This setting configures which "profile" dbt uses for this project.
 profile: 'bc'
 
+# Note: dbt 1.10 errors if both `flags:` here and `config:` in profiles.yml
+# are set. Repo has no source-freshness project hooks, so the new 1.10
+# default (`source_freshness_run_project_hooks: true`) is behaviorally inert.
+# When the user migrates the deprecated profiles.yml `config:` block, move
+# the prefs here under `flags:`.
+
 # These configurations specify where dbt should look for different types of files.
 # The `model-paths` config, for example, states that models in this project can be
 # found in the "models/" directory. You probably won't need to change these!
@@ -27,7 +33,24 @@ models:
   baseball_computer:
     +materialized: table
     +schema: models
+    intermediate:
+      machine_learning:
+        +enabled: false
 
 seeds:
   baseball_computer:
     +schema: seeds
+
+# Per-schema source parquet roots, consumed by `init_db` macro.
+# Defaults below point to the local boxball-rs output dir.
+# To pull from the published R2 bucket instead, override via `--vars` on the CLI:
+#   dbt run-operation init_db --vars '{source_roots: {event: "https://data.baseball.computer/event", game: "https://data.baseball.computer/event", box_score: "https://data.baseball.computer/event", misc: "https://data.baseball.computer/misc", baseballdatabank: "https://data.baseball.computer/baseballdatabank"}}'
+# `baseballdatabank` stays on R2 by default — boxball-rs does not produce it locally.
+vars:
+  source_roots:
+    event: 'https://data.baseball.computer/event'
+    game: 'https://data.baseball.computer/event'
+    box_score: 'https://data.baseball.computer/event'
+    misc: 'https://data.baseball.computer/misc'
+    baseballdatabank: 'https://data.baseball.computer/baseballdatabank'
+    biodata: 'https://data.baseball.computer/biodata'

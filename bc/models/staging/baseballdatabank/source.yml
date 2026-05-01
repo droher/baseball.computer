@@ -3,10 +3,10 @@ sources:
     tables:
       - name: appearances
         columns:
-          - name: yearid
-          - name: teamid
-          - name: lgid
-          - name: playerid
+          - name: year_id
+          - name: team_id
+          - name: lg_id
+          - name: player_id
           - name: g_all
           - name: gs
           - name: g_batting
@@ -27,11 +27,11 @@ sources:
 
       - name: batting
         columns:
-          - name: playerid
-          - name: yearid
+          - name: player_id
+          - name: year_id
           - name: stint
-          - name: teamid
-          - name: lgid
+          - name: team_id
+          - name: lg_id
           - name: g
             data_type: USMALLINT
           - name: ab
@@ -69,11 +69,11 @@ sources:
 
       - name: fielding
         columns:
-          - name: playerid
-          - name: yearid
+          - name: player_id
+          - name: year_id
           - name: stint
-          - name: teamid
-          - name: lgid
+          - name: team_id
+          - name: lg_id
           - name: pos
           - name: g
           - name: gs
@@ -90,11 +90,11 @@ sources:
 
       - name: pitching
         columns:
-          - name: playerid
-          - name: yearid
+          - name: player_id
+          - name: year_id
           - name: stint
-          - name: teamid
-          - name: lgid
+          - name: team_id
+          - name: lg_id
           - name: w
           - name: l
           - name: g
@@ -127,7 +127,7 @@ sources:
           primary_keys:
             - player_id
         columns:
-          - name: playerid
+          - name: player_id
             tests:
               - unique
               - not_null
@@ -156,7 +156,7 @@ sources:
             tests:
               - unique
             data_type: PLAYER_ID
-          - name: bbrefid
+          - name: bbref_id
             tests:
               - unique
       - name: fielding_of
@@ -166,8 +166,8 @@ sources:
           primary_keys:
             - player_id
         columns:
-          - name: playerid
-          - name: yearid
+          - name: player_id
+          - name: year_id
           - name: stint
           - name: glf
           - name: gcf

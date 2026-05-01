@@ -93,23 +93,26 @@ unioned AS (
 ),
 
 agged AS (
+    -- DuckDB 1.x: LIST(...) FILTER (...) where all rows are filtered out returns
+    -- NULL, and MAP(NULL, NULL) is NULL. COALESCE to empty list keeps MAP non-null
+    -- so the contract NOT NULL holds for games where one side is missing.
     SELECT
         game_id,
         MAP(
-            LIST(lineup_position::UTINYINT ORDER BY lineup_position) FILTER (WHERE side = 'Away'),
-            LIST(player_id ORDER BY lineup_position) FILTER (WHERE side = 'Away')
+            COALESCE(LIST(lineup_position::UTINYINT ORDER BY lineup_position) FILTER (WHERE side = 'Away'), []),
+            COALESCE(LIST(player_id ORDER BY lineup_position) FILTER (WHERE side = 'Away'), [])
         ) AS lineup_map_away,
         MAP(
-            LIST(fielding_position::UTINYINT ORDER BY fielding_position) FILTER (WHERE side = 'Away'),
-            LIST(player_id ORDER BY fielding_position) FILTER (WHERE side = 'Away')
+            COALESCE(LIST(fielding_position::UTINYINT ORDER BY fielding_position) FILTER (WHERE side = 'Away'), []),
+            COALESCE(LIST(player_id ORDER BY fielding_position) FILTER (WHERE side = 'Away'), [])
         ) AS fielding_map_away,
         MAP(
-            LIST(lineup_position::UTINYINT ORDER BY lineup_position) FILTER (WHERE side = 'Home'),
-            LIST(player_id ORDER BY lineup_position) FILTER (WHERE side = 'Home')
+            COALESCE(LIST(lineup_position::UTINYINT ORDER BY lineup_position) FILTER (WHERE side = 'Home'), []),
+            COALESCE(LIST(player_id ORDER BY lineup_position) FILTER (WHERE side = 'Home'), [])
         ) AS lineup_map_home,
         MAP(
-            LIST(fielding_position::UTINYINT ORDER BY fielding_position) FILTER (WHERE side = 'Home'),
-            LIST(player_id ORDER BY fielding_position) FILTER (WHERE side = 'Home')
+            COALESCE(LIST(fielding_position::UTINYINT ORDER BY fielding_position) FILTER (WHERE side = 'Home'), []),
+            COALESCE(LIST(player_id ORDER BY fielding_position) FILTER (WHERE side = 'Home'), [])
         ) AS fielding_map_home
     FROM unioned
     GROUP BY 1

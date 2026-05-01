@@ -127,4 +127,4 @@ models:
           - type: not_null
         tests:
           - accepted_values:
-              values: [Left, Middle, Right, Unknown]
+              values: [Left, Middle, Right, All, Unknown]
