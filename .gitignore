@@ -12,3 +12,6 @@ docs/compiled/
 *.log
 __pycache__/
 .wrangler/
+.env
+.env.*
+!.env.example
