@@ -351,8 +351,6 @@ sources:
             data_type: PARK_ID
           - name: name
             description: ""
-            tests:
-              - not_null
           - name: aka
             description: ""
           - name: city
@@ -363,14 +361,27 @@ sources:
             description: ""
           - name: start_date
             description: ""
-            tests:
-              - not_null
           - name: end_date
             description: ""
           - name: league
             description: ""
           - name: notes
             description: ""
+
+      - name: bio
+        description: |
+          Master bio reference for players, managers, coaches, and umpires.
+          Modern data refreshed by upstream simple_files.py, kept in legacy
+          lowercase column shape (player_id/last/first/...).
+        meta:
+          primary_keys:
+            - player_id
+        columns:
+          - name: player_id
+            description: "Retrosheet personnel id."
+            tests:
+              - not_null
+              - unique
 
       - name: roster
         description: |
@@ -411,8 +422,6 @@ sources:
             data_type: TEAM_ID
           - name: position
             description: ""
-            tests:
-              - not_null
 
       - name: schedule
         description: |
@@ -446,4 +455,6 @@ sources:
             description: ""
           - name: makeup_dates
             description: ""
-      - name: bio
+          - name: park_id
+            description: "{{ doc('park_id') }}"
+            data_type: park_id

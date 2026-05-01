@@ -31,7 +31,7 @@ models:
           - type: not_null
       - name: season_group
         description: ""
-        data_type: bigint
+        data_type: smallint
         constraints:
           - type: not_null
       - name: outs

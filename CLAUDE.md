@@ -25,13 +25,13 @@ uv sync                # install + create .venv from uv.lock
 uv run <cmd>           # run inside the env
 ```
 
-Python pinned `>=3.12,<3.13`. The upper bound exists because DuckDB 0.10.x has no Py 3.13 wheel and source-builds fail on the 3.13 C API; lift it once the DuckDB upgrade lands.
+Python pinned `>=3.12,<3.13`. Lift the upper bound once we confirm 3.13 wheels for the full dep stack.
 
 **ML layer is disabled.** `bc/models/intermediate/machine_learning/` (`ml_event_outcomes`, `ml_features`) is excluded from `dbt run` via `+enabled: false` in `bc/dbt_project.yml`. The JAX/Keras dep stack was removed in the 2026 refresh (PLE-383/PLE-384). SQL kept in tree; re-enable by flipping the flag and reinstating the deps.
 
 ### dbt profile
 
-The dbt profile is **not** in `bc/`; it lives at `~/.dbt/profiles.yml` under the profile name `bc`. The default `dev` target writes to `/Users/davidroher/Repos/baseball.computer/bc.db` (absolute path, hard-coded), with a 20GB memory limit and `httpfs` + `parquet` extensions.
+The dbt profile is **not** in `bc/`; it lives at `~/.dbt/profiles.yml` under the profile name `bc`. The default `dev` target writes to `/Users/davidroher/Repos/baseball.computer/bc.db` (absolute path, hard-coded). Settings: `httpfs` + `parquet` extensions, `threads: 6`, `disable_transactions: true`. DuckDB tuning: `enable_fsst_vectors`, `enable_http_metadata_cache`, `parquet_metadata_cache`, `preserve_insertion_order: false`, `checkpoint_threshold: 1GB`. No `memory_limit` — DuckDB uses its default (80% of system RAM). No explicit `temp_directory` — multi-thread connection inits errored on "Cannot switch temporary directory after the current one has been used".
 
 ### Build
 
@@ -125,9 +125,10 @@ metrics/                     -- 9 user-facing aggregate tables + standings
 
 ### Data flow caveats
 
-- The pipeline does **not** parse Retrosheet itself — that's `boxball-rs`. If event-level columns are missing or wrong, the fix usually belongs upstream, not here.
-- There is **no CI**; refreshes are manual (`dbt run` then `python scripts/create_web_db.py`).
-- Dependencies are stale on purpose-of-pause as of last work: DuckDB `0.10.1`, dbt-duckdb `1.7.3`, dbt-core `1.7.11`. Upgrading is on the next-steps list — expect breaking SQL changes (DuckDB 1.x, dbt 1.8/1.9) when you do.
+- The pipeline does **not** parse Retrosheet itself — that's `boxball-rs` (now publishing via `bin/fetch_retrosheet.py`, replacing `alldata.zip`). If event-level columns are missing or wrong, the fix usually belongs upstream.
+- There is **no CI** yet (PLE-394 in flight); refreshes are manual (`dbt run` then `python scripts/create_web_db.py`).
+- Source layout: per-schema R2 prefixes (`event/`, `misc/`, `baseballdatabank/`, `biodata/`) under `https://data.baseball.computer/`. Override via `vars: source_roots` in `dbt_project.yml` to point at local boxball-rs output. `init_db` macro appends `?v=<run-started-at>` cache-bust querystrings to HTTPS sources to bypass stale Cloudflare range caches.
+- Biodata bundle: `teams`, `coaches`, `relatives`, `ejections`, `managers0`, `umpires0` masters live in the `biodata` schema, replacing per-year `umpires/UMPIRES{YYYY}.txt` and `teams/team{YYYY}*.csv` files no longer mirrored.
 
 ## Other directories
 

@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: stg_teams_master
+    description: |
+      Per-team master from Retrosheet's biodata bundle (teams.csv). Replaces
+      the per-year `teams/team{YYYY}*.csv` files which are no longer mirrored
+      by the new fetcher.
+
+    config:
+      contract:
+        enforced: true
+
+    constraints:
+      - type: primary_key
+        columns: &pk [team_id]
+
+    meta:
+      primary_keys: *pk
+
+    columns:
+      - name: team_id
+        description: "Retrosheet team id."
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: league
+        description: ""
+        data_type: varchar
+      - name: city
+        description: ""
+        data_type: varchar
+      - name: nickname
+        description: ""
+        data_type: varchar
+      - name: first_year
+        description: "First season the team existed."
+        data_type: smallint
+      - name: last_year
+        description: "Last season the team existed."
+        data_type: smallint

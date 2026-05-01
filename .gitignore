@@ -9,3 +9,6 @@ scratch.ipynb
 profile.log
 .ipynb_checkpoints/
 docs/compiled/
+*.log
+__pycache__/
+.wrangler/

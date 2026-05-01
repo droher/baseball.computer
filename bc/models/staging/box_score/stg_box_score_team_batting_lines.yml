@@ -64,7 +64,7 @@ models:
         data_type: bigint
       - name: strikeouts
         description: "{{ doc('strikeouts') }}"
-        data_type: integer
+        data_type: bigint
       - name: stolen_bases
         description: "{{ doc('stolen_bases') }}"
         data_type: bigint

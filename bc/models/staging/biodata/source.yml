@@ -1,0 +1,133 @@
+version: 2
+
+sources:
+  - name: biodata
+    description: |
+      Master reference Parquet from Retrosheet's `biodata.zip` bundle, emitted
+      by upstream baseball.computer.rs simple_files.py with normalized lowercase
+      column names. Replaces per-year `umpires/UMPIRES{YYYY}.txt` and
+      `teams/team{YYYY}*.csv` files which the new fetcher does not mirror.
+    tables:
+      - name: teams
+        description: |
+          Per-team master. Replaces per-year teams/team{YYYY}*.csv.
+        meta:
+          primary_keys:
+            - team
+        columns:
+          - name: team
+            description: "Retrosheet team id."
+            tests:
+              - not_null
+          - name: league
+            description: ""
+          - name: city
+            description: ""
+          - name: nickname
+            description: ""
+          - name: first_year
+            description: "First season the team existed."
+          - name: last_year
+            description: "Last season the team existed."
+
+      - name: coaches
+        description: |
+          Per-coach assignments by year.
+        meta:
+          primary_keys:
+            - id
+            - year
+            - team
+        columns:
+          - name: id
+            description: "Retrosheet personnel id (joins biofile.id)."
+          - name: year
+            description: ""
+          - name: team
+            description: ""
+          - name: role
+            description: ""
+          - name: start_date
+            description: ""
+          - name: end_date
+            description: ""
+
+      - name: relatives
+        description: |
+          Player-family relationships graph.
+        columns:
+          - name: id1
+            description: "First personnel id."
+          - name: relation
+            description: "Relationship type (father, brother, etc.)."
+          - name: id2
+            description: "Second personnel id."
+
+      - name: ejections
+        description: |
+          Game ejections.
+        columns:
+          - name: game_id
+            description: "{{ doc('game_id') }}"
+          - name: date
+            description: ""
+          - name: double_header
+            description: ""
+          - name: ejectee
+            description: "Ejected personnel id."
+          - name: ejectee_name
+            description: ""
+          - name: team
+            description: ""
+          - name: job
+            description: "Role of ejectee (player, manager, coach)."
+          - name: umpire
+            description: ""
+          - name: umpire_name
+            description: ""
+          - name: inning
+            description: "-1 if pre-game."
+          - name: reason
+            description: ""
+
+      - name: managers0
+        description: |
+          Manager career index.
+        meta:
+          primary_keys:
+            - id
+        columns:
+          - name: id
+            description: "Retrosheet personnel id."
+            tests:
+              - not_null
+              - unique
+          - name: lastname
+            description: ""
+          - name: firstname
+            description: ""
+          - name: first_g
+            description: "Date of first managed game."
+          - name: last_g
+            description: "Date of last managed game."
+
+      - name: umpires0
+        description: |
+          Umpire career index.
+        meta:
+          primary_keys:
+            - id
+        columns:
+          - name: id
+            description: "Retrosheet personnel id."
+            tests:
+              - not_null
+              - unique
+          - name: lastname
+            description: ""
+          - name: firstname
+            description: ""
+          - name: first_g
+            description: "Date of first umpired game."
+          - name: last_g
+            description: "Date of last umpired game."

@@ -39,14 +39,15 @@ WITH databank AS (
 
 databank_running AS (
     SELECT
-        season,
-        player_id,
-        team_id,
-        SUM(stolen_bases)::SMALLINT AS stolen_bases,
-        SUM(caught_stealing)::SMALLINT AS caught_stealing,
-    FROM {{ ref('stg_databank_batting') }}
+        bat.season,
+        people.retrosheet_player_id AS player_id,
+        bat.team_id,
+        SUM(bat.stolen_bases)::SMALLINT AS stolen_bases,
+        SUM(bat.caught_stealing)::SMALLINT AS caught_stealing,
+    FROM {{ ref('stg_databank_batting') }} AS bat
+    INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
     -- TODO: Add var to indicate final databank override year
-    WHERE season < 1920
+    WHERE bat.season < 1920
     GROUP BY 1, 2, 3
 ),
 

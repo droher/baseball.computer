@@ -55,3 +55,6 @@ models:
       - name: makeup_dates
         description: ""
         data_type: varchar
+      - name: park_id
+        description: "{{ doc('park_id') }}"
+        data_type: park_id

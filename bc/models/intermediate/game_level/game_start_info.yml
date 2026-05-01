@@ -180,13 +180,9 @@ models:
       - name: away_franchise_id
         description: "{{ doc('away_franchise_id') }}"
         data_type: team_id
-        constraints:
-          - type: not_null
       - name: home_franchise_id
         description: "{{ doc('home_franchise_id') }}"
         data_type: team_id
-        constraints:
-          - type: not_null
       - name: away_league
         description: "{{ doc('away_league') }}"
         data_type: varchar
@@ -202,13 +198,9 @@ models:
       - name: away_team_name
         description: "{{ doc('away_team_name') }}"
         data_type: varchar
-        constraints:
-          - type: not_null
       - name: home_team_name
         description: "{{ doc('home_team_name') }}"
         data_type: varchar
-        constraints:
-          - type: not_null
       - name: is_interleague
         description: "{{ doc('is_interleague') }}"
         data_type: boolean

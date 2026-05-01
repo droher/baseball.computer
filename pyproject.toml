@@ -2,14 +2,14 @@
 name = "baseball-computer"
 version = "0.1.0"
 description = ""
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 authors = [{ name = "David Roher", email = "david.roher@gmail.com" }]
 dependencies = [
-    "dbt-core~=1.7.11",
-    "dbt-duckdb~=1.7.3",
-    "duckdb~=0.10.1",
-    "numpy~=1.26.4",
-    "pandas~=2.2.1",
+    "dbt-core~=1.10.0",
+    "dbt-duckdb~=1.10.1",
+    "duckdb~=1.5.2",
+    "numpy>=1.26.4",
+    "pandas>=2.2.1",
     "polars>=0.20.17,<2",
     "pyarrow>=15.0.2",
     "statsmodels>=0.14.1",

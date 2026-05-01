@@ -9,6 +9,7 @@ WITH valid_leagues AS (
         league,
         AVG(runs_scored) AS average_runs_scored,
     FROM {{ ref('team_game_results') }}
+    WHERE league IS NOT NULL
     GROUP BY 1, 2
 ),
 

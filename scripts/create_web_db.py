@@ -2,15 +2,17 @@ import duckdb
 import boto3
 import os
 
-upcast_map = {
-    ""
-}
-
 def export_table_to_parquet(conn, schema_name, table_name, file_name):
-    query = f"COPY (SELECT * FROM {schema_name}.{table_name}) TO '{file_name}' (FORMAT 'parquet', COMPRESSION 'ZSTD', ROW_GROUP_SIZE 1966080)"
+    row_group_size = 1966080 if table_name != "event_states_full" else 262144
+    compression = "ZSTD" if table_name != "event_states_full" else "GZIP"
+    query = f"COPY (SELECT * FROM {schema_name}.{table_name}) TO '{file_name}' (FORMAT 'parquet', COMPRESSION '{compression}', ROW_GROUP_SIZE {row_group_size})"
     conn.sql(query)
     print(f"Exported {schema_name}.{table_name} to {file_name}")
 
+def get_url(file_name, prefix):
+    name_only = file_name.split("/")[-1]
+    url = f"https://data.baseball.computer/{prefix}/{name_only}"
+    return url
 
 def upload_to_r2(file_name, bucket_name, prefix):
     print(f"Uploading {file_name} to R2 bucket {bucket_name}")
@@ -25,13 +27,13 @@ def upload_to_r2(file_name, bucket_name, prefix):
     )
     name_only = file_name.split("/")[-1]
     s3.meta.client.upload_file(file_name, bucket_name, f"{prefix}/{name_only}")
-    url = f"https://data.baseball.computer/{prefix}/{name_only}"
-    return url
+    return get_url(file_name, prefix)
 
 
 def create_view_with_url(new_conn, schema_name, view_name, url):
     new_conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
     query = f"CREATE VIEW {schema_name}.{view_name} AS SELECT * FROM '{url}'"
+    print(query)
     new_conn.execute(query)
 
 

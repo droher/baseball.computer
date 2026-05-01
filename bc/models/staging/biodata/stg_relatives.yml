@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: stg_relatives
+    description: |
+      Player-family relationships graph. From biodata/relatives.csv.
+
+    columns:
+      - name: person_id
+        description: "First personnel id (joins stg_bio.player_id)."
+      - name: relation
+        description: "Relationship type (Brother, Father, etc.)."
+      - name: related_person_id
+        description: "Second personnel id (joins stg_bio.player_id)."

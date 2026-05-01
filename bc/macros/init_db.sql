@@ -1,13 +1,32 @@
 {% macro init_db(sample_factor=1, seed=0) %}
-  {% set base_url = "https://data.baseball.computer" %}
+  {# Per-schema source roots. Override via dbt_project.yml `vars:` or CLI `--vars`.
+     Default = published R2 bucket. Set to local dirs to consume fresh boxball-rs output. #}
+  {% set source_roots = var('source_roots', {
+      'event': 'https://data.baseball.computer/event',
+      'game': 'https://data.baseball.computer/event',
+      'box_score': 'https://data.baseball.computer/event',
+      'misc': 'https://data.baseball.computer/misc',
+      'baseballdatabank': 'https://data.baseball.computer/baseballdatabank',
+      'biodata': 'https://data.baseball.computer/biodata',
+  }) %}
 
     {% for node in graph.sources.values() %}
-      {% set prefix = node.schema if node.schema in ("misc", "baseballdatabank") else "event" %}
+      {% set root = source_roots[node.schema] %}
+      {% set ext = node.meta.get('source_extension', 'parquet') %}
+      {% set read_args = '' %}
+      {% if ext == 'csv' %}
+        {% set read_args = ", header=true, all_varchar=true, delim=',', quote='\"', escape='\"', null_padding=true, ignore_errors=true" %}
+      {% endif %}
+      {# Cache-bust querystring on HTTPS sources to bypass stale Cloudflare
+         range-request caches when upstream re-uploads files. Local paths
+         pass through unchanged. #}
+      {% set is_remote = root.startswith('http') %}
+      {% set bust = '?v=' ~ run_started_at.strftime('%Y%m%d%H%M%S') if is_remote else '' %}
       {% set sql %}
       CREATE SCHEMA IF NOT EXISTS {{ node.schema }};
       SET SCHEMA = '{{ node.schema }}';
       CREATE OR REPLACE TABLE {{ node.schema }}.{{ node.name }} AS (
-        SELECT * FROM '{{ base_url }}/{{ prefix }}/{{ node.identifier }}.parquet'
+        SELECT * FROM read_{{ ext }}('{{ root }}/{{ node.identifier }}.{{ ext }}{{ bust }}'{{ read_args }})
         {% if node.schema == "event" and sample_factor > 1 %}
           WHERE HASH(event_key // 255) % {{ sample_factor }} = {{ seed }}
         {% endif %}
@@ -80,10 +99,11 @@
     CREATE TYPE park_id AS ENUM (
       SELECT DISTINCT park_id FROM misc.park
       UNION
-      -- TODO: Add missing NLB parks
       SELECT DISTINCT park_id FROM box_score.box_score_games WHERE park_id IS NOT NULL
       UNION
       SELECT DISTINCT park_id FROM game.games WHERE park_id IS NOT NULL
+      UNION
+      SELECT DISTINCT park_id FROM misc.schedule WHERE park_id IS NOT NULL
     );
     
     CREATE TYPE team_id AS ENUM (
