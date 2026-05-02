@@ -2,6 +2,8 @@ target/
 dbt_packages/
 logs/
 bc*.db*
+example.db
+bc/.cache/
 parquet/
 .python-version
 scratch.sql

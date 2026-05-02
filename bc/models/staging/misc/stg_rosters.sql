@@ -16,7 +16,10 @@ renamed AS (
     FROM source
     -- TODO: Modify upstream deduper to handle multiple positions on same team
     -- (or talk to retrosheet)
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY year, team_id, player_id ORDER BY position) = 1
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY year, team_id, player_id
+        ORDER BY position, last_name, first_name, bats, throws
+    ) = 1
 )
 
 SELECT * FROM renamed

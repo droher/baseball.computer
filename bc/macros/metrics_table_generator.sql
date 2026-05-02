@@ -1,3 +1,8 @@
+-- ARCHIVED: Phase 1 SQLMesh transition replaces this file with
+-- bc/macros/metric_table_body.sql + bc/macros/metric_col_lists.sql,
+-- which sidestep the SQLMesh ENUM-introspection bug by passing column
+-- lists explicitly. Kept so dbt CLI still works during cutover.
+-- Delete in Phase 2.
 {% macro metric_table_generator(kind, grouping_keys, agg_type, regular_season_only=True) %}
     {%- if agg_type not in ("player", "team", "league") -%}
         {{ exceptions.raise_compiler_error("Invalid agg_type - must be one of player, team, league. Got " ~ agg_type ) }}

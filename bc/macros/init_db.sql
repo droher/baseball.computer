@@ -1,3 +1,6 @@
+-- ARCHIVED: Phase 1 SQLMesh transition replaces this file with
+-- bc/macros/_init_db.py (Python @macro defs wired into before_all).
+-- Kept so dbt CLI still works during cutover. Delete in Phase 2.
 {% macro init_db(sample_factor=1, seed=0) %}
   {# Per-schema source roots. Override via dbt_project.yml `vars:` or CLI `--vars`.
      Default = published R2 bucket. Set to local dirs to consume fresh boxball-rs output. #}

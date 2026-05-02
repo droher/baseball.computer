@@ -28,7 +28,7 @@ game_agg AS (
             WHEN runs >= 10
                 THEN CONCAT('(', runs, ')')
             ELSE runs::STRING
-        END, '') AS line_score,
+        END, '' ORDER BY inning) AS line_score,
         SUM(outs) AS duration_outs,
         LIST(runs::UTINYINT ORDER BY inning) AS line_score_list
     FROM unioned

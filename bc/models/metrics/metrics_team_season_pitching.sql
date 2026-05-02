@@ -1,1 +1,1 @@
-{{  metric_table_generator("pitching", ["team_id", "season"], agg_type="player", regular_season_only=True)  }}
+{{ metric_table_body("pitching", ["team_id", "season"], pitching_int_cols(), metric_game_cols()) }}

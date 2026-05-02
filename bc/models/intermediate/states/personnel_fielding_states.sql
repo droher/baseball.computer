@@ -46,7 +46,7 @@ final AS (
     -- a better way to to this that fails louder on real dupes.
     QUALIFY ROW_NUMBER() OVER (
         PARTITION BY personnel_fielding_key, appearances.fielding_position
-        ORDER BY appearances.end_event_id DESC
+        ORDER BY appearances.end_event_id DESC, appearances.player_id, appearances.start_event_id
     ) = 1
 )
 
