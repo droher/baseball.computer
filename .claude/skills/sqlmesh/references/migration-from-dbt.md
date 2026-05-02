@@ -44,7 +44,7 @@ WHERE event_time > (SELECT MAX(event_time) FROM {{ this }})
 {% endif %}
 ```
 
-Do **not** translate that literally. SQLMesh tracks materialised intervals
+Do **not** translate that literally. SQLMesh tracks materialized intervals
 in state — it knows which time windows are missing without consulting the
 target table. Rewrite as:
 

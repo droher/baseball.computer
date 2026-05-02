@@ -6,13 +6,13 @@ allowed-tools: Read, Grep, Glob, LS, WebFetch, WebSearch
 
 # SQLMesh
 
-Open-source data-transformation framework. Apache 2.0 licence; governed by
+Open-source data-transformation framework. Apache 2.0 license; governed by
 the Linux Foundation since 2026-03-25 (see [LF announcement](https://www.linuxfoundation.org/press/linux-foundation-welcomes-sqlmesh-project)).
 Active development continues. Verify the installed version with `pip show
 sqlmesh` and check [GitHub releases](https://github.com/SQLMesh/sqlmesh/releases)
 for the changelog.
 
-This skill is **OSS-only**. Anything labelled "Tobiko Cloud" is out of scope.
+This skill is **OSS-only**. Anything labeled "Tobiko Cloud" is out of scope.
 Examples assume **DuckDB** as the warehouse engine; other engines work the
 same way at the model level — the [engine integration index](https://sqlmesh.readthedocs.io/en/stable/integrations/engines/)
 covers the small differences.
@@ -35,7 +35,7 @@ Activate as soon as any of these come up:
 ## Always start here
 
 SQLMesh ships fast. The model's training cutoff is usually behind a stable
-release or two, and behaviour around plans, state, and incremental kinds has
+release or two, and behavior around plans, state, and incremental kinds has
 changed several times. Before answering anything more than trivia:
 
 1. WebFetch the relevant page from `https://sqlmesh.readthedocs.io/en/stable/`.
@@ -48,7 +48,7 @@ Skip the fetch only for stable basics already covered in this file.
 
 ## Mental model — this is not dbt
 
-Five concepts carry most of SQLMesh's behaviour. Internalise them before
+Five concepts carry most of SQLMesh's behavior. Internalize them before
 answering design questions.
 
 **Snapshots and fingerprints.** Every model version is a snapshot identified
@@ -62,7 +62,7 @@ environment are *views* over the snapshot store. Promoting `dev` to `prod`
 swaps view targets — it does not rebuild data. See
 [environments](https://sqlmesh.readthedocs.io/en/stable/concepts/environments/).
 
-**Plans.** A plan is the diff between code and what is already materialised,
+**Plans.** A plan is the diff between code and what is already materialized,
 classified as **breaking** (downstream models must rebuild),
 **non-breaking** (only the changed model rebuilds), or **forward-only** (no
 backfill; new data only). The plan output lists each affected snapshot and
@@ -86,13 +86,13 @@ footguns (see [`references/gotchas.md`](references/gotchas.md)).
 
 ```bash
 sqlmesh info                       # sanity-check config and connections
-sqlmesh plan dev --auto-apply      # diff, build, materialise into dev env
+sqlmesh plan dev --auto-apply      # diff, build, materialize into dev env
 sqlmesh audit dev                  # run audits against the dev env
 sqlmesh test                       # run YAML unit tests
 sqlmesh plan                       # promote dev → prod (no env arg = prod)
 ```
 
-`plan dev` shows a categorised summary of changes (added / modified /
+`plan dev` shows a categorized summary of changes (added / modified /
 removed; breaking / non-breaking / forward-only) and a backfill window. With
 `--auto-apply` the user accepts the plan inline; without it they review
 interactively.
@@ -100,9 +100,9 @@ interactively.
 `plan` (no environment) targets `prod`. By default it is **virtual-only** —
 it re-points prod views at snapshots already built in `dev`, so promotion
 is fast and reversible. New physical builds happen only if `prod` sees a
-snapshot it has never materialised.
+snapshot it has never materialized.
 
-To re-materialise data without a code change, use
+To re-materialize data without a code change, use
 `sqlmesh plan dev --restate-model <name>`. See
 [plans](https://sqlmesh.readthedocs.io/en/stable/concepts/plans/).
 
@@ -149,14 +149,14 @@ interval for incremental kinds. For `TIMESTAMP` time columns, use the
 - `INCREMENTAL_BY_TIME_RANGE` — append-mostly fact tables with a clear time
   column.
 - `INCREMENTAL_BY_UNIQUE_KEY` — upserts keyed by a unique column (CDC-shaped).
-- `VIEW` — pure SQL view, no materialisation.
+- `VIEW` — pure SQL view, no materialization.
 - `SEED` — static CSV under `seeds/`.
 - `SCD_TYPE_2` — slowly-changing dimensions with valid-from / valid-to.
 - `EXTERNAL` — data SQLMesh reads but does not own (declared in
   `external_models.yaml`).
-- `EMBEDDED` — inlined into downstream models, not materialised.
+- `EMBEDDED` — inlined into downstream models, not materialized.
 - `MANAGED` — engine-managed (e.g. dynamic tables).
-- `CUSTOM` — user-defined materialisation strategy.
+- `CUSTOM` — user-defined materialization strategy.
 
 Full matrix with required props and DuckDB examples:
 [`references/model-kinds.md`](references/model-kinds.md). Canonical doc:
@@ -363,7 +363,7 @@ Short list — full annotations with citations in
   time-range model.
 - `JINJA_QUERY_BEGIN` blocks in a SQLMesh-native project — that marker is
   a dbt-import compatibility shim, not idiomatic SQLMesh.
-- Tobiko Cloud features (categorisation UI, managed scheduler, cost
+- Tobiko Cloud features (categorization UI, managed scheduler, cost
   tracking). Out of scope for this OSS skill.
 
 ## Deeper reading
@@ -371,5 +371,5 @@ Short list — full annotations with citations in
 - Full documentation URL map: [`references/links.md`](references/links.md)
 - Per-kind details with examples: [`references/model-kinds.md`](references/model-kinds.md)
 - Full CLI surface: [`references/cli.md`](references/cli.md)
-- Sharp-edges catalogue: [`references/gotchas.md`](references/gotchas.md)
+- Sharp-edges catalog: [`references/gotchas.md`](references/gotchas.md)
 - dbt → SQLMesh translation guide: [`references/migration-from-dbt.md`](references/migration-from-dbt.md)

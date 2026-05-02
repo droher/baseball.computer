@@ -23,7 +23,7 @@ flags — the surface evolves quickly.
 |---------|-----|
 | `sqlmesh plan [env]` | The main verb. Diffs code vs state, classifies changes, prompts for backfill, applies. With no env arg, targets `prod` and is virtual-only by default. |
 | `sqlmesh plan dev --auto-apply` | Build to `dev` non-interactively. |
-| `sqlmesh plan --restate-model <name>` | Force re-materialisation of a model without a code change. |
+| `sqlmesh plan --restate-model <name>` | Force re-materialization of a model without a code change. |
 | `sqlmesh plan --forward-only` | Apply changes without backfill. New data picks up the new logic; history keeps the old. |
 | `sqlmesh apply` | Apply a saved plan. Rarely run directly — `plan --auto-apply` is the normal path. |
 | `sqlmesh run [env]` | Run any cron-ready models in the env. Useful for scheduled jobs. |

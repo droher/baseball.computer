@@ -2,7 +2,7 @@
 
 Canonical doc: https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/
 
-A model's kind controls how it is materialised, how SQLMesh decides what to
+A model's kind controls how it is materialized, how SQLMesh decides what to
 backfill, and which properties are required. Pick the simplest kind that
 matches the data shape — over-specifying a kind is a common source of
 unnecessary backfills.
@@ -18,9 +18,9 @@ unnecessary backfills.
 | Static CSV checked into the repo | `SEED` |
 | Type-2 SCD with valid_from / valid_to | `SCD_TYPE_2` |
 | Read-only declaration of an upstream table | `EXTERNAL` |
-| Inline this model into its consumers; do not materialise | `EMBEDDED` |
-| Engine has its own materialisation primitive (Snowflake dynamic table, etc.) | `MANAGED` |
-| None of the above fits — write your own materialisation | `CUSTOM` |
+| Inline this model into its consumers; do not materialize | `EMBEDDED` |
+| Engine has its own materialization primitive (Snowflake dynamic table, etc.) | `MANAGED` |
+| None of the above fits — write your own materialization | `CUSTOM` |
 
 ## FULL
 
@@ -45,7 +45,7 @@ schedules — every run pays the full cost.
 
 ## INCREMENTAL_BY_TIME_RANGE
 
-The default for fact tables. SQLMesh tracks materialised time intervals per
+The default for fact tables. SQLMesh tracks materialized time intervals per
 snapshot and only re-runs gaps. The query must filter by `@start_date` and
 `@end_date` (or their `*_ds` / `*_ts` siblings).
 
@@ -111,7 +111,7 @@ MODEL (
 SELECT * FROM analytics.users WHERE deleted_at IS NULL;
 ```
 
-Use for small projections / filters on top of materialised tables. A view
+Use for small projections / filters on top of materialized tables. A view
 re-runs every time downstream queries hit it, so don't put expensive joins
 behind one.
 
@@ -178,7 +178,7 @@ Discover automatically with
 ## EMBEDDED
 
 The model's query is inlined into every consumer at parse time; never
-materialised. Use for filters or projections that several downstream
+materialized. Use for filters or projections that several downstream
 models share verbatim and you don't want to pay to store.
 
 ```sql
@@ -196,7 +196,7 @@ not like a parameterised macro.
 
 ## MANAGED
 
-The engine owns the materialisation (dynamic tables on Snowflake, materialised
+The engine owns the materialization (dynamic tables on Snowflake, materialized
 views with auto-refresh, etc.). SQLMesh records the snapshot but does not
 schedule the refresh.
 
@@ -217,9 +217,9 @@ for the per-engine matrix.
 
 ## CUSTOM
 
-Plug-in materialisation. Subclass `CustomMaterialization` in Python and
+Plug-in materialization. Subclass `CustomMaterialization` in Python and
 register it in `config.py`. Use for unusual write patterns (e.g. writing
 parquet partitions, calling an API).
 
-See the [custom materialisation](https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/#custom)
+See the [custom materialization](https://sqlmesh.readthedocs.io/en/stable/concepts/models/model_kinds/#custom)
 section of the kinds page for the latest API.

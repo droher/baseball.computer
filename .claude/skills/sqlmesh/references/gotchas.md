@@ -1,7 +1,7 @@
 # SQLMesh sharp edges
 
 Things that bite users — including ones with prior dbt experience —
-because the underlying behaviour differs from what the syntax suggests.
+because the underlying behavior differs from what the syntax suggests.
 
 ## State
 
@@ -27,7 +27,7 @@ backfill. Back up state alongside the warehouse.
 
 **`plan` (no env) targets prod and is virtual-only by default.** It does
 not rebuild data; it re-points prod views at snapshots already built in a
-non-prod environment. If the snapshot has never been materialised
+non-prod environment. If the snapshot has never been materialized
 anywhere, prod build runs. Most surprises here are users expecting
 "`plan` rebuilds prod" — it does not.
 
@@ -93,7 +93,7 @@ doesn't gate the pipeline.
 
 **ClickHouse delete-then-insert is broken at scale.** SQLMesh's
 incremental strategy uses delete-and-insert; ClickHouse async deletes do
-not optimise on clusters and cause concurrency issues. Issue:
+not optimize on clusters and cause concurrency issues. Issue:
 https://github.com/SQLMesh/sqlmesh/issues/3186. For ClickHouse-heavy
 workloads, prefer `FULL` or move to DuckDB / Databricks.
 
