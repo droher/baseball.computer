@@ -1,8 +1,50 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.calc_park_factors_advanced,
+  kind FULL,
+  grain (park_id, season, league),
+  columns (
+    park_id PARK_ID,
+    season SMALLINT,
+    league VARCHAR,
+    sqrt_sample_size DOUBLE,
+    singles_park_factor DOUBLE,
+    doubles_park_factor DOUBLE,
+    triples_park_factor DOUBLE,
+    home_runs_park_factor DOUBLE,
+    strikeouts_park_factor DOUBLE,
+    walks_park_factor DOUBLE,
+    batting_outs_park_factor DOUBLE,
+    runs_park_factor DOUBLE,
+    balls_in_play_park_factor DOUBLE,
+    trajectory_fly_ball_park_factor DOUBLE,
+    trajectory_ground_ball_park_factor DOUBLE,
+    trajectory_line_drive_park_factor DOUBLE,
+    trajectory_pop_up_park_factor DOUBLE,
+    trajectory_unknown_park_factor DOUBLE,
+    batted_distance_infield_park_factor DOUBLE,
+    batted_distance_outfield_park_factor DOUBLE,
+    batted_distance_unknown_park_factor DOUBLE,
+    batted_angle_left_park_factor DOUBLE,
+    batted_angle_right_park_factor DOUBLE,
+    batted_angle_middle_park_factor DOUBLE
+  ),
+  column_descriptions (
+    park_id = @doc('park_id'),
+    season = @doc('season'),
+    league = @doc('league')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_calc_park_factors_advanced.parquet'
+  ),
+);
+
+
+
+
+
+
+
+JINJA_QUERY_BEGIN;
 {% set stats = ["plate_appearances", "singles", "doubles", "triples", 
                 "home_runs", "strikeouts", "walks", "batting_outs", "runs", "balls_in_play",
                 "trajectory_fly_ball", "trajectory_ground_ball", "trajectory_line_drive", "trajectory_pop_up",
@@ -16,7 +58,7 @@ WITH unique_park_seasons AS (
         park_id,
         season,
         home_league AS league
-    FROM {{ ref('game_start_info') }}
+    FROM main_models.game_start_info
     WHERE game_type = 'RegularSeason'
     GROUP BY 1, 2, 3
     HAVING COUNT(*) > 25
@@ -32,8 +74,8 @@ batting_agg AS (
         {%- for stat in stats %}
             SUM(batting.{{ stat }})::INT AS {{ stat }},
         {%- endfor %}
-    FROM {{ ref('event_states_full') }} AS states
-    INNER JOIN {{ ref('event_offense_stats') }} AS batting USING (event_key)
+    FROM main_models.event_states_full AS states
+    INNER JOIN main_models.event_offense_stats AS batting USING (event_key)
     -- Restrict to parks with decent sample
     INNER JOIN unique_park_seasons USING (season, league, park_id)
     WHERE states.game_type = 'RegularSeason'
@@ -161,3 +203,4 @@ final AS (
 )
 
 SELECT * FROM final
+JINJA_END;

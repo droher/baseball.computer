@@ -1,11 +1,41 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.player_game_appearances,
+  kind FULL,
+  grain (game_id, player_id),
+  columns (
+    game_id VARCHAR,
+    player_id VARCHAR,
+    side SIDE,
+    games_started UTINYINT,
+    games_pinch_hit UTINYINT,
+    games_pinch_run UTINYINT,
+    games_defensive_sub UTINYINT,
+    games_ohtani_rule UTINYINT,
+    lineup_position UTINYINT,
+    first_fielding_position UTINYINT,
+    fielding_positions UTINYINT[]
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    player_id = @doc('player_id'),
+    side = @doc('side'),
+    games_started = @doc('games_started'),
+    lineup_position = @doc('lineup_position')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_player_game_appearances.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH event_based AS (
     SELECT game_id
-    FROM {{ ref('stg_games') }}
+    FROM main_models.stg_games
     WHERE source_type = 'PlayByPlay'
 ),
 
@@ -22,12 +52,12 @@ box_offense AS (
             ELSE 'DefensiveSubstitution'
         END AS entered_game_as,
         bat.nth_player_at_position AS position_order
-    FROM {{ ref('stg_box_score_batting_lines') }} AS bat
-    LEFT JOIN {{ ref('stg_box_score_pinch_hitting_lines') }} AS pinch_hit
+    FROM main_models.stg_box_score_batting_lines AS bat
+    LEFT JOIN main_models.stg_box_score_pinch_hitting_lines AS pinch_hit
         ON pinch_hit.game_id = bat.game_id
             AND pinch_hit.pinch_hitter_id = bat.batter_id
             AND pinch_hit.side = bat.side
-    LEFT JOIN {{ ref('stg_box_score_pinch_running_lines') }} AS pinch_run
+    LEFT JOIN main_models.stg_box_score_pinch_running_lines AS pinch_run
         ON pinch_run.game_id = bat.game_id
             AND pinch_run.pinch_runner_id = bat.batter_id
             AND pinch_run.side = bat.side
@@ -42,7 +72,7 @@ offense_union AS (
         entered_game_as,
         -- We're just using this to order so gaps don't matter
         start_event_id AS position_order
-    FROM {{ ref('stg_game_lineup_appearances') }}
+    FROM main_models.stg_game_lineup_appearances
     UNION ALL
     SELECT
         game_id,
@@ -62,7 +92,7 @@ fielding_union AS (
         side,
         fielding_position,
         start_event_id AS position_order
-    FROM {{ ref('stg_game_fielding_appearances') }}
+    FROM main_models.stg_game_fielding_appearances
     UNION ALL
     SELECT
         game_id,
@@ -70,7 +100,7 @@ fielding_union AS (
         side,
         fielding_position,
         nth_position_played_by_player AS position_order
-    FROM {{ ref('stg_box_score_fielding_lines') }}
+    FROM main_models.stg_box_score_fielding_lines
     WHERE game_id NOT IN (SELECT game_id FROM event_based)
 ),
 

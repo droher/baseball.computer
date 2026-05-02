@@ -1,8 +1,27 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.game_results,
+  kind FULL,
+  description 'Includes the results of every completed, suspended, or forfeited game in the database.',
+  grain (game_id),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    season = @doc('season'),
+    game_type = @doc('game_type'),
+    game_finish_date = 'This will always be the same as the game''s `date` unless the game was suspended and finished on a different day. Games that end after midnight will still have the same value as the `date`.',
+    home_team_id = @doc('home_team_id'),
+    away_team_id = @doc('away_team_id')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_game_results.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH event_and_box_results AS (
     SELECT
         game_id,
@@ -17,8 +36,8 @@ WITH event_and_box_results AS (
         line_scores.home_line_score,
         line_scores.away_line_score,
         line_scores.duration_outs,
-    FROM {{ ref('stg_games') }} AS games
-    LEFT JOIN {{ ref('game_line_scores') }} AS line_scores USING (game_id)
+    FROM main_models.stg_games AS games
+    LEFT JOIN main_models.game_line_scores AS line_scores USING (game_id)
 
 ),
 
@@ -31,7 +50,7 @@ gamelog_results AS (
         away_runs_scored,
         away_line_score,
         home_line_score,
-    FROM {{ ref('stg_gamelog') }}
+    FROM main_models.stg_gamelog
     WHERE game_id NOT IN (SELECT game_id FROM event_and_box_results)
 ),
 
@@ -109,9 +128,9 @@ final AS (
         COALESCE(unioned.duration_outs > 54, FALSE) AS is_extra_inning_game,
         COALESCE(unioned.duration_outs < 51, FALSE) AS is_shortened_game,
     FROM unioned
-    INNER JOIN {{ ref('game_start_info') }} AS start_info USING (game_id)
-    LEFT JOIN {{ ref('game_suspensions') }} AS suspensions USING (game_id)
-    LEFT JOIN {{ ref('game_forfeits') }} AS forfeits USING (game_id)
+    INNER JOIN main_models.game_start_info AS start_info USING (game_id)
+    LEFT JOIN main_models.game_suspensions AS suspensions USING (game_id)
+    LEFT JOIN main_models.game_forfeits AS forfeits USING (game_id)
 )
 
 SELECT * FROM final

@@ -1,3 +1,22 @@
+MODEL (
+  name main_models.game_line_scores,
+  kind FULL,
+  description 'Line scores for each game in various formats. One row per game.',
+  grain (game_id),
+  column_descriptions (
+    game_id = @doc('game_id')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_game_line_scores.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH event_lines AS (
     SELECT
         game_id,
@@ -5,7 +24,7 @@ WITH event_lines AS (
         inning_start AS inning,
         SUM(runs_on_play) AS runs,
         SUM(outs_on_play) AS outs,
-    FROM {{ ref('event_states_full') }}
+    FROM main_models.event_states_full
     GROUP BY 1, 2, 3
 ),
 
@@ -15,7 +34,7 @@ unioned AS (
     UNION ALL BY NAME
     
     SELECT *
-    FROM {{ ref('stg_box_score_line_scores') }}
+    FROM main_models.stg_box_score_line_scores
     WHERE game_id NOT IN (SELECT DISTINCT game_id FROM event_lines)
 ),
 
@@ -40,7 +59,7 @@ box_outs AS (
         game_id,
         side,
         SUM(outs_recorded) AS duration_outs
-    FROM {{ ref('stg_box_score_pitching_lines') }}
+    FROM main_models.stg_box_score_pitching_lines
     GROUP BY 1, 2
 ),
 

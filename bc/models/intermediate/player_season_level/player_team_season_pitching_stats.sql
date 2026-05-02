@@ -1,8 +1,178 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.player_team_season_pitching_stats,
+  kind FULL,
+  grain (season, team_id, player_id, game_type),
+  column_descriptions (
+    season = @doc('season'),
+    team_id = @doc('team_id'),
+    player_id = @doc('player_id'),
+    game_type = @doc('game_type'),
+    innings_pitched = @doc('innings_pitched'),
+    games = @doc('games'),
+    batters_faced = @doc('batters_faced'),
+    outs_recorded = @doc('outs_recorded'),
+    inherited_runners_scored = @doc('inherited_runners_scored'),
+    bequeathed_runners_scored = @doc('bequeathed_runners_scored'),
+    team_unearned_runs = @doc('team_unearned_runs'),
+    at_bats = @doc('at_bats'),
+    hits = @doc('hits'),
+    singles = @doc('singles'),
+    doubles = @doc('doubles'),
+    triples = @doc('triples'),
+    home_runs = @doc('home_runs'),
+    total_bases = @doc('total_bases'),
+    strikeouts = @doc('strikeouts'),
+    walks = @doc('walks'),
+    intentional_walks = @doc('intentional_walks'),
+    hit_by_pitches = @doc('hit_by_pitches'),
+    sacrifice_hits = @doc('sacrifice_hits'),
+    sacrifice_flies = @doc('sacrifice_flies'),
+    reached_on_errors = @doc('reached_on_errors'),
+    reached_on_interferences = @doc('reached_on_interferences'),
+    inside_the_park_home_runs = @doc('inside_the_park_home_runs'),
+    ground_rule_doubles = @doc('ground_rule_doubles'),
+    infield_hits = @doc('infield_hits'),
+    on_base_opportunities = @doc('on_base_opportunities'),
+    on_base_successes = @doc('on_base_successes'),
+    grounded_into_double_plays = @doc('grounded_into_double_plays'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    batting_outs = @doc('batting_outs'),
+    balls_in_play = @doc('balls_in_play'),
+    balls_batted = @doc('balls_batted'),
+    trajectory_fly_ball = @doc('trajectory_fly_ball'),
+    trajectory_ground_ball = @doc('trajectory_ground_ball'),
+    trajectory_line_drive = @doc('trajectory_line_drive'),
+    trajectory_pop_up = @doc('trajectory_pop_up'),
+    trajectory_unknown = @doc('trajectory_unknown'),
+    trajectory_known = @doc('trajectory_known'),
+    trajectory_broad_air_ball = @doc('trajectory_broad_air_ball'),
+    trajectory_broad_ground_ball = @doc('trajectory_broad_ground_ball'),
+    trajectory_broad_unknown = @doc('trajectory_broad_unknown'),
+    trajectory_broad_known = @doc('trajectory_broad_known'),
+    bunts = @doc('bunts'),
+    batted_distance_plate = @doc('batted_distance_plate'),
+    batted_distance_infield = @doc('batted_distance_infield'),
+    batted_distance_outfield = @doc('batted_distance_outfield'),
+    batted_distance_unknown = @doc('batted_distance_unknown'),
+    batted_distance_known = @doc('batted_distance_known'),
+    fielded_by_battery = @doc('fielded_by_battery'),
+    fielded_by_infielder = @doc('fielded_by_infielder'),
+    fielded_by_outfielder = @doc('fielded_by_outfielder'),
+    fielded_by_known = @doc('fielded_by_known'),
+    fielded_by_unknown = @doc('fielded_by_unknown'),
+    batted_angle_left = @doc('batted_angle_left'),
+    batted_angle_right = @doc('batted_angle_right'),
+    batted_angle_middle = @doc('batted_angle_middle'),
+    batted_angle_unknown = @doc('batted_angle_unknown'),
+    batted_angle_known = @doc('batted_angle_known'),
+    batted_location_plate = @doc('batted_location_plate'),
+    batted_location_right_infield = @doc('batted_location_right_infield'),
+    batted_location_middle_infield = @doc('batted_location_middle_infield'),
+    batted_location_left_infield = @doc('batted_location_left_infield'),
+    batted_location_left_field = @doc('batted_location_left_field'),
+    batted_location_center_field = @doc('batted_location_center_field'),
+    batted_location_right_field = @doc('batted_location_right_field'),
+    batted_location_unknown = @doc('batted_location_unknown'),
+    batted_location_known = @doc('batted_location_known'),
+    batted_balls_pulled = @doc('batted_balls_pulled'),
+    batted_balls_opposite_field = @doc('batted_balls_opposite_field'),
+    runs = @doc('runs'),
+    times_reached_base = @doc('times_reached_base'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    picked_off = @doc('picked_off'),
+    picked_off_caught_stealing = @doc('picked_off_caught_stealing'),
+    outs_on_basepaths = @doc('outs_on_basepaths'),
+    unforced_outs_on_basepaths = @doc('unforced_outs_on_basepaths'),
+    outs_avoided_on_errors = @doc('outs_avoided_on_errors'),
+    advances_on_wild_pitches = @doc('advances_on_wild_pitches'),
+    advances_on_passed_balls = @doc('advances_on_passed_balls'),
+    advances_on_balks = @doc('advances_on_balks'),
+    advances_on_unspecified_plays = @doc('advances_on_unspecified_plays'),
+    advances_on_defensive_indifference = @doc('advances_on_defensive_indifference'),
+    advances_on_errors = @doc('advances_on_errors'),
+    extra_base_advance_attempts = @doc('extra_base_advance_attempts'),
+    bases_advanced = @doc('bases_advanced'),
+    bases_advanced_on_balls_in_play = @doc('bases_advanced_on_balls_in_play'),
+    surplus_bases_advanced_on_balls_in_play = @doc('surplus_bases_advanced_on_balls_in_play'),
+    outs_on_extra_base_advance_attempts = @doc('outs_on_extra_base_advance_attempts'),
+    pitches = @doc('pitches'),
+    swings = @doc('swings'),
+    swings_with_contact = @doc('swings_with_contact'),
+    strikes = @doc('strikes'),
+    strikes_called = @doc('strikes_called'),
+    strikes_swinging = @doc('strikes_swinging'),
+    strikes_foul = @doc('strikes_foul'),
+    strikes_foul_tip = @doc('strikes_foul_tip'),
+    strikes_in_play = @doc('strikes_in_play'),
+    strikes_unknown = @doc('strikes_unknown'),
+    balls = @doc('balls'),
+    balls_called = @doc('balls_called'),
+    balls_intentional = @doc('balls_intentional'),
+    balls_automatic = @doc('balls_automatic'),
+    unknown_pitches = @doc('unknown_pitches'),
+    pitchouts = @doc('pitchouts'),
+    pitcher_pickoff_attempts = @doc('pitcher_pickoff_attempts'),
+    catcher_pickoff_attempts = @doc('catcher_pickoff_attempts'),
+    pitches_blocked_by_catcher = @doc('pitches_blocked_by_catcher'),
+    pitches_with_runners_going = @doc('pitches_with_runners_going'),
+    passed_balls = @doc('passed_balls'),
+    wild_pitches = @doc('wild_pitches'),
+    balks = @doc('balks'),
+    left_on_base = @doc('left_on_base'),
+    left_on_base_with_two_outs = @doc('left_on_base_with_two_outs'),
+    games_started = @doc('games_started'),
+    inherited_runners = @doc('inherited_runners'),
+    bequeathed_runners = @doc('bequeathed_runners'),
+    games_relieved = @doc('games_relieved'),
+    games_finished = @doc('games_finished'),
+    save_situations_entered = @doc('save_situations_entered'),
+    holds = @doc('holds'),
+    blown_saves = @doc('blown_saves'),
+    saves_by_rule = @doc('saves_by_rule'),
+    save_opportunities = @doc('save_opportunities'),
+    wins = @doc('wins'),
+    losses = @doc('losses'),
+    saves = @doc('saves'),
+    earned_runs = @doc('earned_runs'),
+    complete_games = @doc('complete_games'),
+    shutouts = @doc('shutouts'),
+    quality_starts = @doc('quality_starts'),
+    cheap_wins = @doc('cheap_wins'),
+    tough_losses = @doc('tough_losses'),
+    no_decisions = @doc('no_decisions'),
+    no_hitters = @doc('no_hitters'),
+    perfect_games = @doc('perfect_games'),
+    stolen_bases_second = @doc('stolen_bases_second'),
+    stolen_bases_third = @doc('stolen_bases_third'),
+    stolen_bases_home = @doc('stolen_bases_home'),
+    caught_stealing_second = @doc('caught_stealing_second'),
+    caught_stealing_third = @doc('caught_stealing_third'),
+    caught_stealing_home = @doc('caught_stealing_home'),
+    stolen_base_opportunities = @doc('stolen_base_opportunities'),
+    stolen_base_opportunities_second = @doc('stolen_base_opportunities_second'),
+    stolen_base_opportunities_third = @doc('stolen_base_opportunities_third'),
+    stolen_base_opportunities_home = @doc('stolen_base_opportunities_home'),
+    picked_off_first = @doc('picked_off_first'),
+    picked_off_second = @doc('picked_off_second'),
+    picked_off_third = @doc('picked_off_third'),
+    extra_base_chances = @doc('extra_base_chances'),
+    extra_bases_taken = @doc('extra_bases_taken'),
+    plate_appearances = @doc('plate_appearances')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_player_team_season_pitching_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
+JINJA_QUERY_BEGIN;
 WITH databank AS (
     SELECT
         pitch.season,
@@ -32,11 +202,11 @@ WITH databank AS (
         SUM(pitch.sacrifice_hits)::INT AS sacrifice_hits,
         SUM(pitch.sacrifice_flies)::INT AS sacrifice_flies,
         SUM(pitch.grounded_into_double_plays)::INT AS grounded_into_double_plays,
-    FROM {{ ref('stg_databank_pitching') }} AS pitch
-    INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
+    FROM main_models.stg_databank_pitching AS pitch
+    INNER JOIN main_models.stg_people AS people USING (databank_player_id)
     -- We'd need to do something different for partial coverage seasons but
     -- currently box scores are all or nothing for a given year
-    WHERE pitch.season NOT IN (SELECT DISTINCT season FROM {{ ref('stg_games') }})
+    WHERE pitch.season NOT IN (SELECT DISTINCT season FROM main_models.stg_games)
     GROUP BY 1, 2, 3
 ),
 
@@ -50,8 +220,8 @@ retrosheet AS (
         {% for stat in event_level_pitching_stats() + game_level_pitching_stats() -%}
             SUM({{ stat }})::INT AS {{ stat }},
         {% endfor %}
-    FROM {{ ref('stg_games') }} AS games
-    INNER JOIN {{ ref('player_game_pitching_stats') }} AS stats USING (game_id)
+    FROM main_models.stg_games AS games
+    INNER JOIN main_models.player_game_pitching_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
 ),
 
@@ -65,3 +235,4 @@ reround_ip AS (
 SELECT * FROM reround_ip
 UNION ALL BY NAME
 SELECT * FROM databank
+JINJA_END;

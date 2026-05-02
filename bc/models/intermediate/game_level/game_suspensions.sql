@@ -1,8 +1,37 @@
+MODEL (
+  name main_models.game_suspensions,
+  kind FULL,
+  description 'Information about games that were suspended and resumed at a later date.',
+  grain (game_id),
+  columns (
+    game_id VARCHAR,
+    event_key_at_suspension UINTEGER,
+    date_resumed DATE,
+    new_park_id PARK_ID,
+    away_score_at_suspension UTINYINT,
+    home_score_at_suspension UTINYINT,
+    game_outs_recorded_at_suspension UTINYINT
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    event_key_at_suspension = 'Null for box-score-only suspensions where no event-level row exists.'
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_game_suspensions.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source_event AS (
     SELECT
         event_key,
         STRING_SPLIT(REPLACE(comment, 'Suspend=', ''), ',') AS suspension_info
-    FROM {{ ref('stg_event_comments') }}
+    FROM main_models.stg_event_comments
     WHERE comment ILIKE '%Suspend=%'
 ),
 
@@ -11,7 +40,7 @@ event_joined AS (
         events.game_id,
         event_key AS event_key_at_suspension,
         source_event.suspension_info
-    FROM {{ ref('stg_events') }} AS events
+    FROM main_models.stg_events AS events
     INNER JOIN source_event USING (event_key)
 ),
 
@@ -19,7 +48,7 @@ source_box AS (
     SELECT
         game_id,
         STRING_SPLIT(REPLACE(comment, 'Suspend=', ''), ',') AS suspension_info
-    FROM {{ ref('stg_box_score_comments') }}
+    FROM main_models.stg_box_score_comments
     WHERE comment ILIKE '%Suspend=%'
         AND game_id NOT IN (SELECT game_id FROM event_joined)
 ),

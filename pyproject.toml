@@ -5,8 +5,6 @@ description = ""
 requires-python = ">=3.12"
 authors = [{ name = "David Roher", email = "david.roher@gmail.com" }]
 dependencies = [
-    "dbt-core~=1.10.0",
-    "dbt-duckdb~=1.10.1",
     "duckdb~=1.5.2",
     "numpy>=1.26.4",
     "pandas>=2.2.1",
@@ -14,16 +12,21 @@ dependencies = [
     "pyarrow>=15.0.2",
     "statsmodels>=0.14.1",
     "recordlinkage>=0.16.0",
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]
 dev = [
     "sqlfluff>=3.0.3",
-    "sqlfluff-templater-dbt>=3.0.3",
     "ipykernel>=6.25.2",
     "boto3>=1.34.45",
     "ruamel.yaml>=0.18.5",
 ]
+# Phase 1.5: SQLMesh is the build engine. Group is kept under the legacy
+# `spikes-sqlmesh` name so existing `uv run --group spikes-sqlmesh ...`
+# invocations in CLAUDE.md and other docs keep working. Phase 2 will
+# rename to `migration`. boring-semantic-layer (in `spikes-bsl`) pins an
+# incompatible sqlglot, so the two groups are mutually exclusive.
 spikes-sqlmesh = [
     "sqlmesh>=0.234",
     "ibis-framework[duckdb]>=12.0",
@@ -34,9 +37,6 @@ spikes-bsl = [
     "boring-semantic-layer>=0.3.12",
     "ibis-framework[duckdb]>=11.0",
 ]
-spikes-mf = [
-    "dbt-metricflow",
-]
 
 [tool.uv]
 package = false
@@ -44,6 +44,5 @@ conflicts = [
     [
         { group = "spikes-sqlmesh" },
         { group = "spikes-bsl" },
-        { group = "spikes-mf" },
     ],
 ]

@@ -1,8 +1,57 @@
-{{
-  config(
-    materialized="table"
-    )
-}}
+MODEL (
+  name main_models.ml_features,
+  kind FULL,
+  enabled FALSE,
+  grain (event_key),
+  columns (
+    event_key UINTEGER,
+    outcome_has_batting_bin UTINYINT,
+    outcome_is_in_play_bin UTINYINT,
+    outcome_batted_trajectory_cat VARCHAR,
+    outcome_batted_location_cat VARCHAR,
+    outcome_plate_appearance_cat VARCHAR,
+    outcome_baserunning_cat VARCHAR,
+    outcome_runs_following_num FLOAT,
+    outcome_is_win_bin UTINYINT,
+    generic_sample_weight FLOAT,
+    plate_appearance_sample_weight FLOAT,
+    in_play_sample_weight FLOAT,
+    trajectory_sample_weight FLOAT,
+    location_sample_weight FLOAT,
+    baserunning_play_sample_weight FLOAT,
+    win_sample_weight FLOAT,
+    season_num FLOAT,
+    day_of_year_num FLOAT,
+    inning_num FLOAT,
+    frame_num FLOAT,
+    is_night_game_num FLOAT,
+    score_batting_team_num FLOAT,
+    score_fielding_team_num FLOAT,
+    park_cat PARK_ID,
+    game_type_cat GAME_TYPE,
+    league_cat VARCHAR,
+    base_state_cat VARCHAR,
+    batter_player VARCHAR,
+    runner_first_player VARCHAR,
+    runner_second_player VARCHAR,
+    runner_third_player VARCHAR,
+    pitcher_player VARCHAR,
+    meta_train_test_split VARCHAR
+  ),
+  column_descriptions (
+    event_key = @doc('event_key')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_ml_features.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH final AS (
     SELECT
         o.event_key,
@@ -50,10 +99,10 @@ WITH final AS (
             ELSE 'TEST'
         END AS meta_train_test_split,
 
-    FROM {{ ref('ml_event_outcomes') }} AS o
+    FROM main_models.ml_event_outcomes AS o
     -- This is really an inner join but using o as the base table
     -- preserves the random order
-    LEFT JOIN {{ ref('event_states_full') }} AS e USING (event_key)
+    LEFT JOIN main_models.event_states_full AS e USING (event_key)
 )
 
 SELECT * FROM final

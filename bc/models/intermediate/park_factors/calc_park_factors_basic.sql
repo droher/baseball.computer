@@ -1,8 +1,32 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.calc_park_factors_basic,
+  kind FULL,
+  grain (park_id, season, league),
+  columns (
+    park_id PARK_ID,
+    season SMALLINT,
+    league VARCHAR,
+    sqrt_sample_size DOUBLE,
+    avg_this_runs_per_inning DOUBLE,
+    avg_other_runs_per_inning DOUBLE,
+    basic_park_factor DOUBLE
+  ),
+  column_descriptions (
+    park_id = @doc('park_id'),
+    season = @doc('season'),
+    league = @doc('league')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_calc_park_factors_basic.parquet'
+  ),
+);
+
+
+
+
+
+
+
 -- This needs to cover games with the lowest possible coverage
 -- (run totals for each team)
 WITH batting_agg AS (
@@ -15,8 +39,8 @@ WITH batting_agg AS (
         SUM(r.runs_scored + r.runs_allowed) AS runs,
         -- Estimate innings for games without box score/pbp data
         SUM(COALESCE(r.innings_pitched + r.opponent_innings_pitched, 18)) AS innings,
-    FROM {{ ref('team_game_start_info') }} AS s
-    INNER JOIN {{ ref('team_game_results') }} AS r USING (game_id, team_id)
+    FROM main_models.team_game_start_info AS s
+    INNER JOIN main_models.team_game_results AS r USING (game_id, team_id)
     WHERE s.game_type = 'RegularSeason'
         AND NOT s.is_interleague
     GROUP BY 1, 2, 3, 4, 5

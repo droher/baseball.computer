@@ -1,8 +1,40 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.ml_event_outcomes,
+  kind FULL,
+  enabled FALSE,
+  grain (event_key),
+  columns (
+    event_key UINTEGER,
+    outcome_has_batting_bin UTINYINT,
+    outcome_is_in_play_bin UTINYINT,
+    outcome_batted_trajectory_cat VARCHAR,
+    outcome_batted_location_cat VARCHAR,
+    outcome_plate_appearance_cat VARCHAR,
+    outcome_baserunning_cat VARCHAR,
+    outcome_runs_following_num FLOAT,
+    outcome_is_win_bin UTINYINT,
+    generic_sample_weight FLOAT,
+    plate_appearance_sample_weight FLOAT,
+    in_play_sample_weight FLOAT,
+    trajectory_sample_weight FLOAT,
+    location_sample_weight FLOAT,
+    baserunning_play_sample_weight FLOAT,
+    win_sample_weight FLOAT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_ml_event_outcomes.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH pa_map AS (
     SELECT
         e.game_id,
@@ -16,9 +48,9 @@ WITH pa_map AS (
         bb.trajectory,
         bb.location_depth,
         bb.location_side,
-    FROM {{ ref('stg_events') }} AS e
-    LEFT JOIN {{ ref('seed_plate_appearance_result_types')}} AS result_types USING (plate_appearance_result)
-    LEFT JOIN {{ ref('calc_batted_ball_type') }} AS bb USING (event_key)
+    FROM main_models.stg_events AS e
+    LEFT JOIN main_seeds.seed_plate_appearance_result_types AS result_types USING (plate_appearance_result)
+    LEFT JOIN main_models.calc_batted_ball_type AS bb USING (event_key)
     WINDOW
         rest_of_inning AS (
             PARTITION BY e.game_id, e.inning, e.frame
@@ -37,8 +69,8 @@ baserunning_map AS (
             END
             ORDER BY play_types.priority
         )[1] AS baserunning_result,
-    FROM {{ ref('stg_event_baserunners') }} e
-    INNER JOIN {{ ref('seed_baserunning_play_types') }} AS play_types USING (baserunning_play_type)
+    FROM main_models.stg_event_baserunners e
+    INNER JOIN main_seeds.seed_baserunning_play_types AS play_types USING (baserunning_play_type)
     GROUP BY e.event_key
 ),
 
@@ -60,7 +92,7 @@ joined AS (
         1 / (COUNT(*) OVER (PARTITION BY GREATEST(1913, pa_map.season)) / COUNT(*) OVER ()::FLOAT) AS season_sample_factor,
     FROM pa_map
     LEFT JOIN baserunning_map USING (event_key)
-    INNER JOIN {{ ref('game_results') }} AS game_end USING (game_id)
+    INNER JOIN main_models.game_results AS game_end USING (game_id)
     WHERE pa_map.pa_result IS NOT NULL OR baserunning_map.baserunning_result IS NOT NULL
 ),
 

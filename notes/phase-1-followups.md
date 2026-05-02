@@ -1,11 +1,24 @@
 # Phase 1 — Open Follow-ups
 
+> **Phase 1.5 status update (2026-05-02):** the SQLMesh-native cutover
+> closed several items below. Marked `[done in 1.5]` inline. Items still
+> open are the latent non-determinism in 13–14 model outputs, which Phase
+> 1.5 carries forward unchanged.
+
 Items surfaced during Phase 1 but deferred. None block declaring the
 SQLMesh transition done; all are real and worth picking up.
 
 ## Migration scope: known-not-done
 
-### `_init_db.py` macros never actually run
+### `_init_db.py` macros never actually run [done in 1.5]
+
+Resolved by Phase 1.5 — `BcSqlMeshLoader` (subclass of `SqlMeshLoader`,
+not `DbtLoader`) globs `.py` macros, so `init_db()`, `create_enums()`,
+`alter_types()`, plus the new `load_seeds()` register and fire from
+`config.before_all`. `dbt run-operation init_db` is no longer a build
+prerequisite.
+
+(Original deferred analysis follows for history.)
 
 `bc/macros/_init_db.py` defines three SQLMesh `@macro` functions
 (`init_db`, `create_enums`, `alter_types`) intended to fire from
@@ -97,8 +110,52 @@ These are deferred from Phase 1 plan as previously documented:
 - Delete the 9 thin wrapper `metrics_*.sql` files — replaced by the
   blueprint-style `metric_table_body` macro but kept for now.
 - Move `bc/` → `bc/_legacy/` — full directory restructure.
-- Rename `spikes-sqlmesh` dep group → `migration`.
+- Rename `spikes-sqlmesh` dep group → `migration`. *(Phase 1.5 punted —
+  group still named `spikes-sqlmesh` so existing `uv run` invocations
+  keep working. Rename in Phase 2.)*
 - Delete archived macros `init_db.sql`, `metrics_table_generator.sql`
   (`-- ARCHIVED` prefix kept for dbt-cli fallback during cutover).
+  *(Done in Phase 1.5 — also dropped `summarize_tables.sql` since no
+  model used it.)*
 - Remove `bc/macros/_init_db.py` if option (a) above is taken (it's dead
   code today; lifting to `scripts/` makes it explicitly a build script).
+  *(Resolved in Phase 1.5 by switching to `SqlMeshLoader`, which actually
+  loads it — kept under `bc/macros/`.)*
+
+## Phase 1.5 deferred items
+
+All formerly-deferred YAML metadata items are now ported. The full migration
+pass (`scripts/migration/migrate_yaml_to_model_block.py`) covers:
+
+- **Descriptions** — model + column descriptions migrated into
+  `MODEL(... description ..., column_descriptions (...))`. Pure
+  `{{ doc('key') }}` refs emit `@doc('key')` SQL (resolved at SQLMesh
+  parse time by the `doc` macro in `bc/macros/_docs.py`); mixed-content
+  descriptions inline the resolved text.
+- **`columns (col TYPE, ...)` block** — emitted from per-column
+  `data_type:` whenever YAML declared `contract.enforced: true`. Restores
+  the type-contract enforcement dbt provided.
+- **`meta.download_parquet` URLs** — migrated into
+  `physical_properties (download_parquet = '...')`. `scripts/create_web_db.py`
+  reads them via the SQLMesh model API.
+- **`dbt_utils.not_null_proportion` tests** — port via the built-in
+  `not_null_proportion(column := X, threshold := 0.95)` audit (already in
+  `sqlmesh.core.audit.builtin`).
+- **Source.yml `not_null` / `unique` tests** — folded into
+  `bc/external_models.yaml` `audits:` field, run directly against the
+  external (raw parquet) tables. `unique_values` audits include an
+  `IS NOT NULL` condition since SQLMesh's builtin treats NULL as a
+  duplicate (matches SQL UNIQUE constraint semantics, not dbt's `unique`
+  test which would have failed on the same data).
+- **`relationships` tests** — port via custom
+  `bc/audits/relationships.sql` audit invoked as
+  `relationships(column := X, to_column := Y, to_model := main_models.Z)`.
+- **`not_null` with `config.where`** — port via
+  `not_null(columns := (X), condition := (<where>))` (built-in `not_null`
+  has a `condition` defaults arg).
+
+The remaining items (independent of YAML metadata) still apply:
+
+- **`scripts/diff_dbt_vs_sqlmesh.py` rename:** still has the dbt-vs-sqlmesh
+  name. Generalize to `scripts/diff_duckdb_schemas.py` with neutral
+  arg names (`--left-db/--right-db/--left-schema/--right-schema`).

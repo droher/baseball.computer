@@ -1,12 +1,99 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_batting_stats,
+  kind FULL,
+  description 'This model calculates various batting statistics for each event which ended in a plate appearance. It is designed to capture the "core" hitting stats - stats about pitch sequences, baserunning, and batted balls are captured in other models, which are then joined downstream.',
+  grain (event_key),
+  columns (
+    game_id VARCHAR,
+    event_key UINTEGER,
+    batter_id VARCHAR,
+    pitcher_id VARCHAR,
+    batting_team_id TEAM_ID,
+    fielding_team_id TEAM_ID,
+    batter_lineup_position UTINYINT,
+    plate_appearances UTINYINT,
+    at_bats UTINYINT,
+    hits UTINYINT,
+    singles UTINYINT,
+    doubles UTINYINT,
+    triples UTINYINT,
+    home_runs UTINYINT,
+    total_bases UTINYINT,
+    infield_hits UTINYINT,
+    strikeouts UTINYINT,
+    walks UTINYINT,
+    intentional_walks UTINYINT,
+    hit_by_pitches UTINYINT,
+    sacrifice_flies UTINYINT,
+    sacrifice_hits UTINYINT,
+    reached_on_errors UTINYINT,
+    reached_on_interferences UTINYINT,
+    ground_rule_doubles UTINYINT,
+    inside_the_park_home_runs UTINYINT,
+    on_base_opportunities UTINYINT,
+    on_base_successes UTINYINT,
+    runs_batted_in UTINYINT,
+    grounded_into_double_plays UTINYINT,
+    double_plays UTINYINT,
+    triple_plays UTINYINT,
+    batting_outs UTINYINT,
+    outs_on_play UTINYINT,
+    left_on_base UTINYINT,
+    left_on_base_with_two_outs UTINYINT
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    event_key = @doc('event_key'),
+    batter_id = @doc('batter_id'),
+    pitcher_id = @doc('pitcher_id'),
+    batting_team_id = @doc('team_id'),
+    fielding_team_id = @doc('team_id'),
+    batter_lineup_position = @doc('lineup_position'),
+    plate_appearances = @doc('plate_appearances'),
+    at_bats = @doc('at_bats'),
+    hits = @doc('hits'),
+    singles = @doc('singles'),
+    doubles = @doc('doubles'),
+    triples = @doc('triples'),
+    home_runs = @doc('home_runs'),
+    total_bases = @doc('total_bases'),
+    infield_hits = @doc('infield_hits'),
+    strikeouts = @doc('strikeouts'),
+    walks = @doc('walks'),
+    intentional_walks = @doc('intentional_walks'),
+    hit_by_pitches = @doc('hit_by_pitches'),
+    sacrifice_flies = @doc('sacrifice_flies'),
+    sacrifice_hits = @doc('sacrifice_hits'),
+    reached_on_errors = @doc('reached_on_errors'),
+    reached_on_interferences = @doc('reached_on_interferences'),
+    ground_rule_doubles = @doc('ground_rule_doubles'),
+    inside_the_park_home_runs = @doc('inside_the_park_home_runs'),
+    on_base_opportunities = @doc('on_base_opportunities'),
+    on_base_successes = @doc('on_base_successes'),
+    runs_batted_in = @doc('runs_batted_in'),
+    grounded_into_double_plays = @doc('grounded_into_double_plays'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    batting_outs = @doc('batting_outs'),
+    outs_on_play = @doc('outs_on_play'),
+    left_on_base = @doc('left_on_base'),
+    left_on_base_with_two_outs = @doc('left_on_base_with_two_outs')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_batting_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH sacs AS (
     -- TODO: Investigate single sac hit dedupe (BOS194606040-37)
     SELECT DISTINCT event_key
-    FROM {{ ref('stg_event_flags') }}
+    FROM main_models.stg_event_flags
     WHERE flag IN ('SacrificeFly', 'SacrificeHit')
 ),
 
@@ -69,10 +156,10 @@ final AS (
             ELSE 0
         END::UTINYINT AS left_on_base_with_two_outs,
 
-    FROM {{ ref('stg_events') }} AS pa
-    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS result_types
+    FROM main_models.stg_events AS pa
+    INNER JOIN main_seeds.seed_plate_appearance_result_types AS result_types
         USING (plate_appearance_result)
-    LEFT JOIN {{ ref('event_double_plays') }} AS double_plays USING (event_key)
+    LEFT JOIN main_models.event_double_plays AS double_plays USING (event_key)
     LEFT JOIN sacs USING (event_key)
     WHERE pa.plate_appearance_result IS NOT NULL
 )

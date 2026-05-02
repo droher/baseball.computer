@@ -1,69 +1,28 @@
-"""Custom SQLMesh loader for the baseball.computer dbt-import path.
+"""Custom SQLMesh loader for the baseball.computer project (Phase 1.5).
 
-Subclasses `sqlmesh.dbt.loader.DbtLoader` to fix one upstream defect:
-seed CSVs are loaded via pandas with `keep_default_na=True` hardcoded
-(`sqlmesh/dbt/seed.py:82-86`), which silently coerces literal `"NA"`,
-`"NULL"`, `"N/A"`, etc. to NULL — even when those tokens carry meaning
-to the data. dbt's own seed loader uses agate, which preserves them.
+Subclasses the stock `SqlMeshLoader` to plug a project-local jinja builtins
+module into the `JinjaMacroRegistry`. The reason: the existing dbt-style
+macros under `bc/macros/` (e.g. `stat_lists.sql`, `metric_col_lists.sql`,
+`metric_calcs.sql`) use `{{ return([...]) }}` to surface lists/dicts back to
+callers. SQLMesh's native jinja env does not register `return` by default —
+only the dbt-import path does. Rather than rewrite every macro, we point the
+registry at `bc/jinja_globals.py`, which augments the default builtin set.
 
-`bc/seeds/misc/seed_franchises.csv` uses `"NA"` for the National
-Association (1871-1875) in the `league` column. Without this patch,
-SQLMesh-built tables disagree with dbt-built tables on every NA-bearing
-row — and that divergence cascades through `game_start_info` into park
-factors, standings, and metrics.
-
-The patch wraps `SeedConfig.to_sqlmesh` to flip `keep_default_na=False`
-on the constructed `CsvSettings`. The wrapper is idempotent (guarded by
-a sentinel attribute) and only the empty string + the existing single-
-space sentinel are then treated as null — matching dbt-agate behavior.
+Phase 1 used a different `loader.py` that monkey-patched seed loading. That
+patch is gone in Phase 1.5 because SqlMeshLoader does not load seeds at all
+(seeds are now materialized via `@load_seeds()` `before_all` hook in
+`bc/macros/_init_db.py`).
 """
 
 from __future__ import annotations
 
-import logging
-
-from sqlmesh.dbt.loader import DbtLoader
-from sqlmesh.dbt.seed import SeedConfig
-
-logger = logging.getLogger(__name__)
+from sqlmesh.core.loader import SqlMeshLoader
 
 
-def _patch_seed_loader() -> None:
-    if getattr(SeedConfig.to_sqlmesh, "_bc_patched", False):
-        return
+class BcSqlMeshLoader(SqlMeshLoader):
+    """SqlMeshLoader variant that registers project-local jinja builtins."""
 
-    original = SeedConfig.to_sqlmesh
-
-    def patched(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-        model = original(self, *args, **kwargs)
-        kind = getattr(model, "kind", None)
-        csv_settings = getattr(kind, "csv_settings", None)
-        if csv_settings is None:
-            return model
-        # Disable pandas' default-NA stripping so literal "NA"/"NULL"/etc.
-        # survive as strings (matches dbt-agate). Then re-add "" and " " to
-        # na_values so empty fields and the single-space sentinel still
-        # become NULL — agate treats both as null.
-        if csv_settings.keep_default_na is not False:
-            csv_settings.keep_default_na = False
-        existing = list(csv_settings.na_values or [])
-        for sentinel in ("", " "):
-            if sentinel not in existing:
-                existing.append(sentinel)
-        csv_settings.na_values = existing
-        logger.debug(
-            "PatchedDbtLoader: applied seed csv_settings overrides for %s",
-            model.name,
-        )
-        return model
-
-    patched._bc_patched = True  # type: ignore[attr-defined]
-    SeedConfig.to_sqlmesh = patched  # type: ignore[method-assign]
-
-
-class PatchedDbtLoader(DbtLoader):
-    """DbtLoader variant that disables pandas' default-NA stripping for seeds."""
-
-    def __init__(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
-        _patch_seed_loader()
-        super().__init__(*args, **kwargs)
+    def _load_scripts(self):  # type: ignore[override]
+        macros, jinja_macros = super()._load_scripts()
+        jinja_macros.create_builtins_module = "jinja_globals"
+        return macros, jinja_macros

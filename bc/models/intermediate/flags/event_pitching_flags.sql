@@ -1,8 +1,46 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_pitching_flags,
+  kind FULL,
+  grain (event_key),
+  columns (
+    game_id VARCHAR,
+    event_key UINTEGER,
+    event_id UTINYINT,
+    previous_pitcher_id VARCHAR,
+    pitcher_id VARCHAR,
+    starting_pitcher_flag BOOLEAN,
+    bequeathed_runners UTINYINT,
+    inherited_runners UTINYINT,
+    new_relief_pitcher_flag BOOLEAN,
+    pitcher_exit_flag BOOLEAN,
+    pitcher_finish_flag BOOLEAN,
+    starting_pitcher_exit_flag BOOLEAN,
+    starting_pitcher_early_exit_flag BOOLEAN,
+    save_situation_start_flag BOOLEAN,
+    hold_flag BOOLEAN,
+    save_flag BOOLEAN,
+    blown_save_flag BOOLEAN,
+    blown_long_save_flag BOOLEAN
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    event_key = @doc('event_key'),
+    event_id = @doc('event_id'),
+    pitcher_id = @doc('pitcher_id'),
+    bequeathed_runners = @doc('bequeathed_runners'),
+    inherited_runners = @doc('inherited_runners')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_pitching_flags.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH init_flags AS (
     SELECT
         game_id,
@@ -98,7 +136,7 @@ WITH init_flags AS (
         -- when the pitcher leaves
         batting_team_margin_end >= 0 AS conditional_blown_save_flag
 
-    FROM {{ ref('event_states_full') }}
+    FROM main_models.event_states_full
     WINDOW
         game_side AS (
             PARTITION BY game_id, batting_side

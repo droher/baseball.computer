@@ -1,14 +1,104 @@
+MODEL (
+  name main_models.stg_games,
+  kind FULL,
+  grain (game_id),
+  columns (
+    game_id VARCHAR,
+    game_key UINTEGER,
+    date DATE,
+    start_time TIMESTAMP,
+    doubleheader_status DOUBLEHEADER_STATUS,
+    time_of_day TIME_OF_DAY,
+    game_type GAME_TYPE,
+    bat_first_side SIDE,
+    sky SKY,
+    field_condition FIELD_CONDITION,
+    precipitation PRECIPITATION,
+    wind_direction WIND_DIRECTION,
+    park_id PARK_ID,
+    temperature_fahrenheit TINYINT,
+    attendance UINTEGER,
+    wind_speed_mph UTINYINT,
+    use_dh BOOLEAN,
+    winning_pitcher_id VARCHAR,
+    losing_pitcher_id VARCHAR,
+    save_pitcher_id VARCHAR,
+    game_winning_rbi_player_id VARCHAR,
+    duration_minutes BIGINT,
+    protest_info INTEGER,
+    completion_info INTEGER,
+    scorer VARCHAR,
+    scoring_method VARCHAR,
+    inputter VARCHAR,
+    translator VARCHAR,
+    date_inputted TIMESTAMP,
+    date_edited INTEGER,
+    account_type ACCOUNT_TYPE,
+    filename VARCHAR,
+    source_type VARCHAR,
+    away_team_id TEAM_ID,
+    home_team_id TEAM_ID,
+    umpire_home_id VARCHAR,
+    umpire_first_id VARCHAR,
+    umpire_second_id VARCHAR,
+    umpire_third_id VARCHAR,
+    umpire_left_id VARCHAR,
+    umpire_right_id VARCHAR,
+    season SMALLINT
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    date = @doc('date'),
+    start_time = @doc('start_time'),
+    time_of_day = @doc('time_of_day'),
+    game_type = @doc('game_type'),
+    bat_first_side = @doc('bat_first_side'),
+    sky = @doc('sky'),
+    field_condition = @doc('field_condition'),
+    precipitation = @doc('precipitation'),
+    wind_direction = @doc('wind_direction'),
+    park_id = @doc('park_id'),
+    temperature_fahrenheit = @doc('temperature_fahrenheit'),
+    attendance = @doc('attendance'),
+    wind_speed_mph = @doc('wind_speed_mph'),
+    filename = @doc('filename'),
+    source_type = @doc('source_type'),
+    away_team_id = @doc('away_team_id'),
+    home_team_id = @doc('home_team_id'),
+    umpire_home_id = @doc('umpire_home_id'),
+    umpire_first_id = @doc('umpire_first_id'),
+    umpire_second_id = @doc('umpire_second_id'),
+    umpire_third_id = @doc('umpire_third_id'),
+    umpire_left_id = @doc('umpire_left_id'),
+    umpire_right_id = @doc('umpire_right_id'),
+    season = @doc('season')
+  ),
+  audits (
+    relationships(column := park_id, to_column := park_id, to_model := main_models.stg_parks),
+    not_null(columns := (park_id), condition := (EXTRACT(year FROM date) >= 1875))
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_games.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH from_box_scores AS (
     SELECT *
-    FROM {{ source('box_score', 'box_score_games') }}
-    WHERE game_id NOT IN (SELECT game_id FROM {{ source('game', 'games') }})
+    FROM box_score.box_score_games
+    WHERE game_id NOT IN (SELECT game_id FROM game.games)
 ),
 
 unioned AS (
     SELECT
         *,
         'PlayByPlay' AS source_type
-    FROM {{ source('game', 'games') }}
+    FROM game.games
     UNION ALL
     SELECT
         *,

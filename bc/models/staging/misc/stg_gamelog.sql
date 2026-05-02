@@ -1,5 +1,67 @@
+MODEL (
+  name main_models.stg_gamelog,
+  kind FULL,
+  grain (game_id),
+  columns (
+    season SMALLINT,
+    date DATE,
+    doubleheader_status DOUBLEHEADER_STATUS,
+    game_id VARCHAR,
+    away_team_id TEAM_ID,
+    home_team_id TEAM_ID,
+    time_of_day TIME_OF_DAY,
+    park_id PARK_ID,
+    attendance INTEGER,
+    umpire_home_id VARCHAR,
+    umpire_first_id VARCHAR,
+    umpire_second_id VARCHAR,
+    umpire_third_id VARCHAR,
+    away_starting_pitcher_id VARCHAR,
+    home_starting_pitcher_id VARCHAR,
+    additional_info VARCHAR,
+    bat_first_side SIDE,
+    use_dh BOOLEAN,
+    game_type GAME_TYPE,
+    duration_minutes SMALLINT,
+    away_line_score VARCHAR,
+    home_line_score VARCHAR,
+    away_runs_scored UTINYINT,
+    home_runs_scored UTINYINT,
+    forfeit_info VARCHAR,
+    source_type VARCHAR
+  ),
+  column_descriptions (
+    season = @doc('season'),
+    date = @doc('date'),
+    game_id = @doc('game_id'),
+    away_team_id = @doc('away_team_id'),
+    home_team_id = @doc('home_team_id'),
+    time_of_day = @doc('time_of_day'),
+    park_id = @doc('park_id'),
+    attendance = @doc('attendance'),
+    umpire_home_id = @doc('umpire_home_id'),
+    umpire_first_id = @doc('umpire_first_id'),
+    umpire_second_id = @doc('umpire_second_id'),
+    umpire_third_id = @doc('umpire_third_id'),
+    away_starting_pitcher_id = @doc('away_starting_pitcher_id'),
+    home_starting_pitcher_id = @doc('home_starting_pitcher_id'),
+    bat_first_side = @doc('bat_first_side'),
+    game_type = @doc('game_type'),
+    source_type = @doc('source_type')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_gamelog.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('misc', 'gamelog') }}
+    SELECT * FROM misc.gamelog
 ),
 
 renamed AS (

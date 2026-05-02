@@ -1,5 +1,34 @@
+MODEL (
+  name main_models.stg_rosters,
+  kind FULL,
+  grain (year, player_id, team_id),
+  columns (
+    year INTEGER,
+    player_id VARCHAR,
+    last_name VARCHAR,
+    first_name VARCHAR,
+    bats HAND,
+    throws HAND,
+    team_id TEAM_ID,
+    position VARCHAR
+  ),
+  column_descriptions (
+    player_id = @doc('player_id'),
+    team_id = @doc('team_id')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_rosters.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('misc', 'roster') }}
+    SELECT * FROM misc.roster
 ),
 
 renamed AS (

@@ -1,8 +1,74 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_fielding_stats,
+  kind FULL,
+  description 'Fielding statistics for each event, aggregated at the event level. This allows the inclusion of fielding statistics for events where the specific fielder is unknown.',
+  grain (event_key),
+  columns (
+    event_key UINTEGER,
+    season SMALLINT,
+    game_id VARCHAR,
+    team_id TEAM_ID,
+    personnel_fielding_key INTEGER,
+    outs_played UTINYINT,
+    plate_appearances_in_field UTINYINT,
+    batted_to_fielder UTINYINT,
+    putouts UTINYINT,
+    assists UTINYINT,
+    errors UTINYINT,
+    fielders_choices UTINYINT,
+    assisted_putouts UTINYINT,
+    double_plays UTINYINT,
+    triple_plays UTINYINT,
+    ground_ball_double_plays UTINYINT,
+    stolen_bases UTINYINT,
+    caught_stealing UTINYINT,
+    pickoffs UTINYINT,
+    passed_balls UTINYINT,
+    plate_appearances_in_field_with_ball_in_play UTINYINT,
+    in_play_putouts UTINYINT,
+    in_play_assists UTINYINT,
+    reaching_errors UTINYINT,
+    unknown_putouts UTINYINT,
+    incomplete_events UTINYINT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    season = @doc('season'),
+    game_id = @doc('game_id'),
+    team_id = @doc('team_id'),
+    outs_played = @doc('outs_played'),
+    plate_appearances_in_field = @doc('plate_appearances_in_field'),
+    batted_to_fielder = @doc('batted_to_fielder'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    fielders_choices = @doc('fielders_choices'),
+    assisted_putouts = @doc('assisted_putouts'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    ground_ball_double_plays = @doc('ground_ball_double_plays'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    pickoffs = @doc('pickoffs'),
+    passed_balls = @doc('passed_balls'),
+    plate_appearances_in_field_with_ball_in_play = @doc('plate_appearances_in_field_with_ball_in_play'),
+    in_play_putouts = @doc('in_play_putouts'),
+    in_play_assists = @doc('in_play_assists'),
+    reaching_errors = @doc('reaching_errors'),
+    unknown_putouts = @doc('unknown_putouts'),
+    incomplete_events = @doc('incomplete_events')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_fielding_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH fielding_plays_agg AS (
     SELECT
         event_key,
@@ -13,7 +79,7 @@ WITH fielding_plays_agg AS (
         SUM(assisted_putouts) AS assisted_putouts,
         SUM(unknown_putouts) AS unknown_putouts,
         SUM(incomplete_events) AS incomplete_events,
-    FROM {{ ref('calc_fielding_play_agg') }}
+    FROM main_models.calc_fielding_play_agg
     GROUP BY 1
 ),
 
@@ -24,7 +90,7 @@ baserunning AS (
         COUNT(*) FILTER (WHERE baserunning_play_type LIKE 'CaughtStealing') AS caught_stealing,
         COUNT(*) FILTER (WHERE baserunning_play_type LIKE 'PickedOff%') AS pickoffs,
         BOOL_OR(baserunning_play_type = 'PassedBall')::UTINYINT AS passed_balls,
-    FROM {{ ref('stg_event_baserunners') }}
+    FROM main_models.stg_event_baserunners
     WHERE baserunning_play_type IS NOT NULL
     GROUP BY 1
 ),
@@ -57,11 +123,11 @@ final AS (
         CASE WHEN events.plate_appearance_result = 'ReachedOnError' THEN 1 ELSE 0 END::UTINYINT AS reaching_errors,
         COALESCE(fp.unknown_putouts, 0)::UTINYINT AS unknown_putouts,
         COALESCE(fp.incomplete_events, 0)::UTINYINT AS incomplete_events,
-    FROM {{ ref('stg_events') }} AS events
+    FROM main_models.stg_events AS events
     LEFT JOIN baserunning USING (event_key)
-    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS prt USING (plate_appearance_result)
-    LEFT JOIN {{ ref('event_double_plays') }} AS dp USING (event_key)
-    LEFT JOIN {{ ref('event_personnel_lookup') }} AS lookup USING (event_key)
+    LEFT JOIN main_seeds.seed_plate_appearance_result_types AS prt USING (plate_appearance_result)
+    LEFT JOIN main_models.event_double_plays AS dp USING (event_key)
+    LEFT JOIN main_models.event_personnel_lookup AS lookup USING (event_key)
     LEFT JOIN fielding_plays_agg AS fp USING (event_key)
     WHERE NOT events.no_play_flag
 )

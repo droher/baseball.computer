@@ -1,5 +1,79 @@
+MODEL (
+  name main_models.stg_databank_batting,
+  kind FULL,
+  description 'Aggregate batting statistics by player, season, and stint with a given team.',
+  grain (databank_player_id, season, stint),
+  columns (
+    databank_player_id VARCHAR,
+    season SMALLINT,
+    stint SMALLINT,
+    team_id VARCHAR,
+    league_id VARCHAR,
+    games USMALLINT,
+    at_bats USMALLINT,
+    runs USMALLINT,
+    hits USMALLINT,
+    doubles USMALLINT,
+    triples USMALLINT,
+    home_runs USMALLINT,
+    runs_batted_in USMALLINT,
+    stolen_bases USMALLINT,
+    caught_stealing USMALLINT,
+    walks USMALLINT,
+    strikeouts USMALLINT,
+    intentional_walks USMALLINT,
+    hit_by_pitches USMALLINT,
+    sacrifice_hits USMALLINT,
+    sacrifice_flies USMALLINT,
+    grounded_into_double_plays USMALLINT,
+    singles USMALLINT,
+    total_bases USMALLINT,
+    plate_appearances USMALLINT,
+    on_base_opportunities USMALLINT,
+    on_base_successes USMALLINT
+  ),
+  column_descriptions (
+    databank_player_id = @doc('databank_player_id'),
+    season = @doc('season'),
+    stint = @doc('stint'),
+    team_id = @doc('team_id'),
+    league_id = @doc('league_id'),
+    games = 'Total number of games played',
+    at_bats = @doc('at_bats'),
+    runs = @doc('runs'),
+    hits = @doc('hits'),
+    doubles = @doc('doubles'),
+    triples = @doc('triples'),
+    home_runs = @doc('home_runs'),
+    runs_batted_in = @doc('runs_batted_in'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    walks = @doc('walks'),
+    strikeouts = @doc('strikeouts'),
+    intentional_walks = @doc('intentional_walks'),
+    hit_by_pitches = @doc('hit_by_pitches'),
+    sacrifice_hits = @doc('sacrifice_hits'),
+    sacrifice_flies = @doc('sacrifice_flies'),
+    grounded_into_double_plays = @doc('grounded_into_double_plays'),
+    singles = @doc('singles'),
+    total_bases = @doc('total_bases'),
+    plate_appearances = @doc('plate_appearances'),
+    on_base_opportunities = @doc('on_base_opportunities'),
+    on_base_successes = @doc('on_base_successes')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_databank_batting.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('baseballdatabank', 'batting') }}
+    SELECT * FROM baseballdatabank.batting
 ),
 
 renamed AS (

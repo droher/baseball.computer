@@ -1,8 +1,127 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_states_full,
+  kind FULL,
+  description 'A catch-all table for information describing the state of the event both before and after it occurred. Includes information about the score, the base-out state, and the players involved in the event.',
+  grain (event_key),
+  columns (
+    game_id VARCHAR,
+    event_id UTINYINT,
+    event_key UINTEGER,
+    season SMALLINT,
+    league VARCHAR,
+    is_interleague BOOLEAN,
+    game_type GAME_TYPE,
+    date DATE,
+    park_id PARK_ID,
+    bat_first_side SIDE,
+    time_of_day TIME_OF_DAY,
+    pitching_team_starting_pitcher_id VARCHAR,
+    inning_start UTINYINT,
+    frame_start FRAME,
+    outs_start UTINYINT,
+    inning_in_outs_start UTINYINT,
+    is_gidp_eligible BOOLEAN,
+    batting_side SIDE,
+    fielding_side SIDE,
+    score_home_start UTINYINT,
+    score_away_start UTINYINT,
+    home_margin_start TINYINT,
+    batting_team_margin_start TINYINT,
+    batter_lineup_position UTINYINT,
+    batter_fielding_position UTINYINT,
+    batter_hand HAND,
+    pitcher_hand HAND,
+    away_team_id TEAM_ID,
+    home_team_id TEAM_ID,
+    batting_team_id TEAM_ID,
+    fielding_team_id TEAM_ID,
+    batter_id VARCHAR,
+    pitcher_id VARCHAR,
+    base_state_start UTINYINT,
+    runners_count_start UTINYINT,
+    frame_start_flag BOOLEAN,
+    runner_first_id_start VARCHAR,
+    runner_second_id_start VARCHAR,
+    runner_third_id_start VARCHAR,
+    count_balls UTINYINT,
+    count_strikes UTINYINT,
+    inning_end UTINYINT,
+    frame_end FRAME,
+    outs_on_play UTINYINT,
+    outs_end UTINYINT,
+    base_state_end UTINYINT,
+    runs_on_play UTINYINT,
+    score_home_end UTINYINT,
+    score_away_end UTINYINT,
+    home_margin_end TINYINT,
+    batting_team_margin_end TINYINT,
+    frame_end_flag BOOLEAN,
+    truncated_frame_flag BOOLEAN,
+    game_end_flag BOOLEAN,
+    league_group VARCHAR,
+    season_group SMALLINT,
+    inning_group_start VARCHAR,
+    inning_group_end VARCHAR,
+    truncated_home_margin_start TINYINT,
+    truncated_home_margin_end TINYINT,
+    run_expectancy_start_key VARCHAR,
+    run_expectancy_end_key VARCHAR,
+    win_expectancy_start_key VARCHAR,
+    win_expectancy_end_key VARCHAR
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    event_id = @doc('event_id'),
+    event_key = @doc('event_key'),
+    season = @doc('season'),
+    league = @doc('league'),
+    is_interleague = @doc('is_interleague'),
+    game_type = @doc('game_type'),
+    date = @doc('date'),
+    park_id = @doc('park_id'),
+    bat_first_side = @doc('bat_first_side'),
+    time_of_day = @doc('time_of_day'),
+    inning_start = @doc('inning_start'),
+    frame_start = @doc('frame_start'),
+    outs_start = @doc('outs_start'),
+    inning_in_outs_start = @doc('inning_in_outs_start'),
+    is_gidp_eligible = @doc('is_gidp_eligible'),
+    batting_side = @doc('batting_side'),
+    score_home_start = @doc('score_home_start'),
+    score_away_start = @doc('score_away_start'),
+    away_team_id = @doc('away_team_id'),
+    home_team_id = @doc('home_team_id'),
+    batter_id = @doc('batter_id'),
+    pitcher_id = @doc('pitcher_id'),
+    base_state_start = @doc('base_state_start'),
+    runners_count_start = @doc('runners_count_start'),
+    frame_start_flag = @doc('frame_start_flag'),
+    runner_first_id_start = @doc('runner_first_id_start'),
+    runner_second_id_start = @doc('runner_second_id_start'),
+    runner_third_id_start = @doc('runner_third_id_start'),
+    inning_end = @doc('inning_end'),
+    frame_end = @doc('frame_end'),
+    outs_on_play = @doc('outs_on_play'),
+    outs_end = @doc('outs_end'),
+    base_state_end = @doc('base_state_end'),
+    runs_on_play = @doc('runs_on_play'),
+    score_home_end = @doc('score_home_end'),
+    score_away_end = @doc('score_away_end'),
+    frame_end_flag = @doc('frame_end_flag'),
+    truncated_frame_flag = @doc('truncated_frame_flag'),
+    game_end_flag = @doc('game_end_flag')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_states_full.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH final AS (
     SELECT
         -- IDs
@@ -120,10 +239,10 @@ WITH final AS (
             '_', inning_group_end, base_out.frame_end, truncated_home_margin_end,
             base_out.outs_end % 3, COALESCE(base_out.base_state_end, 0)
         ) AS win_expectancy_end_key,
-    FROM {{ ref('stg_events') }} AS e
-    INNER JOIN {{ ref('game_start_info') }} AS g USING (game_id)
-    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS players USING (event_key)
-    INNER JOIN {{ ref('event_base_out_states') }} AS base_out USING (event_key)
+    FROM main_models.stg_events AS e
+    INNER JOIN main_models.game_start_info AS g USING (game_id)
+    INNER JOIN main_models.event_states_batter_pitcher AS players USING (event_key)
+    INNER JOIN main_models.event_base_out_states AS base_out USING (event_key)
 
 )
 

@@ -1,12 +1,81 @@
+MODEL (
+  name main_models.event_player_fielding_stats,
+  kind FULL,
+  description 'Fielding statistics for each player in each event, regardless of whether the fielder was involved in the play. This is the largest table in the database by number of rows, so exercise caution when querying it.',
+  grain (event_key, fielding_position),
+  columns (
+    event_key UINTEGER,
+    fielding_position UTINYINT,
+    game_id VARCHAR,
+    player_id VARCHAR,
+    team_id TEAM_ID,
+    outs_played UTINYINT,
+    plate_appearances_in_field UTINYINT,
+    plate_appearances_in_field_with_ball_in_play UTINYINT,
+    unknown_putouts_while_fielding UTINYINT,
+    balls_hit_to UTINYINT,
+    putouts UTINYINT,
+    assists UTINYINT,
+    errors UTINYINT,
+    fielders_choices UTINYINT,
+    assisted_putouts UTINYINT,
+    in_play_putouts UTINYINT,
+    in_play_assists UTINYINT,
+    reaching_errors UTINYINT,
+    stolen_bases UTINYINT,
+    caught_stealing UTINYINT,
+    pickoffs UTINYINT,
+    passed_balls UTINYINT,
+    double_plays UTINYINT,
+    triple_plays UTINYINT,
+    ground_ball_double_plays UTINYINT,
+    double_plays_started UTINYINT,
+    ground_ball_double_plays_started UTINYINT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    fielding_position = @doc('fielding_position'),
+    game_id = @doc('game_id'),
+    player_id = @doc('player_id'),
+    team_id = @doc('team_id'),
+    outs_played = @doc('outs_played'),
+    plate_appearances_in_field = @doc('plate_appearances_in_field'),
+    plate_appearances_in_field_with_ball_in_play = @doc('plate_appearances_in_field_with_ball_in_play'),
+    unknown_putouts_while_fielding = @doc('unknown_putouts_while_fielding'),
+    balls_hit_to = @doc('balls_hit_to'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    fielders_choices = @doc('fielders_choices'),
+    assisted_putouts = @doc('assisted_putouts'),
+    in_play_putouts = @doc('in_play_putouts'),
+    in_play_assists = @doc('in_play_assists'),
+    reaching_errors = @doc('reaching_errors'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    pickoffs = @doc('pickoffs'),
+    passed_balls = @doc('passed_balls'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    ground_ball_double_plays = @doc('ground_ball_double_plays'),
+    double_plays_started = @doc('double_plays_started'),
+    ground_ball_double_plays_started = @doc('ground_ball_double_plays_started')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_player_fielding_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 -- TODO: Unclear whether this should exist as such.
 -- Per-event-fielding stats for positions not involved in the play
 -- are only there for innings/PA played, which can be tabulated
 -- in more efficient ways.
-{{
-  config(
-    materialized = 'table',
-    )
-}}
 WITH final AS (
     SELECT
         e.event_key,
@@ -62,9 +131,9 @@ WITH final AS (
                 THEN e.ground_ball_double_plays
             ELSE 0
         END::UTINYINT AS ground_ball_double_plays_started,
-    FROM {{ ref('event_fielding_stats') }} AS e
-    INNER JOIN {{ ref('personnel_fielding_states') }} AS p USING (personnel_fielding_key)
-    LEFT JOIN {{ ref('calc_fielding_play_agg') }} AS fp USING (event_key, fielding_position)
+    FROM main_models.event_fielding_stats AS e
+    INNER JOIN main_models.personnel_fielding_states AS p USING (personnel_fielding_key)
+    LEFT JOIN main_models.calc_fielding_play_agg AS fp USING (event_key, fielding_position)
 )
 
 SELECT * FROM final

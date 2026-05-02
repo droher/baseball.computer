@@ -1,15 +1,46 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.team_season_fielding_stats,
+  kind FULL,
+  grain (season, team_id, game_type),
+  column_descriptions (
+    season = @doc('season'),
+    team_id = @doc('team_id'),
+    game_type = @doc('game_type'),
+    games = @doc('games'),
+    outs_played = @doc('outs_played'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    passed_balls = @doc('passed_balls'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    plate_appearances_in_field = @doc('plate_appearances_in_field'),
+    plate_appearances_in_field_with_ball_in_play = @doc('plate_appearances_in_field_with_ball_in_play'),
+    fielders_choices = @doc('fielders_choices'),
+    reaching_errors = @doc('reaching_errors'),
+    pickoffs = @doc('pickoffs'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    ground_ball_double_plays = @doc('ground_ball_double_plays')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_team_season_fielding_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH game_agg AS (
     SELECT
         season,
         team_id,
         game_type,
         COUNT(*) AS games
-    FROM {{ ref('team_game_start_info') }}
+    FROM main_models.team_game_start_info
     GROUP BY 1, 2, 3
 ),
 
@@ -29,9 +60,9 @@ databank AS (
         -- appear for catchers, not pitchers
         SUM(f.stolen_bases)::USMALLINT AS stolen_bases,
         SUM(f.caught_stealing)::USMALLINT AS caught_stealing,
-    FROM {{ ref('player_position_team_season_fielding_stats') }} AS f
+    FROM main_models.player_position_team_season_fielding_stats AS f
     INNER JOIN game_agg USING (season, team_id)
-    WHERE f.season NOT IN (SELECT DISTINCT season FROM {{ ref('game_start_info') }})
+    WHERE f.season NOT IN (SELECT DISTINCT season FROM main_models.game_start_info)
     GROUP BY 1, 2
 ),
 
@@ -56,8 +87,8 @@ retrosheet AS (
         SUM(stats.double_plays)::USMALLINT AS double_plays,
         SUM(stats.triple_plays)::USMALLINT AS triple_plays,
         SUM(stats.ground_ball_double_plays)::USMALLINT AS ground_ball_double_plays
-    FROM {{ ref('game_start_info') }} AS games
-    INNER JOIN {{ ref('team_game_fielding_stats') }} AS stats USING (game_id)
+    FROM main_models.game_start_info AS games
+    INNER JOIN main_models.team_game_fielding_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3
 ),
 

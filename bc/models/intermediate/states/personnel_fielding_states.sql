@@ -1,8 +1,33 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.personnel_fielding_states,
+  kind FULL,
+  grain (personnel_fielding_key, fielding_position),
+  columns (
+    game_id VARCHAR,
+    fielding_team_id TEAM_ID,
+    fielding_side SIDE,
+    personnel_fielding_key BIGINT,
+    start_event_id UTINYINT,
+    end_event_id UINTEGER,
+    player_id VARCHAR,
+    fielding_position UTINYINT
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    player_id = @doc('player_id'),
+    fielding_position = @doc('fielding_position')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_personnel_fielding_states.parquet'
+  ),
+);
+
+
+
+
+
+
+
 -- We create the concept of a personnel state as a range of events
 -- where none of the players in the lineup change. This allows us
 -- to store personnel info at a lower cardinality than one row per event-player.
@@ -15,7 +40,7 @@ WITH ranges AS (
             MIN(start_event_id - 1) OVER w,
             end_event_id
         )::UINTEGER AS end_event_id
-    FROM {{ ref('stg_game_fielding_appearances') }}
+    FROM main_models.stg_game_fielding_appearances
     -- The MIN over this window is the next-largest value
     WINDOW w AS (
         PARTITION BY game_id, side
@@ -35,8 +60,8 @@ final AS (
         ranges.end_event_id,
         appearances.player_id,
         appearances.fielding_position,
-    FROM {{ ref('stg_game_fielding_appearances') }} AS appearances
-    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
+    FROM main_models.stg_game_fielding_appearances AS appearances
+    INNER JOIN main_models.stg_games AS games USING (game_id)
     INNER JOIN ranges
         ON ranges.game_id = appearances.game_id
             AND ranges.side = appearances.side

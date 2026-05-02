@@ -1,5 +1,22 @@
+MODEL (
+  name main_models.stg_ejections,
+  kind FULL,
+  description 'Game ejections. From biodata/ejections.csv.',
+  column_descriptions (
+    game_id = @doc('game_id'),
+    ejectee_id = 'Personnel id ejected.',
+    ejectee_role = 'P=player, M=manager, C=coach, etc.',
+    inning = 'Inning of ejection (-1 if pre-game).'
+  ),
+);
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('biodata', 'ejections') }}
+    SELECT * FROM biodata.ejections
 ),
 
 renamed AS (

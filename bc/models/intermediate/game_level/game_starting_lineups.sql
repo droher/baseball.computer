@@ -1,15 +1,39 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.game_starting_lineups,
+  kind FULL,
+  grain (game_id),
+  columns (
+    game_id VARCHAR,
+    lineup_map_away MAP(UTINYINT, VARCHAR),
+    fielding_map_away MAP(UTINYINT, VARCHAR),
+    lineup_map_home MAP(UTINYINT, VARCHAR),
+    fielding_map_home MAP(UTINYINT, VARCHAR)
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    lineup_map_away = @doc('lineup_map_away'),
+    fielding_map_away = @doc('fielding_map_away'),
+    lineup_map_home = @doc('lineup_map_home'),
+    fielding_map_home = @doc('fielding_map_home')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_game_starting_lineups.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH event_offense AS (
     SELECT
         game_id,
         player_id,
         side,
         lineup_position
-    FROM {{ ref('stg_game_lineup_appearances') }}
+    FROM main_models.stg_game_lineup_appearances
     WHERE start_event_id = 1
         -- Full outer join will cover pitchers
         AND lineup_position > 0
@@ -23,7 +47,7 @@ event_fielding AS (
         -- This is to choose pitcher over DH
         -- when Ohtani is doing both.
         MIN(fielding_position) AS fielding_position
-    FROM {{ ref('stg_game_fielding_appearances') }}
+    FROM main_models.stg_game_fielding_appearances
     WHERE start_event_id = 1
     GROUP BY 1, 2, 3
 ),
@@ -34,7 +58,7 @@ box_offense AS (
         batter_id,
         side,
         lineup_position
-    FROM {{ ref('stg_box_score_batting_lines') }}
+    FROM main_models.stg_box_score_batting_lines
     WHERE nth_player_at_position = 1
 ),
 
@@ -44,7 +68,7 @@ box_fielding AS (
         fielder_id,
         side,
         fielding_position
-    FROM {{ ref('stg_box_score_fielding_lines') }}
+    FROM main_models.stg_box_score_fielding_lines
     -- This doesn't fully filter down to starters,
     -- just the first position played by any player,
     -- starter or sub.

@@ -1,8 +1,26 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.leverage_index,
+  kind FULL,
+  grain (win_expectancy_start_key),
+  columns (
+    win_expectancy_start_key VARCHAR,
+    win_leverage_unscaled DOUBLE,
+    run_leverage_unscaled DOUBLE,
+    win_leverage_index DOUBLE,
+    run_leverage_index DOUBLE,
+    agg_sample_size HUGEINT
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_leverage_index.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH trans AS (
     SELECT
         win_expectancy_start_key,
@@ -12,7 +30,7 @@ WITH trans AS (
         -- including league/time in the leverage calc
         AVG(ABS(expected_home_win_change)) AS absolute_expected_home_win_change,
         AVG(ABS(expected_runs_change)) AS absolute_expected_runs_change,
-    FROM {{ ref('event_transition_values') }}
+    FROM main_models.event_transition_values
     GROUP BY 1, 2
 ),
 

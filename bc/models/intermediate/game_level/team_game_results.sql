@@ -1,8 +1,148 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.team_game_results,
+  kind FULL,
+  description 'A version of `game_results` that includes one row for each team in each game. Also includes additional statistics (traditional box score stats) for games that have that information available.',
+  grain (game_id, team_id),
+  columns (
+    season SMALLINT,
+    game_id VARCHAR,
+    game_finish_date DATE,
+    team_id TEAM_ID,
+    game_type GAME_TYPE,
+    team_side SIDE,
+    league VARCHAR,
+    division VARCHAR,
+    opponent_league VARCHAR,
+    opponent_division VARCHAR,
+    season_game_number BIGINT,
+    is_interleague BOOLEAN,
+    wins INTEGER,
+    losses INTEGER,
+    runs_scored UTINYINT,
+    runs_allowed UTINYINT,
+    hits USMALLINT,
+    errors UTINYINT,
+    left_on_base USMALLINT,
+    at_bats USMALLINT,
+    doubles USMALLINT,
+    triples USMALLINT,
+    home_runs USMALLINT,
+    runs_batted_in USMALLINT,
+    sacrifice_hits USMALLINT,
+    sacrifice_flies USMALLINT,
+    hit_by_pitches USMALLINT,
+    walks USMALLINT,
+    intentional_walks USMALLINT,
+    strikeouts USMALLINT,
+    stolen_bases USMALLINT,
+    caught_stealing USMALLINT,
+    grounded_into_double_plays USMALLINT,
+    reached_on_interferences USMALLINT,
+    innings_pitched DECIMAL(6,4),
+    individual_earned_runs_allowed USMALLINT,
+    earned_runs_allowed UTINYINT,
+    wild_pitches USMALLINT,
+    balks USMALLINT,
+    putouts UTINYINT,
+    assists UTINYINT,
+    passed_balls UTINYINT,
+    double_plays_turned UTINYINT,
+    triple_plays_turned UTINYINT,
+    opponent_team_id TEAM_ID,
+    opponent_runs USMALLINT,
+    opponent_hits USMALLINT,
+    opponent_errors UTINYINT,
+    opponent_left_on_base USMALLINT,
+    opponent_at_bats USMALLINT,
+    opponent_doubles USMALLINT,
+    opponent_triples USMALLINT,
+    opponent_home_runs USMALLINT,
+    opponent_runs_batted_in USMALLINT,
+    opponent_sacrifice_hits USMALLINT,
+    opponent_sacrifice_flies USMALLINT,
+    opponent_hit_by_pitches USMALLINT,
+    opponent_walks USMALLINT,
+    opponent_intentional_walks USMALLINT,
+    opponent_strikeouts USMALLINT,
+    opponent_stolen_bases USMALLINT,
+    opponent_caught_stealing USMALLINT,
+    opponent_grounded_into_double_plays USMALLINT,
+    opponent_reached_on_interferences USMALLINT,
+    opponent_innings_pitched DECIMAL(6,4),
+    opponent_individual_earned_runs_allowed USMALLINT,
+    opponent_earned_runs_allowed UTINYINT,
+    opponent_wild_pitches USMALLINT,
+    opponent_balks USMALLINT,
+    opponent_putouts UTINYINT,
+    opponent_assists UTINYINT,
+    opponent_passed_balls UTINYINT,
+    opponent_double_plays UTINYINT,
+    opponent_triple_plays UTINYINT,
+    home_wins INTEGER,
+    home_losses INTEGER,
+    away_wins INTEGER,
+    away_losses INTEGER,
+    interleague_wins INTEGER,
+    interleague_losses INTEGER,
+    east_wins INTEGER,
+    east_losses INTEGER,
+    central_wins INTEGER,
+    central_losses INTEGER,
+    west_wins INTEGER,
+    west_losses INTEGER,
+    one_run_wins INTEGER,
+    one_run_losses INTEGER,
+    win_streak_id BIGINT,
+    loss_streak_id BIGINT,
+    win_streak_length BIGINT,
+    loss_streak_length BIGINT
+  ),
+  column_descriptions (
+    season = @doc('season'),
+    game_id = @doc('game_id'),
+    team_id = @doc('team_id'),
+    game_type = @doc('game_type'),
+    league = @doc('league'),
+    division = @doc('division'),
+    is_interleague = @doc('is_interleague'),
+    wins = @doc('wins'),
+    losses = @doc('losses'),
+    hits = @doc('hits'),
+    errors = @doc('errors'),
+    left_on_base = @doc('left_on_base'),
+    at_bats = @doc('at_bats'),
+    doubles = @doc('doubles'),
+    triples = @doc('triples'),
+    home_runs = @doc('home_runs'),
+    runs_batted_in = @doc('runs_batted_in'),
+    sacrifice_hits = @doc('sacrifice_hits'),
+    sacrifice_flies = @doc('sacrifice_flies'),
+    hit_by_pitches = @doc('hit_by_pitches'),
+    walks = @doc('walks'),
+    intentional_walks = @doc('intentional_walks'),
+    strikeouts = @doc('strikeouts'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    grounded_into_double_plays = @doc('grounded_into_double_plays'),
+    reached_on_interferences = @doc('reached_on_interferences'),
+    innings_pitched = @doc('innings_pitched'),
+    wild_pitches = @doc('wild_pitches'),
+    balks = @doc('balks'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    passed_balls = @doc('passed_balls')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_team_game_results.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH joined AS (
     SELECT
         s.season,
@@ -82,16 +222,16 @@ WITH joined AS (
         f_opp.passed_balls AS opponent_passed_balls,
         f_opp.double_plays AS opponent_double_plays,
         f_opp.triple_plays AS opponent_triple_plays,
-    FROM {{ ref('team_game_start_info') }} AS s
-    INNER JOIN {{ ref('game_results') }} AS r USING (game_id)
-    LEFT JOIN {{ ref('team_game_offense_stats') }} AS o USING (game_id, team_id)
-    LEFT JOIN {{ ref('team_game_fielding_stats') }} AS f USING (game_id, team_id)
-    LEFT JOIN {{ ref('team_game_pitching_stats') }} AS p USING (game_id, team_id)
-    LEFT JOIN {{ ref('team_game_offense_stats') }} AS o_opp
+    FROM main_models.team_game_start_info AS s
+    INNER JOIN main_models.game_results AS r USING (game_id)
+    LEFT JOIN main_models.team_game_offense_stats AS o USING (game_id, team_id)
+    LEFT JOIN main_models.team_game_fielding_stats AS f USING (game_id, team_id)
+    LEFT JOIN main_models.team_game_pitching_stats AS p USING (game_id, team_id)
+    LEFT JOIN main_models.team_game_offense_stats AS o_opp
         ON o_opp.game_id = o.game_id AND o_opp.team_id != o.team_id
-    LEFT JOIN {{ ref('team_game_fielding_stats') }} AS f_opp
+    LEFT JOIN main_models.team_game_fielding_stats AS f_opp
         ON f_opp.game_id = f.game_id AND f_opp.team_id != f.team_id
-    LEFT JOIN {{ ref('team_game_pitching_stats') }} AS p_opp
+    LEFT JOIN main_models.team_game_pitching_stats AS p_opp
         ON p_opp.game_id = p.game_id AND p_opp.team_id != p.team_id
 ),
 

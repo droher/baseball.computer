@@ -1,5 +1,19 @@
+MODEL (
+  name main_models.stg_coaches,
+  kind FULL,
+  description 'Per-coach assignments by year. From biodata/coaches.csv.',
+  column_descriptions (
+    person_id = 'Retrosheet personnel id (joins stg_bio.player_id).'
+  ),
+);
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('biodata', 'coaches') }}
+    SELECT * FROM biodata.coaches
 ),
 
 renamed AS (

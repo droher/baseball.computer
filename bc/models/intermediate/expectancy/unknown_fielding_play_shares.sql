@@ -1,13 +1,40 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.unknown_fielding_play_shares,
+  kind FULL,
+  grain (game_id, player_id, fielding_position),
+  columns (
+    game_id VARCHAR,
+    team_id TEAM_ID,
+    fielding_position UTINYINT,
+    player_id VARCHAR,
+    estimated_unknown_plays DOUBLE,
+    estimated_unknown_plays_team DOUBLE,
+    play_share DOUBLE,
+    play_share_subset_assists DOUBLE,
+    play_share_subset_putouts DOUBLE
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    team_id = @doc('team_id'),
+    fielding_position = @doc('fielding_position'),
+    player_id = @doc('player_id')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_unknown_fielding_play_shares.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH incomplete_games AS (
     SELECT
         game_id,
         team_id
-    FROM {{ ref('team_game_fielding_stats') }}
+    FROM main_models.team_game_fielding_stats
     WHERE unknown_putouts > 0
 ),
 
@@ -17,8 +44,8 @@ unassisted_putout_rates AS (
         SUM(f.putouts) AS total,
         SUM(f.putouts - f.assisted_putouts) AS unassisted,
         unassisted / total AS unassisted_putout_rate
-    FROM {{ ref('calc_fielding_play_agg') }} f
-    INNER JOIN {{ ref('stg_events') }} AS e USING (event_key)
+    FROM main_models.calc_fielding_play_agg f
+    INNER JOIN main_models.stg_events AS e USING (event_key)
     WHERE e.plate_appearance_result = 'InPlayOut'
         AND e.batted_to_fielder > 0
         AND e.outs_on_play = 1
@@ -33,7 +60,7 @@ team_totals AS (
         GREATEST(SUM(CASE WHEN fielding_position > 6 THEN surplus_box_putouts END), 0) AS surplus_of_putouts,
         GREATEST(SUM(CASE WHEN fielding_position < 6 THEN surplus_box_assists END), 0) AS surplus_if_assists,
         GREATEST(total_surplus_putouts - surplus_of_putouts - surplus_if_assists, 0) AS surplus_if_unassisted_putouts
-    FROM {{ ref('player_position_game_fielding_stats') }}
+    FROM main_models.player_position_game_fielding_stats
     INNER JOIN incomplete_games USING (game_id, team_id)
     GROUP BY 1, 2
 ),
@@ -70,7 +97,7 @@ calc_shares AS (
             END, 0
         ) AS estimated_unknown_plays_assists,
         estimated_unknown_plays_putouts + estimated_unknown_plays_assists AS estimated_unknown_plays
-    FROM {{ ref('player_position_game_fielding_stats') }} AS p
+    FROM main_models.player_position_game_fielding_stats AS p
     INNER JOIN team_totals AS t USING (game_id, team_id)
     INNER JOIN unassisted_putout_rates AS r USING (fielding_position)
     WINDOW w AS (PARTITION BY game_id, team_id)

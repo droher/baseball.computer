@@ -1,15 +1,90 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_base_out_states,
+  kind FULL,
+  description 'This model provides event-level information about the state of the game in terms of bases and outs. It combines data from the ''stg_events'' and ''stg_event_baserunners'' tables to calculate various metrics such as the number of outs at the start and end of each event, the number of runs scored on each play, the base state at the start and end of each event, and the IDs of the baserunners at the start and end of each event. Additionally, it includes flags to indicate the start and end of innings, frames, and games, as well as flags for truncated frames.',
+  grain (event_key),
+  columns (
+    event_key UINTEGER,
+    inning_start UTINYINT,
+    inning_end UTINYINT,
+    frame_start FRAME,
+    frame_end FRAME,
+    inning_in_outs_start UTINYINT,
+    outs_start UTINYINT,
+    outs_end UTINYINT,
+    outs_on_play UTINYINT,
+    is_gidp_eligible BOOLEAN,
+    base_state_start UTINYINT,
+    runner_first_id_start VARCHAR,
+    runner_second_id_start VARCHAR,
+    runner_third_id_start VARCHAR,
+    runners_count_start UTINYINT,
+    base_state_end UTINYINT,
+    runners_count_end UTINYINT,
+    runner_first_id_end VARCHAR,
+    runner_second_id_end VARCHAR,
+    runner_third_id_end VARCHAR,
+    score_home_start UTINYINT,
+    score_away_start UTINYINT,
+    score_home_end UTINYINT,
+    score_away_end UTINYINT,
+    runs_on_play UTINYINT,
+    frame_start_flag BOOLEAN,
+    frame_end_flag BOOLEAN,
+    truncated_frame_flag BOOLEAN,
+    game_start_flag BOOLEAN,
+    game_end_flag BOOLEAN
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    inning_start = @doc('inning_start'),
+    inning_end = @doc('inning_end'),
+    frame_start = @doc('frame_start'),
+    frame_end = @doc('frame_end'),
+    inning_in_outs_start = @doc('inning_in_outs_start'),
+    outs_start = @doc('outs_start'),
+    outs_end = @doc('outs_end'),
+    outs_on_play = @doc('outs_on_play'),
+    is_gidp_eligible = @doc('is_gidp_eligible'),
+    base_state_start = @doc('base_state_start'),
+    runner_first_id_start = @doc('runner_first_id_start'),
+    runner_second_id_start = @doc('runner_second_id_start'),
+    runner_third_id_start = @doc('runner_third_id_start'),
+    runners_count_start = @doc('runners_count_start'),
+    base_state_end = @doc('base_state_end'),
+    runners_count_end = @doc('runners_count_end'),
+    runner_first_id_end = @doc('runner_first_id_end'),
+    runner_second_id_end = @doc('runner_second_id_end'),
+    runner_third_id_end = @doc('runner_third_id_end'),
+    score_home_start = @doc('score_home_start'),
+    score_away_start = @doc('score_away_start'),
+    score_home_end = @doc('score_home_end'),
+    score_away_end = @doc('score_away_end'),
+    runs_on_play = @doc('runs_on_play'),
+    frame_start_flag = @doc('frame_start_flag'),
+    frame_end_flag = @doc('frame_end_flag'),
+    truncated_frame_flag = @doc('truncated_frame_flag'),
+    game_start_flag = @doc('game_start_flag'),
+    game_end_flag = @doc('game_end_flag')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_base_out_states.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH runners AS (
     SELECT
         event_key,
         ANY_VALUE(CASE WHEN baserunner_bit = 1 THEN runner_id END)::PLAYER_ID AS runner_first_id,
         ANY_VALUE(CASE WHEN baserunner_bit = 2 THEN runner_id END)::PLAYER_ID AS runner_second_id,
         ANY_VALUE(CASE WHEN baserunner_bit = 4 THEN runner_id END)::PLAYER_ID AS runner_third_id,
-    FROM {{ ref('stg_event_baserunners') }}
+    FROM main_models.stg_event_baserunners
     GROUP BY 1
 ),
 
@@ -31,9 +106,9 @@ add_outs AS (
         runners.runner_third_id,
         events.base_state AS base_state,
         COALESCE(info.is_force_on_second, FALSE) AND outs_start < 2 AS is_gidp_eligible,
-    FROM {{ ref('stg_events') }} AS events
+    FROM main_models.stg_events AS events
     LEFT JOIN runners USING (event_key)
-    LEFT JOIN {{ ref('seed_base_state_info') }} AS info USING (base_state)
+    LEFT JOIN main_seeds.seed_base_state_info AS info USING (base_state)
 ),
 
 final AS (

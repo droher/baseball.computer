@@ -1,8 +1,89 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.player_position_game_fielding_stats,
+  kind FULL,
+  grain (game_id, player_id, fielding_position),
+  columns (
+    game_id VARCHAR,
+    player_id VARCHAR,
+    fielding_position UTINYINT,
+    team_id TEAM_ID,
+    games_started UTINYINT,
+    outs_played UTINYINT,
+    putouts UTINYINT,
+    assists UTINYINT,
+    errors UTINYINT,
+    double_plays UTINYINT,
+    triple_plays UTINYINT,
+    plate_appearances_in_field UTINYINT,
+    plate_appearances_in_field_with_ball_in_play UTINYINT,
+    reaching_errors UTINYINT,
+    fielders_choices UTINYINT,
+    assisted_putouts UTINYINT,
+    in_play_putouts UTINYINT,
+    in_play_assists UTINYINT,
+    balls_hit_to UTINYINT,
+    ground_ball_double_plays UTINYINT,
+    passed_balls UTINYINT,
+    stolen_bases UTINYINT,
+    caught_stealing UTINYINT,
+    surplus_box_putouts TINYINT,
+    surplus_box_assists TINYINT,
+    surplus_box_errors TINYINT,
+    unknown_putouts_while_fielding UTINYINT,
+    pickoffs UTINYINT,
+    double_plays_started UTINYINT,
+    ground_ball_double_plays_started UTINYINT
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    player_id = @doc('player_id'),
+    fielding_position = @doc('fielding_position'),
+    team_id = @doc('team_id'),
+    games_started = @doc('games_started'),
+    outs_played = @doc('outs_played'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    plate_appearances_in_field = @doc('plate_appearances_in_field'),
+    plate_appearances_in_field_with_ball_in_play = @doc('plate_appearances_in_field_with_ball_in_play'),
+    reaching_errors = @doc('reaching_errors'),
+    fielders_choices = @doc('fielders_choices'),
+    assisted_putouts = @doc('assisted_putouts'),
+    in_play_putouts = @doc('in_play_putouts'),
+    in_play_assists = @doc('in_play_assists'),
+    balls_hit_to = @doc('balls_hit_to'),
+    ground_ball_double_plays = @doc('ground_ball_double_plays'),
+    passed_balls = @doc('passed_balls'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    unknown_putouts_while_fielding = @doc('unknown_putouts_while_fielding'),
+    pickoffs = @doc('pickoffs'),
+    double_plays_started = @doc('double_plays_started'),
+    ground_ball_double_plays_started = @doc('ground_ball_double_plays_started')
+  ),
+  audits (
+    not_null_proportion(column := outs_played, threshold := 0.995),
+    not_null_proportion(column := putouts, threshold := 0.995),
+    not_null_proportion(column := assists, threshold := 0.995),
+    not_null_proportion(column := errors, threshold := 0.995),
+    not_null_proportion(column := double_plays, threshold := 0.995),
+    not_null_proportion(column := triple_plays, threshold := 0.995),
+    not_null_proportion(column := stolen_bases, threshold := 0.93),
+    not_null_proportion(column := caught_stealing, threshold := 0.93)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_player_position_game_fielding_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH box_agg AS (
     SELECT
         game_id,
@@ -16,8 +97,8 @@ WITH box_agg AS (
         CASE WHEN BOOL_OR(stats.double_plays IS NULL) THEN NULL ELSE SUM(stats.double_plays) END AS double_plays,
         CASE WHEN BOOL_OR(stats.triple_plays IS NULL) THEN NULL ELSE SUM(stats.triple_plays) END AS triple_plays,
         CASE WHEN BOOL_OR(stats.passed_balls IS NULL) THEN NULL ELSE SUM(stats.passed_balls) END AS passed_balls
-    FROM {{ ref('stg_box_score_fielding_lines') }} AS stats
-    INNER JOIN {{ ref('stg_games') }} AS games USING (game_id)
+    FROM main_models.stg_box_score_fielding_lines AS stats
+    INNER JOIN main_models.stg_games AS games USING (game_id)
     GROUP BY 1, 2, 3
 ),
 
@@ -49,7 +130,7 @@ event_agg AS (
         SUM(double_plays_started)::UTINYINT AS double_plays_started,
         SUM(ground_ball_double_plays_started)::UTINYINT AS ground_ball_double_plays_started,
         SUM(unknown_putouts_while_fielding)::UTINYINT AS unknown_putouts_while_fielding
-    FROM {{ ref('event_player_fielding_stats') }}
+    FROM main_models.event_player_fielding_stats
     GROUP BY 1, 2, 3
 ),
 
@@ -115,7 +196,7 @@ final AS (
         (box_agg.errors - event_agg.errors)::TINYINT AS surplus_box_errors,
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
-    LEFT JOIN {{ ref('player_game_appearances') }} AS appearances USING (game_id, player_id)
+    LEFT JOIN main_models.player_game_appearances AS appearances USING (game_id, player_id)
 )
 
 SELECT * FROM final

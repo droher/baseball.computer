@@ -1,8 +1,53 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.player_position_team_season_fielding_stats,
+  kind FULL,
+  grain (season, team_id, player_id, fielding_position, game_type),
+  column_descriptions (
+    season = @doc('season'),
+    team_id = @doc('team_id'),
+    player_id = @doc('player_id'),
+    fielding_position = @doc('fielding_position'),
+    game_type = @doc('game_type'),
+    fielding_position_category = @doc('fielding_position_category'),
+    games = @doc('games'),
+    games_started = @doc('games_started'),
+    outs_played = @doc('outs_played'),
+    plate_appearances_in_field = @doc('plate_appearances_in_field'),
+    plate_appearances_in_field_with_ball_in_play = @doc('plate_appearances_in_field_with_ball_in_play'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    fielders_choices = @doc('fielders_choices'),
+    reaching_errors = @doc('reaching_errors'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    ground_ball_double_plays = @doc('ground_ball_double_plays'),
+    passed_balls = @doc('passed_balls'),
+    balls_hit_to = @doc('balls_hit_to'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    games_left_field = @doc('games_left_field'),
+    games_center_field = @doc('games_center_field'),
+    games_right_field = @doc('games_right_field'),
+    unknown_putouts_while_fielding = @doc('unknown_putouts_while_fielding'),
+    assisted_putouts = @doc('assisted_putouts'),
+    in_play_putouts = @doc('in_play_putouts'),
+    in_play_assists = @doc('in_play_assists'),
+    pickoffs = @doc('pickoffs'),
+    double_plays_started = @doc('double_plays_started'),
+    ground_ball_double_plays_started = @doc('ground_ball_double_plays_started')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_player_position_team_season_fielding_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH databank AS (
     SELECT
         field.season,
@@ -33,12 +78,12 @@ WITH databank AS (
         SUM(field.passed_balls)::USMALLINT AS passed_balls,
         SUM(field.stolen_bases)::USMALLINT AS stolen_bases,
         SUM(field.caught_stealing)::USMALLINT AS caught_stealing,
-    FROM {{ ref('stg_databank_fielding') }} AS field
-    LEFT JOIN {{ ref('stg_databank_fielding_of') }} AS of_games USING (databank_player_id, season, stint)
-    INNER JOIN {{ ref('stg_people') }} AS people USING (databank_player_id)
+    FROM main_models.stg_databank_fielding AS field
+    LEFT JOIN main_models.stg_databank_fielding_of AS of_games USING (databank_player_id, season, stint)
+    INNER JOIN main_models.stg_people AS people USING (databank_player_id)
     -- We'd need to do something different for partial coverage seasons but
     -- currently box scores are all or nothing for a given year
-    WHERE field.season NOT IN (SELECT DISTINCT season FROM {{ ref('stg_games') }})
+    WHERE field.season NOT IN (SELECT DISTINCT season FROM main_models.stg_games)
     GROUP BY 1, 2, 3, 4
 ),
 
@@ -83,8 +128,8 @@ game_agg AS (
         COUNT_IF(stats.fielding_position = 7)::USMALLINT AS games_left_field,
         COUNT_IF(stats.fielding_position = 8)::USMALLINT AS games_center_field,
         COUNT_IF(stats.fielding_position = 9)::USMALLINT AS games_right_field,
-    FROM {{ ref('stg_games') }} AS games
-    INNER JOIN {{ ref('player_position_game_fielding_stats') }} AS stats USING (game_id)
+    FROM main_models.stg_games AS games
+    INNER JOIN main_models.player_position_game_fielding_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4, 5
 ),
 

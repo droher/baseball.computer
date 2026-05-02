@@ -1,14 +1,28 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.linear_weights,
+  kind FULL,
+  grain (season, league, play),
+  column_descriptions (
+    season = @doc('season'),
+    league = @doc('league')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_linear_weights.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH valid_leagues AS (
     SELECT
         season,
         league,
         AVG(runs_scored) AS average_runs_scored,
-    FROM {{ ref('team_game_results') }}
+    FROM main_models.team_game_results
     WHERE league IS NOT NULL
     GROUP BY 1, 2
 ),
@@ -21,12 +35,12 @@ union_plays AS (
             ELSE cat.result_category
         END AS play,
         'BATTING' AS play_category,
-    FROM {{ ref('stg_events') }} AS e
-    INNER JOIN {{ ref('seed_plate_appearance_result_types') }} AS cat USING (plate_appearance_result)
+    FROM main_models.stg_events AS e
+    INNER JOIN main_seeds.seed_plate_appearance_result_types AS cat USING (plate_appearance_result)
     -- Only include plays that didn't have simultaneous baserunning plays,
     -- or plays with an atypical number of outs recorded for its type (e.g. single with an out)
     WHERE e.event_key NOT IN (
-        SELECT event_key FROM {{ ref('stg_event_baserunners') }} WHERE baserunning_play_type IS NOT NULL
+        SELECT event_key FROM main_models.stg_event_baserunners WHERE baserunning_play_type IS NOT NULL
     )
     UNION ALL BY NAME
     -- Only consider baserunning plays with a single event for now.
@@ -37,10 +51,10 @@ union_plays AS (
         e.event_key,
         FIRST(CASE WHEN e.is_out THEN cat.result_category_out ELSE cat.result_category_safe END) AS play,
         FIRST('BASERUNNING') AS play_category,
-    FROM {{ ref('stg_event_baserunners') }} AS e
-    INNER JOIN {{ ref('seed_baserunning_play_types') }} AS cat USING (baserunning_play_type)
+    FROM main_models.stg_event_baserunners AS e
+    INNER JOIN main_seeds.seed_baserunning_play_types AS cat USING (baserunning_play_type)
     WHERE e.event_key NOT IN (
-            SELECT event_key FROM {{ ref('stg_events') }} WHERE plate_appearance_result IS NOT NULL
+            SELECT event_key FROM main_models.stg_events WHERE plate_appearance_result IS NOT NULL
         )
     GROUP BY 1
     HAVING COUNT(*) = 1
@@ -55,7 +69,7 @@ joined AS (
         trans.expected_runs_change,
         trans.expected_batting_win_change
     FROM union_plays
-    INNER JOIN {{ ref('event_transition_values') }} AS trans USING (event_key)
+    INNER JOIN main_models.event_transition_values AS trans USING (event_key)
 ),
 
 agg_specific AS (

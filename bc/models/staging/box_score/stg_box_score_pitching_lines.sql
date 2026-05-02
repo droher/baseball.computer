@@ -1,5 +1,46 @@
+MODEL (
+  name main_models.stg_box_score_pitching_lines,
+  kind FULL,
+  description 'Aggregate pitching data for each player in each game, derived from Retroshet box score data.',
+  column_descriptions (
+    game_id = @doc('game_id'),
+    pitcher_id = @doc('pitcher_id'),
+    side = @doc('side'),
+    nth_pitcher = 'Nth player to pitch for this team in this game. Differentiates appearances by the same player who switches between pitcher and other positions.',
+    outs_recorded = @doc('outs_recorded'),
+    no_out_batters = 'Number of batters faced by this pitcher in his final inning of work, if he did not record an out in that inning.',
+    batters_faced = @doc('batters_faced'),
+    hits = @doc('hits'),
+    doubles = @doc('doubles'),
+    triples = @doc('triples'),
+    home_runs = @doc('home_runs'),
+    runs = @doc('runs'),
+    earned_runs = @doc('earned_runs'),
+    walks = @doc('walks'),
+    intentional_walks = @doc('intentional_walks'),
+    strikeouts = @doc('strikeouts'),
+    hit_by_pitches = @doc('hit_by_pitches'),
+    wild_pitches = @doc('wild_pitches'),
+    balks = @doc('balks'),
+    sacrifice_hits = @doc('sacrifice_hits'),
+    sacrifice_flies = @doc('sacrifice_flies'),
+    singles = @doc('singles'),
+    total_bases = @doc('total_bases'),
+    on_base_opportunities = @doc('on_base_opportunities'),
+    on_base_successes = @doc('on_base_successes'),
+    games_started = @doc('games_started'),
+    games_relieved = @doc('games_relieved'),
+    games_finished = @doc('games_finished')
+  ),
+);
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('box_score', 'box_score_pitching_lines') }}
+    SELECT * FROM box_score.box_score_pitching_lines
 ),
 
 renamed AS (

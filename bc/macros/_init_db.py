@@ -1,14 +1,11 @@
 """SQLMesh ports of the three init_db jinja macros.
 
-Phase 1 replaces `bc/macros/init_db.sql`. Reasons:
+These run as `before_all` hooks. Each macro returns a list of SQL strings;
+SQLMesh executes them in order on the gateway connection.
 
-- SQLMesh's dbt-import jinja runtime does not expose `graph.sources`, so the
-  original `{% for node in graph.sources.values() %}` cannot run. We walk the
-  six `source.yml` files directly.
-- These run as `before_all` hooks. Each macro returns a list of SQL strings;
-  SQLMesh executes them in order on the gateway connection.
-- `_` prefix on the filename keeps dbt's macro loader from ever picking this
-  file up, so the legacy jinja macros stay loadable while both engines coexist.
+Source-table metadata lives in `bc/external_models.yaml` (auto-loaded by
+SQLMesh's external-model loader). `init_db` and `alter_types` walk that file
+to emit DDL.
 """
 
 from __future__ import annotations
@@ -22,72 +19,64 @@ import yaml
 from sqlmesh import macro
 from sqlmesh.core.macros import MacroEvaluator
 
-logger = logging.getLogger(__name__)
+
+def _logger() -> logging.Logger:
+    """Lazy logger factory.
+
+    A module-level `logger = logging.getLogger(__name__)` would be captured
+    as a free variable by SQLMesh's `serialize_env`, which only accepts
+    literals / modules / callables — Logger instances raise
+    "Object cannot be serialized".
+    """
+    return logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# source.yml parsing
+# external_models.yaml parsing
 
 
-_SCHEMAS: tuple[str, ...] = (
-    "event",
-    "game",
-    "box_score",
-    "misc",
-    "baseballdatabank",
-    "biodata",
-)
+def _external_models_path() -> Path:
+    """Compute the external_models.yaml path lazily.
 
-_STAGING_DIR = Path(__file__).resolve().parent.parent / "models" / "staging"
-
-
-def _source_files() -> list[Path]:
-    return [_STAGING_DIR / schema / "source.yml" for schema in _SCHEMAS]
-
-
-_source_cache: list[dict[str, Any]] | None = None
+    Module-level Path objects break SQLMesh's `make_python_env` serializer
+    (closures over Path globals can't round-trip through pydantic). Building
+    inside a function keeps Path off the module surface.
+    """
+    return Path(__file__).resolve().parent.parent / "external_models.yaml"
 
 
 def _parsed_sources() -> list[dict[str, Any]]:
-    """Flatten all six source.yml files into a list of source-table dicts.
+    """Read bc/external_models.yaml; return one entry per external model.
 
-    Returns one entry per `tables[]` element, augmented with the parent
-    `sources[].name` (= duckdb schema). Cached at module load.
+    Each entry has:
+      - schema: duckdb schema (= name.split('.')[0])
+      - name:   table name within the schema
+      - columns: dict[col_name, data_type]  (cast manifest; may be partial)
     """
-    global _source_cache
-    if _source_cache is not None:
-        return _source_cache
-
+    path = _external_models_path()
+    if not path.exists():
+        raise RuntimeError(f"external_models.yaml missing: {path}")
+    doc = yaml.safe_load(path.read_text()) or []
     out: list[dict[str, Any]] = []
-    for path in _source_files():
-        if not path.exists():
-            logger.warning("source.yml missing: %s", path)
-            continue
-        doc = yaml.safe_load(path.read_text())
-        for source in doc.get("sources", []):
-            schema = source["name"]
-            for table in source.get("tables", []):
-                out.append(
-                    {
-                        "schema": schema,
-                        "name": table["name"],
-                        "identifier": table.get("identifier", table["name"]),
-                        "meta": table.get("meta", {}) or {},
-                        "columns": table.get("columns", []) or [],
-                    }
-                )
-    _source_cache = out
+    for entry in doc:
+        fqn = entry["name"]
+        if "." not in fqn:
+            raise RuntimeError(
+                f"external model name must be schema.table, got '{fqn}'"
+            )
+        schema, name = fqn.split(".", 1)
+        out.append(
+            {
+                "schema": schema,
+                "name": name,
+                "columns": entry.get("columns") or {},
+            }
+        )
     return out
 
 
 # ---------------------------------------------------------------------------
 # Helpers
-
-
-_CSV_READ_ARGS = (
-    ", header=true, all_varchar=true, delim=',', quote='\"', escape='\"',"
-    " null_padding=true, ignore_errors=true"
-)
 
 
 def _source_roots(evaluator: MacroEvaluator) -> dict[str, str]:
@@ -105,6 +94,28 @@ def _force_reload(evaluator: MacroEvaluator) -> bool:
 
 def _cache_bust() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S")
+
+
+def _drop_type_statements() -> list[str]:
+    """DROP TYPE IF EXISTS for every project ENUM, in dependency order.
+
+    Used by `create_enums` (always — needs to drop before re-creating)
+    and by `init_db` when `force_reload=true` (must drop ENUMs before
+    `CREATE OR REPLACE TABLE` on tables whose columns reference them,
+    otherwise DuckDB rejects the replace).
+    """
+    return [
+        f"DROP TYPE IF EXISTS {t}"
+        for t in (
+            "base", "baserunner", "frame", "side", "hand",
+            "game_type", "account_type", "doubleheader_status", "time_of_day",
+            "sky", "field_condition", "precipitation", "wind_direction",
+            "plate_appearance_result", "pitch_sequence_item",
+            "park_id", "team_id", "game_id", "player_id",
+            "trajectory", "location_general", "location_depth", "location_angle",
+            "baserunning_play", "fielding_play",
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -133,12 +144,19 @@ def init_db(
     bust = _cache_bust()
 
     statements: list[str] = []
+    if force_reload:
+        # CREATE OR REPLACE TABLE fails on tables whose columns reference
+        # an ENUM; drop the ENUMs first so the cascade clears.
+        statements.extend(_drop_type_statements())
     seen_schemas: set[str] = set()
     for node in _parsed_sources():
         schema = node["schema"]
         name = node["name"]
-        identifier = node["identifier"]
-        ext = node["meta"].get("source_extension", "parquet")
+
+        if "'" in name or "'" in schema:
+            raise RuntimeError(
+                f"single-quote in source identifier breaks DDL: {schema}.{name!r}"
+            )
 
         try:
             root = roots[schema]
@@ -148,10 +166,12 @@ def init_db(
                 f"(table {name})"
             ) from e
 
+        if "'" in root:
+            raise RuntimeError(f"single-quote in source_root breaks DDL: {root!r}")
+
         is_remote = root.startswith("http")
         bust_qs = f"?v={bust}" if is_remote else ""
-        read_args = _CSV_READ_ARGS if ext == "csv" else ""
-        url = f"{root}/{identifier}.{ext}{bust_qs}"
+        url = f"{root}/{name}.parquet{bust_qs}"
 
         if schema not in seen_schemas:
             statements.append(f"CREATE SCHEMA IF NOT EXISTS {schema}")
@@ -160,10 +180,10 @@ def init_db(
         verb = "CREATE OR REPLACE TABLE" if force_reload else "CREATE TABLE IF NOT EXISTS"
         statements.append(
             f"{verb} {schema}.{name} AS ("
-            f"SELECT * FROM read_{ext}('{url}'{read_args}))"
+            f"SELECT * FROM read_parquet('{url}'))"
         )
 
-    logger.info(
+    _logger().info(
         "init_db: %d statements across %d schemas (force_reload=%s)",
         len(statements),
         len(seen_schemas),
@@ -192,22 +212,13 @@ def create_enums(evaluator: MacroEvaluator) -> list[str]:
             )
             base_exists = bool(row and row[0])
         except Exception as e:
-            logger.warning("create_enums: type-existence check failed (%s); proceeding with full DDL", e)
+            _logger().warning("create_enums: type-existence check failed (%s); proceeding with full DDL", e)
             base_exists = False
         if base_exists:
-            logger.info("create_enums: base type already exists, skipping (set force_reload=true to recreate)")
+            _logger().info("create_enums: base type already exists, skipping (set force_reload=true to recreate)")
             return []
 
-    drop_types = [
-        "base", "baserunner", "frame", "side", "hand",
-        "game_type", "account_type", "doubleheader_status", "time_of_day",
-        "sky", "field_condition", "precipitation", "wind_direction",
-        "plate_appearance_result", "pitch_sequence_item",
-        "park_id", "team_id", "game_id", "player_id",
-        "trajectory", "location_general", "location_depth", "location_angle",
-        "baserunning_play", "fielding_play",
-    ]
-    statements: list[str] = [f"DROP TYPE IF EXISTS {t}" for t in drop_types]
+    statements: list[str] = _drop_type_statements()
 
     statements.extend(
         [
@@ -257,27 +268,103 @@ def create_enums(evaluator: MacroEvaluator) -> list[str]:
         ]
     )
 
-    logger.info("create_enums: %d statements", len(statements))
+    _logger().info("create_enums: %d statements", len(statements))
     return statements
 
 
 @macro()
-def alter_types(evaluator: MacroEvaluator) -> list[str]:
-    """Cast source columns to their declared `data_type:`.
+def alter_types(evaluator: MacroEvaluator) -> list[str]:  # noqa: ARG001
+    """Cast source columns to their declared types.
 
-    Replaces `init_db.sql:146-156`. Must run after `create_enums` so that
-    references to ENUM types resolve.
+    Reads the `columns:` mapping from each external_models.yaml entry and
+    emits one ALTER per column. Must run after `create_enums` so that
+    ENUM type references resolve.
     """
     statements: list[str] = []
     for node in _parsed_sources():
         schema = node["schema"]
         name = node["name"]
-        for col in node["columns"]:
-            data_type = col.get("data_type")
-            if not data_type:
-                continue
+        for col_name, data_type in node["columns"].items():
             statements.append(
-                f'ALTER TABLE {schema}.{name} ALTER COLUMN "{col["name"]}" TYPE {data_type}'
+                f'ALTER TABLE {schema}.{name} ALTER COLUMN "{col_name}" TYPE {data_type}'
             )
-    logger.info("alter_types: %d ALTER statements", len(statements))
+    _logger().info("alter_types: %d ALTER statements", len(statements))
+    return statements
+
+
+# ---------------------------------------------------------------------------
+# Seed loader
+#
+# dbt's seed loader uses agate, which preserves literal "NA" / "NULL" / etc.
+# in CSV cells. Phase 1 patched SQLMesh's pandas-based seed loader
+# (`PatchedDbtLoader`) to mirror that behavior. Phase 1.5 drops the dbt-import
+# path entirely, so we no longer get any seed loading for free — this macro
+# replaces it.
+#
+# Strategy: emit `CREATE OR REPLACE TABLE main_seeds.<name>` DDL using DuckDB's
+# `read_csv` with `nullstr=['', ' ']` so only empty fields and the single-space
+# sentinel become NULL (matching agate). Literal "NA" survives as a string.
+# Column types come from the seed YAML's `data_type:` entries.
+
+
+def _seeds_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "seeds"
+
+
+def _parsed_seeds() -> list[dict[str, Any]]:
+    """Return one entry per seed YAML (yml + matching .csv)."""
+    out: list[dict[str, Any]] = []
+    seeds_dir = _seeds_dir()
+    for yml_path in sorted(seeds_dir.rglob("*.yml")):
+        doc = yaml.safe_load(yml_path.read_text())
+        for seed in doc.get("seeds", []) or []:
+            name = seed["name"]
+            csv_path = yml_path.with_name(f"{name}.csv")
+            if not csv_path.exists():
+                _logger().warning("seed CSV missing for %s: %s", name, csv_path)
+                continue
+            out.append(
+                {
+                    "name": name,
+                    "csv_path": str(csv_path),
+                    "columns": seed.get("columns", []) or [],
+                }
+            )
+    return out
+
+
+@macro()
+def load_seeds(evaluator: MacroEvaluator) -> list[str]:  # noqa: ARG001
+    """Load every seed CSV into `main_seeds.<name>`.
+
+    Replaces dbt's `dbt seed` step. NA-preserving via `nullstr=['', ' ']`;
+    column types come from the seed YAML.
+    """
+    statements: list[str] = ["CREATE SCHEMA IF NOT EXISTS main_seeds"]
+    for seed in _parsed_seeds():
+        name = seed["name"]
+        csv_path = seed["csv_path"]
+        if "'" in name or "'" in csv_path:
+            raise RuntimeError(
+                f"single-quote in seed identifier breaks DDL: {name!r} {csv_path!r}"
+            )
+        cols_with_type = [
+            (col["name"], col["data_type"])
+            for col in seed["columns"]
+            if col.get("data_type")
+        ]
+        if cols_with_type:
+            cols_clause = ", ".join(
+                f"'{cname}': '{ctype.upper()}'" for cname, ctype in cols_with_type
+            )
+            columns_arg = f", columns={{{cols_clause}}}"
+        else:
+            columns_arg = ""
+        statements.append(
+            f"CREATE OR REPLACE TABLE main_seeds.{name} AS "
+            f"SELECT * FROM read_csv("
+            f"'{csv_path}', header=true, nullstr=['', ' ']"
+            f"{columns_arg})"
+        )
+    _logger().info("load_seeds: %d seeds", len(statements) - 1)
     return statements

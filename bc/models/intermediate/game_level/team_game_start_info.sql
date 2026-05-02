@@ -1,3 +1,57 @@
+MODEL (
+  name main_models.team_game_start_info,
+  kind FULL,
+  description 'A version of `game_start_info` that includes one row for each team in each game.',
+  grain (game_id, team_id),
+  column_descriptions (
+    team_id = @doc('team_id'),
+    league = @doc('league'),
+    division = @doc('division'),
+    team_name = @doc('team_name'),
+    game_id = @doc('game_id'),
+    date = @doc('date'),
+    start_time = @doc('start_time'),
+    season = @doc('season'),
+    time_of_day = @doc('time_of_day'),
+    game_type = @doc('game_type'),
+    bat_first_side = @doc('bat_first_side'),
+    sky = @doc('sky'),
+    field_condition = @doc('field_condition'),
+    precipitation = @doc('precipitation'),
+    wind_direction = @doc('wind_direction'),
+    park_id = @doc('park_id'),
+    temperature_fahrenheit = @doc('temperature_fahrenheit'),
+    attendance = @doc('attendance'),
+    wind_speed_mph = @doc('wind_speed_mph'),
+    source_type = @doc('source_type'),
+    umpire_home_id = @doc('umpire_home_id'),
+    umpire_first_id = @doc('umpire_first_id'),
+    umpire_second_id = @doc('umpire_second_id'),
+    umpire_third_id = @doc('umpire_third_id'),
+    umpire_left_id = @doc('umpire_left_id'),
+    umpire_right_id = @doc('umpire_right_id'),
+    filename = @doc('filename'),
+    is_regular_season = @doc('is_regular_season'),
+    is_postseason = @doc('is_postseason'),
+    away_franchise_id = @doc('away_franchise_id'),
+    home_franchise_id = @doc('home_franchise_id'),
+    is_interleague = @doc('is_interleague'),
+    lineup_map_away = @doc('lineup_map_away'),
+    lineup_map_home = @doc('lineup_map_home'),
+    fielding_map_away = @doc('fielding_map_away'),
+    fielding_map_home = @doc('fielding_map_home')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_team_game_start_info.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH base AS (
     SELECT
         home_team_id AS team_id,
@@ -12,7 +66,7 @@ WITH base AS (
         away_starting_pitcher_id AS opponent_starting_pitcher_id,
         'Home'::SIDE AS team_side,
         *
-    FROM {{ ref('game_start_info') }}
+    FROM main_models.game_start_info
     UNION ALL BY NAME
     SELECT
         away_team_id AS team_id,
@@ -27,7 +81,7 @@ WITH base AS (
         home_starting_pitcher_id AS opponent_starting_pitcher_id,
         'Away'::SIDE AS team_side,
         *
-    FROM {{ ref('game_start_info') }}
+    FROM main_models.game_start_info
 ),
 
 add_series_start_flag AS (

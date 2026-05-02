@@ -1,8 +1,38 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_run_assignment_stats,
+  kind FULL,
+  grain (event_key, pitcher_id),
+  columns (
+    event_key UINTEGER,
+    pitcher_id VARCHAR,
+    game_id VARCHAR,
+    team_id TEAM_ID,
+    runs UTINYINT,
+    team_unearned_runs UTINYINT,
+    inherited_runners_scored UTINYINT,
+    bequeathed_runners_scored UTINYINT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    pitcher_id = @doc('pitcher_id'),
+    game_id = @doc('game_id'),
+    team_id = @doc('team_id'),
+    runs = @doc('runs'),
+    team_unearned_runs = @doc('team_unearned_runs'),
+    inherited_runners_scored = @doc('inherited_runners_scored'),
+    bequeathed_runners_scored = @doc('bequeathed_runners_scored')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_run_assignment_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH event_runs AS (
     SELECT
         run_stats.event_key,
@@ -12,9 +42,9 @@ WITH event_runs AS (
         COALESCE(run_stats.explicit_charged_pitcher_id, charged_pitcher.pitcher_id) AS charged_pitcher_id,
         run_stats.runs,
         events.team_unearned_runs
-    FROM {{ ref('event_baserunning_stats') }} AS run_stats
-    INNER JOIN {{ ref('stg_events') }} AS events USING (event_key)
-    INNER JOIN {{ ref('event_states_batter_pitcher') }} AS charged_pitcher
+    FROM main_models.event_baserunning_stats AS run_stats
+    INNER JOIN main_models.stg_events AS events USING (event_key)
+    INNER JOIN main_models.event_states_batter_pitcher AS charged_pitcher
         ON charged_pitcher.event_key = run_stats.charge_event_key
     WHERE run_stats.runs = 1
 ),

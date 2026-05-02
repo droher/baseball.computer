@@ -1,8 +1,66 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.game_start_info,
+  kind FULL,
+  description 'Key table for information about every game in the database. Only information that is known at the time of the game''s start is included. For example, the final score is not included here, but the starting lineups are. For information about the results of the game, see the `game_results` table.',
+  grain (game_id),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    date = @doc('date'),
+    start_time = @doc('start_time'),
+    season = @doc('season'),
+    home_team_id = @doc('home_team_id'),
+    away_team_id = @doc('away_team_id'),
+    time_of_day = @doc('time_of_day'),
+    game_type = @doc('game_type'),
+    bat_first_side = @doc('bat_first_side'),
+    sky = @doc('sky'),
+    field_condition = @doc('field_condition'),
+    precipitation = @doc('precipitation'),
+    wind_direction = @doc('wind_direction'),
+    park_id = @doc('park_id'),
+    temperature_fahrenheit = @doc('temperature_fahrenheit'),
+    attendance = @doc('attendance'),
+    wind_speed_mph = @doc('wind_speed_mph'),
+    source_type = @doc('source_type'),
+    umpire_home_id = @doc('umpire_home_id'),
+    umpire_first_id = @doc('umpire_first_id'),
+    umpire_second_id = @doc('umpire_second_id'),
+    umpire_third_id = @doc('umpire_third_id'),
+    umpire_left_id = @doc('umpire_left_id'),
+    umpire_right_id = @doc('umpire_right_id'),
+    filename = @doc('filename'),
+    home_starting_pitcher_id = @doc('home_starting_pitcher_id'),
+    away_starting_pitcher_id = @doc('away_starting_pitcher_id'),
+    is_regular_season = @doc('is_regular_season'),
+    is_postseason = @doc('is_postseason'),
+    is_integrated = 'Whether or not this game took place in a racially integrated league/season. This is defined as all AL/NL games from 1947 onward. Keep in mind that integration status has nuances that go well beyond the scope of this field: specifically, some teams had no Black players as late as 1958, and Black players were generally underrepresented until the early 70s, especially in the AL. See Mark Armour''s research for more detail: https://sabr.org/journal/article/the-effects-of-integration-1947-1986/',
+    is_negro_leagues = 'Whether or not this was a game with Negro League teams. This includes exhibition/all-star games that featured Black and white teams.',
+    is_segregated_white = 'Whether or not this was a non-Negro-League game before MLB was integrated in 1947.',
+    away_franchise_id = @doc('away_franchise_id'),
+    home_franchise_id = @doc('home_franchise_id'),
+    away_league = @doc('away_league'),
+    home_league = @doc('home_league'),
+    away_division = @doc('away_division'),
+    home_division = @doc('home_division'),
+    away_team_name = @doc('away_team_name'),
+    home_team_name = @doc('home_team_name'),
+    is_interleague = @doc('is_interleague'),
+    lineup_map_away = @doc('lineup_map_away'),
+    lineup_map_home = @doc('lineup_map_home'),
+    fielding_map_away = @doc('fielding_map_away'),
+    fielding_map_home = @doc('fielding_map_home')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_game_start_info.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH games AS (
     SELECT
         g.game_id,
@@ -34,7 +92,7 @@ WITH games AS (
         g.umpire_left_id,
         g.umpire_right_id,
         g.filename,
-    FROM {{ ref('stg_games') }} AS g
+    FROM main_models.stg_games AS g
 ),
 
 add_gamelog AS (
@@ -67,7 +125,7 @@ add_gamelog AS (
         'Unknown'::FIELD_CONDITION AS field_condition,
         'Unknown'::PRECIPITATION AS precipitation,
         'Unknown'::WIND_DIRECTION AS wind_direction,
-    FROM {{ ref('stg_gamelog') }}
+    FROM main_models.stg_gamelog
     WHERE game_id NOT IN (SELECT game_id FROM games)
 ),
 
@@ -103,19 +161,19 @@ add_rest AS (
     FROM add_gamelog
     -- It's an extra join, but we need to join after denormalizing
     -- in order to get the gamelog-only games
-    LEFT JOIN {{ ref('seed_franchises') }} AS franchise_a
+    LEFT JOIN main_seeds.seed_franchises AS franchise_a
         ON add_gamelog.away_team_id = franchise_a.team_id
             AND add_gamelog.date BETWEEN
             franchise_a.date_start AND COALESCE(franchise_a.date_end, '9999-12-31')
-    LEFT JOIN {{ ref('seed_franchises') }} AS franchise_h
+    LEFT JOIN main_seeds.seed_franchises AS franchise_h
         ON add_gamelog.home_team_id = franchise_h.team_id
             AND add_gamelog.date BETWEEN
             franchise_h.date_start AND COALESCE(franchise_h.date_end, '9999-12-31')
-    LEFT JOIN {{ ref('game_starting_lineups') }} AS lineups USING (game_id)
-    LEFT JOIN {{ ref('seed_game_types') }} AS game_types USING (game_type)
+    LEFT JOIN main_models.game_starting_lineups AS lineups USING (game_id)
+    LEFT JOIN main_seeds.seed_game_types AS game_types USING (game_type)
     -- Some parks are missing from early box files, so we supplement with the gamelog
     -- Otherwise, gamelog games are mutually exclusive with box/event games in this data
-    LEFT JOIN {{ ref('stg_gamelog') }} AS missing_parks USING (game_id)
+    LEFT JOIN main_models.stg_gamelog AS missing_parks USING (game_id)
 )
 
 SELECT * FROM add_rest
