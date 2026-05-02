@@ -170,22 +170,12 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH event_agg AS (
     SELECT
         game_id,
         player_id,
         MIN(team_id) AS team_id,
-        {% for stat in event_level_pitching_stats() -%}
-            {% if stat.count("bases_advanced") > 0 %}
-                {% set dtype = "INT2" %}
-            {% elif stat.startswith("pitches") %}
-                {% set dtype = "USMALLINT" %}
-            {% else %}
-                {% set dtype = "UTINYINT" %}
-            {% endif %}
-            SUM({{ stat }})::{{ dtype }} AS {{ stat }},
-        {% endfor %}
+        @player_pitching_sum_block()
     FROM main_models.event_pitching_stats
     GROUP BY 1, 2
 ),
@@ -316,4 +306,3 @@ final AS (
 )
 
 SELECT * FROM final
-JINJA_END;

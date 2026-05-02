@@ -64,7 +64,6 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH source AS (
     SELECT * FROM event.event_baserunners
 ),
@@ -88,8 +87,8 @@ renamed AS (
         explicit_out_flag,
         run_scored_flag,
         rbi_flag,
-        {{ event_id_to_key("reached_on_event_id", "event_key") }} AS reached_on_event_key,
-        {{ event_id_to_key("charge_event_id", "event_key") }} AS charge_event_key,
+        @event_id_to_key(reached_on_event_id, event_key) AS reached_on_event_key,
+        @event_id_to_key(charge_event_id, event_key) AS charge_event_key,
         -- Bitwise agg of this gives us the full base_state
         CASE baserunner
             WHEN 'First' THEN 1
@@ -102,4 +101,3 @@ renamed AS (
 )
 
 SELECT * FROM renamed
-JINJA_END;

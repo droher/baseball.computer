@@ -326,15 +326,11 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH initial_sum AS (
     SELECT
         game_id,
         team_id,
-        {% for stat in event_level_pitching_stats() + game_level_pitching_stats() -%}
-            {% set dtype = "INT1" if stat.startswith("surplus") else "USMALLINT" %}
-            SUM({{ stat }})::{{ dtype }} AS {{ stat }},
-        {% endfor %}
+        @pitching_combined_sum_usmallint()
     FROM main_models.player_game_pitching_stats
     GROUP BY 1, 2
 ),
@@ -358,4 +354,3 @@ final AS (
 )
 
 SELECT * FROM final
-JINJA_END;

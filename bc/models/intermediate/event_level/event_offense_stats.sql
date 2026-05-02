@@ -154,7 +154,6 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH batter_baserunning AS (
     SELECT *
     FROM main_models.event_baserunning_stats
@@ -191,11 +190,8 @@ final AS (
         COALESCE(team_id, batting_team_id)::TEAM_ID AS team_id,
         COALESCE(player_id, runner_id)::PLAYER_ID AS player_id,
         baserunner,
-        {% for stat in event_level_offense_stats() -%}
-            COALESCE({{ stat }}, 0)::INT1 AS {{ stat }},
-        {% endfor %}
+        @EACH(@event_level_offense_stats(), stat -> COALESCE(@stat, 0)::INT1 AS @stat)
     FROM unioned
 )
 
 SELECT * FROM final
-JINJA_END;

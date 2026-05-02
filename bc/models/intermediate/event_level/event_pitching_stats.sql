@@ -149,26 +149,6 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
-{# Phase 1.5: dbt_utils.get_filtered_columns_in_relation is unavailable
-   under SqlMeshLoader. Hardcoded list kept in lockstep with
-   event_baserunning_stats.sql output cols × event_level_pitching_stats(). #}
-{% set baserunning_stats_cols = [
-    "runs", "outs_on_basepaths", "times_reached_base",
-    "stolen_base_opportunities", "stolen_base_opportunities_second",
-    "stolen_base_opportunities_third", "stolen_base_opportunities_home",
-    "stolen_bases", "stolen_bases_second", "stolen_bases_third", "stolen_bases_home",
-    "caught_stealing", "caught_stealing_second", "caught_stealing_third", "caught_stealing_home",
-    "picked_off", "picked_off_first", "picked_off_second", "picked_off_third",
-    "picked_off_caught_stealing",
-    "advances_on_wild_pitches", "advances_on_passed_balls", "advances_on_balks",
-    "advances_on_unspecified_plays", "advances_on_defensive_indifference", "advances_on_errors",
-    "extra_base_advance_attempts", "bases_advanced", "bases_advanced_on_balls_in_play",
-    "surplus_bases_advanced_on_balls_in_play", "outs_on_extra_base_advance_attempts",
-    "outs_avoided_on_errors", "unforced_outs_on_basepaths",
-    "extra_base_chances", "extra_bases_taken",
-    "times_lead_runner", "times_force_on_runner", "times_next_base_empty"
-] %}
 WITH baserunning_agg AS (
     -- Runs are populated separately to charge to the right pitcher
     SELECT
@@ -176,9 +156,7 @@ WITH baserunning_agg AS (
         MIN(game_id) AS game_id,
         MIN(current_pitcher_id) AS player_id,
         MIN(fielding_team_id) AS team_id,
-        {% for col in baserunning_stats_cols if col in event_level_pitching_stats() -%}
-            SUM({{ col }})::TINYINT AS {{ col }},
-        {% endfor %}
+        @EACH(@pitching_baserunning_cols(), col -> SUM(@col)::TINYINT AS @col)
     FROM main_models.event_baserunning_stats
     GROUP BY 1
 ),
@@ -241,11 +219,8 @@ final AS (
         event_key,
         team_id,
         player_id,
-        {% for stat in event_level_pitching_stats() -%}
-            COALESCE({{ stat }}, 0)::INT1 AS {{ stat }},
-        {% endfor %}
+        @EACH(@event_level_pitching_stats(), stat -> COALESCE(@stat, 0)::INT1 AS @stat)
     FROM unioned
 )
 
 SELECT * FROM final
-JINJA_END;

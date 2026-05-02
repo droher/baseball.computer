@@ -13,6 +13,7 @@ dependencies = [
     "statsmodels>=0.14.1",
     "recordlinkage>=0.16.0",
     "pyyaml>=6.0",
+    "sqlmesh[lsp,ui,web]>=0.228.5",
 ]
 
 [dependency-groups]

@@ -172,7 +172,6 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH databank AS (
     SELECT
         pitch.season,
@@ -217,9 +216,7 @@ retrosheet AS (
         stats.player_id,
         games.game_type,
         COUNT(*)::INT AS games,
-        {% for stat in event_level_pitching_stats() + game_level_pitching_stats() -%}
-            SUM({{ stat }})::INT AS {{ stat }},
-        {% endfor %}
+        @EACH(@combined_pitching_stats(), s -> SUM(@s)::INT AS @s)
     FROM main_models.stg_games AS games
     INNER JOIN main_models.player_game_pitching_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
@@ -235,4 +232,3 @@ reround_ip AS (
 SELECT * FROM reround_ip
 UNION ALL BY NAME
 SELECT * FROM databank
-JINJA_END;

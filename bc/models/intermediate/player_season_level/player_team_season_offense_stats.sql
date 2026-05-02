@@ -153,7 +153,6 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH databank AS (
     SELECT
         bat.season,
@@ -209,9 +208,7 @@ retrosheet AS (
         stats.player_id,
         games.game_type,
         COUNT(*)::SMALLINT AS games,
-        {% for stat in event_level_offense_stats() -%}
-            SUM({{ stat }})::SMALLINT AS {{ stat }},
-        {% endfor %}
+        @EACH(@event_level_offense_stats(), s -> SUM(@s)::SMALLINT AS @s)
     FROM main_models.stg_games AS games
     INNER JOIN main_models.player_game_offense_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4
@@ -240,4 +237,3 @@ final AS (
 )
 
 SELECT * FROM final
-JINJA_END;

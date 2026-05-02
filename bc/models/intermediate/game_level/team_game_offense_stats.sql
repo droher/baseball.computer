@@ -287,22 +287,18 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH initial_sum AS (
     SELECT
         game_id,
         team_id,
-        {% for stat in event_level_offense_stats() -%}
-            {% set dtype = "INT1" if stat.startswith("surplus") else "USMALLINT" %}
-            SUM({{ stat }})::{{ dtype }} AS {{ stat }},
-        {% endfor %}
+        @offense_sum_usmallint()
     FROM main_models.player_game_offense_stats
     GROUP BY 1, 2
 ),
 
 -- A few definitions change when aggregated at the team level
 final AS (
-    SELECT 
+    SELECT
         * REPLACE (
             left_on_base_with_two_outs AS left_on_base,
     )
@@ -310,4 +306,3 @@ final AS (
 )
 
 SELECT * FROM final
-JINJA_END;

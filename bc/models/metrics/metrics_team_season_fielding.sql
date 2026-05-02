@@ -72,6 +72,4 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
-{{ metric_table_body("fielding", ["team_id", "season"], fielding_int_cols(), metric_game_cols()) }}
-JINJA_END;
+@metric_table_body('fielding', 'team_id', 'season')

@@ -151,7 +151,6 @@ MODEL (
 
 
 
-JINJA_QUERY_BEGIN;
 WITH box_score AS (
     SELECT
         CASE WHEN bat.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS team_id,
@@ -168,10 +167,7 @@ final AS (
         game_id,
         team_id,
         player_id,
-        {% for stat in event_level_offense_stats() -%}
-            {% set dtype = "INT1" if stat.startswith("surplus") else "UTINYINT" %}
-            SUM({{ stat }})::{{ dtype }} AS {{ stat }},
-        {% endfor %}
+        @offense_sum_utinyint()
     FROM main_models.event_offense_stats
     GROUP BY 1, 2, 3
     UNION ALL BY NAME
@@ -210,4 +206,3 @@ final AS (
 )
 
 SELECT * FROM final
-JINJA_END;
