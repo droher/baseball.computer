@@ -35,3 +35,10 @@ State lives in `bc/bc_state.db` (auto-created, separate from `bc.db`).
 - `notes/phase-1-plan.md` — Phase 1 (dbt → SQLMesh dbt-import) status
 - `notes/phase-1-followups.md` — open items + Phase 1.5 deferred work
 - `notes/migration-evaluation.md` — multi-phase migration plan
+
+## Agent skills
+
+`.claude/skills/sqlmesh/` ships a project-agnostic SQLMesh reference
+skill (model authoring, plan/apply workflow, audits, CLI, dbt migration).
+Loaded automatically when working on SQLMesh code, or invoked
+explicitly with `/sqlmesh`.
