@@ -22,6 +22,12 @@ MODEL (
     games_started = @doc('games_started'),
     lineup_position = @doc('lineup_position')
   ),
+  audits (
+    not_null(columns := (game_id, player_id)),
+    unique_grain(columns := (game_id, player_id)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := player_id, to_model := main_models.people, to_column := player_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_game_appearances.parquet'
   ),

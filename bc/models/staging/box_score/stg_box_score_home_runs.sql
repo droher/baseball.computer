@@ -9,6 +9,11 @@ MODEL (
     pitcher_id = @doc('pitcher_id'),
     inning = @doc('inning')
   ),
+  audits (
+    relationships(column := batter_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := pitcher_id, to_model := main_models.people, to_column := player_id)
+  ),
 );
 
 

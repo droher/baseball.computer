@@ -86,6 +86,11 @@ MODEL (
     batted_balls_pulled = @doc('batted_balls_pulled'),
     batted_balls_opposite_field = @doc('batted_balls_opposite_field')
   ),
+  audits (
+    not_null(columns := (event_key)),
+    unique_values(columns := (event_key)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_batted_ball_stats.parquet'
   ),

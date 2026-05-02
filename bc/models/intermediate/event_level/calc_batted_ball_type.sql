@@ -36,7 +36,11 @@ MODEL (
     location_edge = 'The edge of the area that the batted ball was hit to, relative to `location_side`. This is currently not deduced and only appears on rows with recorded locations.'
   ),
   audits (
-    accepted_values(column := location_edge, is_in := ('Left', 'Middle', 'Right', 'All', 'Unknown'))
+    not_null(columns := (event_key)),
+    unique_values(columns := (event_key)),
+    accepted_values(column := location_edge, is_in := ('Left', 'Middle', 'Right', 'All', 'Unknown')),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_calc_batted_ball_type.parquet'

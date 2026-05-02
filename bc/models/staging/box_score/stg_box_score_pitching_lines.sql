@@ -32,6 +32,10 @@ MODEL (
     games_relieved = @doc('games_relieved'),
     games_finished = @doc('games_finished')
   ),
+  audits (
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := pitcher_id, to_model := main_models.people, to_column := player_id)
+  ),
 );
 
 

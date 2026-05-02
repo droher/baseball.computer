@@ -27,6 +27,10 @@ MODEL (
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_people.parquet'
   ),
+  audits (
+    unique_values(columns := (person_id)),
+    not_null(columns := (person_id))
+  ),
 );
 
 
@@ -86,7 +90,7 @@ joined AS (
 
 final AS (
     SELECT
-        CASE WHEN person_id SIMILAR TO '[a-z]{5}[01][0-9]{2}' THEN person_id ELSE NULL END AS player_id,
+        CASE WHEN person_id SIMILAR TO '[a-z\-]{5}[01][0-9]{2}' THEN person_id ELSE NULL END AS player_id,
         *
     FROM joined
 )

@@ -16,6 +16,11 @@ MODEL (
     game_id = @doc('game_id'),
     event_key_at_suspension = 'Null for box-score-only suspensions where no event-level row exists.'
   ),
+  audits (
+    not_null(columns := (game_id)),
+    unique_values(columns := (game_id)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_game_suspensions.parquet'
   ),

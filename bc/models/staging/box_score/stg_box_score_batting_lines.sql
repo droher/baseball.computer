@@ -63,6 +63,12 @@ MODEL (
     on_base_successes = @doc('on_base_successes'),
     batting_outs = @doc('batting_outs')
   ),
+  audits (
+    not_null(columns := (game_id, side, batter_id, lineup_position, nth_player_at_position)),
+    unique_grain(columns := (game_id, side, batter_id, lineup_position, nth_player_at_position)),
+    relationships(column := batter_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_box_score_batting_lines.parquet'
   ),

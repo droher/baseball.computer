@@ -61,6 +61,14 @@ MODEL (
     double_plays_started = @doc('double_plays_started'),
     ground_ball_double_plays_started = @doc('ground_ball_double_plays_started')
   ),
+  audits (
+    not_null(columns := (event_key, fielding_position)),
+    unique_grain(columns := (event_key, fielding_position)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := player_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_player_fielding_stats.parquet'
   ),

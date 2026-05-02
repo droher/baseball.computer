@@ -16,6 +16,11 @@ MODEL (
     lineup_map_home = @doc('lineup_map_home'),
     fielding_map_home = @doc('fielding_map_home')
   ),
+  audits (
+    not_null(columns := (game_id)),
+    unique_values(columns := (game_id)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_game_starting_lineups.parquet'
   ),

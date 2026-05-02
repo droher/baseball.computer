@@ -161,6 +161,13 @@ MODEL (
     extra_bases_taken = @doc('extra_bases_taken'),
     plate_appearances = @doc('plate_appearances')
   ),
+  audits (
+    not_null(columns := (season, team_id, player_id, game_type)),
+    unique_grain(columns := (season, team_id, player_id, game_type)),
+    valid_baseball_season(column := season),
+    relationships(column := player_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_team_season_pitching_stats.parquet'
   ),
@@ -203,9 +210,6 @@ WITH databank AS (
         SUM(pitch.grounded_into_double_plays)::INT AS grounded_into_double_plays,
     FROM main_models.stg_databank_pitching AS pitch
     INNER JOIN main_models.stg_people AS people USING (databank_player_id)
-    -- We'd need to do something different for partial coverage seasons but
-    -- currently box scores are all or nothing for a given year
-    WHERE pitch.season NOT IN (SELECT DISTINCT season FROM main_models.stg_games)
     GROUP BY 1, 2, 3
 ),
 
@@ -222,13 +226,50 @@ retrosheet AS (
     GROUP BY 1, 2, 3, 4
 ),
 
-reround_ip AS (
-    SELECT * REPLACE (
-        ROUND(outs_recorded / 3, 2) AS innings_pitched
-    )
-    FROM retrosheet
+retrosheet_seasons AS (
+    SELECT DISTINCT season FROM main_models.stg_games
+),
+
+databank_only AS (
+    SELECT
+        databank.*,
+        ROUND(databank.outs_recorded / 3, 2) AS innings_pitched
+    FROM databank
+    LEFT JOIN retrosheet_seasons USING (season)
+    WHERE retrosheet_seasons.season IS NULL
+),
+
+retrosheet_supplemented AS (
+    SELECT
+        r.* REPLACE (
+            COALESCE(r.batters_faced, d.batters_faced) AS batters_faced,
+            COALESCE(r.earned_runs, d.earned_runs) AS earned_runs,
+            COALESCE(r.walks, d.walks) AS walks,
+            COALESCE(r.strikeouts, d.strikeouts) AS strikeouts,
+            COALESCE(r.home_runs, d.home_runs) AS home_runs,
+            COALESCE(r.wild_pitches, d.wild_pitches) AS wild_pitches,
+            COALESCE(r.hit_by_pitches, d.hit_by_pitches) AS hit_by_pitches,
+            COALESCE(r.balks, d.balks) AS balks,
+            COALESCE(r.intentional_walks, d.intentional_walks) AS intentional_walks,
+            COALESCE(r.sacrifice_hits, d.sacrifice_hits) AS sacrifice_hits,
+            COALESCE(r.sacrifice_flies, d.sacrifice_flies) AS sacrifice_flies,
+            COALESCE(r.grounded_into_double_plays, d.grounded_into_double_plays) AS grounded_into_double_plays,
+            COALESCE(r.outs_recorded, d.outs_recorded) AS outs_recorded,
+            COALESCE(r.hits, d.hits) AS hits,
+            COALESCE(r.runs, d.runs) AS runs,
+            ROUND(COALESCE(r.outs_recorded, d.outs_recorded) / 3, 2) AS innings_pitched
+        )
+    FROM retrosheet AS r
+    LEFT JOIN databank AS d
+        ON r.season = d.season
+            AND r.team_id = d.team_id
+            AND r.player_id = d.player_id
+            -- Lahman is regular-season only; suppress the join (and thus the
+            -- COALESCE supplement) for postseason / exhibition retrosheet rows
+            -- so they keep their own values intact.
+            AND r.game_type = 'RegularSeason'
 )
 
-SELECT * FROM reround_ip
+SELECT * FROM retrosheet_supplemented
 UNION ALL BY NAME
-SELECT * FROM databank
+SELECT * FROM databank_only

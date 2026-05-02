@@ -14,6 +14,13 @@ MODEL (
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_game_results.parquet'
   ),
+  audits (
+    unique_values(columns := (game_id)),
+    not_null(columns := (game_id, season)),
+    valid_baseball_season(column := season),
+    relationships(column := away_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    relationships(column := home_team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
 );
 
 

@@ -15,6 +15,11 @@ MODEL (
     is_triple_play = 'Whether the event is a triple play.',
     is_ground_ball_double_play = 'Whether the event is a ground ball double play.'
   ),
+  audits (
+    not_null(columns := (event_key)),
+    unique_values(columns := (event_key)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_double_plays.parquet'
   ),

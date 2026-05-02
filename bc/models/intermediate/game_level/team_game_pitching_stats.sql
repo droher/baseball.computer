@@ -318,6 +318,12 @@ MODEL (
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_team_game_pitching_stats.parquet'
   ),
+  audits (
+    not_null(columns := (game_id, team_id)),
+    unique_grain(columns := (game_id, team_id)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
 );
 
 

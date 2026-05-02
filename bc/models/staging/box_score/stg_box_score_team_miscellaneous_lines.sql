@@ -16,6 +16,11 @@ MODEL (
     side = @doc('side'),
     left_on_base = @doc('left_on_base')
   ),
+  audits (
+    not_null(columns := (game_id, side)),
+    unique_grain(columns := (game_id, side)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_box_score_team_miscellaneous_lines.parquet'
   ),

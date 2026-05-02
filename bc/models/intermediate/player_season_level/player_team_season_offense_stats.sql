@@ -142,6 +142,13 @@ MODEL (
     extra_base_chances = @doc('extra_base_chances'),
     extra_bases_taken = @doc('extra_bases_taken')
   ),
+  audits (
+    not_null(columns := (season, team_id, player_id, game_type)),
+    unique_grain(columns := (season, team_id, player_id, game_type)),
+    valid_baseball_season(column := season),
+    relationships(column := player_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_team_season_offense_stats.parquet'
   ),

@@ -14,6 +14,11 @@ MODEL (
     winning_side = 'Home or Away if a winner was declared, Tie if not.',
     price_of_beer_dollars = 'What could go wrong?'
   ),
+  audits (
+    not_null(columns := (game_id)),
+    unique_values(columns := (game_id)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_game_forfeits.parquet'
   ),

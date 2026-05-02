@@ -54,6 +54,11 @@ MODEL (
     wild_pitches = @doc('wild_pitches'),
     balks = @doc('balks')
   ),
+  audits (
+    not_null(columns := (event_key)),
+    unique_values(columns := (event_key)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_pitch_sequence_stats.parquet'
   ),

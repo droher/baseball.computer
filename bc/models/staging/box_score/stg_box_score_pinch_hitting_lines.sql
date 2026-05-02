@@ -23,6 +23,12 @@ MODEL (
     caught_stealing = @doc('caught_stealing'),
     grounded_into_double_plays = @doc('grounded_into_double_plays')
   ),
+  audits (
+    not_null(columns := (game_id, pinch_hitter_id, inning)),
+    unique_grain(columns := (game_id, pinch_hitter_id, inning)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := pinch_hitter_id, to_model := main_models.people, to_column := player_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_box_score_pinch_hitting_lines.parquet'
   ),

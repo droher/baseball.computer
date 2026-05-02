@@ -31,6 +31,12 @@ MODEL (
     unknown_putouts = @doc('unknown_putouts'),
     incomplete_events = @doc('incomplete_events')
   ),
+  audits (
+    not_null(columns := (event_key, fielding_position)),
+    unique_grain(columns := (event_key, fielding_position)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_calc_fielding_play_agg.parquet'
   ),

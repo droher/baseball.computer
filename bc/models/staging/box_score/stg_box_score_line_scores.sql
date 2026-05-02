@@ -15,6 +15,11 @@ MODEL (
     inning = @doc('inning'),
     runs = @doc('runs')
   ),
+  audits (
+    not_null(columns := (game_id, batting_side, inning)),
+    unique_grain(columns := (game_id, batting_side, inning)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_box_score_line_scores.parquet'
   ),

@@ -79,6 +79,16 @@ MODEL (
     left_on_base = @doc('left_on_base'),
     left_on_base_with_two_outs = @doc('left_on_base_with_two_outs')
   ),
+  audits (
+    not_null(columns := (event_key)),
+    unique_values(columns := (event_key)),
+    relationships(column := batter_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := batting_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := fielding_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := pitcher_id, to_model := main_models.people, to_column := player_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_batting_stats.parquet'
   ),

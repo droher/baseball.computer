@@ -25,6 +25,11 @@ MODEL (
     triple_plays = @doc('triple_plays'),
     passed_balls = @doc('passed_balls')
   ),
+  audits (
+    not_null(columns := (game_id, side)),
+    unique_grain(columns := (game_id, side)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_box_score_team_fielding_lines.parquet'
   ),

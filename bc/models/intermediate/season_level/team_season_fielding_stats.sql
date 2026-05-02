@@ -23,6 +23,12 @@ MODEL (
     triple_plays = @doc('triple_plays'),
     ground_ball_double_plays = @doc('ground_ball_double_plays')
   ),
+  audits (
+    not_null(columns := (season, team_id, game_type)),
+    unique_grain(columns := (season, team_id, game_type)),
+    valid_baseball_season(column := season),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_team_season_fielding_stats.parquet'
   ),

@@ -29,6 +29,10 @@ MODEL (
     triple_plays = @doc('triple_plays'),
     passed_balls = @doc('passed_balls')
   ),
+  audits (
+    relationships(column := fielder_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
 );
 
 

@@ -143,6 +143,14 @@ MODEL (
     extra_base_chances = @doc('extra_base_chances'),
     extra_bases_taken = @doc('extra_bases_taken')
   ),
+  audits (
+    not_null(columns := (event_key, baserunner)),
+    unique_grain(columns := (event_key, baserunner)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := player_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_offense_stats.parquet'
   ),

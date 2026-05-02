@@ -13,6 +13,7 @@ from sqlmesh.core.config import (
     Config,
     DuckDBConnectionConfig,
     GatewayConfig,
+    LinterConfig,
     ModelDefaultsConfig,
     PlanConfig,
 )
@@ -76,4 +77,8 @@ config = Config(
         "models/**/*.yml",
         "seeds/**/*.yml",
     ],
+    linter=LinterConfig(
+        enabled=True,
+        warn_rules={"nomissingaudits"},
+    ),
 )

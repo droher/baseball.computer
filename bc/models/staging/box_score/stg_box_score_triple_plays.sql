@@ -10,6 +10,9 @@ MODEL (
   column_descriptions (
     game_id = @doc('game_id')
   ),
+  audits (
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
 );
 
 

@@ -64,10 +64,10 @@ def batter_pitcher_park_factor(
         (
             f"SUM(this_{s}_rate * sample_weight) / SUM(sample_weight) AS avg_this_{s}_rate,\n{indent}"
             f"SUM(other_{s}_rate * sample_weight) / SUM(sample_weight) AS avg_other_{s}_rate,\n{indent}"
-            f"avg_this_{s}_rate / (1 - avg_this_{s}_rate) AS this_{s}_odds,\n{indent}"
-            f"avg_other_{s}_rate / (1 - avg_other_{s}_rate) AS other_{s}_odds,\n{indent}"
-            f"this_{s}_odds / other_{s}_odds AS {s}_odds_park_factor,\n{indent}"
-            f"avg_this_{s}_rate / avg_other_{s}_rate AS {s}_rate_park_factor"
+            f"avg_this_{s}_rate / NULLIF(1 - avg_this_{s}_rate, 0) AS this_{s}_odds,\n{indent}"
+            f"avg_other_{s}_rate / NULLIF(1 - avg_other_{s}_rate, 0) AS other_{s}_odds,\n{indent}"
+            f"this_{s}_odds / NULLIF(other_{s}_odds, 0) AS {s}_odds_park_factor,\n{indent}"
+            f"avg_this_{s}_rate / NULLIF(avg_other_{s}_rate, 0) AS {s}_rate_park_factor"
         )
         for s in rate_stats
     )
@@ -113,6 +113,7 @@ def batter_pitcher_park_factor(
             AND NOT states.is_interleague
             {hand_filter}
         GROUP BY 1, 2, 3, 4, 5
+        HAVING SUM(lines.{denominator_stat}) > 0
     ),
 
     multi_year_range AS MATERIALIZED (

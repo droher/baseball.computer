@@ -46,3 +46,7 @@ conflicts = [
         { group = "spikes-bsl" },
     ],
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["bc/tests"]
+pythonpath = ["bc"]

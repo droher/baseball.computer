@@ -131,3 +131,70 @@ refactor will:
   metrics.
 
 Until then, Phase 2 produces row-equivalent output through inlining.
+
+## Audit sweep (sqlmesh-audit-sweep-event-level)
+
+Branch `sqlmesh-audit-sweep-event-level` carried out three coordinated
+pieces of work on top of the leverage cleanup:
+
+1. **Audit coverage broadened**. 46 model files gained explicit `audits`
+   blocks (event_level, season+game_level, box_score staging). Custom
+   audit `bc/audits/unique_grain.sql` introduced — composite-key uniqueness
+   (the built-in `unique_values((a, b))` checks each column individually,
+   not the tuple). 27 existing usages of `unique_values((a, b))` migrated.
+2. **Audit infra bugs fixed**:
+   - `unique_values` per-column footgun (above).
+   - `valid_baseball_season(birth_year)` removed from `people.sql` —
+     1803 false positives on pre-1871 birth years (Cap Anson born 1832).
+3. **Real data integrity findings (A–E) addressed**:
+   - **A**: `seed_franchises.csv` got 5 rows for ATH (Sacramento 2025),
+     BFA, CUS, HOE, LCB (Negro Leagues). OAK row's `date_end` set to
+     `2024-09-26`.
+   - **B**: `bc/models/intermediate/bio/people.sql:93` regex changed from
+     `[a-z]{5}[01][0-9]{2}` to `[a-z\-]{5}[01][0-9]{2}` to accept the
+     dashed retrosheet ID format used for ≤4-letter surnames
+     (`lee-b104`, `puk-a001`, `lo--c001`). Was zeroing out
+     `player_id` on 2602 people rows.
+   - **C**: `player_team_season_pitching_stats.sql` Lahman supplement
+     restructure. Was wholesale-replacing only seasons absent from
+     `stg_games`; now FULL JOINs Lahman per `(season, team_id, player_id)`
+     and COALESCEs 15 supplement-eligible stats per row. Fixes 1872 + 1874
+     `batters_faced` NULLs (box source had all-NULL bfp; Lahman has the
+     value). Same pattern not yet applied to
+     `player_team_season_offense_stats` — known follow-up below.
+   - **D**: `bc/python_models/park_factors/builder.py` got
+     `HAVING SUM({denominator_stat}) > 0` on `lines_agg` to drop
+     batter-pitcher pairs with 0 in the denominator (NaN source for
+     `outs` variant — 2593 row failures gone). All `(1 - rate)` and
+     ratio denominators in the odds calc wrapped with `NULLIF`.
+   - **E**: `registration.py` got a `bounded_max` parameter
+     (default `10.0`); the `hit_location` and `out_location` variants set
+     `bounded_max=20.0` to accommodate genuine Negro League NN1/NN2
+     small-sample park-factor outliers (sqrt_sample_size ~506; rates
+     genuinely hit 1.0 for spatial-distribution stats).
+
+### New open follow-ups
+
+- **Partial-coverage SUMs**. The Lahman supplement only catches
+  *all-NULL* upstream cases. For partial-coverage years (1901-07 BFP
+  ~15-25% NULL rows in `stg_box_score_pitching_lines`, 1903-09 ER
+  ~50-100% NULL), `SUM(stat)` produces a biased-low partial total
+  (NULLs treated as 0) that is non-NULL, so COALESCE doesn't fire.
+  Fix needs `IF(BOOL_OR(col IS NULL), NULL, SUM(col))` at both
+  `box_agg` (in `player_game_pitching_stats.sql`) and the
+  per-season SUM in `player_team_season_pitching_stats.sql` (the
+  `@EACH(@combined_pitching_stats(), s -> SUM(@s)::INT AS @s)` macro
+  expansion). Probably wants a `@nullable_sum` helper macro since
+  the same pattern would apply to batting/fielding.
+- **Apply Lahman supplement to batting**.
+  `player_team_season_offense_stats.sql` likely has the same shape
+  bug for early-NA SO/CS/SH (and the post-1920s SH/SF era when
+  SF wasn't separated). Audits don't fail today (PA is non-null
+  everywhere), but the latent NULLs propagate to downstream metrics.
+  Mirror the pitching restructure.
+- **Park-factor priors for sparse leagues**. Even with `bounded_max=20`,
+  the 6 residual NN1/NN2 spatial-distribution outliers represent real
+  data but extreme park factors. Could bump `prior_sample_size` per-league
+  (e.g. 5000 for NN1/NN2 vs 1000 default) to dampen further if downstream
+  use cases need it.
+

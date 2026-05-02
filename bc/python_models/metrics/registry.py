@@ -37,6 +37,7 @@ class Metric(BaseModel):
     name: str
     kind: MetricKind
     source: MetricSource
+    dtype: str = "DOUBLE"
     formula: Callable[[TableExpr], IbisExpr] | None = None
     numerator: Callable[[TableExpr], IbisExpr] | None = None
     denominator: Callable[[TableExpr], IbisExpr] | None = None

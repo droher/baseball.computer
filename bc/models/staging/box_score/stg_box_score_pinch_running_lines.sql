@@ -19,6 +19,10 @@ MODEL (
     stolen_bases = @doc('stolen_bases'),
     caught_stealing = @doc('caught_stealing')
   ),
+  audits (
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := pinch_runner_id, to_model := main_models.people, to_column := player_id)
+  ),
 );
 
 
