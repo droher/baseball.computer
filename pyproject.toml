@@ -23,16 +23,15 @@ dev = [
     "boto3>=1.34.45",
     "ruamel.yaml>=0.18.5",
 ]
-# Phase 1.5: SQLMesh is the build engine. Group is kept under the legacy
-# `spikes-sqlmesh` name so existing `uv run --group spikes-sqlmesh ...`
-# invocations in CLAUDE.md and other docs keep working. Phase 2 will
-# rename to `migration`. boring-semantic-layer (in `spikes-bsl`) pins an
-# incompatible sqlglot, so the two groups are mutually exclusive.
-spikes-sqlmesh = [
+# Phase 2: SQLMesh + Ibis is the build engine. boring-semantic-layer (in
+# `spikes-bsl`) pins an incompatible sqlglot, so the two groups are
+# mutually exclusive.
+migration = [
     "sqlmesh>=0.234",
     "ibis-framework[duckdb]>=12.0",
     "polars>=1.31",
     "numba>=0.59",
+    "pydantic>=2.7",
 ]
 spikes-bsl = [
     "boring-semantic-layer>=0.3.12",
@@ -43,7 +42,7 @@ spikes-bsl = [
 package = false
 conflicts = [
     [
-        { group = "spikes-sqlmesh" },
+        { group = "migration" },
         { group = "spikes-bsl" },
     ],
 ]

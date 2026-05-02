@@ -2,18 +2,18 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
-    "extra != 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh'",
-    "python_full_version >= '3.14' and platform_python_implementation != 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
-    "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
-    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
-    "python_full_version >= '3.14' and platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
-    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
-    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
-    "extra != 'group-17-baseball-computer-spikes-bsl' and extra != 'group-17-baseball-computer-spikes-sqlmesh'",
+    "python_full_version >= '3.14' and platform_python_implementation != 'PyPy' and extra != 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl'",
+    "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and extra != 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl'",
+    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and extra != 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl'",
+    "python_full_version >= '3.14' and platform_python_implementation == 'PyPy' and extra != 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl'",
+    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and extra != 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl'",
+    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and extra != 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl'",
+    "extra == 'group-17-baseball-computer-migration' and extra != 'group-17-baseball-computer-spikes-bsl'",
+    "extra != 'group-17-baseball-computer-migration' and extra != 'group-17-baseball-computer-spikes-bsl'",
 ]
 conflicts = [[
+    { package = "baseball-computer", group = "migration" },
     { package = "baseball-computer", group = "spikes-bsl" },
-    { package = "baseball-computer", group = "spikes-sqlmesh" },
 ]]
 
 [[package]]
@@ -40,7 +40,7 @@ version = "4.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/19/14/2c5dd9f512b66549ae92767a9c7b330ae88e1932ca57876909410251fe13/anyio-4.13.0.tar.gz", hash = "sha256:334b70e641fd2221c1505b3890c69882fe4a2df910cba14d97019b90b24439dc", size = 231622, upload-time = "2026-03-24T12:59:09.671Z" }
 wheels = [
@@ -102,11 +102,11 @@ dependencies = [
     { name = "pandas" },
     { name = "polars" },
     { name = "pyarrow", version = "21.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
     { name = "pyyaml" },
     { name = "recordlinkage" },
     { name = "sqlmesh", version = "0.228.5", source = { registry = "https://pypi.org/simple" }, extra = ["lsp", "web"], marker = "extra == 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "sqlmesh", version = "0.234.1", source = { registry = "https://pypi.org/simple" }, extra = ["lsp", "web"], marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "sqlmesh", version = "0.234.1", source = { registry = "https://pypi.org/simple" }, extra = ["lsp", "web"], marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
     { name = "statsmodels" },
 ]
 
@@ -117,15 +117,16 @@ dev = [
     { name = "ruamel-yaml" },
     { name = "sqlfluff" },
 ]
+migration = [
+    { name = "ibis-framework", extra = ["duckdb"], marker = "extra == 'group-17-baseball-computer-migration'" },
+    { name = "numba" },
+    { name = "polars" },
+    { name = "pydantic" },
+    { name = "sqlmesh", version = "0.234.1", source = { registry = "https://pypi.org/simple" } },
+]
 spikes-bsl = [
     { name = "boring-semantic-layer" },
     { name = "ibis-framework", extra = ["duckdb"], marker = "extra == 'group-17-baseball-computer-spikes-bsl'" },
-]
-spikes-sqlmesh = [
-    { name = "ibis-framework", extra = ["duckdb"], marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh'" },
-    { name = "numba" },
-    { name = "polars" },
-    { name = "sqlmesh", version = "0.234.1", source = { registry = "https://pypi.org/simple" } },
 ]
 
 [package.metadata]
@@ -148,15 +149,16 @@ dev = [
     { name = "ruamel-yaml", specifier = ">=0.18.5" },
     { name = "sqlfluff", specifier = ">=3.0.3" },
 ]
-spikes-bsl = [
-    { name = "boring-semantic-layer", specifier = ">=0.3.12" },
-    { name = "ibis-framework", extras = ["duckdb"], specifier = ">=11.0" },
-]
-spikes-sqlmesh = [
+migration = [
     { name = "ibis-framework", extras = ["duckdb"], specifier = ">=12.0" },
     { name = "numba", specifier = ">=0.59" },
     { name = "polars", specifier = ">=1.31" },
+    { name = "pydantic", specifier = ">=2.7" },
     { name = "sqlmesh", specifier = ">=0.234" },
+]
+spikes-bsl = [
+    { name = "boring-semantic-layer", specifier = ">=0.3.12" },
+    { name = "ibis-framework", extras = ["duckdb"], specifier = ">=11.0" },
 ]
 
 [[package]]
@@ -401,7 +403,7 @@ name = "click"
 version = "8.3.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/bb/63/f9e1ea081ce35720d8b92acde70daaedace594dc93b693c869e0d5910718/click-8.3.3.tar.gz", hash = "sha256:398329ad4837b2ff7cbe1dd166a4c0f8900c3ca3a218de04466f38f6497f18a2", size = 328061, upload-time = "2026-04-22T15:11:27.506Z" }
 wheels = [
@@ -703,10 +705,10 @@ name = "fastapi"
 version = "0.120.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "annotated-doc", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pydantic", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "starlette", version = "0.49.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "typing-extensions", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "annotated-doc", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "pydantic", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "starlette", version = "0.49.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "typing-extensions", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/40/cc/28aff6e246ee85bd571b26e4a793b84d42700e3bdc3008c3d747eda7b06d/fastapi-0.120.1.tar.gz", hash = "sha256:b5c6217e9ddca6dfcf54c97986180d4a1955e10c693d74943fc5327700178bff", size = 337616, upload-time = "2025-10-27T17:53:42.954Z" }
 wheels = [
@@ -903,7 +905,7 @@ dependencies = [
     { name = "parsy" },
     { name = "python-dateutil" },
     { name = "sqlglot", version = "27.28.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "sqlglot", version = "30.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh'" },
+    { name = "sqlglot", version = "30.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration'" },
     { name = "toolz" },
     { name = "typing-extensions" },
     { name = "tzdata" },
@@ -920,7 +922,7 @@ duckdb = [
     { name = "packaging" },
     { name = "pandas" },
     { name = "pyarrow", version = "21.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh'" },
+    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration'" },
     { name = "pyarrow-hotfix" },
     { name = "rich" },
 ]
@@ -960,7 +962,7 @@ name = "ipykernel"
 version = "7.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "appnope", marker = "sys_platform == 'darwin' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "appnope", marker = "sys_platform == 'darwin' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "comm" },
     { name = "debugpy" },
     { name = "ipython" },
@@ -984,12 +986,12 @@ name = "ipython"
 version = "9.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "decorator" },
     { name = "ipython-pygments-lexers" },
     { name = "jedi" },
     { name = "matplotlib-inline" },
-    { name = "pexpect", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh') or (sys_platform == 'win32' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "pexpect", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl') or (sys_platform == 'win32' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "prompt-toolkit" },
     { name = "psutil" },
     { name = "pygments" },
@@ -2013,7 +2015,7 @@ name = "pytest"
 version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -2121,7 +2123,7 @@ name = "pyzmq"
 version = "27.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "implementation_name == 'pypy' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "cffi", marker = "implementation_name == 'pypy' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/04/0b/3c9baedbdf613ecaa7aa07027780b8867f57b6293b6ee50de316c9f3222b/pyzmq-27.1.0.tar.gz", hash = "sha256:ac0765e3d44455adb6ddbf4417dcce460fc40a05978c08efdf2948072f6db540", size = 281750, upload-time = "2025-09-08T23:10:18.157Z" }
 wheels = [
@@ -2615,26 +2617,26 @@ name = "sqlmesh"
 version = "0.234.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "astor", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "click", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "croniter", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "dateparser", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "duckdb", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "humanize", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "hyperscript", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "ipywidgets", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "jinja2", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "json-stream", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "packaging", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pandas", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pydantic", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "python-dotenv", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "requests", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "rich", extra = ["jupyter"], marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "ruamel-yaml", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "sqlglot", version = "30.4.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "tenacity", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "time-machine", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "astor" },
+    { name = "click" },
+    { name = "croniter" },
+    { name = "dateparser" },
+    { name = "duckdb" },
+    { name = "humanize" },
+    { name = "hyperscript" },
+    { name = "ipywidgets" },
+    { name = "jinja2" },
+    { name = "json-stream" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "rich", extra = ["jupyter"], marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "ruamel-yaml" },
+    { name = "sqlglot", version = "30.4.3", source = { registry = "https://pypi.org/simple" } },
+    { name = "tenacity" },
+    { name = "time-machine" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f6/a7/4691fd1183dbd2b8056f6e213b145db84eb13a1a908c58d079ced1e25c20/sqlmesh-0.234.1.tar.gz", hash = "sha256:677d4b264e0b0f200676ee06a50d8b10e0016998f066dd07574a108b4fb7af6f", size = 13473977, upload-time = "2026-04-17T17:21:28.714Z" }
 wheels = [
@@ -2643,19 +2645,19 @@ wheels = [
 
 [package.optional-dependencies]
 lsp = [
-    { name = "fastapi", version = "0.120.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "lsprotocol", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pygls", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "sse-starlette", version = "3.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "watchfiles", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "fastapi", version = "0.120.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "lsprotocol", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "pygls", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "sse-starlette", version = "3.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "watchfiles", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
 ]
 web = [
-    { name = "fastapi", version = "0.120.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "sse-starlette", version = "3.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "uvicorn", extra = ["standard"], marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "watchfiles", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "fastapi", version = "0.120.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "pyarrow", version = "24.0.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "sse-starlette", version = "3.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "uvicorn", extra = ["standard"], marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "watchfiles", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
 ]
 
 [[package]]
@@ -2683,8 +2685,8 @@ name = "sse-starlette"
 version = "3.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "starlette", version = "0.49.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "anyio", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "starlette", version = "0.49.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e1/9a/f35932a8c0eb6b2287b66fa65a0321df8c84e4e355a659c1841a37c39fdb/sse_starlette-3.4.1.tar.gz", hash = "sha256:f780bebcf6c8997fe514e3bd8e8c648d8284976b391c8bed0bcb1f611632b555", size = 35127, upload-time = "2026-04-26T13:32:32.292Z" }
 wheels = [
@@ -2730,8 +2732,8 @@ name = "starlette"
 version = "0.49.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "extra == 'group-17-baseball-computer-spikes-sqlmesh' or extra != 'group-17-baseball-computer-spikes-bsl'" },
-    { name = "typing-extensions", marker = "(python_full_version < '3.13' and extra != 'group-17-baseball-computer-spikes-bsl') or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "anyio", marker = "extra == 'group-17-baseball-computer-migration' or extra != 'group-17-baseball-computer-spikes-bsl'" },
+    { name = "typing-extensions", marker = "(python_full_version < '3.13' and extra == 'group-17-baseball-computer-migration') or (python_full_version < '3.13' and extra != 'group-17-baseball-computer-spikes-bsl') or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/de/1a/608df0b10b53b0beb96a37854ee05864d182ddd4b1156a22f1ad3860425a/starlette-0.49.3.tar.gz", hash = "sha256:1c14546f299b5901a1ea0e34410575bc33bbd741377a10484a54445588d00284", size = 2655031, upload-time = "2025-11-01T15:12:26.13Z" }
 wheels = [
@@ -2927,7 +2929,7 @@ name = "tqdm"
 version = "4.67.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
 wheels = [
@@ -2978,7 +2980,7 @@ name = "tzlocal"
 version = "5.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "tzdata", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "tzdata", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8b/2e/c14812d3d4d9cd1773c6be938f89e5735a1f11a9f184ac3639b93cef35d5/tzlocal-5.3.1.tar.gz", hash = "sha256:cceffc7edecefea1f595541dbd6e990cb1ea3d19bf01b2809f362a03dd7921fd", size = 30761, upload-time = "2025-03-05T21:17:41.549Z" }
 wheels = [
@@ -3044,11 +3046,11 @@ wheels = [
 
 [package.optional-dependencies]
 standard = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "httptools" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh') or (sys_platform == 'cygwin' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh') or (sys_platform == 'win32' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl') or (sys_platform == 'cygwin' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl') or (sys_platform == 'win32' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "watchfiles" },
     { name = "websockets" },
 ]
@@ -3228,8 +3230,8 @@ dependencies = [
     { name = "cityhash", marker = "python_full_version < '4'" },
     { name = "click" },
     { name = "cloudpickle" },
-    { name = "cryptography", version = "45.0.7", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and platform_python_implementation != 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl') or (python_full_version < '3.14' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh') or (platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
-    { name = "cryptography", version = "46.0.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and extra == 'group-17-baseball-computer-spikes-bsl') or (platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl') or (extra == 'group-17-baseball-computer-spikes-bsl' and extra == 'group-17-baseball-computer-spikes-sqlmesh')" },
+    { name = "cryptography", version = "45.0.7", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and platform_python_implementation != 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl') or (python_full_version < '3.14' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl') or (platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
+    { name = "cryptography", version = "46.0.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and extra == 'group-17-baseball-computer-spikes-bsl') or (platform_python_implementation == 'PyPy' and extra == 'group-17-baseball-computer-spikes-bsl') or (extra == 'group-17-baseball-computer-migration' and extra == 'group-17-baseball-computer-spikes-bsl')" },
     { name = "dask", marker = "python_full_version < '4'" },
     { name = "envyaml" },
     { name = "filelock" },

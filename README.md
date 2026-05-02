@@ -15,10 +15,10 @@ loaded by `before_all` Python `@macro`s in `bc/macros/_init_db.py`. dbt
 is no longer a runtime dependency.
 
 ```bash
-uv sync --group spikes-sqlmesh
+uv sync --group migration
 cd bc
-uv run --group spikes-sqlmesh sqlmesh plan dev --auto-apply   # build dev env
-uv run --group spikes-sqlmesh sqlmesh audit                   # run audits
+uv run --group migration sqlmesh plan dev --auto-apply   # build dev env
+uv run --group migration sqlmesh audit                   # run audits
 ```
 
 Source-table metadata (45 parquet sources) lives in

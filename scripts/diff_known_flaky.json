@@ -1,0 +1,4 @@
+{
+  "comment": "Phase 1.6 latent-nondeterminism baseline — captured pre-Phase-2 build. Empty on capture because the dev build happened to match prod for this run. Carried-forward flaky tables (per notes/phase-1-followups.md): metrics_player_career_pitching, metrics_player_career_fielding, metrics_player_season_league_pitching, metrics_player_season_league_fielding, metrics_team_season_pitching, metrics_team_season_fielding, calc_park_factors_basic. Re-run scripts/diff_models.py --capture-baseline whenever a fresh dev build surfaces drift in those models so the allowlist tracks reality.",
+  "pairs": []
+}

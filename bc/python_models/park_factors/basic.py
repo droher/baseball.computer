@@ -1,34 +1,16 @@
-MODEL (
-  name main_models.calc_park_factors_basic,
-  kind FULL,
-  grain (park_id, season, league),
-  columns (
-    park_id PARK_ID,
-    season SMALLINT,
-    league VARCHAR,
-    sqrt_sample_size DOUBLE,
-    avg_this_runs_per_inning DOUBLE,
-    avg_other_runs_per_inning DOUBLE,
-    basic_park_factor DOUBLE
-  ),
-  column_descriptions (
-    park_id = @doc('park_id'),
-    season = @doc('season'),
-    league = @doc('league')
-  ),
-  physical_properties (
-    download_parquet = 'https://data.baseball.computer/dbt/main_models_calc_park_factors_basic.parquet'
-  ),
-);
+"""SQL builder for ``main_models.calc_park_factors_basic``.
+
+Mirrors ``bc/models/intermediate/park_factors/calc_park_factors_basic.sql`` —
+team-game runs / innings, league-rate factor, 2-yr trailing window, pair-wise
+self-join with clamped runs/inning, sample-weighted ``basic_park_factor``.
+"""
+
+from __future__ import annotations
 
 
-
-
-
-
-
--- This needs to cover games with the lowest possible coverage
--- (run totals for each team)
+def build_basic_park_factor_sql() -> str:
+    """Return the 6-CTE SQL body for ``calc_park_factors_basic``."""
+    return """
 WITH batting_agg AS (
     SELECT
         s.park_id,
@@ -37,8 +19,7 @@ WITH batting_agg AS (
         s.team_id,
         s.opponent_id,
         SUM(r.runs_scored + r.runs_allowed) AS runs,
-        -- Estimate innings for games without box score/pbp data
-        SUM(COALESCE(r.innings_pitched + r.opponent_innings_pitched, 18)) AS innings,
+        SUM(COALESCE(r.innings_pitched + r.opponent_innings_pitched, 18)) AS innings
     FROM main_models.team_game_start_info AS s
     INNER JOIN main_models.team_game_results AS r USING (game_id, team_id)
     WHERE s.game_type = 'RegularSeason'
@@ -64,10 +45,8 @@ multi_year_range AS (
         ba.league,
         ba.team_id,
         ba.opponent_id,
-        -- Adjust to handle wide year-to-year differences
-        -- common in 19th century
         SUM(ba.runs) OVER w / averages.run_factor AS runs,
-        SUM(ba.innings) OVER w AS innings,
+        SUM(ba.innings) OVER w AS innings
     FROM batting_agg AS ba
     INNER JOIN averages USING (season, league)
     WINDOW w AS (
@@ -85,7 +64,6 @@ self_joined AS (
         this.league,
         this.team_id,
         this.opponent_id,
-        -- Restrict avg runs per inning to between 0.1 AND 1
         GREATEST(0.1, LEAST(1, this.runs / this.innings)) AS this_runs_per_inning,
         GREATEST(0.1, LEAST(1, other.runs / other.innings)) AS other_runs_per_inning,
         SQRT(LEAST(this.innings, other.innings)) AS sample_size,
@@ -102,7 +80,6 @@ self_joined AS (
 rate_calculation AS (
     SELECT
         *,
-        -- Find the park pair with the highest sample size, and upweight all other pairs to match
         MAX(sum_sample_size) OVER (PARTITION BY this_park_id, season, league) AS scaling_factor,
         sample_size * (scaling_factor / sum_sample_size) AS sample_weight
     FROM self_joined
@@ -122,3 +99,4 @@ final AS (
 )
 
 SELECT * FROM final
+"""
