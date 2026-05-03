@@ -18,6 +18,7 @@ from sqlmesh.core.config import (
     PlanConfig,
 )
 from sqlmesh.core.config.common import VirtualEnvironmentMode
+from sqlmesh.core.config.connection import DuckDBAttachOptions
 from sqlmesh.core.model.kind import FullKind
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -31,8 +32,24 @@ _DUCKDB_SETTINGS = {
 }
 
 _DUCKDB_CONNECTION = DuckDBConnectionConfig(
-    database=str(PROJECT_ROOT.parent / "bc.db"),
-    extensions=["httpfs", "parquet"],
+    extensions=["httpfs", "parquet", "ducklake"],
+    catalogs={
+        # First entry is the default catalog. bc.db stays the build target
+        # for state and intermediate model materializations; only the
+        # publish layer uses the bc_publish DuckLake catalog (populated by
+        # scripts/publish_ducklake.py post-build).
+        "bc": str(PROJECT_ROOT.parent / "bc.db"),
+        # Relative data_path so the catalog can be uploaded to R2 and
+        # consumers attach by URL — DuckLake resolves relative paths
+        # against the catalog's parent URL at attach time. SQLMesh always
+        # runs with cwd=bc/, so the local resolution is bc/bc_publish_data/.
+        "bc_publish": DuckDBAttachOptions(
+            type="ducklake",
+            path=str(PROJECT_ROOT / "bc_publish.ducklake"),
+            data_path="bc_publish_data/",
+            data_inlining_row_limit=0,
+        ),
+    },
     connector_config=_DUCKDB_SETTINGS,
     concurrent_tasks=6,
 )

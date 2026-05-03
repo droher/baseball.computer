@@ -1,6 +1,8 @@
 # Migration plan & status
 
-**Status:** Phases 0–3 shipped. Ready to start **Phase 4 (DuckLake publish)**.
+**Status:** Phases 0–3 shipped. Phase 4 publish-side shipped (validation
+phase — site cutover deferred to Phase 4.x; see
+`notes/phase-4-followups.md`).
 
 The original evaluation that compared 5 candidate stacks across axes A–D
 lives in git history (`af2f1ee` and earlier). This doc has been pared
@@ -44,7 +46,9 @@ remaining phases with the detail they warrant given what we've learned.
 | 1.6 — jinja → Python `@macro` | ✅ shipped | `phase-1.6-cleanup` (merged) | `notes/phase-1.6-followups.md` |
 | 2 — Ibis expression layer | ✅ shipped | `phase-2-ibis`, audit sweep | `notes/phase-2-followups.md` |
 | 3 — BSL semantic layer | ✅ shipped | `phase-3-bsl` | `notes/phase-3-followups.md` |
-| **4 — DuckLake publish** | **next** | — | — |
+| 4 — DuckLake publish (publish side) | ✅ shipped | `phase-4-ducklake-publish` | `notes/phase-4-followups.md` |
+| 4.x — DuckLake site cutover | deferred | — | `notes/phase-4-followups.md` |
+| 4.5 — Incremental kinds for hot tables | pending | — | `notes/phase-4-followups.md` |
 | 5 — Axis-D event-locality | pending | — | — |
 | 6 — ML re-enablement (Hamilton) | pending | — | — |
 | 7 — Optional graduations (Rust ext / `boxball-rs` pushdown) | deferred | — | — |
@@ -228,37 +232,79 @@ time-travel. Replaces the parquet-files + `bc_remote.db` views pattern.
 Spike 6 settled the path: SQLMesh-driven DuckLake on R2, no parallel
 dbt-duckdb lane.
 
-### 4.1 SQLMesh DuckLake target
+### Shipped — publish side (validation phase)
 
-```python
-# bc/config.py — additional gateway / catalog
-catalogs = {
-    'ducklake_publish': {
-        'type': 'ducklake',
-        'metadata_path': 'bc_publish.ducklake',  # local SQLite during build
-        'data_path': 's3://baseball-computer-data/v<DATA_VERSION>/',
-    },
-}
-```
+The publish-and-upload pair runs alongside the existing
+`scripts/create_web_db.py` flow. The original parquet+views artifact is
+still the canonical one; site cutover is tracked separately
+(see §4.x below and `notes/phase-4-followups.md`).
 
-Build pipeline writes the DuckLake catalog (SQLite) + parquet data
-files locally, then uploads both to R2 with appropriate caching headers.
+- `bc/config.py` adds a second SQLMesh catalog `bc_publish` via
+  `DuckDBAttachOptions(type="ducklake", path=..., data_path=...,
+  data_inlining_row_limit=0)`. Local catalog at `bc/bc_publish.ducklake`
+  (DuckDB-backed), data dir `bc/bc_publish_data/`. The data path is
+  recorded relative so the catalog file is portable: when uploaded to
+  R2, consumers attach by URL and DuckLake resolves data files against
+  the catalog URL's parent.
+- `scripts/publish_ducklake.py` reads `main_models.*` + `main_seeds.*`
+  out of `bc.db` and rewrites them into `bc_publish.*`. ENUM columns
+  are cast to VARCHAR — DuckLake v1.0 doesn't preserve user-defined
+  types (the official migration script in DuckLake's docs does the
+  same cast). Catalog options set once: `parquet_compression=zstd`,
+  `parquet_row_group_size=1966080`, `data_inlining_row_limit=0`. The
+  smaller row groups + GZIP that `create_web_db.py` uses for
+  `event_states_full` are not yet reproducible per-table in DuckLake —
+  options are catalog-wide. Tracked as Phase 4.5.
+- `scripts/upload_ducklake.py` uploads `bc/bc_publish.ducklake` to
+  `s3://timeball/baseball/v<DATA_VERSION>/baseball.ducklake` and the
+  data dir under the same prefix, preserving the
+  `bc_publish_data/<schema>/<table>/<file>.parquet` layout that the
+  catalog references relatively. `Cache-Control: public,
+  max-age=31536000, immutable` on data files; long-lived but not
+  immutable on the catalog (replaced each build); Cloudflare cache
+  purge fires for the catalog URL after upload.
 
-### 4.2 Consumer attach
+### Consumer attach (validation only)
 
 ```sql
-ATTACH 'ducklake:https://data.baseball.computer/baseball.ducklake' AS bc;
+INSTALL ducklake; LOAD ducklake;
+ATTACH 'https://data.baseball.computer/baseball/v1/baseball.ducklake'
+    AS bc (TYPE ducklake, READ_ONLY);
 SELECT * FROM bc.main_models.metrics_player_season_league_offense LIMIT 10;
 ```
 
-Single attach exposes the same tables and ENUMs as today's
-`bc_remote.db`, plus snapshots (no more cache-bust querystring trick —
-catalog snapshots replace it).
+Note: when attaching by HTTPS URL, the canonical syntax is
+`(TYPE ducklake)`, not the `ducklake:` URL-prefix form. The
+`ducklake:` prefix is for local file / postgres / sqlite catalog
+backends.
 
-### 4.3 Cutover
+### 4.x Site cutover (deferred)
 
-Per Phase 0 decision: automatic cutover, no parallel-publish window.
-Retire `scripts/create_web_db.py`'s parquet+views path.
+Triggers — the site team confirms on a test branch that:
+
+- DuckLake query results match `bc_remote.db` for a representative
+  sample of site queries.
+- Cold-attach latency is acceptable (single catalog fetch + lazy
+  parquet reads vs the current single-DB-file fetch).
+- VARCHAR-instead-of-ENUM is acceptable for site code (no ENUM-typed
+  filters or joins broken).
+- The LLM-metadata bridge (`notes/llm-metadata.md`) consumes the
+  DuckLake table layout cleanly, or works against either artifact.
+
+When cutover lands: delete `scripts/create_web_db.py`, stop publishing
+the `dbt/` R2 prefix, update README + site docs to point exclusively
+at DuckLake, optionally purge the old `dbt/` prefix after a grace
+window.
+
+### 4.5 Incremental kinds for hot tables
+
+DuckLake snapshot retention is cheap when models are
+incremental — only changed partitions get new files; older snapshots
+keep referencing unchanged ones. Today every model in this repo is
+`kind FULL`, so retaining N snapshots costs roughly N × full table
+size (~40 GB × N). Once event-grain `metrics_*` and `event_states_full`
+move to incremental kinds, snapshot retention drops to a thin overlay
+on the immutable base. Out of scope for the Phase 4 PR.
 
 ---
 
@@ -377,17 +423,22 @@ extension).
 | 1 + 1.5 + 1.6 — SQLMesh + dbt removal + Python `@macro` | ✅ |
 | 2 — Ibis | ✅ |
 | 3 — BSL semantic | ✅ |
-| 4 — DuckLake publish | next |
+| 4 — DuckLake publish (publish side) | ✅ |
+| 4.x — DuckLake site cutover | deferred |
+| 4.5 — Incremental kinds for hot tables | pending |
 | 5 — Axis-D event-locality | pending |
 | 6 — Hamilton ML | parallel/post-5 |
 | 7 — Rust ext / `boxball-rs` pushdown | deferred |
 
-Critical path: 4 → 5, with Phase 6 paralleling 5.
+Critical path: 4.x (site cutover) → 5, with Phase 6 paralleling 5. The
+LLM-metadata bridge can start now that Phase 4's publish side has
+landed; it just needs to point at whichever artifact (`bc_remote.db`
+or DuckLake) the site cutover settles on.
 
 The **LLM-metadata bridge** (`notes/llm-metadata.md`) is a parallel
 work stream, not a migration phase. It depends on Phase 3 (the metric
 registry it consumes is the BSL source of truth) and Phase 4 (the
-artifact it ships into is the DuckLake-published `bc_remote.db`). Once
-both land, the bridge work — `metadata/` YAML cards, JSON Schemas,
-compile pipeline, `CREATE MACRO` emission, sample-value sampling,
-artifact upload — can start. Scoped and tracked in `llm-metadata.md`.
+artifact it ships into). Bridge work — `metadata/` YAML cards, JSON
+Schemas, compile pipeline, `CREATE MACRO` emission, sample-value
+sampling, artifact upload — can proceed in parallel with the site
+cutover trigger evaluation.
