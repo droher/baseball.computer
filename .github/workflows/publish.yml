@@ -34,6 +34,10 @@ jobs:
         working-directory: bc
         run: uv run --group migration sqlmesh plan --auto-apply --no-prompts --var force_reload=true
 
+      - name: SQLMesh janitor
+        working-directory: bc
+        run: uv run --group migration sqlmesh janitor --ignore-ttl
+
       - name: Publish DuckLake catalog
         run: uv run --group migration python scripts/publish_ducklake.py
 

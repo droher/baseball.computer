@@ -98,6 +98,12 @@ config = Config(
     ),
     virtual_environment_mode=VirtualEnvironmentMode.DEV_ONLY,
     plan=PlanConfig(always_recreate_environment=True),
+    # Build-only DB; FULL kind replaces every table on each plan, so
+    # old versioned snapshot tables are pure dead weight. Tight TTL +
+    # a janitor sweep after each plan keeps bc.db from accreting GBs
+    # of orphaned `sqlmesh__main_models.*__<hash>__dev` tables.
+    snapshot_ttl="in 1 hour",
+    environment_ttl="in 1 hour",
     before_all=[
         "@init_db()",
         "@create_enums()",

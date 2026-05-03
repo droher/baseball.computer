@@ -296,6 +296,15 @@ def main() -> None:
     except Exception as exc:
         logger.warning("final checkpoint failed: %r", exc)
 
+    # plan() does not auto-run the janitor for non-prod environments,
+    # so dev builds accrete prior versioned snapshot tables forever.
+    # Force a sweep now that we've checkpointed.
+    try:
+        ctx.run_janitor(ignore_ttl=True)
+        logger.info("janitor sweep done")
+    except Exception as exc:
+        logger.warning("janitor failed: %r", exc)
+
 
 if __name__ == "__main__":
     main()
