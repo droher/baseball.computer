@@ -174,11 +174,20 @@ def _diff_one_model(
         raise RuntimeError(f"dev table {DEV_SCHEMA}.{table} not found")
     prod_col_set = {c for c, _ in prod_cols}
     dev_col_set = {c for c, _ in dev_cols}
-    if prod_col_set != dev_col_set:
-        only_prod = prod_col_set - dev_col_set
-        only_dev = dev_col_set - prod_col_set
+    only_prod = prod_col_set - dev_col_set
+    only_dev = dev_col_set - prod_col_set
+    if only_prod:
+        # A column the prod table has and dev doesn't is a regression —
+        # we'd lose data on cutover. Always blocking.
         raise RuntimeError(
-            f"column-set mismatch on {table}: only_prod={sorted(only_prod)} only_dev={sorted(only_dev)}"
+            f"column-set mismatch on {table}: prod has columns dev is missing: {sorted(only_prod)}"
+        )
+    if only_dev:
+        # New columns in dev are fine — common during phase work that
+        # extends the schema. Log so the diff still surfaces them.
+        logging.getLogger("diff_models").info(
+            "%s: dev adds %d new column(s): %s",
+            table, len(only_dev), sorted(only_dev),
         )
     prod_q = _qualify(PROD_SCHEMA, table)
     dev_q = _qualify(DEV_SCHEMA, table)

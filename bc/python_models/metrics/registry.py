@@ -1,9 +1,16 @@
 """Pydantic Metric class + METRICS registry for the 9 metrics_* tables.
 
-Phase 2 only uses ``formula`` (single lambda for one-shot expressions)
-or ``numerator``/``denominator`` (semantic-layer-friendly ratio) so the
-generated SQL matches the Phase 1.6 macro literally. Phase 3 will turn
-on ``derived`` for true composition (e.g. OPS = OBP + SLG).
+Three forms of expression:
+
+- ``formula(t)`` — single lambda over an Ibis table.
+- ``numerator(t) / denominator(t)`` — semantic-friendly ratio.
+- ``derived(m)`` — composition over previously-evaluated measures, where
+  ``m`` is a measure-scope: anything that responds to attribute access by
+  name. Same shape as BSL's ``MeasureScope`` so the same lambda works in
+  both ``build_metric_sql`` and ``bsl.SemanticTable.with_measures``.
+
+``evaluate_all(t, metrics)`` runs a topological pass: non-derived metrics
+first, then derived metrics resolve against the accumulated dict.
 """
 
 from __future__ import annotations
@@ -24,12 +31,85 @@ MetricKind = Literal["offense", "pitching", "fielding"]
 MetricSource = Literal["season", "event"]
 
 
+class _MeasureProxy:
+    """Attribute-access view over a ``dict[str, IbisExpr]``.
+
+    Used by ``evaluate_all`` to feed already-computed measures into a
+    derived lambda. Mirrors BSL's MeasureScope shape so the same
+    ``derived=lambda m: m.obp + m.slg`` works in both worlds.
+    """
+
+    __slots__ = ("_d",)
+
+    def __init__(self, d: dict[str, IbisExpr]) -> None:
+        self._d = d
+
+    def __getattr__(self, name: str) -> IbisExpr:
+        try:
+            return self._d[name]
+        except KeyError as e:
+            raise AttributeError(
+                f"derived metric references unknown measure {name!r}; "
+                f"available: {sorted(self._d)}"
+            ) from e
+
+
+class _DepCaptureProxy:
+    """Records every attribute access; arithmetic returns self.
+
+    Probe object used to introspect a derived lambda's dependencies
+    without evaluating real Ibis expressions. Any ``m.x`` access records
+    ``x``; arithmetic / comparison / call all return ``self`` so chained
+    expressions (``m.a + m.b * m.c``) keep flowing.
+    """
+
+    def __init__(self, sink: set[str]) -> None:
+        object.__setattr__(self, "_sink", sink)
+
+    def __getattr__(self, name: str) -> _DepCaptureProxy:
+        # Dunders never name a sibling measure. Raising AttributeError
+        # also keeps Python machinery (copy, deepcopy, repr) from
+        # polluting the dep set.
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        self._sink.add(name)  # type: ignore[attr-defined]
+        return self
+
+    def _self(self, *_a: Any, **_k: Any) -> _DepCaptureProxy:
+        return self
+
+    def __bool__(self) -> bool:
+        # Branching (``m.a if m.cond else m.b``) silently drops one
+        # branch's deps because Python only evaluates the chosen side.
+        # Force authors toward ``ibis.cases`` / ``ibis.coalesce``.
+        raise TypeError(
+            "derived metric lambdas must not branch on measure values "
+            "(use ibis.cases / ibis.coalesce for conditionals)"
+        )
+
+    __add__ = __radd__ = _self
+    __sub__ = __rsub__ = _self
+    __mul__ = __rmul__ = _self
+    __truediv__ = __rtruediv__ = _self
+    __floordiv__ = __rfloordiv__ = _self
+    __mod__ = __rmod__ = _self
+    __pow__ = __rpow__ = _self
+    __matmul__ = __rmatmul__ = _self
+    __lshift__ = __rshift__ = _self
+    __and__ = __or__ = __xor__ = _self
+    __rand__ = __ror__ = __rxor__ = _self
+    __invert__ = _self
+    __neg__ = _self
+    __pos__ = _self
+    __abs__ = _self
+    __lt__ = __le__ = __gt__ = __ge__ = _self
+    __call__ = _self
+
+
 class Metric(BaseModel):
     """One named ratio/formula computed over the basic_stats / event_agg CTEs.
 
     Exactly one of {formula, numerator+denominator, derived} must be set.
-    Phase 2 uses ``formula`` and ``numerator/denominator``; ``derived``
-    is reserved for Phase 3 composition.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
@@ -41,7 +121,7 @@ class Metric(BaseModel):
     formula: Callable[[TableExpr], IbisExpr] | None = None
     numerator: Callable[[TableExpr], IbisExpr] | None = None
     denominator: Callable[[TableExpr], IbisExpr] | None = None
-    derived: Callable[[TableExpr, dict[str, IbisExpr]], IbisExpr] | None = None
+    derived: Callable[[Any], IbisExpr] | None = None
 
     @model_validator(mode="after")
     def _exactly_one_form(self) -> Metric:
@@ -62,14 +142,91 @@ class Metric(BaseModel):
         return self
 
     def evaluate(self, t: TableExpr) -> IbisExpr:
-        """Apply the metric to an Ibis table expression."""
+        """Apply a non-derived metric to an Ibis table.
+
+        Derived metrics need other measures in scope — use ``evaluate_all``.
+        """
         if self.formula is not None:
             return self.formula(t)
         if self.numerator is not None and self.denominator is not None:
             return self.numerator(t) / self.denominator(t)
-        raise NotImplementedError(
-            f"Metric {self.name!r}: 'derived' form is Phase 3 — not used yet"
+        raise ValueError(
+            f"Metric {self.name!r}: derived form requires evaluate_all() "
+            "(needs sibling measures in scope)"
         )
+
+    def dependencies(self) -> set[str]:
+        """Names this derived metric reads off the measure scope.
+
+        Returns empty set for non-derived metrics.
+        """
+        if self.derived is None:
+            return set()
+        sink: set[str] = set()
+        try:
+            self.derived(_DepCaptureProxy(sink))
+        except Exception as e:
+            raise ValueError(
+                f"Metric {self.name!r}: derived lambda raised during dependency "
+                f"capture; the lambda must use only attribute access on the "
+                f"scope (got {type(e).__name__}: {e})"
+            ) from e
+        return sink
+
+
+def evaluate_all(
+    t: TableExpr, metrics: list[Metric]
+) -> dict[str, IbisExpr]:
+    """Two-pass evaluator: non-derived first, then derived in topo order.
+
+    Returns ``{name: ibis_expr}`` in registration order so downstream
+    column emission stays stable. Raises on cycles or missing deps.
+    """
+    out: dict[str, IbisExpr] = {}
+
+    base: list[Metric] = []
+    derived: list[Metric] = []
+    for m in metrics:
+        (derived if m.derived is not None else base).append(m)
+
+    for m in base:
+        out[m.name] = m.evaluate(t)
+
+    deps = {m.name: m.dependencies() for m in derived}
+    by_name = {m.name: m for m in derived}
+
+    visiting: set[str] = set()
+    resolved: set[str] = set()
+    order: list[str] = []
+
+    def visit(name: str, stack: list[str]) -> None:
+        if name in resolved or name not in by_name:
+            return
+        if name in visiting:
+            cycle = " -> ".join([*stack, name])
+            raise ValueError(f"derived metric cycle detected: {cycle}")
+        visiting.add(name)
+        for dep in deps[name]:
+            if dep in by_name:
+                visit(dep, [*stack, name])
+            elif dep not in out:
+                raise ValueError(
+                    f"Metric {name!r}: derived references unknown measure "
+                    f"{dep!r} (not in base or derived set)"
+                )
+        visiting.remove(name)
+        resolved.add(name)
+        order.append(name)
+
+    for m in derived:
+        visit(m.name, [])
+
+    for name in order:
+        m = by_name[name]
+        assert m.derived is not None
+        out[name] = m.derived(_MeasureProxy(out))
+
+    return {m.name: out[m.name] for m in metrics}
 
 
 MetricKey = tuple[str, MetricKind]

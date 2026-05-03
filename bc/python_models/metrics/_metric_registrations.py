@@ -1,20 +1,15 @@
 """Register every metric used by the 9 metrics_* tables.
 
-One Metric per (basic-rate or event-based) formula, mirrored from
-bc/macros/_metric_table_body.py. The macro will be retired in Phase 2
-stage G; for now both produce identical row values.
+One Metric per (basic-rate or event-based) formula. Derived (composite)
+metrics use ``derived=lambda m: ...`` referring to other measures by
+attribute access on the scope ``m``; ``evaluate_all`` resolves the graph
+in topological order.
 
 Imported for side effects from bc/python_models/metrics/__init__.py.
 """
 
 from __future__ import annotations
 
-from ._ibis_helpers import (
-    coverage_weighted_ba,
-    known_angle_out_hit_ratio,
-    known_trajectory_broad_out_hit_ratio,
-    known_trajectory_out_hit_ratio,
-)
 from .registry import Metric, register
 
 # ---------------------------------------------------------------------------
@@ -54,8 +49,7 @@ def _register_basic_offense() -> None:
             name="on_base_plus_slugging",
             kind="offense",
             source="season",
-            formula=lambda t: t.on_base_successes.sum() / t.on_base_opportunities.sum()
-            + t.total_bases.sum() / t.at_bats.sum(),
+            derived=lambda m: m.on_base_percentage + m.slugging_percentage,
         )
     )
     register(
@@ -63,8 +57,7 @@ def _register_basic_offense() -> None:
             name="isolated_power",
             kind="offense",
             source="season",
-            formula=lambda t: t.total_bases.sum() / t.at_bats.sum()
-            - t.hits.sum() / t.at_bats.sum(),
+            derived=lambda m: m.slugging_percentage - m.batting_average,
         )
     )
     register(
@@ -268,8 +261,8 @@ def _register_basic_pitching() -> None:
             name="on_base_plus_slugging_against",
             kind="pitching",
             source="season",
-            formula=lambda t: t.on_base_successes.sum() / t.on_base_opportunities.sum()
-            + t.total_bases.sum() / t.at_bats.sum(),
+            derived=lambda m: m.on_base_percentage_against
+            + m.slugging_percentage_against,
         )
     )
     register(
@@ -320,11 +313,48 @@ def _register_basic_fielding() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Event-based: batted-ball trajectory + angle (3 sides) + direction (2 sides).
+# Event-based: batted-ball trajectory + angle + direction.
 #
-# Inlined dependencies: the macro defined `known_trajectory_out_hit_ratio` etc.
-# as references to other named metrics, but in a single GROUP BY all aliases
-# resolve at the same level — algebraically equivalent to inlining the SUMs.
+# Coverage-weighted batting averages use a shared shape:
+#     SUM(x * hits) * R / (SUM(x * hits) * R + SUM(x * (at_bats - hits)))
+# where R is one of the *_out_hit_ratio derived measures. We register
+# one pair of base measures (sum_<col>_hits, sum_<col>_outs) per column
+# so the coverage_weighted_*_batting_average lambdas read as pure
+# composition.
+
+# (col, output-suffix, ratio-measure-name)
+_COVERAGE_WEIGHTED_VARIANTS: tuple[tuple[str, str, str], ...] = (
+    ("trajectory_broad_air_ball", "air_ball", "known_trajectory_broad_out_hit_ratio"),
+    ("trajectory_ground_ball", "ground_ball", "known_trajectory_broad_out_hit_ratio"),
+    ("trajectory_fly_ball", "fly_ball", "known_trajectory_out_hit_ratio"),
+    ("trajectory_line_drive", "line_drive", "known_trajectory_out_hit_ratio"),
+    ("trajectory_pop_up", "pop_up", "known_trajectory_out_hit_ratio"),
+    ("batted_angle_left", "angle_left", "known_angle_out_hit_ratio"),
+    ("batted_angle_right", "angle_right", "known_angle_out_hit_ratio"),
+    ("batted_angle_middle", "angle_middle", "known_angle_out_hit_ratio"),
+    ("batted_balls_pulled", "pulled", "known_angle_out_hit_ratio"),
+    ("batted_balls_opposite_field", "opposite_field", "known_angle_out_hit_ratio"),
+)
+
+
+def _coverage_weighted_derived(col: str, ratio_name: str):
+    """Build a derived lambda for one coverage-weighted batting average.
+
+    Captures ``col`` and ``ratio_name`` via default args so each closure
+    is self-contained (no shared mutable state).
+    """
+
+    hits_attr = f"sum_{col}_hits"
+    outs_attr = f"sum_{col}_outs"
+
+    def fn(m, _hits=hits_attr, _outs=outs_attr, _ratio=ratio_name):
+        h = getattr(m, _hits)
+        o = getattr(m, _outs)
+        r = getattr(m, _ratio)
+        hits_term = h * r
+        return hits_term / (hits_term + o)
+
+    return fn
 
 
 def _batted_ball_metrics(kind: str) -> None:
@@ -394,7 +424,8 @@ def _batted_ball_metrics(kind: str) -> None:
             name="known_trajectory_out_hit_ratio",
             kind=kind,  # type: ignore[arg-type]
             source="event",
-            formula=known_trajectory_out_hit_ratio,
+            derived=lambda m: m.known_trajectory_rate_outs
+            / m.known_trajectory_rate_hits,
         )
     )
     register(
@@ -402,7 +433,8 @@ def _batted_ball_metrics(kind: str) -> None:
             name="known_trajectory_broad_out_hit_ratio",
             kind=kind,  # type: ignore[arg-type]
             source="event",
-            formula=known_trajectory_broad_out_hit_ratio,
+            derived=lambda m: m.known_trajectory_broad_rate_outs
+            / m.known_trajectory_broad_rate_hits,
         )
     )
     register(
@@ -436,14 +468,7 @@ def _batted_ball_metrics(kind: str) -> None:
             name="ground_air_out_ratio",
             kind=kind,  # type: ignore[arg-type]
             source="event",
-            formula=lambda t: (
-                (t.trajectory_broad_ground_ball * (t.at_bats - t.hits)).sum()
-                / (t.trajectory_broad_known * (t.at_bats - t.hits)).sum()
-            )
-            / (
-                (t.trajectory_broad_air_ball * (t.at_bats - t.hits)).sum()
-                / (t.trajectory_broad_known * (t.at_bats - t.hits)).sum()
-            ),
+            derived=lambda m: m.ground_ball_rate_outs / m.air_ball_rate_outs,
         )
     )
     register(
@@ -469,14 +494,7 @@ def _batted_ball_metrics(kind: str) -> None:
             name="ground_air_hit_ratio",
             kind=kind,  # type: ignore[arg-type]
             source="event",
-            formula=lambda t: (
-                (t.trajectory_broad_ground_ball * t.hits).sum()
-                / (t.trajectory_broad_known * t.hits).sum()
-            )
-            / (
-                (t.trajectory_broad_air_ball * t.hits).sum()
-                / (t.trajectory_broad_known * t.hits).sum()
-            ),
+            derived=lambda m: m.ground_ball_hit_rate / m.air_ball_hit_rate,
         )
     )
     register(
@@ -515,43 +533,6 @@ def _batted_ball_metrics(kind: str) -> None:
             denominator=lambda t: t.trajectory_broad_known.sum(),
         )
     )
-    # Coverage-weighted batting averages — broad trajectory (air, ground).
-    for col in ("trajectory_broad_air_ball", "trajectory_ground_ball"):
-        out_name = (
-            "coverage_weighted_air_ball_batting_average"
-            if col == "trajectory_broad_air_ball"
-            else "coverage_weighted_ground_ball_batting_average"
-        )
-        register(
-            Metric(
-                name=out_name,
-                kind=kind,  # type: ignore[arg-type]
-                source="event",
-                formula=(
-                    lambda t, _c=col: coverage_weighted_ba(
-                        t, _c, known_trajectory_broad_out_hit_ratio
-                    )
-                ),
-            )
-        )
-    # Coverage-weighted batting averages — fine trajectory (fly, line, pop).
-    for col, out_name in (
-        ("trajectory_fly_ball", "coverage_weighted_fly_ball_batting_average"),
-        ("trajectory_line_drive", "coverage_weighted_line_drive_batting_average"),
-        ("trajectory_pop_up", "coverage_weighted_pop_up_batting_average"),
-    ):
-        register(
-            Metric(
-                name=out_name,
-                kind=kind,  # type: ignore[arg-type]
-                source="event",
-                formula=(
-                    lambda t, _c=col: coverage_weighted_ba(
-                        t, _c, known_trajectory_out_hit_ratio
-                    )
-                ),
-            )
-        )
     # Angle.
     register(
         Metric(
@@ -585,7 +566,7 @@ def _batted_ball_metrics(kind: str) -> None:
             name="known_angle_out_hit_ratio",
             kind=kind,  # type: ignore[arg-type]
             source="event",
-            formula=known_angle_out_hit_ratio,
+            derived=lambda m: m.known_angle_rate_outs / m.known_angle_rate_hits,
         )
     )
     for a in ("left", "right", "middle"):
@@ -622,18 +603,6 @@ def _batted_ball_metrics(kind: str) -> None:
                 denominator=lambda t: t.batted_angle_known.sum(),
             )
         )
-        register(
-            Metric(
-                name=f"coverage_weighted_angle_{a}_batting_average",
-                kind=kind,  # type: ignore[arg-type]
-                source="event",
-                formula=(
-                    lambda t, _a=a: coverage_weighted_ba(
-                        t, f"batted_angle_{_a}", known_angle_out_hit_ratio
-                    )
-                ),
-            )
-        )
     # Direction.
     for d in ("pulled", "opposite_field"):
         col = f"batted_balls_{d}"
@@ -666,16 +635,31 @@ def _batted_ball_metrics(kind: str) -> None:
                 denominator=lambda t: t.batted_angle_known.sum(),
             )
         )
+    # Coverage-weighted batting averages: register the base sum measures
+    # then the derived metric for each variant.
+    for col, suffix, ratio_name in _COVERAGE_WEIGHTED_VARIANTS:
         register(
             Metric(
-                name=f"coverage_weighted_{d}_batting_average",
+                name=f"sum_{col}_hits",
                 kind=kind,  # type: ignore[arg-type]
                 source="event",
-                formula=(
-                    lambda t, _c=col: coverage_weighted_ba(
-                        t, _c, known_angle_out_hit_ratio
-                    )
-                ),
+                formula=(lambda t, _c=col: (t[_c] * t.hits).sum()),
+            )
+        )
+        register(
+            Metric(
+                name=f"sum_{col}_outs",
+                kind=kind,  # type: ignore[arg-type]
+                source="event",
+                formula=(lambda t, _c=col: (t[_c] * (t.at_bats - t.hits)).sum()),
+            )
+        )
+        register(
+            Metric(
+                name=f"coverage_weighted_{suffix}_batting_average",
+                kind=kind,  # type: ignore[arg-type]
+                source="event",
+                derived=_coverage_weighted_derived(col, ratio_name),
             )
         )
 

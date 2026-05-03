@@ -1,6 +1,6 @@
 # Migration plan & status
 
-**Status:** Phases 0–2 shipped. Ready to start **Phase 3 (BSL semantic layer)**.
+**Status:** Phases 0–3 shipped. Ready to start **Phase 4 (DuckLake publish)**.
 
 The original evaluation that compared 5 candidate stacks across axes A–D
 lives in git history (`af2f1ee` and earlier). This doc has been pared
@@ -43,8 +43,8 @@ remaining phases with the detail they warrant given what we've learned.
 | 1.5 — dbt removal | ✅ shipped | merged into 1 | (covered in 1-followups) |
 | 1.6 — jinja → Python `@macro` | ✅ shipped | `phase-1.6-cleanup` (merged) | `notes/phase-1.6-followups.md` |
 | 2 — Ibis expression layer | ✅ shipped | `phase-2-ibis`, audit sweep | `notes/phase-2-followups.md` |
-| **3 — BSL semantic layer** | **next** | — | — |
-| 4 — DuckLake publish | pending | — | — |
+| 3 — BSL semantic layer | ✅ shipped | `phase-3-bsl` | `notes/phase-3-followups.md` |
+| **4 — DuckLake publish** | **next** | — | — |
 | 5 — Axis-D event-locality | pending | — | — |
 | 6 — ML re-enablement (Hamilton) | pending | — | — |
 | 7 — Optional graduations (Rust ext / `boxball-rs` pushdown) | deferred | — | — |
@@ -201,9 +201,22 @@ Two consumption modes:
 
 ### 3.3 Phase 3 deliverables
 
-- `Metric.derived` evaluator + cycle detection.
-- BSL semantic tables for offense/pitching/fielding × event/season.
-- Top-20 metrics validated against Phase 2 outputs (1e-9 tolerance).
+- ✅ `Metric.derived` evaluator + cycle detection. Two-pass
+  `evaluate_all` in `bc/python_models/metrics/registry.py`; topo sort
+  with cycle + missing-dep diagnostics; `_DepCaptureProxy` for static
+  introspection.
+- ✅ BSL semantic tables for offense/pitching/fielding × event/season.
+  Six factories in `bc/semantic/tables.py`. Same `Metric` objects
+  power both build-time and runtime.
+- ✅ Top-20 metrics validated against Phase 2 outputs (1e-9 tolerance).
+  See `bc/tests/test_bsl_semantic.py` (top-50 2024 batters,
+  OBP/SLG/OPS row-equivalent) and `bc/tests/test_derived_metrics.py`
+  (algebraic checks on synthetic memtable).
+
+See `notes/phase-3-followups.md` for the env-split rationale (sqlglot
+27 vs 30 via xorq pin), BSL event-grain regular-season filter
+discrepancy, and the schema impact of the coverage-weighted registry
+expansion.
 
 ---
 
@@ -363,13 +376,13 @@ extension).
 | 0 — Spikes | ✅ |
 | 1 + 1.5 + 1.6 — SQLMesh + dbt removal + Python `@macro` | ✅ |
 | 2 — Ibis | ✅ |
-| 3 — BSL semantic | next |
-| 4 — DuckLake publish | pending |
+| 3 — BSL semantic | ✅ |
+| 4 — DuckLake publish | next |
 | 5 — Axis-D event-locality | pending |
 | 6 — Hamilton ML | parallel/post-5 |
 | 7 — Rust ext / `boxball-rs` pushdown | deferred |
 
-Critical path: 3 → 4 → 5, with Phase 6 paralleling 5.
+Critical path: 4 → 5, with Phase 6 paralleling 5.
 
 The **LLM-metadata bridge** (`notes/llm-metadata.md`) is a parallel
 work stream, not a migration phase. It depends on Phase 3 (the metric

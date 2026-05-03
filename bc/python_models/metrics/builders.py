@@ -157,10 +157,10 @@ def build_metric_sql(kind: MetricKind, grouping_keys: list[str]) -> str:
     # module-level globals so SQLMesh's python-env serializer doesn't
     # try to repr+eval it.
     from python_models.metrics import _metric_registrations  # noqa: F401
-    from python_models.metrics.registry import metrics_for
+    from python_models.metrics.registry import evaluate_all, metrics_for
 
-    for m in metrics_for(kind, "season"):
-        basic_aggs[m.name] = m.evaluate(season_filtered)
+    season_metrics = metrics_for(kind, "season")
+    basic_aggs.update(evaluate_all(season_filtered, season_metrics))
 
     basic_stats = season_filtered.group_by(grouping_keys).aggregate(**basic_aggs)
 
@@ -172,8 +172,8 @@ def build_metric_sql(kind: MetricKind, grouping_keys: list[str]) -> str:
     )
 
     event_aggs: dict[str, IbisExpr] = {"games": event_filtered.game_id.nunique()}
-    for m in metrics_for(kind, "event"):
-        event_aggs[m.name] = m.evaluate(event_filtered)
+    event_metrics = metrics_for(kind, "event")
+    event_aggs.update(evaluate_all(event_filtered, event_metrics))
 
     event_agg = event_filtered.group_by(grouping_keys).aggregate(**event_aggs)
 
@@ -185,7 +185,7 @@ def build_metric_sql(kind: MetricKind, grouping_keys: list[str]) -> str:
     select_args: list[Any] = [basic_stats[k] for k in grouping_keys]
     for c in int_cols:
         select_args.append(basic_stats[c].cast("int32").name(c))
-    for m in metrics_for(kind, "season"):
+    for m in season_metrics:
         select_args.append(basic_stats[m.name])
 
     select_args.append(
@@ -193,7 +193,7 @@ def build_metric_sql(kind: MetricKind, grouping_keys: list[str]) -> str:
             "event_coverage_rate"
         )
     )
-    for m in metrics_for(kind, "event"):
+    for m in event_metrics:
         select_args.append(event_agg[m.name])
 
     final = joined.select(*select_args)

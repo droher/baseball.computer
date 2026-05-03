@@ -68,3 +68,18 @@ def test_descriptions_are_subset_of_columns(kind, scope, grain):
     cols = set(metric_columns(kind, grain))
     descs = set(metric_column_descriptions(kind, grain))
     assert descs.issubset(cols)
+
+
+@pytest.mark.parametrize(
+    "kind,source,name",
+    [
+        ("offense", "season", "on_base_plus_slugging"),
+        ("offense", "event", "known_trajectory_out_hit_ratio"),
+    ],
+)
+def test_derived_metrics_present_in_metrics_for(kind, source, name):
+    from python_models.metrics import _metric_registrations  # noqa: F401
+    from python_models.metrics.registry import metrics_for
+
+    found = next(m for m in metrics_for(kind, source) if m.name == name)
+    assert found.derived is not None, f"{name} should be a derived Metric"
