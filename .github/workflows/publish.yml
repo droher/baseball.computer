@@ -1,0 +1,41 @@
+name: publish_ducklake
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish_ducklake
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: build + publish + upload
+    runs-on: [self-hosted, baseball.computer]
+    timeout-minutes: 720
+    env:
+      R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ZONE_ID:   ${{ secrets.CLOUDFLARE_ZONE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - run: uv sync --group migration --frozen
+
+      - name: Reset stale DuckLake artefacts
+        run: uv run --group migration python scripts/publish_ducklake.py --reset --smoke-only
+
+      - name: SQLMesh plan (prod)
+        working-directory: bc
+        run: uv run --group migration sqlmesh plan --auto-apply --no-prompts
+
+      - name: Publish DuckLake catalog
+        run: uv run --group migration python scripts/publish_ducklake.py
+
+      - name: Upload to R2 + purge Cloudflare cache
+        run: uv run --group migration python scripts/upload_ducklake.py
