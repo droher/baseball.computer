@@ -317,26 +317,30 @@ Spike 4 + Spike 5 settled the path: pure Polars in SQLMesh Python
 models. Numba (D4) stays available for genuinely row-iterative cases
 but isn't required for the planned ports.
 
-### 5.1 First wave
+### 5.1 First wave — shipped
 
-1. **`event_pitching_flags`.** Save/hold/blown-save FSM. Three CTE
-   stages of `LAG/LEAD ... OVER (PARTITION BY game_id, batting_side
-   ORDER BY event_id) IGNORE NULLS` collapse to
-   `forward_fill().shift(1).over([...], order_by='event_id')` chains.
-   Spike 4 reproduced this on a 225K-row season slice.
-2. **`event_baserunning_stats`.** Bitfield decoder. Split into:
-   - A pure Polars / Ibis projection over the decoded `base_state` bits
-     (`t.base_state.bit_and(7)`-style), or
-   - A Numba `@njit` registered as a DuckDB Arrow UDF if the multi-flag
-     interdependence makes Polars expressions ugly.
-3. **Audit other windowed-CTE models.** Anything matching the `LAG
-   IGNORE NULLS` shape is a candidate.
-4. **SQL ergonomics.** Insert `QUALIFY` (filter on a window function
-   without wrapping in a CTE) and recursive CTE `USING KEY` (DuckDB May
-   2025) where they shorten existing models. Free wins regardless of
-   the Python-model rewrites.
+1. **`event_pitching_flags`** — done. Save/hold/blown-save FSM ported
+   to a SQLMesh Python `@model` returning a Polars-derived DataFrame.
+   Transform lives in `bc/python_models/event_locality/pitching_flags.py`;
+   model entrypoint at `bc/models/intermediate/flags/event_pitching_flags.py`.
+   Diff vs the prior SQL snapshot: 0 drift on all 17 non-grain columns
+   across 18.1M rows. Unit tests at `bc/tests/test_event_pitching_flags.py`.
+2. **`event_baserunning_stats`** — recon found this is pure bitfield
+   `bit_and` over `base_state`, no `LAG`/`LEAD` at all. Not Phase 5
+   pain; deferred indefinitely (revisit only if bitfield ergonomics
+   become a maintenance issue).
 
-### 5.2 What stays in SQL
+### 5.2 Second wave — queued
+
+Pointers and audits live in `notes/phase-5-followups.md`.
+
+- `team_game_results` (two streak-FSM `LAG IGNORE NULLS` windows).
+- `team_game_start_info` (one series-id `LAG IGNORE NULLS` lookup).
+- SQL ergonomics one-shot: insert `QUALIFY` and recursive CTE
+  `USING KEY` (DuckDB May 2025) where they shorten existing models.
+  Orthogonal to the Polars rewrites — ship as its own pass.
+
+### 5.3 What stays in SQL
 
 - Aggregations (`metrics_*` Phase 2 work — Ibis on top of SQL).
 - Cross-game joins (`event_states_full` and similar).

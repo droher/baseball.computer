@@ -63,6 +63,7 @@ PHASE_2_MODELS: list[str] = [
     "calc_park_factor_trajectory_outs",
     "calc_park_factor_hit_location",
     "calc_park_factor_out_location",
+    "event_pitching_flags",
 ]
 
 GRAINS: dict[str, list[str]] = {
@@ -83,6 +84,7 @@ GRAINS: dict[str, list[str]] = {
     "calc_park_factor_trajectory_outs": ["park_id", "season", "league"],
     "calc_park_factor_hit_location": ["park_id", "season", "league", "batter_hand"],
     "calc_park_factor_out_location": ["park_id", "season", "league", "batter_hand"],
+    "event_pitching_flags": ["event_key"],
 }
 
 INT_TOL = 0.0
@@ -187,7 +189,9 @@ def _diff_one_model(
         # extends the schema. Log so the diff still surfaces them.
         logging.getLogger("diff_models").info(
             "%s: dev adds %d new column(s): %s",
-            table, len(only_dev), sorted(only_dev),
+            table,
+            len(only_dev),
+            sorted(only_dev),
         )
     prod_q = _qualify(PROD_SCHEMA, table)
     dev_q = _qualify(DEV_SCHEMA, table)
@@ -235,8 +239,7 @@ def _diff_one_model(
                 f"OR isinf(p.{col_q}) OR isinf(d.{col_q}))"
             )
             mismatch_clause = (
-                f"({distinct} "
-                f"AND ({non_finite} OR ABS(p.{col_q} - d.{col_q}) > {tol}))"
+                f"({distinct} AND ({non_finite} OR ABS(p.{col_q} - d.{col_q}) > {tol}))"
             )
             # Only finite-vs-finite contributes to max_abs; non-finite
             # mismatches still count in rows_diff.
