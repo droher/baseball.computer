@@ -37,7 +37,7 @@ DATA_VERSION_FILE = BC_DIR / "data_version.txt"
 PUBLISH_SCHEMAS = ("main_models", "main_seeds")
 COMPRESSION = "zstd"
 ROW_GROUP_SIZE = "1966080"
-SNAPSHOT_RETENTION = "30 days"
+KEEP_LAST_N_SNAPSHOTS = 5
 SMOKE_SAMPLE = 5
 # Force every row to land in parquet files so R2 has the full artifact.
 # Default inlining keeps small tables inside the catalog DuckDB; we want
@@ -116,9 +116,7 @@ def select_with_enum_casts(cols: list[tuple[str, str]]) -> str:
     return ", ".join(parts)
 
 
-def attach_catalog(
-    con: duckdb.DuckDBPyConnection, *, read_only: bool = False
-) -> None:
+def attach_catalog(con: duckdb.DuckDBPyConnection, *, read_only: bool = False) -> None:
     """ATTACH the local DuckLake catalog using relative paths.
 
     Caller must have chdir'd to BC_DIR first so the relative paths resolve
@@ -179,19 +177,40 @@ def publish_table(
 
 
 def expire_snapshots(con: duckdb.DuckDBPyConnection) -> None:
-    sql = (
-        "CALL ducklake_expire_snapshots('bc_publish',"
-        f" older_than => now() - INTERVAL '{SNAPSHOT_RETENTION}')"
+    """Expire all snapshots except the most recent KEEP_LAST_N_SNAPSHOTS.
+
+    DuckLake's `older_than` cutoff doesn't fit a daily-dispatch cadence —
+    we want a fixed working set, not a time window. Query the snapshots
+    catalogue, take everything past the keep-window, and pass the IDs
+    explicitly via `versions`.
+    """
+    rows = con.execute(
+        "SELECT snapshot_id FROM ducklake_snapshots('bc_publish') ORDER BY snapshot_id DESC"
+    ).fetchall()
+    all_ids = [int(r[0]) for r in rows]
+    expire_ids = all_ids[KEEP_LAST_N_SNAPSHOTS:]
+    if not expire_ids:
+        _log.info(
+            "snapshot count %d <= keep %d, nothing to expire",
+            len(all_ids),
+            KEEP_LAST_N_SNAPSHOTS,
+        )
+        return
+    versions_literal = ", ".join(str(i) for i in expire_ids)
+    expired = con.execute(
+        f"CALL ducklake_expire_snapshots('bc_publish', versions => [{versions_literal}])"
+    ).fetchall()
+    _log.info(
+        "expired %d snapshots (kept %d, total before=%d)",
+        len(expired),
+        KEEP_LAST_N_SNAPSHOTS,
+        len(all_ids),
     )
-    rows = con.execute(sql).fetchall()
-    _log.info("expire_snapshots returned %d rows", len(rows))
 
 
 def report_sizes() -> tuple[int, int]:
     catalog_bytes = CATALOG_PATH.stat().st_size if CATALOG_PATH.exists() else 0
-    data_bytes = sum(
-        f.stat().st_size for f in DATA_PATH.rglob("*") if f.is_file()
-    )
+    data_bytes = sum(f.stat().st_size for f in DATA_PATH.rglob("*") if f.is_file())
     _log.info(
         "artifact sizes: catalog=%.1f MB, data_path=%.1f MB",
         catalog_bytes / 1e6,
@@ -210,9 +229,7 @@ def smoke_check() -> None:
 def _smoke_run(con: duckdb.DuckDBPyConnection) -> None:
     sample = con.execute(_SAMPLE_TABLES_SQL, [SMOKE_SAMPLE]).fetchall()
     for schema, table in sample:
-        cols = con.execute(
-            f'DESCRIBE "bc_publish"."{schema}"."{table}"'
-        ).fetchall()
+        cols = con.execute(f'DESCRIBE "bc_publish"."{schema}"."{table}"').fetchall()
         type_set = sorted({c[1] for c in cols})
         _log.info(
             "DESCRIBE bc_publish.%s.%s cols=%d distinct_types=%s",
@@ -235,6 +252,10 @@ def publish() -> None:
 
     with contextlib.chdir(BC_DIR):
         con = duckdb.connect(bc_db_abs)
+        # Reclaim freed pages before publish so bc.db on-disk size matches
+        # logical size (drops/replaces accumulate stale pages until
+        # checkpoint).
+        _ = con.execute("CHECKPOINT")
         attach_catalog(con)
         set_catalog_options(con)
 

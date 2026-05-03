@@ -29,6 +29,8 @@ _DUCKDB_SETTINGS = {
     "preserve_insertion_order": False,
     "parquet_metadata_cache": True,
     "checkpoint_threshold": "1GB",
+    "memory_limit": "48GB",
+    "threads": 7,
 }
 
 _DUCKDB_CONNECTION = DuckDBConnectionConfig(
@@ -51,7 +53,7 @@ _DUCKDB_CONNECTION = DuckDBConnectionConfig(
         ),
     },
     connector_config=_DUCKDB_SETTINGS,
-    concurrent_tasks=6,
+    concurrent_tasks=2,
 )
 
 _STATE_CONNECTION = DuckDBConnectionConfig(

@@ -74,13 +74,13 @@ options:
 
 ## Snapshot retention API
 
-Plan called for `expire_snapshots(retain_last => 3)`; DuckLake v1.0
-exposes `ducklake_expire_snapshots(catalog, older_than => INTERVAL '...')`
-or `versions => [N1, N2]` (specific snapshot IDs) instead. The publish
-script uses `older_than => INTERVAL '30 days'`. If we want
-exactly-N retention, we'd need to query `ducklake_snapshots()`,
-sort by commit time, pick the IDs to keep, and pass the rest as
-`versions`. Only worth doing if 30 days proves wrong in practice.
+Resolved. `scripts/publish_ducklake.py:expire_snapshots()` queries
+`ducklake_snapshots('bc_publish')` ordered by `snapshot_id DESC`,
+keeps the first `KEEP_LAST_N_SNAPSHOTS` (= 5), and passes the rest
+to `ducklake_expire_snapshots(versions => [...])`. Switched from the
+30-day window because every snapshot is full-size while all models
+are FULL kind — a fixed working set bounds R2 storage cost regardless
+of dispatch cadence.
 
 ## ENUM degradation
 

@@ -32,7 +32,7 @@ jobs:
 
       - name: SQLMesh plan (prod)
         working-directory: bc
-        run: uv run --group migration sqlmesh plan --auto-apply --no-prompts
+        run: uv run --group migration sqlmesh plan --auto-apply --no-prompts --var force_reload=true
 
       - name: Publish DuckLake catalog
         run: uv run --group migration python scripts/publish_ducklake.py
