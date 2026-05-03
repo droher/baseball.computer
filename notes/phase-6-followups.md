@@ -111,28 +111,99 @@ predictions written back into DuckDB via a streaming Python `@model`.
   batch (`mlflow.models.signature.infer_signature`) so MLflow logs
   the model with full input/output schema rather than a warning.
 
-## Open second-wave targets
+## What landed (second-wave first target — `outcome_is_in_play_bin`)
 
-`ml_event_outcomes` provides 7 more targets, each with its own sample
+- `bc/python_models/ml/features.py` — added `TargetSpec` (Pydantic v2,
+  frozen) plus `PLATE_APPEARANCE_CAT` and `IS_IN_PLAY_BIN` instances
+  and an `ALL_TARGETS` tuple. `target_by_name` looks up by name.
+  Legacy `TARGET_COLUMN` / `SAMPLE_WEIGHT_COLUMN` aliases remain
+  bound to the plate-appearance spec for back-compat.
+- `bc/python_models/ml/model_factory.py` — new shared builder.
+  `_make_outputs_layer(trunk, target_spec, num_classes)` dispatches:
+  `multiclass` → `Dense(num_classes, softmax)` + sparse-categorical
+  CE; `binary` → `Dense(1, sigmoid)` + binary CE. The trunk
+  (per-categorical embeddings, one-hot for low-card, normalized
+  numerics, two dense ReLU blocks) is identical for both targets.
+- `bc/python_models/ml/model_plate_appearance_cat.py`,
+  `model_is_in_play_bin.py` — thin wrappers binding their `TargetSpec`
+  to `model_factory.build_model`. The PA shim preserves the existing
+  test surface and keeps the saved Keras layer/model names stable.
+- `bc/python_models/ml/training.py` — replaces
+  `training_plate_appearance_cat.py`. Generic over `TargetSpec`:
+  `_select`, `collect_feature_stats`, `_encode_batch`,
+  `make_batch_generator`, `run_fit_and_log`, `write_pin`, and `train`
+  all take a spec. Binary `_encode_batch` casts the target to
+  `Float32` and skips the class-index round-trip (`class_index` is
+  ignored by the binary path). `_select` filters
+  `WHERE <weight_column> > 0` so zero-weight rows don't waste batches
+  — important for binary targets like `in_play_sample_weight` where
+  most events outside batting have weight 0.
+- `bc/python_models/ml/hamilton_dag.py` — same DAG, now consumes
+  `target_spec` as an input. `num_classes` returns 1 for `binary`
+  kind, `len(class_labels)` otherwise. Adding a third target requires
+  no DAG changes.
+- `bc/python_models/ml/prediction.py` — `Scorer` gained a `kind`
+  field and a per-kind output schema. Multiclass schema is unchanged
+  (`predicted_class`, `predicted_class_proba`). Binary emits
+  `predicted_class_bin` (UInt8, threshold 0.5) and `predicted_proba`
+  (Float64, raw sigmoid). The pin JSON now carries `kind` and
+  `target_column`/`target_name`, which `load_scorer` reads to choose
+  the right output path.
+- `bc/models/intermediate/machine_learning/predictions_is_in_play_bin.py`
+  — SQLMesh Python `@model` mirroring `predictions_plate_appearance_cat`
+  but with the binary-schema columns and matching audits
+  (`bounded_range` 0/1 on `predicted_class_bin`, 0.0/1.0 on
+  `predicted_proba`).
+- `scripts/train_is_in_play_bin.py` — CLI parallel to
+  `train_plate_appearance_cat.py`.
+- `bc/tests/test_is_in_play_bin_model.py` — 5 tests on the binary
+  build_model + Scorer schema (output shape, shim parity, schema,
+  empty-input, OOV handling).
+
+## Decisions / why-not log (second wave)
+
+- **TargetSpec, not a base class hierarchy.** A flat Pydantic model
+  with a `kind` enum is enough to express the differences between
+  multiclass and binary targets at the four touch points (model head,
+  loss/metric, `_encode_batch`, Scorer output schema). A class
+  hierarchy would have spread the dispatch across more files without
+  reducing the total branch count.
+- **Shared trunk, per-target heads — but trained independently.** The
+  followups previously suggested a multi-task model with one shared
+  trunk and many heads. Skipping that for now: each target trains
+  separately and ships its own MLflow run. Multi-task training is a
+  larger optimization choice (target weighting, loss balancing,
+  joint validation) that we should make once we have ≥3 targets and
+  a clear use case.
+- **Filter zero-weight rows in `_select`, not in `_encode_batch`.**
+  For binary targets like `is_in_play_bin`, ~half of events have
+  zero weight. Filtering at SQL time keeps DuckDB from streaming
+  rows we'd discard immediately, and keeps the train/test row counts
+  honest.
+- **Binary head emits a single sigmoid scalar, not 2-class softmax.**
+  Both are equivalent in expressiveness, but the scalar form gives a
+  cleaner output schema (`predicted_proba` directly) and a smaller
+  model. `predicted_class_bin` is just `proba >= 0.5`.
+
+## Open third-wave targets
+
+`ml_event_outcomes` provides 6 more targets, each with its own sample
 weight column. Order roughly by feature reuse and reviewability:
 
 | Target column | Type | Sample weight | Notes |
 |---|---|---|---|
-| `outcome_is_in_play_bin` | binary | `in_play_sample_weight` | Logistic head; should reuse the same feature stack. |
 | `outcome_batted_trajectory_cat` | multiclass | `trajectory_sample_weight` | Conditional on in-play. Either nest under `is_in_play_bin` or accept a "not in play" class. |
 | `outcome_batted_location_cat` | multiclass | `location_sample_weight` | Same conditional structure as trajectory. |
 | `outcome_baserunning_cat` | multiclass | `baserunning_play_sample_weight` | Different feature subset (runners on base matter most). |
-| `outcome_runs_following_num` | regression | `generic_sample_weight` | Linear head + MSE; useful for run-expectancy work. |
+| `outcome_runs_following_num` | regression | `generic_sample_weight` | Needs a `regression` branch in `_make_outputs_layer` (linear head + MSE). |
 | `outcome_is_win_bin` | binary | `win_sample_weight` | Win probability; check meta_train_test_split partitions correctly across game state. |
 | `outcome_has_batting_bin` | binary | `generic_sample_weight` | Lowest priority — already largely deterministic from event type. |
 
-Suggested approach: factor `_make_outputs_layer(target_kind, num_classes)`
-in `model_plate_appearance_cat.py` so additional targets are one
-function call plus a target-specific training script. Or move toward a
-multi-task model with shared trunk and per-target heads (common
-embedding tables), trained jointly with weighted summed losses — this
-is where Hamilton's DAG pays off, since each target becomes a leaf
-node consuming the shared encoder.
+For the multiclass + binary targets above, adding a new target is now
+purely additive: declare a `TargetSpec` in `features.py`, add a
+`scripts/train_<name>.py` CLI and a `predictions_<name>.py` `@model`,
+and reuse the existing factory + DAG. Regression needs a small extension
+to `_make_outputs_layer` and `_encode_batch`.
 
 ## Other follow-ups
 

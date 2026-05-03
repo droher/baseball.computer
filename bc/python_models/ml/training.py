@@ -1,10 +1,13 @@
-"""Training entry point for the plate-appearance-cat model.
+"""Generic training pipeline for Phase 6 ML targets.
 
 One pass over the TRAIN partition collects vocabularies + numeric
-statistics; a Keras model is constructed from those; a streaming
-generator over `ml_features` feeds `model.fit`. The fitted artifact is
-logged to MLflow (file backend) and the run id is pinned so the
-prediction `@model` can find it.
+statistics; a Keras model is constructed via `model_factory.build_model`
+from those; a streaming generator over `ml_features` feeds `model.fit`.
+The fitted artifact is logged to MLflow (file backend) and the run id
+is pinned so the prediction `@model` can find it.
+
+All target-specific knobs (target column, weight column, kind, vocab
+dir, pin path, experiment name) are derived from the `TargetSpec`.
 """
 
 from __future__ import annotations
@@ -31,26 +34,34 @@ from python_models.ml.features import (
     HIGH_CARD_CATEGORICAL,
     LOW_CARD_CATEGORICAL,
     NUMERIC,
-    SAMPLE_WEIGHT_COLUMN,
     SPLIT_COLUMN,
-    TARGET_COLUMN,
+    TargetSpec,
     Vocabulary,
     build_vocabulary,
 )
-from python_models.ml.model_plate_appearance_cat import build_model
+from python_models.ml.model_factory import build_model
 
 _log = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ARTIFACT_DIR = REPO_ROOT / "bc" / "hamilton_artifacts"
-VOCAB_DIR = ARTIFACT_DIR / "vocabs" / "plate_appearance_cat"
+VOCAB_ROOT = ARTIFACT_DIR / "vocabs"
 MLRUNS_DIR = REPO_ROOT / "bc" / "mlruns"
 MLFLOW_TRACKING_DB = REPO_ROOT / "bc" / "mlflow.db"
-PIN_PATH = REPO_ROOT / "bc" / "python_models" / "ml" / "artifacts" / "plate_appearance_cat.json"
+PIN_ROOT = REPO_ROOT / "bc" / "python_models" / "ml" / "artifacts"
 DEFAULT_BATCH_ROWS = 250_000
 DEFAULT_EPOCHS = 3
+DEFAULT_KERAS_BATCH_SIZE = 4096
 DEFAULT_DB = str(REPO_ROOT / "bc.db")
 DEFAULT_SCHEMA = "main_models__dev"
+
+
+def vocab_dir_for(target_spec: TargetSpec) -> Path:
+    return VOCAB_ROOT / target_spec.name
+
+
+def pin_path_for(target_spec: TargetSpec) -> Path:
+    return PIN_ROOT / f"{target_spec.name}.json"
 
 
 @dataclass(frozen=True)
@@ -67,15 +78,34 @@ _VALID_SPLITS: frozenset[str] = frozenset({"TRAIN", "TEST"})
 _VALID_SCHEMAS: frozenset[str] = frozenset({"main_models", "main_models__dev"})
 
 
-def _select(split: str, schema: str) -> str:
+def _select(target_spec: TargetSpec, split: str, schema: str) -> str:
     if split not in _VALID_SPLITS:
         raise ValueError(f"split {split!r} not in {sorted(_VALID_SPLITS)}")
     if schema not in _VALID_SCHEMAS:
         raise ValueError(f"schema {schema!r} not in {sorted(_VALID_SCHEMAS)}")
-    cols = ", ".join((GRAIN_COLUMN, *ALL_FEATURE_COLUMNS, TARGET_COLUMN, SAMPLE_WEIGHT_COLUMN))
+    cols = ", ".join(
+        (
+            GRAIN_COLUMN,
+            *ALL_FEATURE_COLUMNS,
+            target_spec.target_column,
+            target_spec.weight_column,
+        )
+    )
+    where = [
+        f"{SPLIT_COLUMN} = '{split}'",
+        f"{target_spec.target_column} IS NOT NULL",
+    ]
+    # For binary targets, exclude rows that have weight 0 — otherwise
+    # the model would see lots of "outcome_is_in_play_bin = 0 because
+    # the event isn't a plate appearance" rows, which carry no real
+    # signal. For multiclass targets the 'Other' class is meaningful
+    # so we keep weight-0 rows; their gradient contribution is zero
+    # anyway because the loss is sample-weighted.
+    if target_spec.kind == "binary":
+        where.append(f"{target_spec.weight_column} > 0")
     return (
-        f"SELECT {cols} FROM {schema}.ml_features "
-        f"WHERE {SPLIT_COLUMN} = '{split}' AND {TARGET_COLUMN} IS NOT NULL"
+        f"SELECT {cols} FROM {schema}.ml_features WHERE "
+        + " AND ".join(where)
     )
 
 
@@ -90,9 +120,10 @@ def _load_cached_vocab(col: str, vocab_dir: Path) -> Vocabulary | None:
 
 def collect_feature_stats(
     con: duckdb.DuckDBPyConnection,
+    target_spec: TargetSpec,
     schema: str,
     *,
-    vocab_dir: Path = VOCAB_DIR,
+    vocab_dir: Path,
     rebuild_vocabs: bool = False,
 ) -> FeatureStats:
     """One pass over the TRAIN partition to capture vocabularies + numeric stats.
@@ -102,7 +133,7 @@ def collect_feature_stats(
     when the upstream changes (or pass `rebuild_vocabs=True`). Numeric
     statistics and class labels are recomputed every run.
     """
-    train_query = _select("TRAIN", schema)
+    train_query = _select(target_spec, "TRAIN", schema)
 
     vocabularies: dict[str, Vocabulary] = {}
     if not rebuild_vocabs:
@@ -146,13 +177,16 @@ def collect_feature_stats(
 
     _log.info("collecting target class labels")
     class_rows = con.execute(
-        f"SELECT DISTINCT {TARGET_COLUMN} AS v FROM ({train_query}) WHERE {TARGET_COLUMN} IS NOT NULL ORDER BY v"
+        f"SELECT DISTINCT {target_spec.target_column} AS v "
+        f"FROM ({train_query}) "
+        f"WHERE {target_spec.target_column} IS NOT NULL "
+        f"ORDER BY v"
     ).fetchall()
-    class_labels = tuple(r[0] for r in class_rows)
+    class_labels = tuple(str(r[0]) for r in class_rows)
 
     train_count = con.execute(f"SELECT COUNT(*) FROM ({train_query})").fetchone()
     test_count = con.execute(
-        f"SELECT COUNT(*) FROM ({_select('TEST', schema)})"
+        f"SELECT COUNT(*) FROM ({_select(target_spec, 'TEST', schema)})"
     ).fetchone()
     assert train_count is not None and test_count is not None
 
@@ -166,63 +200,86 @@ def collect_feature_stats(
     )
 
 
+_BatchInputs = dict[str, NDArray[np.int64] | NDArray[np.float32]]
+_Batch = tuple[_BatchInputs, NDArray[Any], NDArray[np.float32]]
+
+
 def _encode_batch(
     df: pl.DataFrame,
+    target_spec: TargetSpec,
     stats: FeatureStats,
     class_index: dict[str, int],
-) -> tuple[dict[str, NDArray[np.int64] | NDArray[np.float32]], NDArray[np.int64], NDArray[np.float32]]:
-    inputs: dict[str, NDArray[np.int64] | NDArray[np.float32]] = {}
+) -> _Batch:
+    inputs: _BatchInputs = {}
     for col in (*HIGH_CARD_CATEGORICAL, *LOW_CARD_CATEGORICAL):
         encoded = stats.vocabularies[col].encode(df[col]).to_numpy()
         inputs[col] = encoded.astype(np.int64).reshape(-1, 1)
     for col in NUMERIC:
         inputs[col] = df[col].cast(pl.Float32).fill_null(0.0).to_numpy().reshape(-1, 1)
 
-    target_codes = (
-        df[TARGET_COLUMN]
-        .cast(pl.Utf8)
-        .replace_strict(class_index, default=-1)
-        .cast(pl.Int64)
-        .to_numpy()
-    )
-    valid = target_codes >= 0
-    if not bool(valid.all()):
-        _log.warning("dropping %d rows with unknown target class", int((~valid).sum()))
-        for k, v in inputs.items():
-            inputs[k] = v[valid]
-        target_codes = target_codes[valid]
+    if target_spec.kind == "multiclass":
+        target_codes = (
+            df[target_spec.target_column]
+            .cast(pl.Utf8)
+            .replace_strict(class_index, default=-1)
+            .cast(pl.Int64)
+            .to_numpy()
+        )
+        valid = target_codes >= 0
+        if not bool(valid.all()):
+            _log.warning(
+                "dropping %d rows with unknown target class", int((~valid).sum())
+            )
+            for k, v in inputs.items():
+                inputs[k] = v[valid]
+            target_codes = target_codes[valid]
+        targets: NDArray[Any] = target_codes.astype(np.int64)
+    elif target_spec.kind == "binary":
+        target_codes = (
+            df[target_spec.target_column].cast(pl.Float32).fill_null(0.0).to_numpy()
+        )
+        targets = target_codes.astype(np.float32).reshape(-1, 1)
+        valid = np.ones(targets.shape[0], dtype=bool)
+    else:
+        raise ValueError(f"unsupported target kind {target_spec.kind!r}")
 
-    weights = df[SAMPLE_WEIGHT_COLUMN].cast(pl.Float32).fill_null(0.0).to_numpy()
+    weights = (
+        df[target_spec.weight_column].cast(pl.Float32).fill_null(0.0).to_numpy()
+    )
     if not bool(valid.all()):
         weights = weights[valid]
-    return inputs, target_codes.astype(np.int64), weights.astype(np.float32)
+    return inputs, targets, weights.astype(np.float32)
 
 
 def make_batch_generator(
     db_path: str,
+    target_spec: TargetSpec,
     split: str,
     schema: str,
     stats: FeatureStats,
     class_index: dict[str, int],
     rows_per_fetch: int,
     keras_batch_size: int,
-) -> Iterator[tuple[dict[str, NDArray[np.int64] | NDArray[np.float32]], NDArray[np.int64], NDArray[np.float32]]]:
+) -> Iterator[_Batch]:
     """Yield Keras-sized mini-batches.
 
     DuckDB streams `rows_per_fetch`-row chunks from `ml_features`; each
     chunk is encoded once and then sliced into `keras_batch_size`
-    mini-batches before yielding. Mirrors the inner `batches_to_grab`
-    factor from the deleted `keras_sandbox.ipynb`. The connection is
-    re-opened per pass so Keras can re-iterate per epoch.
+    mini-batches before yielding. The connection is re-opened per pass
+    so Keras can re-iterate per epoch.
     """
     while True:
         with open_bc_db(db_path, read_only=True) as con:
             for chunk in stream_query(
-                con, _select(split, schema), rows_per_batch=rows_per_fetch
+                con,
+                _select(target_spec, split, schema),
+                rows_per_batch=rows_per_fetch,
             ):
                 if chunk.height == 0:
                     continue
-                inputs, targets, weights = _encode_batch(chunk, stats, class_index)
+                inputs, targets, weights = _encode_batch(
+                    chunk, target_spec, stats, class_index
+                )
                 n = targets.shape[0]
                 for start in range(0, n, keras_batch_size):
                     end = min(start + keras_batch_size, n)
@@ -247,6 +304,7 @@ def save_vocabularies(stats: FeatureStats, vocab_dir: Path) -> dict[str, str]:
 def write_pin(
     pin_path: Path,
     *,
+    target_spec: TargetSpec,
     run_id: str,
     tracking_uri: str,
     vocab_paths: dict[str, str],
@@ -256,6 +314,9 @@ def write_pin(
 ) -> None:
     pin_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
+        "target_name": target_spec.name,
+        "target_column": target_spec.target_column,
+        "kind": target_spec.kind,
         "run_id": run_id,
         "tracking_uri": tracking_uri,
         "vocab_paths": vocab_paths,
@@ -269,6 +330,7 @@ def write_pin(
 
 def run_fit_and_log(
     *,
+    target_spec: TargetSpec,
     model: Any,
     stats: FeatureStats,
     class_index: dict[str, int],
@@ -278,16 +340,25 @@ def run_fit_and_log(
     rows_per_batch: int,
     keras_batch_size: int,
 ) -> dict[str, str]:
-    """Drive `model.fit` over streaming generators and log to MLflow.
-
-    Hamilton's `fitted_run` node calls into this. Kept as a plain
-    function so it stays directly callable for ad-hoc training too.
-    """
     train_gen = make_batch_generator(
-        db_path, "TRAIN", schema, stats, class_index, rows_per_batch, keras_batch_size
+        db_path,
+        target_spec,
+        "TRAIN",
+        schema,
+        stats,
+        class_index,
+        rows_per_batch,
+        keras_batch_size,
     )
     test_gen = make_batch_generator(
-        db_path, "TEST", schema, stats, class_index, rows_per_batch, keras_batch_size
+        db_path,
+        target_spec,
+        "TEST",
+        schema,
+        stats,
+        class_index,
+        rows_per_batch,
+        keras_batch_size,
     )
 
     steps_per_epoch = max(1, stats.train_row_count // keras_batch_size)
@@ -304,6 +375,8 @@ def run_fit_and_log(
     with mlflow.start_run() as run:
         _ = mlflow.log_params(
             {
+                "target_name": target_spec.name,
+                "target_kind": target_spec.kind,
                 "epochs": epochs,
                 "rows_per_batch": rows_per_batch,
                 "keras_batch_size": keras_batch_size,
@@ -324,13 +397,12 @@ def run_fit_and_log(
             for epoch_idx, v in enumerate(values):
                 _ = mlflow.log_metric(metric_name, float(v), step=epoch_idx)
 
-        # Build a model signature from a sample batch so MLflow stops
-        # warning about unknown input/output schema.
         from mlflow.models.signature import infer_signature
 
         sample_inputs, _, _ = next(
             make_batch_generator(
                 db_path,
+                target_spec,
                 "TEST",
                 schema,
                 stats,
@@ -351,47 +423,44 @@ def run_fit_and_log(
 
 def train(
     *,
+    target_spec: TargetSpec,
     db_path: str = DEFAULT_DB,
     schema: str = DEFAULT_SCHEMA,
     epochs: int = DEFAULT_EPOCHS,
     rows_per_batch: int = DEFAULT_BATCH_ROWS,
-    keras_batch_size: int = 4096,
+    keras_batch_size: int = DEFAULT_KERAS_BATCH_SIZE,
     rebuild_vocabs: bool = False,
 ) -> str:
-    """Compose the Hamilton DAG and materialize the pinned run id.
-
-    The `pin_written` node is the leaf of the DAG; requesting it pulls
-    feature_stats → model → fitted_run → vocab persistence → pin write
-    in dependency order.
-    """
+    """Compose the Hamilton DAG and materialize the pinned run id."""
     from hamilton import driver
 
     from python_models.ml import hamilton_dag
 
     dr = driver.Builder().with_modules(hamilton_dag).build()
     inputs: dict[str, object] = {
+        "target_spec": target_spec,
         "db_path": db_path,
         "schema": schema,
         "epochs": epochs,
         "rows_per_batch": rows_per_batch,
         "keras_batch_size": keras_batch_size,
         "rebuild_vocabs": rebuild_vocabs,
-        "vocab_dir": VOCAB_DIR,
+        "vocab_dir": vocab_dir_for(target_spec),
         "mlflow_tracking_db": MLFLOW_TRACKING_DB,
         "mlruns_dir": MLRUNS_DIR,
-        "experiment_name": "plate_appearance_cat",
-        "pin_path": PIN_PATH,
+        "experiment_name": target_spec.name,
+        "pin_path": pin_path_for(target_spec),
     }
     result = dr.execute(["pin_written"], inputs=inputs)
     return str(result["pin_written"])
 
 
-def export_dag_diagram(out_path: Path) -> Path:
-    """Emit the Hamilton training DAG as a PNG/dot file for the followups."""
+def export_dag_diagram(out_path: Path, target_spec: TargetSpec) -> Path:
     from hamilton import driver
 
     from python_models.ml import hamilton_dag
 
+    del target_spec  # diagram is target-agnostic; included for symmetry with train()
     dr = driver.Builder().with_modules(hamilton_dag).build()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fmt = out_path.suffix.lstrip(".") or "png"

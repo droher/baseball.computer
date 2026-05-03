@@ -1,7 +1,7 @@
-"""Train the Phase 6 plate-appearance-cat model and pin the run id.
+"""Train the Phase 6 is-in-play binary model and pin the run id.
 
 Run via:
-    uv run --group migration-ml python scripts/train_plate_appearance_cat.py \
+    uv run --group migration-ml python scripts/train_is_in_play_bin.py \
         [--epochs 3] [--rows-per-batch 250000] [--db bc/bc.db]
 """
 
@@ -17,7 +17,7 @@ BC_DIR = REPO_ROOT / "bc"
 if str(BC_DIR) not in sys.path:
     sys.path.insert(0, str(BC_DIR))
 
-from python_models.ml.features import PLATE_APPEARANCE_CAT  # noqa: E402
+from python_models.ml.features import IS_IN_PLAY_BIN  # noqa: E402
 from python_models.ml.training import (  # noqa: E402
     DEFAULT_BATCH_ROWS,
     DEFAULT_DB,
@@ -53,7 +53,7 @@ def main() -> int:
     )
 
     run_id = train(
-        target_spec=PLATE_APPEARANCE_CAT,
+        target_spec=IS_IN_PLAY_BIN,
         db_path=str(args.db),
         schema=str(args.schema),
         epochs=int(args.epochs),

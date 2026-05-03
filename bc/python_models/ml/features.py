@@ -1,15 +1,18 @@
-"""Feature schema for the Phase 6 plate-appearance-cat model.
+"""Feature schema for the Phase 6 ML models.
 
 One source of truth for which `ml_features` columns are model inputs,
-how they're typed, and the encoding strategy. Training, vocabulary
-construction, and inference all import from here so they cannot drift.
+how they're typed, and the encoding strategy. Targets are described as
+`TargetSpec` instances; training, vocabulary construction, and
+inference all import from here so they cannot drift.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar, Literal
 
 import polars as pl
+from pydantic import BaseModel, ConfigDict
 
 # High-cardinality identifier columns get learned embeddings.
 HIGH_CARD_CATEGORICAL: tuple[str, ...] = (
@@ -38,8 +41,6 @@ NUMERIC: tuple[str, ...] = (
     "score_fielding_team_num",
 )
 
-TARGET_COLUMN = "outcome_plate_appearance_cat"
-SAMPLE_WEIGHT_COLUMN = "plate_appearance_sample_weight"
 SPLIT_COLUMN = "meta_train_test_split"
 GRAIN_COLUMN = "event_key"
 
@@ -50,6 +51,48 @@ ALL_FEATURE_COLUMNS: tuple[str, ...] = (
 )
 
 OOV_TOKEN = "<oov>"
+
+TargetKind = Literal["multiclass", "binary"]
+
+
+class TargetSpec(BaseModel):
+    """Describes one trainable target on `ml_features`.
+
+    `name` is used as the experiment name, the artifact filename stem,
+    the Keras model `name`, and the output layer `name`. Anything that
+    needs a per-target identifier should derive it from here.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    name: str
+    target_column: str
+    weight_column: str
+    kind: TargetKind
+
+
+PLATE_APPEARANCE_CAT = TargetSpec(
+    name="plate_appearance_cat",
+    target_column="outcome_plate_appearance_cat",
+    weight_column="plate_appearance_sample_weight",
+    kind="multiclass",
+)
+
+IS_IN_PLAY_BIN = TargetSpec(
+    name="is_in_play_bin",
+    target_column="outcome_is_in_play_bin",
+    weight_column="in_play_sample_weight",
+    kind="binary",
+)
+
+ALL_TARGETS: tuple[TargetSpec, ...] = (PLATE_APPEARANCE_CAT, IS_IN_PLAY_BIN)
+
+
+def target_by_name(name: str) -> TargetSpec:
+    for spec in ALL_TARGETS:
+        if spec.name == name:
+            return spec
+    raise KeyError(f"unknown target {name!r}; known: {[s.name for s in ALL_TARGETS]}")
 
 
 @dataclass(frozen=True)

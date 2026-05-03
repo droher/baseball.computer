@@ -6,14 +6,14 @@ import polars as pl
 
 from python_models.ml.features import (
     ALL_FEATURE_COLUMNS,
+    ALL_TARGETS,
     HIGH_CARD_CATEGORICAL,
     LOW_CARD_CATEGORICAL,
     NUMERIC,
-    SAMPLE_WEIGHT_COLUMN,
     SPLIT_COLUMN,
-    TARGET_COLUMN,
     Vocabulary,
     build_vocabulary,
+    target_by_name,
     target_class_labels,
 )
 
@@ -30,9 +30,15 @@ def test_feature_columns_are_partitioned() -> None:
 
 
 def test_target_and_weight_columns_distinct() -> None:
-    assert TARGET_COLUMN not in ALL_FEATURE_COLUMNS
-    assert SAMPLE_WEIGHT_COLUMN not in ALL_FEATURE_COLUMNS
+    for spec in ALL_TARGETS:
+        assert spec.target_column not in ALL_FEATURE_COLUMNS
+        assert spec.weight_column not in ALL_FEATURE_COLUMNS
     assert SPLIT_COLUMN not in ALL_FEATURE_COLUMNS
+
+
+def test_target_by_name_round_trips() -> None:
+    for spec in ALL_TARGETS:
+        assert target_by_name(spec.name) is spec
 
 
 def test_vocabulary_size_includes_oov_slot() -> None:
