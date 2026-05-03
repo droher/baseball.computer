@@ -33,6 +33,18 @@ migration = [
     "numba>=0.59",
     "pydantic>=2.7",
 ]
+# Phase 6: Hamilton ML stack on top of migration. PyTorch backend for
+# Keras 3 — MPS support ships in torch core, no tensorflow-metal /
+# jax-metal plugin needed. Set KERAS_BACKEND=torch before importing
+# keras (handled in python_models/ml/__init__.py).
+migration-ml = [
+    {include-group = "migration"},
+    "apache-hamilton[visualization]>=1.90",
+    "mlflow>=2.18",
+    "scikit-learn>=1.5",
+    "keras>=3.7",
+    "torch>=2.5",
+]
 spikes-bsl = [
     "boring-semantic-layer>=0.3.12",
     "ibis-framework[duckdb]>=11.0",
@@ -45,8 +57,15 @@ conflicts = [
         { group = "migration" },
         { group = "spikes-bsl" },
     ],
+    [
+        { group = "migration-ml" },
+        { group = "spikes-bsl" },
+    ],
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["bc/tests"]
 pythonpath = ["bc"]
+
+[tool.pyright]
+extraPaths = ["bc"]

@@ -23,3 +23,7 @@ __pycache__/
 .claude/*
 !.claude/skills/
 CLAUDE.md
+bc/mlruns/
+bc/mlflow.db
+bc/mlflow.db-*
+bc/hamilton_artifacts/

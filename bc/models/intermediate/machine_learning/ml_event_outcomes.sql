@@ -1,7 +1,6 @@
 MODEL (
   name main_models.ml_event_outcomes,
   kind FULL,
-  enabled FALSE,
   grain (event_key),
   columns (
     event_key UINTEGER,
@@ -23,6 +22,10 @@ MODEL (
   ),
   column_descriptions (
     event_key = @doc('event_key')
+  ),
+  audits (
+    not_null(columns := (event_key)),
+    unique_grain(columns := (event_key))
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_ml_event_outcomes.parquet'
