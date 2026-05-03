@@ -175,26 +175,43 @@ pieces of work on top of the leverage cleanup:
 
 ### New open follow-ups
 
-- **Partial-coverage SUMs**. The Lahman supplement only catches
-  *all-NULL* upstream cases. For partial-coverage years (1901-07 BFP
-  ~15-25% NULL rows in `stg_box_score_pitching_lines`, 1903-09 ER
-  ~50-100% NULL), `SUM(stat)` produces a biased-low partial total
-  (NULLs treated as 0) that is non-NULL, so COALESCE doesn't fire.
-  Fix needs `IF(BOOL_OR(col IS NULL), NULL, SUM(col))` at both
-  `box_agg` (in `player_game_pitching_stats.sql`) and the
-  per-season SUM in `player_team_season_pitching_stats.sql` (the
-  `@EACH(@combined_pitching_stats(), s -> SUM(@s)::INT AS @s)` macro
-  expansion). Probably wants a `@nullable_sum` helper macro since
-  the same pattern would apply to batting/fielding.
-- **Apply Lahman supplement to batting**.
-  `player_team_season_offense_stats.sql` likely has the same shape
-  bug for early-NA SO/CS/SH (and the post-1920s SH/SF era when
-  SF wasn't separated). Audits don't fail today (PA is non-null
-  everywhere), but the latent NULLs propagate to downstream metrics.
-  Mirror the pitching restructure.
+- **Partial-coverage SUMs** — still open. Initial fix (`@nullable_sum`
+  macro that poisons the SUM whenever any contributing game-row is
+  NULL, forcing the COALESCE-against-Lahman to fire) was reverted on
+  2026-05-03: it discarded retrosheet's partial information for stats
+  Lahman doesn't track in the era retrosheet lacks (e.g. SF pre-1954,
+  IBB pre-1955, GIDP pre-1933) — Wagner 1909 SF went from a partial
+  6 to NULL with the supplement returning NULL too. The right fix
+  needs per-stat per-row gating: only choose Lahman when the per-game
+  data has at least one NULL contributor AND Lahman's value is
+  strictly greater than retrosheet's partial SUM. Sketched but not
+  shipped — gets fiddly because SQLMesh's `EXCLUDE`/`REPLACE` clauses
+  don't expand `@EACH` macros, so the per-stat block has to be
+  emitted via a Python-side macro returning a string (or every stat
+  enumerated by hand). Defer until a real consumer asks for it.
+- **Apply Lahman supplement to batting** — *resolved 2026-05-03*.
+  `player_team_season_offense_stats.sql` restructured to mirror
+  pitching: `databank` covers all seasons, `databank_only` for seasons
+  absent from stg_games, `retrosheet_supplemented` FULL JOINs Lahman
+  per `(season, team_id, player_id)` and COALESCEs 19 supplement-eligible
+  stats. Same caveat as pitching: COALESCE only fires when retrosheet's
+  SUM is NULL, so partial-coverage years still report retrosheet's
+  biased-low partial. Pre-1920 SB/CS override (databank_running)
+  preserved as a separate REPLACE — distinct semantic (override vs
+  fill-on-NULL).
 - **Park-factor priors for sparse leagues**. Even with `bounded_max=20`,
   the 6 residual NN1/NN2 spatial-distribution outliers represent real
   data but extreme park factors. Could bump `prior_sample_size` per-league
   (e.g. 5000 for NN1/NN2 vs 1000 default) to dampen further if downstream
   use cases need it.
+- **Custom `relationships` audit broken under DEV_ONLY mode**.
+  `bc/audits/relationships.sql` references `@to_model` which renders to
+  the prod-physical FQN (e.g. `main_models.game_results`); when
+  `virtual_environment_mode=DEV_ONLY`, that schema doesn't exist and
+  the audit fails with a CatalogException after a successful
+  materialization. Pre-existing — surfaced when re-running `sqlmesh
+  plan dev` against player_game_offense_stats / player_game_pitching_stats.
+  Fix needs the audit to resolve `@to_model` through the dev virtualization
+  layer (probably swap to a built-in `forall` audit or rewrite using a
+  resolver helper that consults the env at audit time).
 

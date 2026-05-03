@@ -38,22 +38,17 @@ When the cutover lands:
    reference only the DuckLake URL.
 4. After the grace window, purge the `dbt/` R2 prefix.
 
-## 4.5 Incremental kinds for hot tables
+## 4.5 Incremental kinds — shelved
 
-Today every model is `kind FULL`. DuckLake snapshot retention is cheap
-when models are incremental (only changed partitions get new files;
-older snapshots keep pointing at unchanged ones), but with FULL kinds
-each snapshot writes a full fresh parquet set, so retaining N snapshots
-costs roughly N × full table size (~40 GB × N for the warehouse).
-
-Candidates to move to incremental kinds:
-
-- `event_states_full` — biggest table, event-grain, append-only by
-  `(season, game_id, event_id)`.
-- `metrics_player_event_*` and similar event-grain `metrics_*` tables.
-
-Once these are incremental, increase the snapshot-retention window
-without storage explosion.
+Decision (2026-05-03): not pursuing. The motivation was DuckLake
+snapshot-retention storage savings, but we have no current need to
+retain snapshots — both SQLMesh (`snapshot_ttl="in 1 hour"` + janitor)
+and DuckLake (`expire_snapshots()` keeping the last 5) prune
+aggressively, so a fixed working set already bounds cost. Adding
+`INCREMENTAL_BY_TIME_RANGE` would add coordination complexity (interval
+config, late-arriving data, partition replacement on the publish side)
+without paying off until we want long history. Revisit only when we
+actually want to retain N>>5 snapshots.
 
 ## Per-table compression / row-group settings
 

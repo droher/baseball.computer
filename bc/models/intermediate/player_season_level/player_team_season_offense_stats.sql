@@ -190,7 +190,6 @@ WITH databank AS (
         SUM(bat.on_base_successes)::SMALLINT AS on_base_successes,
     FROM main_models.stg_databank_batting AS bat
     INNER JOIN main_models.stg_people AS people USING (databank_player_id)
-    WHERE bat.season NOT IN (SELECT DISTINCT season FROM main_models.stg_games)
     GROUP BY 1, 2, 3
 ),
 
@@ -221,26 +220,81 @@ retrosheet AS (
     GROUP BY 1, 2, 3, 4
 ),
 
-unioned AS (
-    SELECT * FROM retrosheet
-    UNION ALL BY NAME
-    SELECT * FROM databank
+-- Materialize VARCHAR copies of ENUM join keys once so DuckDB can hash-join
+-- to databank (VARCHAR team_id / game_type). Mirrors the pattern in
+-- player_team_season_pitching_stats.sql.
+retrosheet_keyed AS (
+    SELECT
+        retrosheet.*,
+        team_id::VARCHAR AS team_id_str,
+        game_type::VARCHAR AS game_type_str
+    FROM retrosheet
 ),
 
+retrosheet_seasons AS (
+    SELECT DISTINCT season FROM main_models.stg_games
+),
+
+databank_only AS (
+    SELECT databank.*
+    FROM databank
+    LEFT JOIN retrosheet_seasons USING (season)
+    WHERE retrosheet_seasons.season IS NULL
+),
+
+retrosheet_supplemented AS (
+    SELECT
+        r.* EXCLUDE (team_id_str, game_type_str) REPLACE (
+            COALESCE(r.at_bats, d.at_bats) AS at_bats,
+            COALESCE(r.runs, d.runs) AS runs,
+            COALESCE(r.hits, d.hits) AS hits,
+            COALESCE(r.doubles, d.doubles) AS doubles,
+            COALESCE(r.triples, d.triples) AS triples,
+            COALESCE(r.home_runs, d.home_runs) AS home_runs,
+            COALESCE(r.runs_batted_in, d.runs_batted_in) AS runs_batted_in,
+            COALESCE(r.walks, d.walks) AS walks,
+            COALESCE(r.strikeouts, d.strikeouts) AS strikeouts,
+            COALESCE(r.intentional_walks, d.intentional_walks) AS intentional_walks,
+            COALESCE(r.hit_by_pitches, d.hit_by_pitches) AS hit_by_pitches,
+            COALESCE(r.sacrifice_hits, d.sacrifice_hits) AS sacrifice_hits,
+            COALESCE(r.sacrifice_flies, d.sacrifice_flies) AS sacrifice_flies,
+            COALESCE(r.grounded_into_double_plays, d.grounded_into_double_plays) AS grounded_into_double_plays,
+            COALESCE(r.singles, d.singles) AS singles,
+            COALESCE(r.total_bases, d.total_bases) AS total_bases,
+            COALESCE(r.plate_appearances, d.plate_appearances) AS plate_appearances,
+            COALESCE(r.on_base_opportunities, d.on_base_opportunities) AS on_base_opportunities,
+            COALESCE(r.on_base_successes, d.on_base_successes) AS on_base_successes
+        )
+    FROM retrosheet_keyed AS r
+    LEFT JOIN databank AS d
+        ON r.season = d.season
+            AND r.team_id_str = d.team_id
+            AND r.player_id = d.player_id
+            -- Lahman is regular-season only; suppress the join (and thus the
+            -- COALESCE supplement) for postseason / exhibition retrosheet rows
+            -- so they keep their own values intact.
+            AND r.game_type_str = 'RegularSeason'
+),
+
+-- Pre-1920 SB/CS overrides: retrosheet's pre-1920 totals are unreliable,
+-- so we OVERRIDE rather than fill-on-NULL. Distinct from the COALESCE-only
+-- supplement above.
 final AS (
     SELECT
-        u.* REPLACE (
-            CASE WHEN u.game_type = 'RegularSeason'
-                    THEN COALESCE(d.stolen_bases, u.stolen_bases)
-                ELSE u.stolen_bases
+        s.* REPLACE (
+            CASE WHEN s.game_type = 'RegularSeason'
+                    THEN COALESCE(dr.stolen_bases, s.stolen_bases)
+                ELSE s.stolen_bases
             END AS stolen_bases,
-            CASE WHEN u.game_type = 'RegularSeason'
-                    THEN COALESCE(d.caught_stealing, u.caught_stealing)
-                ELSE u.caught_stealing
+            CASE WHEN s.game_type = 'RegularSeason'
+                    THEN COALESCE(dr.caught_stealing, s.caught_stealing)
+                ELSE s.caught_stealing
             END AS caught_stealing
         )
-    FROM unioned AS u
-    LEFT JOIN databank_running AS d USING (season, player_id, team_id)
+    FROM retrosheet_supplemented AS s
+    LEFT JOIN databank_running AS dr USING (season, player_id, team_id)
 )
 
 SELECT * FROM final
+UNION ALL BY NAME
+SELECT * FROM databank_only
