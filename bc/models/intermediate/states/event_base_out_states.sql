@@ -111,7 +111,7 @@ add_outs AS (
     LEFT JOIN main_seeds.seed_base_state_info AS info USING (base_state)
 ),
 
-final AS (
+scored AS (
     SELECT
         event_key,
         inning AS inning_start,
@@ -124,6 +124,7 @@ final AS (
         outs_start,
         outs_end,
         outs_on_play,
+        batting_side,
         is_gidp_eligible,
         base_state AS base_state_start,
         runner_first_id AS runner_first_id_start,
@@ -135,15 +136,13 @@ final AS (
         LEAD(runner_first_id) OVER narrow AS runner_first_id_end,
         LEAD(runner_second_id) OVER narrow AS runner_second_id_end,
         LEAD(runner_third_id) OVER narrow AS runner_third_id_end,
-        COALESCE(SUM(runs_on_play) FILTER (WHERE batting_side = 'Home') OVER start_event, 0)::UTINYINT AS score_home_start,
-        COALESCE(SUM(runs_on_play) FILTER (WHERE batting_side = 'Away') OVER start_event, 0)::UTINYINT AS score_away_start,
         COALESCE(SUM(runs_on_play) FILTER (WHERE batting_side = 'Home') OVER end_event, 0)::UTINYINT AS score_home_end,
         COALESCE(SUM(runs_on_play) FILTER (WHERE batting_side = 'Away') OVER end_event, 0)::UTINYINT AS score_away_end,
         runs_on_play,
         LAG(event_key) OVER narrow IS NULL AS frame_start_flag,
         LEAD(event_key) OVER narrow IS NULL AS frame_end_flag,
         LEAD(event_key) OVER narrow IS NULL AND outs_end != 3 AS truncated_frame_flag,
-        LAG(event_key) OVER start_event IS NULL AS game_start_flag,
+        LAG(event_key) OVER end_event IS NULL AS game_start_flag,
         LEAD(event_key) OVER end_event IS NULL AS game_end_flag,
     FROM add_outs
     WINDOW
@@ -151,16 +150,25 @@ final AS (
             PARTITION BY game_key, inning, frame_key
             ORDER BY event_key
         ),
-        start_event AS (
-            PARTITION BY game_key
-            ORDER BY event_key
-            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
-        ),
+        -- One game_key-partitioned window covers all the running aggregates
+        -- and the LAG/LEAD checks (frame is ignored for LAG/LEAD), instead
+        -- of running a separate ...AND 1 PRECEDING window for score_*_start.
         end_event AS (
             PARTITION BY game_key
             ORDER BY event_key
             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
         )
+),
+
+final AS (
+    SELECT
+        * EXCLUDE (batting_side),
+        -- score_*_end reflects runs through the current row; subtracting
+        -- the runs scored ON the current row (which can only be home or
+        -- away) yields the start-of-row score. Saves two windowed SUMs.
+        (score_home_end - CASE WHEN batting_side = 'Home' THEN runs_on_play ELSE 0 END)::UTINYINT AS score_home_start,
+        (score_away_end - CASE WHEN batting_side = 'Away' THEN runs_on_play ELSE 0 END)::UTINYINT AS score_away_start,
+    FROM scored
 )
 
 SELECT * FROM final

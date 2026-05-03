@@ -6,7 +6,7 @@ MODEL (
     game_id VARCHAR,
     fielding_team_id TEAM_ID,
     fielding_side SIDE,
-    personnel_fielding_key BIGINT,
+    personnel_fielding_key INTEGER,
     start_event_id UTINYINT,
     end_event_id UINTEGER,
     player_id VARCHAR,
@@ -54,7 +54,10 @@ final AS (
         appearances.game_id,
         CASE WHEN appearances.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS fielding_team_id,
         appearances.side AS fielding_side,
-        (games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END
+        -- INTEGER (not BIGINT) so downstream joins can hash on the raw column.
+        -- Range: ±(max(game_key) + 255). game_key is a row id over stg_games
+        -- (a few million max), well within INT range.
+        ((games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END)::INTEGER
         AS personnel_fielding_key,
         ranges.start_event_id,
         ranges.end_event_id,

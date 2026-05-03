@@ -6,7 +6,7 @@ MODEL (
     game_id VARCHAR,
     pinch_runner_id VARCHAR,
     inning BIGINT,
-    side VARCHAR,
+    side SIDE,
     runs BIGINT,
     stolen_bases BIGINT,
     caught_stealing BIGINT
@@ -39,7 +39,7 @@ renamed AS (
         game_id,
         pinch_runner_id,
         inning,
-        side,
+        side::SIDE AS side,
         runs,
         stolen_bases,
         caught_stealing

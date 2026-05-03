@@ -36,16 +36,16 @@ MODEL (
 
 WITH fielders AS (
     SELECT
-        personnel_fielding_key::INT AS personnel_fielding_key,
-        ANY_VALUE(CASE WHEN fielding_position = 1 THEN player_id END)::PLAYER_ID AS pitcher_id,
-        ANY_VALUE(CASE WHEN fielding_position = 2 THEN player_id END)::PLAYER_ID AS catcher_id,
-        ANY_VALUE(CASE WHEN fielding_position = 3 THEN player_id END)::PLAYER_ID AS first_base_id,
-        ANY_VALUE(CASE WHEN fielding_position = 4 THEN player_id END)::PLAYER_ID AS second_base_id,
-        ANY_VALUE(CASE WHEN fielding_position = 5 THEN player_id END)::PLAYER_ID AS third_base_id,
-        ANY_VALUE(CASE WHEN fielding_position = 6 THEN player_id END)::PLAYER_ID AS shortstop_id,
-        ANY_VALUE(CASE WHEN fielding_position = 7 THEN player_id END)::PLAYER_ID AS left_field_id,
-        ANY_VALUE(CASE WHEN fielding_position = 8 THEN player_id END)::PLAYER_ID AS center_field_id,
-        ANY_VALUE(CASE WHEN fielding_position = 9 THEN player_id END)::PLAYER_ID AS right_field_id       
+        personnel_fielding_key,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 1)::PLAYER_ID AS pitcher_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 2)::PLAYER_ID AS catcher_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 3)::PLAYER_ID AS first_base_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 4)::PLAYER_ID AS second_base_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 5)::PLAYER_ID AS third_base_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 6)::PLAYER_ID AS shortstop_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 7)::PLAYER_ID AS left_field_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 8)::PLAYER_ID AS center_field_id,
+        ANY_VALUE(player_id) FILTER (WHERE fielding_position = 9)::PLAYER_ID AS right_field_id
     FROM main_models.personnel_fielding_states
     GROUP BY 1
 ),

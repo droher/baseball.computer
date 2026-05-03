@@ -36,7 +36,26 @@ MODEL (
 
 
 
-WITH joined AS (
+-- Per-event batter fielding position, collapsed to one row per event_key.
+-- Ohtani-type cases (a player who is simultaneously a pitcher and a DH)
+-- produce multiple stg_game_fielding_appearances rows whose ranges overlap
+-- the same event_id; MAX picks DH (highest position number). Doing the
+-- dedupe in a narrow CTE — instead of via QUALIFY on the wide `joined`
+-- row — avoids a HASH_GROUP_BY that builds a STRUCT of every output column
+-- to power arg_max over the full row.
+WITH batter_field_at_event AS (
+    SELECT
+        events.event_key,
+        MAX(batter_field.fielding_position) AS batter_fielding_position
+    FROM main_models.stg_events AS events
+    INNER JOIN main_models.stg_game_fielding_appearances AS batter_field
+        ON events.game_id = batter_field.game_id
+            AND events.batter_id = batter_field.player_id
+            AND events.event_id BETWEEN batter_field.start_event_id AND batter_field.end_event_id
+    GROUP BY 1
+),
+
+joined AS (
     SELECT
         events.game_id,
         events.event_key,
@@ -46,7 +65,7 @@ WITH joined AS (
         events.fielding_team_id,
         events.batter_id,
         events.batter_lineup_position,
-        batter_field.fielding_position AS batter_fielding_position,
+        batter_field.batter_fielding_position,
         events.pitcher_id,
         CASE
             WHEN events.specified_batter_hand IS NOT NULL THEN events.specified_batter_hand
@@ -62,32 +81,13 @@ WITH joined AS (
         END::HAND AS pitcher_hand,
         events.strikeout_responsible_batter_id,
         events.walk_responsible_pitcher_id,
-        {# fielders.catcher_id,
-        fielders.first_base_id,
-        fielders.second_base_id,
-        fielders.third_base_id,
-        fielders.shortstop_id,
-        fielders.left_field_id,
-        fielders.center_field_id,
-        fielders.right_field_id #}
     FROM main_models.stg_events AS events
-    {# INNER JOIN main_models.event_fielders_flat AS fielders USING (event_key) #}
     LEFT JOIN main_models.people AS batters
         ON events.batter_id = batters.player_id
     LEFT JOIN main_models.people AS pitchers
         ON events.pitcher_id = pitchers.player_id
-    LEFT JOIN main_models.stg_game_fielding_appearances AS batter_field
-        ON events.game_id = batter_field.game_id
-            AND events.batter_id = batter_field.player_id
-            AND events.event_id BETWEEN batter_field.start_event_id AND batter_field.end_event_id
-),
-
-the_singular_exception_of_shohhei_ohtani AS (
-    SELECT *
-    FROM joined
-    -- Choose DH when he's both, just because
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY event_key ORDER BY batter_fielding_position DESC) = 1
+    LEFT JOIN batter_field_at_event AS batter_field USING (event_key)
 )
 
 
-SELECT * FROM the_singular_exception_of_shohhei_ohtani
+SELECT * FROM joined

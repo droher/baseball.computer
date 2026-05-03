@@ -158,12 +158,14 @@ MODEL (
 
 
 WITH baserunning_agg AS (
-    -- Runs are populated separately to charge to the right pitcher
+    -- Runs are populated separately to charge to the right pitcher.
+    -- game_id / player_id / team_id are functionally determined by event_key,
+    -- so ANY_VALUE picks any row from the group with no comparison cost.
     SELECT
         event_key,
-        MIN(game_id) AS game_id,
-        MIN(current_pitcher_id) AS player_id,
-        MIN(fielding_team_id) AS team_id,
+        ANY_VALUE(game_id) AS game_id,
+        ANY_VALUE(current_pitcher_id) AS player_id,
+        ANY_VALUE(fielding_team_id) AS team_id,
         @EACH(@pitching_baserunning_cols(), col -> SUM(@col)::TINYINT AS @col)
     FROM main_models.event_baserunning_stats
     GROUP BY 1

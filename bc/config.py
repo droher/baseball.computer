@@ -2,10 +2,17 @@
 
 State lives in a separate DuckDB file (bc_state.db) so the Phase 4
 DuckLake publish layer can manage the data file independently.
+
+When ``BC_PERF_MODE=1`` is set, the gateway is reconfigured for the
+instrumentation harness in ``scripts/perf_run.py``: pool size drops to
+1 (so per-snapshot pragma SETs stick to the same connection) and
+DuckDB JSON profiling is enabled so the harness can copy the per-query
+plan tree out after each evaluation.
 """
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 
@@ -22,16 +29,32 @@ from sqlmesh.core.config.connection import DuckDBAttachOptions
 from sqlmesh.core.model.kind import FullKind
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+_PERF_MODE = os.environ.get("BC_PERF_MODE") == "1"
 
-_DUCKDB_SETTINGS = {
+_DUCKDB_THREADS = int(os.environ.get("BC_DUCKDB_THREADS", "14"))
+
+_DUCKDB_SETTINGS: dict[str, object] = {
     "enable_fsst_vectors": True,
     "enable_http_metadata_cache": True,
     "preserve_insertion_order": False,
     "parquet_metadata_cache": True,
     "checkpoint_threshold": "1GB",
     "memory_limit": "48GB",
-    "threads": 7,
+    "threads": _DUCKDB_THREADS,
 }
+
+if _PERF_MODE:
+    _DUCKDB_SETTINGS["enable_profiling"] = "json"
+    _DUCKDB_SETTINGS["profiling_mode"] = "detailed"
+    _DUCKDB_SETTINGS["profiling_coverage"] = "ALL"
+    # Initial path; perf_run.py overrides per-snapshot via SET on the
+    # adapter so each evaluation's plan tree lands in its own file.
+    _DUCKDB_SETTINGS["profile_output"] = str(
+        PROJECT_ROOT.parent / "logs" / "perf" / "_last_query.json"
+    )
+
+_DEFAULT_POOL_SIZE = 1 if _PERF_MODE else 6
+_POOL_SIZE = int(os.environ.get("BC_CONCURRENT_TASKS", str(_DEFAULT_POOL_SIZE)))
 
 _DUCKDB_CONNECTION = DuckDBConnectionConfig(
     extensions=["httpfs", "parquet", "ducklake"],
@@ -53,7 +76,7 @@ _DUCKDB_CONNECTION = DuckDBConnectionConfig(
         ),
     },
     connector_config=_DUCKDB_SETTINGS,
-    concurrent_tasks=2,
+    concurrent_tasks=_POOL_SIZE,
 )
 
 _STATE_CONNECTION = DuckDBConnectionConfig(

@@ -29,7 +29,7 @@ WITH lineup AS (
     SELECT
         game_id,
         batting_side,
-        personnel_lineup_key::INT AS personnel_lineup_key,
+        personnel_lineup_key,
         ANY_VALUE(start_event_id) AS start_event_id,
         ANY_VALUE(end_event_id) AS end_event_id
     FROM main_models.personnel_lineup_states
@@ -40,7 +40,7 @@ fielding AS (
     SELECT
         game_id,
         fielding_side,
-        personnel_fielding_key::INT AS personnel_fielding_key,
+        personnel_fielding_key,
         ANY_VALUE(start_event_id) AS start_event_id,
         ANY_VALUE(end_event_id) AS end_event_id
     FROM main_models.personnel_fielding_states

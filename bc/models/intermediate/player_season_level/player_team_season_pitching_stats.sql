@@ -226,6 +226,17 @@ retrosheet AS (
     GROUP BY 1, 2, 3, 4
 ),
 
+-- Materialize VARCHAR copies of ENUM join keys once so DuckDB can hash-join
+-- to databank (VARCHAR team_id / game_type). Without this, the implicit
+-- CAST(enum AS VARCHAR) inside the join predicate forces BLOCKWISE_NL_JOIN.
+retrosheet_keyed AS (
+    SELECT
+        retrosheet.*,
+        team_id::VARCHAR AS team_id_str,
+        game_type::VARCHAR AS game_type_str
+    FROM retrosheet
+),
+
 retrosheet_seasons AS (
     SELECT DISTINCT season FROM main_models.stg_games
 ),
@@ -241,7 +252,7 @@ databank_only AS (
 
 retrosheet_supplemented AS (
     SELECT
-        r.* REPLACE (
+        r.* EXCLUDE (team_id_str, game_type_str) REPLACE (
             COALESCE(r.batters_faced, d.batters_faced) AS batters_faced,
             COALESCE(r.earned_runs, d.earned_runs) AS earned_runs,
             COALESCE(r.walks, d.walks) AS walks,
@@ -259,15 +270,15 @@ retrosheet_supplemented AS (
             COALESCE(r.runs, d.runs) AS runs,
             ROUND(COALESCE(r.outs_recorded, d.outs_recorded) / 3, 2) AS innings_pitched
         )
-    FROM retrosheet AS r
+    FROM retrosheet_keyed AS r
     LEFT JOIN databank AS d
         ON r.season = d.season
-            AND r.team_id = d.team_id
+            AND r.team_id_str = d.team_id
             AND r.player_id = d.player_id
             -- Lahman is regular-season only; suppress the join (and thus the
             -- COALESCE supplement) for postseason / exhibition retrosheet rows
             -- so they keep their own values intact.
-            AND r.game_type = 'RegularSeason'
+            AND r.game_type_str = 'RegularSeason'
 )
 
 SELECT * FROM retrosheet_supplemented

@@ -6,7 +6,7 @@ MODEL (
     game_id VARCHAR,
     batting_team_id TEAM_ID,
     batting_side SIDE,
-    personnel_lineup_key BIGINT,
+    personnel_lineup_key INTEGER,
     start_event_id UTINYINT,
     end_event_id UINTEGER,
     player_id VARCHAR,
@@ -62,7 +62,7 @@ final AS (
         appearances.game_id,
         CASE WHEN ranges.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS batting_team_id,
         appearances.side AS batting_side,
-        (games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END::INT
+        ((games.game_key + ranges.start_event_id) * CASE WHEN appearances.side = 'Home' THEN 1 ELSE -1 END)::INTEGER
         AS personnel_lineup_key,
         ranges.start_event_id,
         ranges.end_event_id,

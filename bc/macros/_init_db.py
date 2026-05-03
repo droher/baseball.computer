@@ -189,6 +189,10 @@ def init_db(
 
     Idempotent by default (CREATE TABLE IF NOT EXISTS); pass
     `--var force_reload=true` to re-load via CREATE OR REPLACE.
+
+    Parallelism note: SQLMesh runs returned statements serially. Use
+    `scripts/preload_sources.py` before the SQLMesh build to populate
+    bc.db in parallel; this macro then becomes a string of no-ops.
     """
     if sample_factor != 1 or seed != 0:
         raise NotImplementedError(
