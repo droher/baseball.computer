@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 6 ML feature schema + vocabulary helpers."""
+"""Unit tests for the ML feature schema + vocabulary helpers."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
-"""Train the Phase 6 is-in-play binary model and pin the run id.
+"""Train the is-in-play binary model and pin the run id.
 
 Run via:
-    uv run --group migration-ml python scripts/train_is_in_play_bin.py \
+    uv run --group ml python scripts/train_is_in_play_bin.py \
         [--epochs 3] [--rows-per-batch 250000] [--db bc/bc.db]
 """
 

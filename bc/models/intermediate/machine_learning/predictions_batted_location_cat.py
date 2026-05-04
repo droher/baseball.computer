@@ -1,4 +1,4 @@
-"""SQLMesh wrapper around the Phase 6 batted-location multiclass scorer.
+"""SQLMesh wrapper around the batted-location multiclass scorer.
 
 Streams `ml_features` rows in DuckDB Arrow record batches, runs each
 batch through the cached Keras scorer, and yields one pandas DataFrame

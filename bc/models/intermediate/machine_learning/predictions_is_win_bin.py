@@ -1,4 +1,4 @@
-"""SQLMesh wrapper around the Phase 6 is-win binary scorer.
+"""SQLMesh wrapper around the is-win binary scorer.
 
 Streams `ml_features` rows in DuckDB Arrow record batches, runs each
 batch through the cached Keras scorer, and yields one pandas DataFrame

@@ -1,10 +1,4 @@
-"""Phase 5 — Polars rewrite of event_pitching_flags.
-
-Replaces the stacked-CTE SQL model. The four `LAG(... IGNORE NULLS) OVER`
-windows that drive the save / hold / blown-save FSM map cleanly onto
-`forward_fill().shift(1).over(...)` in Polars; see
-`bc/python_models/event_locality/__init__.py` for the lag mapping.
-"""
+"""Polars FSM that derives save / hold / blown-save flags per event."""
 
 from __future__ import annotations
 

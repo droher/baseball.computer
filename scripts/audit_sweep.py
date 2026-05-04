@@ -8,7 +8,7 @@ on year-shaped cols, relationships on FK cols.
 Dry-run only — prints suggestions, does not modify files.
 
 Usage:
-    uv run --group migration python scripts/audit_sweep.py [glob...]
+    uv run --group build python scripts/audit_sweep.py [glob...]
         # default glob: bc/models/intermediate/event_level/*.sql
 """
 

@@ -4,7 +4,7 @@ Three forms of expression:
 
 - ``formula(t)`` — single lambda over an Ibis table.
 - ``numerator(t) / denominator(t)`` — semantic-friendly ratio.
-- ``derived(m)`` — composition over previously-evaluated measures, where
+- ``derived(m)`` — composition over already-evaluated measures, where
   ``m`` is a measure-scope: anything that responds to attribute access by
   name. Same shape as BSL's ``MeasureScope`` so the same lambda works in
   both ``build_metric_sql`` and ``bsl.SemanticTable.with_measures``.

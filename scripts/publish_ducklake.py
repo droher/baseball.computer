@@ -1,8 +1,8 @@
 """Publish main_models + main_seeds from bc.db into a DuckLake catalog.
 
-Phase 4 publish target. Runs alongside scripts/create_web_db.py during the
-validation phase — does not replace it. scripts/upload_ducklake.py uploads
-the resulting catalog + data files to R2.
+Runs alongside scripts/create_web_db.py during validation — does not
+displace it. scripts/upload_ducklake.py uploads the resulting catalog +
+data files to R2.
 
 Outputs:
   bc/bc_publish.ducklake     SQLite catalog (consumer attaches to this URL)
@@ -253,7 +253,7 @@ def publish() -> None:
     with contextlib.chdir(BC_DIR):
         con = duckdb.connect(bc_db_abs)
         # Reclaim freed pages before publish so bc.db on-disk size matches
-        # logical size (drops/replaces accumulate stale pages until
+        # logical size (drops and overwrites accumulate stale pages until
         # checkpoint).
         _ = con.execute("CHECKPOINT")
         attach_catalog(con)

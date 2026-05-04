@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 6 Keras model factory + scoring contract."""
+"""Unit tests for the Keras model factory + scoring contract."""
 
 from __future__ import annotations
 

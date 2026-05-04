@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 5 Polars FSM behind event_pitching_flags."""
+"""Unit tests for the Polars FSM behind event_pitching_flags."""
 
 from __future__ import annotations
 

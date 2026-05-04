@@ -1,4 +1,4 @@
-"""Hamilton DAG for Phase 6 ML training pipelines.
+"""Hamilton DAG for the ML training pipeline.
 
 Each top-level function is a Hamilton node; parameter names declare
 dependencies. Compose a `hamilton.driver.Driver` over this module and
@@ -6,9 +6,9 @@ materialize a leaf node (`pin_written`) to run.
 
 The DAG is target-agnostic: it consumes a `TargetSpec` via the
 `target_spec` input, and the model factory + training driver dispatch
-on `target_spec.kind`. Adding a new target is purely additive — declare
-the spec in `features.py`, hand it to `training.train(...)`, and the
-same DAG runs end-to-end.
+on `target_spec.kind`. To add a new target, declare its spec in
+`features.py`, hand it to `training.train(...)`, and the same DAG
+runs end-to-end.
 """
 
 from __future__ import annotations

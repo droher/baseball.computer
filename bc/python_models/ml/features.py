@@ -1,4 +1,4 @@
-"""Feature schema for the Phase 6 ML models.
+"""Feature schema for the ML models.
 
 One source of truth for which `ml_features` columns are model inputs,
 how they're typed, and the encoding strategy. Targets are described as

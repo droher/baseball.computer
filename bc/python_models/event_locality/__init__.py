@@ -1,8 +1,6 @@
-"""Phase 5 — pure-Polars FSM transforms over event-locality data.
+"""Pure-Polars FSM transforms over event-locality data.
 
-The SQL counterparts (`event_pitching_flags`, future `team_game_results`,
-`team_game_start_info`) lean on `LAG(... IGNORE NULLS) OVER (...)` to
-forward-propagate state through windowed partitions. The mapping in Polars:
+DuckDB window translations used in this package:
 
     LAG(x IGNORE NULLS) OVER (PARTITION BY g ORDER BY o)
         = x.forward_fill().over(g, order_by=o).shift(1).over(g, order_by=o)

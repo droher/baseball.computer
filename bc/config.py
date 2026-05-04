@@ -1,7 +1,7 @@
 """SQLMesh configuration for baseball.computer.
 
-State lives in a separate DuckDB file (bc_state.db) so the Phase 4
-DuckLake publish layer can manage the data file independently.
+State lives in a separate DuckDB file (bc_state.db) so the DuckLake
+publish layer can manage the data file independently.
 
 When ``BC_PERF_MODE=1`` is set, the gateway is reconfigured for the
 instrumentation harness in ``scripts/perf_run.py``: pool size drops to

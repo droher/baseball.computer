@@ -1,9 +1,8 @@
-"""Generic Keras model factory for Phase 6 ML targets.
+"""Generic Keras model factory for ML targets.
 
 One trunk (per-categorical embeddings, one-hot for low-card, normalized
 numerics, two dense ReLU blocks) terminates in a target-specific output
-layer chosen from the `TargetSpec.kind`. Adding a regression target
-later means another branch in `_make_outputs_layer`.
+layer chosen from the `TargetSpec.kind`.
 """
 
 from __future__ import annotations

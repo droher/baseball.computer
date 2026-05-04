@@ -25,21 +25,21 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - run: uv sync --group migration --frozen
+      - run: uv sync --group build --frozen
 
       - name: Reset stale DuckLake artefacts
-        run: uv run --group migration python scripts/publish_ducklake.py --reset --smoke-only
+        run: uv run --group build python scripts/publish_ducklake.py --reset --smoke-only
 
       - name: SQLMesh plan (prod)
         working-directory: bc
-        run: uv run --group migration sqlmesh plan --auto-apply --no-prompts --var force_reload=true
+        run: uv run --group build sqlmesh plan --auto-apply --no-prompts --var force_reload=true
 
       - name: SQLMesh janitor
         working-directory: bc
-        run: uv run --group migration sqlmesh janitor --ignore-ttl
+        run: uv run --group build sqlmesh janitor --ignore-ttl
 
       - name: Publish DuckLake catalog
-        run: uv run --group migration python scripts/publish_ducklake.py
+        run: uv run --group build python scripts/publish_ducklake.py
 
       - name: Upload to R2 + purge Cloudflare cache
-        run: uv run --group migration python scripts/upload_ducklake.py
+        run: uv run --group build python scripts/upload_ducklake.py

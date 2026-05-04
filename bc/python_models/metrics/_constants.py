@@ -1,8 +1,4 @@
-"""Column-list constants shared across the 9 metrics_* models.
-
-Lifted from bc/macros/_metric_table_body.py — single source of truth
-for Phase 2. The macro keeps its own copy until stage G removes it.
-"""
+"""Column-list constants shared across the 9 metrics_* models."""
 
 from __future__ import annotations
 

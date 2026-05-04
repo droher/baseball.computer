@@ -1,7 +1,7 @@
-"""Train the Phase 6 runs-following regression model and pin the run id.
+"""Train the runs-following regression model and pin the run id.
 
 Run via:
-    uv run --group migration-ml python scripts/train_runs_following_num.py \
+    uv run --group ml python scripts/train_runs_following_num.py \
         [--epochs 3] [--rows-per-batch 250000] [--db bc/bc.db]
 """
 

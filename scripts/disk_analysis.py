@@ -16,7 +16,7 @@ few percent at the table level.
 
 Usage::
 
-    uv run --group migration python scripts/disk_analysis.py
+    uv run --group build python scripts/disk_analysis.py
 """
 
 from __future__ import annotations

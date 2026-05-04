@@ -1,7 +1,7 @@
 """Programmatic @model registration for the metrics_* tables.
 
-One call per (kind, scope) collapses what used to be 9 hand-written
-.py models with ~220-line columns/column_descriptions dicts.
+One call per (kind, scope) emits a SQLMesh model with the right
+columns / column_descriptions / audits / grain.
 """
 
 from __future__ import annotations

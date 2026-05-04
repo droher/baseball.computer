@@ -1,15 +1,10 @@
 """SQL builder for ``main_models.calc_park_factors_advanced``.
 
-Mirrors ``bc/models/intermediate/park_factors/calc_park_factors_advanced.sql``
-exactly except for one type-stability fix:
-
-The legacy SQL casts the ``multi_year_range`` SUM windows to ``INT`` but
-unions them with synthetic prior rows where ``averages.avg_*_per_pa * 1000`` is
-DOUBLE. DuckDB widens both branches of the UNION ALL to DOUBLE, and the spike
-(``notes/spikes/02_ibis_park_factors``) traced ~2-3% drift on
-``sqrt_sample_size`` to that branch-type mismatch propagating through
-``with_priors``. Cast the prior numerators to ``INT`` so both branches share
-the same type and the SUM downstream stays integer-clean.
+The ``multi_year_range`` SUM windows cast to ``INT``; the synthetic prior
+rows compute ``averages.avg_*_per_pa * 1000`` as DOUBLE. DuckDB widens both
+UNION ALL branches to DOUBLE, and that mismatch drifted ``sqrt_sample_size``
+by ~2-3%. Casting the prior numerators to ``INT`` keeps both branches the
+same type and the downstream SUM integer-clean.
 """
 
 from __future__ import annotations
@@ -57,11 +52,10 @@ def build_advanced_park_factor_sql() -> str:
     avg_rates = (",\n" + indent).join(
         f"SUM({s}) / SUM(plate_appearances) AS avg_{s}_per_pa" for s in rates
     )
-    # Macro emitted ``averages.avg_<s>_per_pa * 1000::SMALLINT`` (DOUBLE).
-    # Match exactly so prior numerators keep fractional precision; the
-    # multi_year_range branch is INT, but the UNION-widened DOUBLE is
-    # what flows into the downstream SUM/SQRT pipeline that prod was
-    # built from. Reproducing that yields byte-equivalent park factors.
+    # ``averages.avg_<s>_per_pa * 1000::SMALLINT`` evaluates to DOUBLE.
+    # Keep that exact shape so prior numerators retain fractional precision:
+    # the multi_year_range branch is INT, but UNION widens to DOUBLE, which
+    # is what flows into the downstream SUM/SQRT pipeline.
     prior_rate_cols = (",\n" + indent).join(
         f"averages.avg_{s}_per_pa * 1000::SMALLINT AS {s}" for s in rates
     )

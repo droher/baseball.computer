@@ -1,8 +1,8 @@
 """Smoke + row-equivalence tests for the BSL semantic tables.
 
-Runs only under the ``spikes-bsl`` uv group (the migration env can't
+Runs only under the ``bsl`` uv group (the build env can't
 install boring-semantic-layer because xorq pins an incompatible
-sqlglot). pytest collects-and-skips cleanly under the migration env via
+sqlglot). pytest collects-and-skips cleanly under the build env via
 ``importorskip``.
 """
 

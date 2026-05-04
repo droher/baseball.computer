@@ -9,16 +9,15 @@ documented at [docs.baseball.computer](https://docs.baseball.computer).
 
 ## Build engine
 
-Phase 1.5 (current) uses **SQLMesh-native** as the build engine. Models
-live under `bc/models/` as `MODEL(...)` blocks; sources and seeds are
-loaded by `before_all` Python `@macro`s in `bc/macros/_init_db.py`. dbt
-is no longer a runtime dependency.
+SQLMesh-native. Models live under `bc/models/` as `MODEL(...)` blocks;
+sources and seeds load via `before_all` Python `@macro`s in
+`bc/macros/_init_db.py`.
 
 ```bash
-uv sync --group migration
+uv sync --group build
 cd bc
-uv run --group migration sqlmesh plan dev --auto-apply   # build dev env
-uv run --group migration sqlmesh audit                   # run audits
+uv run --group build sqlmesh plan dev --auto-apply   # build dev env
+uv run --group build sqlmesh audit                   # run audits
 ```
 
 Source-table metadata (45 parquet sources) lives in
@@ -32,13 +31,12 @@ State lives in `bc/bc_state.db` (auto-created, separate from `bc.db`).
 ## Documentation
 
 - [docs.baseball.computer](https://docs.baseball.computer) — model + column docs
-- `notes/phase-1-plan.md` — Phase 1 (dbt → SQLMesh dbt-import) status
-- `notes/phase-1-followups.md` — open items + Phase 1.5 deferred work
-- `notes/migration-evaluation.md` — multi-phase migration plan
+- `CLAUDE.md` — present-state guide for AI agents
+- `notes/followups.md` — open operational items
 
 ## Agent skills
 
 `.claude/skills/sqlmesh/` ships a project-agnostic SQLMesh reference
-skill (model authoring, plan/apply workflow, audits, CLI, dbt migration).
-Loaded automatically when working on SQLMesh code, or invoked
-explicitly with `/sqlmesh`.
+skill (model authoring, plan/apply workflow, audits, CLI). Loaded
+automatically when working on SQLMesh code, or invoked explicitly
+with `/sqlmesh`.

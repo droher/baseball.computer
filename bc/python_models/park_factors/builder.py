@@ -1,10 +1,4 @@
-"""SQL builder for the 6 ``calc_park_factor_*`` analysis views.
-
-Mirrors the legacy ``@batter_pitcher_park_factor`` jinja-style macro
-(``bc/macros/_park_factors.py``) one CTE at a time. The macro is still
-in the tree for the .sql callers; this Python port runs the same shape
-for the new Python ``@model`` decorators.
-"""
+"""SQL builder for the 6 ``calc_park_factor_*`` analysis views."""
 
 from __future__ import annotations
 
@@ -21,7 +15,7 @@ def batter_pitcher_park_factor(
 ) -> str:
     """Build the 7-CTE park-factor SQL for one numerator-set / denominator pair.
 
-    Args mirror the legacy macro positionally:
+    Args:
 
     - ``rate_stats``: list of numerator columns (one ``*_park_factor`` output each).
     - ``denominator_stat``: shared denominator (e.g. ``plate_appearances``).

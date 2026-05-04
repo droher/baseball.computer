@@ -1,4 +1,4 @@
-"""Phase 5 second wave — pure-Polars FSM transforms for game-level models.
+"""Pure-Polars FSM transforms for game-level models.
 
 Mirrors the lag-mapping conventions documented in
 `python_models/event_locality/__init__.py`.

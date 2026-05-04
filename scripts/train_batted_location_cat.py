@@ -1,7 +1,7 @@
-"""Train the Phase 6 batted-location multiclass model and pin the run id.
+"""Train the batted-location multiclass model and pin the run id.
 
 Run via:
-    uv run --group migration-ml python scripts/train_batted_location_cat.py \
+    uv run --group ml python scripts/train_batted_location_cat.py \
         [--epochs 3] [--rows-per-batch 250000] [--db bc/bc.db]
 """
 

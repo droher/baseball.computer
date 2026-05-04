@@ -94,7 +94,7 @@ def run_one(threads: int, workers: int) -> dict[str, object]:
 
     log_path = LOG_DIR / f"grid_t{threads}_w{workers}.log"
     cmd = [
-        "uv", "run", "--group", "migration",
+        "uv", "run", "--group", "build",
         "python", str(REPO_ROOT / "scripts" / "_grid_one.py"),
     ]
     logger.info("[t=%d, w=%d] starting -> %s", threads, workers, log_path)

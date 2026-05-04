@@ -10,7 +10,7 @@ evaluate so the model's final query plan survives).
 
 Run with::
 
-    uv run --group migration python scripts/perf_run.py
+    uv run --group build python scripts/perf_run.py
 
 Output:
     logs/perf/perf_<UTCstamp>.jsonl   per-snapshot metrics

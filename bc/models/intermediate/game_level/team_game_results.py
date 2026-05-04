@@ -1,11 +1,4 @@
-"""Phase 5 second wave — Polars rewrite of team_game_results.
-
-Replaces the SQL `enriched` → `streak_calc_continued` → `final` CTE
-chain. The streak forward-fill on win_streak_id / loss_streak_id maps
-onto Polars `forward_fill().over(...)`; the final cumulative counts
-become `cum_count().over(...)`. See
-`bc/python_models/event_locality/__init__.py` for the lag mapping.
-"""
+"""SQLMesh model that joins team-game inputs and computes streak + split counts via Polars."""
 
 from __future__ import annotations
 

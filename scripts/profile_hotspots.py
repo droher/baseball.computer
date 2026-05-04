@@ -16,7 +16,7 @@ subagents) and write findings to ``notes/perf-profile-report.md``.
 
 Usage::
 
-    uv run --group migration python scripts/profile_hotspots.py [--top N]
+    uv run --group build python scripts/profile_hotspots.py [--top N]
 """
 
 from __future__ import annotations

@@ -1,9 +1,4 @@
-"""Phase 6 ML pipeline.
-
-Imports as `python_models.ml` (matches the `python_models/event_locality`
-precedent). The `sf-hamilton` PyPI package imports as `hamilton`; it is
-referenced from this package's training/prediction entry points but
-lives at the top level, so there is no name clash.
+"""ML training + scoring pipeline rooted at python_models.ml.
 
 Sets `KERAS_BACKEND=torch` before any keras import. Apple Silicon MPS
 support ships in torch core; no `tensorflow-metal` / `jax-metal`

@@ -1,7 +1,7 @@
 """BSL semantic-table factories backed by the Pydantic Metric registry.
 
 This package is import-isolated from sqlmesh. It runs under the
-``spikes-bsl`` uv group (which excludes sqlmesh because boring-semantic-
+``bsl`` uv group (which excludes sqlmesh because boring-semantic-
 layer pulls an incompatible sqlglot pin via xorq).
 
 Entry points:

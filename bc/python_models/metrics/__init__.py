@@ -1,7 +1,7 @@
 """Metric registry + SQL builder for the 9 metrics_* tables.
 
-Importing this package triggers ``_metric_registrations`` so the global
-``METRICS`` dict is populated by the time callers look at it.
+Importing this package triggers ``_metric_registrations`` for its side
+effect of populating the global ``METRICS`` dict.
 """
 
 from __future__ import annotations

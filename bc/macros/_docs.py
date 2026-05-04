@@ -41,10 +41,6 @@ def _doc_dict() -> dict[str, str]:
     Compiled regexes and Path objects stay function-local — SQLMesh's
     `make_python_env` serializer captures module globals through closures,
     and `re.Pattern` / `Path` don't survive that round-trip.
-
-    Body normalization (`" ".join(line.strip() ...)` then collapse
-    whitespace) matches scripts/migration/migrate_yaml_to_model_block.py
-    so swapping inlined descriptions for `@doc('key')` is byte-identical.
     """
     block_re = re.compile(
         r"\{%\s*docs\s+(\w+)\s*%\}(.*?)\{%\s*enddocs\s*%\}", re.DOTALL

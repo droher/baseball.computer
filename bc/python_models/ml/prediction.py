@@ -1,4 +1,4 @@
-"""Inference entry point for Phase 6 ML targets.
+"""Inference entry point for ML targets.
 
 Loaded by SQLMesh `@model` wrappers under
 `bc/models/intermediate/machine_learning/`. Reads the pin JSON,

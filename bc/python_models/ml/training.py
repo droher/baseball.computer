@@ -1,4 +1,4 @@
-"""Generic training pipeline for Phase 6 ML targets.
+"""Generic training pipeline for ML targets.
 
 One pass over the TRAIN partition collects vocabularies + numeric
 statistics; a Keras model is constructed via `model_factory.build_model`
