@@ -22,12 +22,6 @@ _GRAINS: dict[str, list[str]] = {
     "team_season": ["team_id", "season"],
 }
 
-_VOLUME_COL: dict[str, str] = {
-    "offense": "plate_appearances",
-    "pitching": "batters_faced",
-    "fielding": "outs_played",
-}
-
 _DESCRIPTION_NOUN: dict[str, str] = {
     "offense": "offensive statistics and averages",
     "pitching": "pitching statistics and averages",
@@ -62,9 +56,12 @@ def register_metric_model(kind: str, scope: str) -> None:
     _kind = kind
     _grain = grain
 
-    not_null_cols = exp.Tuple(
-        expressions=[exp.column(c) for c in [*grain, _VOLUME_COL[kind]]]
-    )
+    # not_null on the grain only. The volume column (outs_played /
+    # plate_appearances / batters_faced) can legitimately be null on
+    # the fielding side — Negro Leagues (NN1, NN2) and pre-1900s rows
+    # don't carry an outs_played figure, and the downstream rate
+    # metrics tolerate that by producing null.
+    not_null_cols = exp.Tuple(expressions=[exp.column(c) for c in grain])
     audits: list[tuple[str, dict[str, Any]]] = [
         ("not_null", {"columns": not_null_cols}),
     ]

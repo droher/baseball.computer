@@ -15,15 +15,9 @@ from python_models.game_level.team_game_results import (
     TEAM_GAME_RESULTS_OUTPUT_COLUMNS,
     compute_team_game_results,
 )
-from python_models.game_level.team_game_start_info import (
-    TEAM_GAME_START_INFO_OUTPUT_COLUMNS,
-    compute_team_game_start_info,
-)
 
 __all__ = [
     "TEAM_GAME_RESULTS_INPUT_COLUMNS",
     "TEAM_GAME_RESULTS_OUTPUT_COLUMNS",
-    "TEAM_GAME_START_INFO_OUTPUT_COLUMNS",
     "compute_team_game_results",
-    "compute_team_game_start_info",
 ]

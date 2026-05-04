@@ -64,7 +64,11 @@ MODEL (
 
 
 WITH source AS (
-    SELECT * FROM box_score.box_score_pinch_hitting_lines
+    -- Drop the 2255 early-1900s box-score rows (mostly 1908-09 NL games)
+    -- that record a pinch-hit appearance without an inning. inning is
+    -- part of the grain, so the rows can't be retained without breaking
+    -- unique_grain. Recover when the source parser fills the gap.
+    SELECT * FROM box_score.box_score_pinch_hitting_lines WHERE inning IS NOT NULL
 ),
 
 renamed AS (

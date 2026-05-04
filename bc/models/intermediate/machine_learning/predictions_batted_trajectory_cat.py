@@ -17,6 +17,8 @@ import polars as pl
 from sqlglot import exp
 from sqlmesh import ExecutionContext, model
 
+from python_models.ml import artifact_exists
+
 _UPSTREAM = "main_models.ml_features"
 _BATCH_ROWS = 500_000
 
@@ -58,6 +60,7 @@ _AUDITS = [
 @model(
     "main_models.predictions_batted_trajectory_cat",
     kind="FULL",
+    enabled=artifact_exists("batted_trajectory_cat"),
     columns={
         "event_key": "UINTEGER",
         "predicted_class": "VARCHAR",
