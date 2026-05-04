@@ -104,20 +104,27 @@ def _env_aware_target(
     )
 
 
-def _table_exists(evaluator: MacroEvaluator, table: exp.Table) -> bool:
-    """Probe the engine adapter for ``table``. Treat any error as missing."""
+def _table_populated(evaluator: MacroEvaluator, table: exp.Table) -> bool:
+    """Probe the engine adapter for ``table`` and confirm it has rows.
+
+    Returns ``False`` when the table is missing OR present but empty —
+    both states are treated as "not yet built" so the audit short-circuits
+    instead of flagging every source row as an FK violation. This matters
+    on a fresh prod plan: SQLMesh schedules audits per model in DAG
+    order, but ``to_model`` references aren't in the dependency graph
+    (declaring them would cycle), so a staging table can audit before
+    its referent is materialized.
+    """
     adapter = evaluator.locals.get("engine_adapter")
     if adapter is None:
         # Loading stage / no adapter available — assume present so the
         # predicate compiles. Real audit runtime always has an adapter.
         return True
     try:
-        adapter.fetchone(
-            exp.select(exp.Literal.number(1))
-            .from_(table)
-            .limit(0)
+        row = adapter.fetchone(
+            exp.select(exp.Literal.number(1)).from_(table).limit(1)
         )
-        return True
+        return row is not None
     except Exception:
         return False
 
@@ -131,18 +138,20 @@ def relationships_check(
 ) -> exp.Expression:
     """Render the FK predicate for the ``relationships`` audit.
 
-    Returns ``TRUE`` when the target view doesn't exist in the current
-    env (transitively-referenced model not built yet). Returns the full
-    ``column NOT IN (SELECT to_column FROM env_target)`` predicate
-    otherwise.
+    The audit body returns rows that fail (rows the WHERE clause
+    matches). Returning ``FALSE`` here short-circuits the WHERE so no
+    rows are reported as violations when the target view doesn't exist
+    in the current env (transitively-referenced model not built yet).
+    Returns the full ``column NOT IN (SELECT to_column FROM env_target)``
+    predicate otherwise.
     """
     target = _to_table(to_model, evaluator.dialect)
     this_model = _this_model_table(evaluator)
     env_target = _env_aware_target(target, this_model)
     actual_target = env_target if env_target is not None else target
 
-    if not _table_exists(evaluator, actual_target):
-        return exp.true()
+    if not _table_populated(evaluator, actual_target):
+        return exp.false()
 
     column_expr = column if isinstance(column, exp.Expression) else exp.column(_identifier_name(column))
     to_col_name = _identifier_name(to_column)

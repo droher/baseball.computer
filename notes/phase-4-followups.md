@@ -3,8 +3,95 @@
 Phase 4 shipped the DuckLake publish side as a parallel artifact alongside
 `scripts/create_web_db.py`. The original parquet+`bc_remote.db` flow
 continues to publish on every build; the DuckLake artifact is for site-team
-validation. This file captures the work remaining before the DuckLake
-artifact can become canonical and the old flow can retire.
+validation. Local end-to-end validation completed 2026-05-03 against the
+`dev` schema (see "4.0 Local validation receipt" below). Validation against
+a real `main_models` build is blocked on the items in "Prod build blockers"
+below; site cutover (4.x) stays deferred behind that.
+
+## 4.0 Local validation receipt (2026-05-03)
+
+Validated by running the publish path against `bc.db` and comparing all
+rows table-for-table back to the source. The canonical
+`scripts/publish_ducklake.py` only publishes from `main_models` +
+`main_seeds`; that build hasn't been promoted to prod yet (see "Prod
+build blockers"), so the receipt below was produced from a one-shot
+ad-hoc script that publishes from `main_models__dev` + `main_seeds`
+into a separate `bc_publish_dev.ducklake` catalog. The script otherwise
+mirrors `publish_ducklake.py` (same ENUM→VARCHAR cast, same compression
++ row group + inlining knobs, same snapshot-retention logic). When the
+real `main_models` is built, re-running `scripts/publish_ducklake.py
+--reset` should reproduce the same shape.
+
+Numbers from the dev validation:
+
+- 163 objects published (141 from `main_models__dev`, 22 from `main_seeds`).
+- 736,919,764 rows total, 75.8s wall.
+- 24 ENUM types in `bc.db`; cast to VARCHAR on publish per the existing
+  `select_with_enum_casts` path.
+- Catalog 4 KB, data path 6.7 GB on disk (zstd, 1.97M-row groups,
+  inlining disabled).
+- Snapshot retention: 161 transient snapshots from per-table commits
+  expired down to the last 5 via `ducklake_expire_snapshots`.
+- Smoke check on 5 sample tables passes; consumer-side `DESCRIBE` returns
+  expected column counts and types.
+
+Parity vs `bc.db`:
+
+- 0 / 163 row-count mismatches.
+- Aggregate parity (COUNT, MIN, MAX, SUM-as-HUGEINT, COUNT(DISTINCT
+  text_col)) on 4 representative tables — `event_states_full`
+  (18.1M rows, ENUM-heavy), `team_game_results` (478K rows, Phase 5
+  Polars FSM port), `event_pitching_flags` (18.1M rows, Phase 5 first
+  wave), `seed_franchises` (365 rows, ENUM-free) — exact match between
+  `bc.<src_schema>.<table>` and `bc_pub_dev.<dst_schema>.<table>`.
+
+The R2 upload step (`scripts/upload_ducklake.py`) is unchanged and
+unrun; it will be exercised when the real `main_models` build is
+available and the catalog is ready to push.
+
+## Prod build blockers (uncovered 2026-05-03)
+
+A fresh `sqlmesh plan --auto-apply` (no env = prod) against the current
+`bc.db` does not run cleanly. Three real bugs surface during backfill;
+all need fixes before `main_models` exists for `publish_ducklake.py` to
+read from. Tracked here so the followups doc holds the short list.
+
+1. **`relationships` audit macro polarity (FIXED)** — `bc/macros/_env_to_model.py`
+   short-circuited with `exp.true()` when the FK target view didn't
+   exist, but the audit body returns rows the WHERE matches as
+   violations, so TRUE flagged every non-null source row as failing.
+   Switched to `exp.false()` and renamed `_table_exists` → `_table_populated`
+   so the short-circuit also fires when the target exists but is still
+   empty (fresh prod plan: staging audit may run before referent
+   backfills, since `to_model` deps aren't in the DAG to avoid cycles).
+   Once the target is populated on a subsequent plan, the real check
+   runs. No standalone unit test — add one when the SQLMesh
+   `MacroEvaluator` fixture story for custom macros is figured out.
+
+2. **`team_game_start_info` MAP cast** — fresh prod backfill fails with
+   `Conversion Error: Unimplemented type for cast (STRUCT("key" INTEGER,
+   "value" VARCHAR)[] -> MAP(UTINYINT, VARCHAR))` on column
+   `lineup_map_away`. The Phase 5 wave-2 Polars FSM port emits a
+   `STRUCT[]` shape that DuckDB can't auto-cast to the model contract's
+   `MAP(UTINYINT, TEXT)`. Fix: emit the column as a real DuckDB MAP
+   from Polars (or relax the contract to STRUCT[] if the consumer can
+   handle either).
+
+3. **Six third-wave ML predictions models reference missing artifact
+   JSONs** — `predictions_batted_trajectory_cat`,
+   `predictions_batted_location_cat`, `predictions_baserunning_cat`,
+   `predictions_runs_following_num`, `predictions_is_win_bin`,
+   `predictions_has_batting_bin` each fail in `load_scorer` with
+   `FileNotFoundError: bc/python_models/ml/artifacts/<name>.json`.
+   Already known per `CLAUDE.md` ("shipped code + tests but need a real
+   `scripts/train_<name>.py` run"). Either run training for each (long)
+   or set those `@model`s to `enabled FALSE` until the artifacts land.
+
+4. **`stg_box_score_pinch_hitting_lines` not_null violations** — 2255
+   rows fail `not_null((game_id, pinch_hitter_id, inning))`. Either
+   real source-data gaps that need a `WHERE` filter at the staging
+   level or an audit `condition` exclusion. Investigate before
+   declaring the audit non-blocking.
 
 ## 4.x Site cutover (deferred)
 
