@@ -60,30 +60,35 @@ harness is exposing latent non-determinism that has been silently
 fluctuating between dbt builds — nobody noticed because dbt always
 produced the same answer on the same machine.
 
-### 1. `team_game_start_info` — window ties on bad upstream dh_status
+### 1. `team_game_start_info` — window ties on bad upstream dh_status [resolved 2026-05-03]
+
+The upstream `baseball.computer.rs` parser fix landed. Verified against
+`box_score.box_score_games`: BRO 1904-05-30 now returns
+`BRO190405301`=`DoubleHeaderGame1`, `BRO190405302`=`DoubleHeaderGame2`.
+A fresh dev rebuild picks up the corrected source parquet so the window
+ties no longer fall through to `SingleGame` defaults.
+
+`bc_remote.db` (the published-parquet catalog) still points to the
+prior publish, so the diff harness still reports drift on direction-
+stat counters and the cascade through `team_game_start_info`. That
+clears once the next prod publish lands.
+
+(Original analysis kept below for history.)
 
 Window `ORDER BY date, doubleheader_status` ties → `LAG()` picks an
 arbitrary neighbor → `days_since_last_game` differs between engines.
 
 Concrete example: BRO @ BSN doubleheader 1904-05-30. Both
-`BRO190405301` and `BRO190405302` have `doubleheader_status = 'SingleGame'`
-in `stg_games` (event-derived) — but `stg_gamelog` correctly labels them
+`BRO190405301` and `BRO190405302` had `doubleheader_status = 'SingleGame'`
+in `stg_games` (event-derived) — but `stg_gamelog` correctly labelled them
 `DoubleHeaderGame1` / `DoubleHeaderGame2`. `game_start_info` UNIONs
-games over gamelog, so the wrong event-derived value wins.
+games over gamelog, so the wrong event-derived value won.
 
-Root cause is in upstream Retrosheet `1904.EBN` (Event Box) file or the
-parser at `baseball.computer.rs`. EBN files are box-score-derived (no
-play-by-play exists for 1904); the doubleheader-number header may not
-be populated, parser falls through to `SingleGame` default.
-
-**Fix options:**
-- File issue against `baseball.computer.rs` to derive dh from game_id
-  suffix when missing from header.
-- In `game_start_info`, prefer `stg_gamelog.doubleheader_status` over
-  `stg_games.doubleheader_status` when they disagree (gamelog is the
-  authoritative scheduling source).
-- Add `game_id` tiebreaker to windows in `team_game_start_info` —
-  band-aid, doesn't fix the underlying wrong dh_status.
+Root cause was in upstream Retrosheet `1904.EBN` (Event Box) parsing.
+EBN files are box-score-derived (no play-by-play exists for 1904); the
+doubleheader-number header was not populated, parser fell through to
+`SingleGame`. Fixed upstream by deriving dh from the game_id suffix
+when the header is missing.
 
 ### 2. Other 13 mismatched tables
 

@@ -51,28 +51,41 @@ reference `main_models.people` / `main_models.game_results` which don't
 exist in dev). Independent of this work — see `bc/audits/relationships.sql`
 for the bug; it's been called out across prior phase notes.
 
-## Second wave — queued candidates
-
-Recon during this wave widened the candidate list beyond what
-`migration-evaluation.md` originally listed:
+## Second wave — landed 2026-05-03
 
 ### `team_game_results`
 
-Two `LAG ... IGNORE NULLS` windows feeding a streak FSM. Same shape as
-`event_pitching_flags` save_flags CTE but at game grain rather than
-event grain. Likely smallest second-wave port; clean port of the
-forward_fill+shift idiom. Confirm partition key is `(team_id, season)`
-and ordering is `game_date, game_number`.
+Ported. New package `bc/python_models/game_level/` with
+`team_game_results.py` (pure Polars FSM) and a SQLMesh `@model` wrapper
+at `bc/models/intermediate/game_level/team_game_results.py`. The two
+`LAG ... IGNORE NULLS` windows for `win_streak_id` / `loss_streak_id`
+collapse to `pl.when(is_win/is_loss).then(start_id).forward_fill().over(
+season, team_id, game_type, order_by=(game_finish_date,
+season_game_number))`; streak length is `cum_count().over(partition +
+streak_id, order_by=...)` masked to 0 on non-streak rows. The original
+`joined` CTE (~10-table join) runs as DuckDB SQL inside the Python
+entrypoint; the Polars transform takes over for the FSM stages. All 5
+audits (`not_null`, `unique_grain`, `valid_baseball_season`, two
+`relationships`) preserved on the new `@model`. 12 unit tests in
+`bc/tests/test_team_game_results.py`. SQL counterpart deleted.
 
 ### `team_game_start_info`
 
-One `LAG ... IGNORE NULLS` for series-id derivation (carrying the
-running series identifier across consecutive games against the same
-opponent). Single FSM column; smaller diff. Phase-1 nondeterminism
-catalogue (`notes/phase-1-followups.md`) already calls out
-doubleheader-induced churn here — the Polars port is not expected to
-fix that, but it shouldn't regress it either. Capture allowlist before
-diffing.
+Ported. `bc/python_models/game_level/team_game_start_info.py` for the
+Polars transform; SQLMesh wrapper at
+`bc/models/intermediate/game_level/team_game_start_info.py`. Single
+`LAG ... IGNORE NULLS` on `series_id` becomes
+`series_id.forward_fill().over(season, team_id, game_type, opponent_id,
+order_by=(date, doubleheader_status))`. The SQL `base` UNION ALL +
+`* EXCLUDE (...)` runs as DuckDB SQL; the Polars transform adds
+`series_id`, `season_game_number`, `series_game_number`, and
+`days_since_last_game`. 6 audits preserved. 8 unit tests in
+`bc/tests/test_team_game_start_info.py`. SQL counterpart deleted.
+
+The phase-1 doubleheader churn is fixed upstream (see
+`notes/phase-1-followups.md`); the new Polars windows order on
+`(date, doubleheader_status)` exactly as the SQL did, so the fix
+flows through unchanged.
 
 ### Skipped / not Phase 5
 

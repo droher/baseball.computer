@@ -12,6 +12,8 @@ Schema of the returned frame depends on `Scorer.kind`:
    model_run_id}`. `predicted_class_bin` is `1` when the sigmoid prob
   is >= 0.5, else `0`. `predicted_proba` is the raw sigmoid output —
   i.e. the probability of the positive class.
+- `regression`: `{event_key, predicted_value, model_run_id}`.
+  `predicted_value` is the raw linear output of the regression head.
 """
 
 from __future__ import annotations
@@ -61,6 +63,14 @@ class Scorer:
                     "model_run_id": pl.Utf8,
                 }
             )
+        if self.kind == "regression":
+            return pl.DataFrame(
+                schema={
+                    GRAIN_COLUMN: pl.UInt32,
+                    "predicted_value": pl.Float64,
+                    "model_run_id": pl.Utf8,
+                }
+            )
         return pl.DataFrame(
             schema={
                 GRAIN_COLUMN: pl.UInt32,
@@ -100,6 +110,18 @@ class Scorer:
                     GRAIN_COLUMN: features[GRAIN_COLUMN],
                     "predicted_class_bin": pl.Series(predicted, dtype=pl.UInt8),
                     "predicted_proba": pl.Series(proba, dtype=pl.Float64),
+                    "model_run_id": pl.Series(
+                        [self.run_id] * features.height, dtype=pl.Utf8
+                    ),
+                }
+            )
+
+        if self.kind == "regression":
+            value = raw.reshape(-1).astype(np.float64)
+            return pl.DataFrame(
+                {
+                    GRAIN_COLUMN: features[GRAIN_COLUMN],
+                    "predicted_value": pl.Series(value, dtype=pl.Float64),
                     "model_run_id": pl.Series(
                         [self.run_id] * features.height, dtype=pl.Utf8
                     ),

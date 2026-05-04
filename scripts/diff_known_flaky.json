@@ -1,6 +1,174 @@
 {
-  "comment": "Phase 3 baseline \u2014 re-captured after Phase 3 BSL work. The Phase 3 changes (Metric.derived rewrite, evaluate_all builder, BSL semantic tables) are algebraically equivalent at the materialized-table level (verified by tests/test_derived_metrics.py); the drift here is upstream data churn between the prod build snapshot and this dev rebuild, mostly the team_game_start_info doubleheader / pulled+opposite-field direction stats noted in notes/phase-1-followups.md and notes/phase-2-followups.md. New tables in this baseline vs the empty Phase 2 snapshot: metrics_player_career_offense, metrics_player_season_league_offense, metrics_team_season_offense (all driven by the direction-stats churn). Re-capture whenever a fresh dev build naturally re-shuffles upstream values.",
+  "comment": "Phase-followups closeout baseline (2026-05-03). The diff harness now ATTACHes bc_remote.db (the published-parquet reference) and compares it against the local dev rebuild under DEV_ONLY mode. The upstream Retrosheet doubleheader fix has landed in the source parquet (verified directly: box_score.box_score_games returns DoubleHeaderGame1/Game2 for BRO 1904-05-30). The 556 (model, column) pairs here reflect the prod-vs-dev gap from this rebuild: bc_remote.db still points to the previously-published parquet, which predates the dev refresh, so direction-stat drift (pulled / opposite-field) and the partial-coverage SUM cluster (1901-07 BFP, 1903-09 ER, pre-1920 SB/CS, pre-1933 GIDP, pre-1954 SF, pre-1955 IBB) noted in notes/phase-2-followups.md still show. Re-capture after each fresh prod publish.",
   "pairs": [
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "balls_in_play_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "batted_angle_left_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "batted_angle_middle_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "batted_angle_right_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "batted_distance_infield_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "batted_distance_outfield_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "batting_outs_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "doubles_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "home_runs_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "runs_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "singles_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "sqrt_sample_size"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "strikeouts_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "trajectory_fly_ball_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "trajectory_ground_ball_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "trajectory_line_drive_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "trajectory_pop_up_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "trajectory_unknown_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "triples_park_factor"
+    },
+    {
+      "model": "calc_park_factors_advanced",
+      "column": "walks_park_factor"
+    },
+    {
+      "model": "calc_park_factors_basic",
+      "column": "avg_other_runs_per_inning"
+    },
+    {
+      "model": "calc_park_factors_basic",
+      "column": "avg_this_runs_per_inning"
+    },
+    {
+      "model": "calc_park_factors_basic",
+      "column": "basic_park_factor"
+    },
+    {
+      "model": "calc_park_factors_basic",
+      "column": "sqrt_sample_size"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "assisted_putouts"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "assists"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "balls_hit_to"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "double_plays"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "errors"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "event_coverage_rate"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "fielding_percentage"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "ground_ball_double_plays"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "in_play_assists"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "in_play_putouts"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "innings_played"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "outs_played"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "plate_appearances_in_field"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "plate_appearances_in_field_with_ball_in_play"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "putouts"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "range_factor"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "reaching_errors"
+    },
+    {
+      "model": "metrics_player_career_fielding",
+      "column": "unknown_putouts_while_fielding"
+    },
     {
       "model": "metrics_player_career_offense",
       "column": "batted_balls_opposite_field"
@@ -11,11 +179,43 @@
     },
     {
       "model": "metrics_player_career_offense",
+      "column": "batting_average_on_balls_in_play"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "catcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_player_career_offense",
       "column": "coverage_weighted_opposite_field_batting_average"
     },
     {
       "model": "metrics_player_career_offense",
       "column": "coverage_weighted_pulled_batting_average"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "doubles"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "grounded_into_double_plays"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "home_run_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "home_runs"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "isolated_power"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "on_base_plus_slugging"
     },
     {
       "model": "metrics_player_career_offense",
@@ -31,6 +231,42 @@
     },
     {
       "model": "metrics_player_career_offense",
+      "column": "pitch_ball_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitch_contact_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitch_foul_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitch_strike_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitch_swing_and_miss_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitch_swing_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitched_called_strike_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "pitches"
+    },
+    {
+      "model": "metrics_player_career_offense",
       "column": "pulled_rate"
     },
     {
@@ -40,6 +276,62 @@
     {
       "model": "metrics_player_career_offense",
       "column": "pulled_rate_outs"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "runs_batted_in"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "secondary_average"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "singles"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "slugging_percentage"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "strikeout_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "strikeouts"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "strikes"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "strikes_in_play"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "swings"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "swings_with_contact"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "total_bases"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "triples"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "walk_rate"
+    },
+    {
+      "model": "metrics_player_career_offense",
+      "column": "walks"
     },
     {
       "model": "metrics_player_career_pitching",
@@ -52,6 +344,10 @@
     {
       "model": "metrics_player_career_pitching",
       "column": "batters_faced"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "catcher_pickoff_attempts"
     },
     {
       "model": "metrics_player_career_pitching",
@@ -95,6 +391,42 @@
     },
     {
       "model": "metrics_player_career_pitching",
+      "column": "pitch_ball_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitch_contact_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitch_foul_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitch_strike_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitch_swing_and_miss_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitch_swing_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitched_called_strike_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "pitches"
+    },
+    {
+      "model": "metrics_player_career_pitching",
       "column": "pulled_rate"
     },
     {
@@ -108,6 +440,22 @@
     {
       "model": "metrics_player_career_pitching",
       "column": "strikeout_rate"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "strikes"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "strikes_in_play"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "swings"
+    },
+    {
+      "model": "metrics_player_career_pitching",
+      "column": "swings_with_contact"
     },
     {
       "model": "metrics_player_career_pitching",
@@ -216,6 +564,50 @@
     {
       "model": "metrics_player_season_league_offense",
       "column": "advances_on_wild_pitches"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "air_ball_hit_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "air_ball_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_left_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_left_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_left_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_middle_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_middle_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_middle_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_right_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_right_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "angle_right_rate_outs"
     },
     {
       "model": "metrics_player_season_league_offense",
@@ -351,6 +743,10 @@
     },
     {
       "model": "metrics_player_season_league_offense",
+      "column": "catcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
       "column": "caught_stealing"
     },
     {
@@ -359,7 +755,39 @@
     },
     {
       "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_air_ball_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_angle_left_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_angle_middle_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_angle_right_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_fly_ball_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_ground_ball_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_line_drive_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
       "column": "coverage_weighted_opposite_field_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "coverage_weighted_pop_up_batting_average"
     },
     {
       "model": "metrics_player_season_league_offense",
@@ -411,6 +839,30 @@
     },
     {
       "model": "metrics_player_season_league_offense",
+      "column": "fly_ball_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "ground_air_hit_ratio"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "ground_air_out_ratio"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "ground_ball_hit_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "ground_ball_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "ground_ball_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
       "column": "grounded_into_double_plays"
     },
     {
@@ -435,11 +887,31 @@
     },
     {
       "model": "metrics_player_season_league_offense",
+      "column": "known_angle_out_hit_ratio"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "known_angle_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "known_angle_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "known_angle_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
       "column": "left_on_base"
     },
     {
       "model": "metrics_player_season_league_offense",
       "column": "left_on_base_with_two_outs"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "line_drive_rate"
     },
     {
       "model": "metrics_player_season_league_offense",
@@ -475,6 +947,34 @@
     },
     {
       "model": "metrics_player_season_league_offense",
+      "column": "pitch_ball_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pitch_contact_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pitch_foul_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pitch_strike_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pitch_swing_and_miss_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pitch_swing_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pitched_called_strike_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
       "column": "pitcher_pickoff_attempts"
     },
     {
@@ -496,6 +996,10 @@
     {
       "model": "metrics_player_season_league_offense",
       "column": "plate_appearances_while_on_base"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "pop_up_rate"
     },
     {
       "model": "metrics_player_season_league_offense",
@@ -536,6 +1040,14 @@
     {
       "model": "metrics_player_season_league_offense",
       "column": "slugging_percentage"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "stolen_base_attempt_rate_second"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "stolen_base_attempt_rate_third"
     },
     {
       "model": "metrics_player_season_league_offense",
@@ -659,6 +1171,14 @@
     },
     {
       "model": "metrics_player_season_league_offense",
+      "column": "triples"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
+      "column": "unforced_out_rate"
+    },
+    {
+      "model": "metrics_player_season_league_offense",
       "column": "walk_rate"
     },
     {
@@ -672,6 +1192,50 @@
     {
       "model": "metrics_player_season_league_pitching",
       "column": "advances_on_passed_balls"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "air_ball_hit_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "air_ball_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_left_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_left_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_left_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_middle_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_middle_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_middle_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_right_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_right_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "angle_right_rate_outs"
     },
     {
       "model": "metrics_player_season_league_pitching",
@@ -819,6 +1383,10 @@
     },
     {
       "model": "metrics_player_season_league_pitching",
+      "column": "catcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
       "column": "caught_stealing"
     },
     {
@@ -831,7 +1399,39 @@
     },
     {
       "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_air_ball_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_angle_left_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_angle_middle_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_angle_right_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_fly_ball_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_ground_ball_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_line_drive_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
       "column": "coverage_weighted_opposite_field_batting_average"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "coverage_weighted_pop_up_batting_average"
     },
     {
       "model": "metrics_player_season_league_pitching",
@@ -891,11 +1491,35 @@
     },
     {
       "model": "metrics_player_season_league_pitching",
+      "column": "fly_ball_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
       "column": "games_finished"
     },
     {
       "model": "metrics_player_season_league_pitching",
       "column": "games_relieved"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "ground_air_hit_ratio"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "ground_air_out_ratio"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "ground_ball_hit_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "ground_ball_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "ground_ball_rate_outs"
     },
     {
       "model": "metrics_player_season_league_pitching",
@@ -951,11 +1575,31 @@
     },
     {
       "model": "metrics_player_season_league_pitching",
+      "column": "known_angle_out_hit_ratio"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "known_angle_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "known_angle_rate_hits"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "known_angle_rate_outs"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
       "column": "left_on_base"
     },
     {
       "model": "metrics_player_season_league_pitching",
       "column": "left_on_base_with_two_outs"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "line_drive_rate"
     },
     {
       "model": "metrics_player_season_league_pitching",
@@ -1007,6 +1651,38 @@
     },
     {
       "model": "metrics_player_season_league_pitching",
+      "column": "pitch_ball_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitch_contact_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitch_data_coverage_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitch_foul_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitch_strike_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitch_swing_and_miss_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitch_swing_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pitched_called_strike_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
       "column": "pitcher_pickoff_attempts"
     },
     {
@@ -1024,6 +1700,10 @@
     {
       "model": "metrics_player_season_league_pitching",
       "column": "plate_appearances"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "pop_up_rate"
     },
     {
       "model": "metrics_player_season_league_pitching",
@@ -1080,6 +1760,14 @@
     {
       "model": "metrics_player_season_league_pitching",
       "column": "slugging_percentage_against"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "stolen_base_attempt_rate_second"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
+      "column": "stolen_base_attempt_rate_third"
     },
     {
       "model": "metrics_player_season_league_pitching",
@@ -1207,6 +1895,10 @@
     },
     {
       "model": "metrics_player_season_league_pitching",
+      "column": "unforced_out_rate"
+    },
+    {
+      "model": "metrics_player_season_league_pitching",
       "column": "unforced_outs_on_basepaths"
     },
     {
@@ -1234,6 +1926,38 @@
       "column": "wins"
     },
     {
+      "model": "metrics_team_season_fielding",
+      "column": "assists"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "double_plays"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "errors"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "fielding_percentage"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "innings_played"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "outs_played"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "putouts"
+    },
+    {
+      "model": "metrics_team_season_fielding",
+      "column": "range_factor"
+    },
+    {
       "model": "metrics_team_season_offense",
       "column": "batted_balls_opposite_field"
     },
@@ -1243,11 +1967,31 @@
     },
     {
       "model": "metrics_team_season_offense",
+      "column": "batting_average_on_balls_in_play"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "catcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_team_season_offense",
       "column": "coverage_weighted_opposite_field_batting_average"
     },
     {
       "model": "metrics_team_season_offense",
       "column": "coverage_weighted_pulled_batting_average"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "grounded_into_double_plays"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "isolated_power"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "on_base_plus_slugging"
     },
     {
       "model": "metrics_team_season_offense",
@@ -1263,6 +2007,42 @@
     },
     {
       "model": "metrics_team_season_offense",
+      "column": "pitch_ball_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitch_contact_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitch_foul_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitch_strike_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitch_swing_and_miss_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitch_swing_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitched_called_strike_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "pitches"
+    },
+    {
+      "model": "metrics_team_season_offense",
       "column": "pulled_rate"
     },
     {
@@ -1272,6 +2052,50 @@
     {
       "model": "metrics_team_season_offense",
       "column": "pulled_rate_outs"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "runs_batted_in"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "secondary_average"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "singles"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "slugging_percentage"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "strikeout_rate"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "strikeouts"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "strikes"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "strikes_in_play"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "swings"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "swings_with_contact"
+    },
+    {
+      "model": "metrics_team_season_offense",
+      "column": "total_bases"
     },
     {
       "model": "metrics_team_season_pitching",
@@ -1284,6 +2108,10 @@
     {
       "model": "metrics_team_season_pitching",
       "column": "batters_faced"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "catcher_pickoff_attempts"
     },
     {
       "model": "metrics_team_season_pitching",
@@ -1327,6 +2155,42 @@
     },
     {
       "model": "metrics_team_season_pitching",
+      "column": "pitch_ball_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitch_contact_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitch_foul_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitch_strike_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitch_swing_and_miss_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitch_swing_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitched_called_strike_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitcher_pickoff_attempts"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "pitches"
+    },
+    {
+      "model": "metrics_team_season_pitching",
       "column": "pulled_rate"
     },
     {
@@ -1340,6 +2204,22 @@
     {
       "model": "metrics_team_season_pitching",
       "column": "strikeout_rate"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "strikes"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "strikes_in_play"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "swings"
+    },
+    {
+      "model": "metrics_team_season_pitching",
+      "column": "swings_with_contact"
     },
     {
       "model": "metrics_team_season_pitching",

@@ -29,6 +29,7 @@ TableExpr = Any
 
 MetricKind = Literal["offense", "pitching", "fielding"]
 MetricSource = Literal["season", "event"]
+MetricClassification = Literal["sum", "ratio", "derived"]
 
 
 class _MeasureProxy:
@@ -122,6 +123,30 @@ class Metric(BaseModel):
     numerator: Callable[[TableExpr], IbisExpr] | None = None
     denominator: Callable[[TableExpr], IbisExpr] | None = None
     derived: Callable[[Any], IbisExpr] | None = None
+
+    @property
+    def classification(self) -> MetricClassification:
+        """Coarse shape of this metric's expression.
+
+        ``"sum"``     — single ``formula`` lambda; pure aggregation or
+                        arithmetic over columns. Stays ``[base]`` in BSL.
+        ``"ratio"``   — ``numerator / denominator`` form; one SUM/SUM
+                        ratio. BSL flags as ``[calc]`` because it parses
+                        as a BinOp.
+        ``"derived"`` — ``derived`` lambda over the measure scope; a true
+                        composite of other registered measures
+                        (e.g. ``OPS = OBP + SLG``). Also ``[calc]`` in
+                        BSL today.
+
+        Used by ``classifications_for`` and the BSL semantic-layer
+        consumers to recover the lost ratio-vs-composite distinction
+        that BSL collapses into a single ``[calc]`` bucket.
+        """
+        if self.derived is not None:
+            return "derived"
+        if self.numerator is not None:
+            return "ratio"
+        return "sum"
 
     @model_validator(mode="after")
     def _exactly_one_form(self) -> Metric:
@@ -256,3 +281,15 @@ def register(metric: Metric) -> Metric:
 def metrics_for(kind: MetricKind, source: MetricSource) -> list[Metric]:
     """All metrics matching (kind, source), in registration order."""
     return [m for m in METRICS.values() if m.kind == kind and m.source == source]
+
+
+def classifications_for(
+    kind: MetricKind, source: MetricSource
+) -> dict[str, MetricClassification]:
+    """Classification per metric for a (kind, source) slice.
+
+    Recovers the ratio-vs-derived distinction BSL collapses into a
+    single ``[calc]`` bucket. ``"sum"`` matches BSL ``[base]``; ``"ratio"``
+    and ``"derived"`` both fall under BSL ``[calc]``.
+    """
+    return {m.name: m.classification for m in metrics_for(kind, source)}

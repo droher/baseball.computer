@@ -32,7 +32,7 @@ def _embedding_dim(vocab_size: int) -> int:
 class _Head:
     output: keras.KerasTensor
     loss: keras.losses.Loss
-    metric: keras.metrics.Metric
+    metrics: tuple[keras.metrics.Metric, ...]
 
 
 def _make_outputs_layer(
@@ -45,14 +45,24 @@ def _make_outputs_layer(
         return _Head(
             output=out,
             loss=keras.losses.SparseCategoricalCrossentropy(),
-            metric=keras.metrics.SparseCategoricalAccuracy(),
+            metrics=(keras.metrics.SparseCategoricalAccuracy(),),
         )
     if target_spec.kind == "binary":
         out = layers.Dense(1, activation="sigmoid", name=target_spec.name)(trunk)
         return _Head(
             output=out,
             loss=keras.losses.BinaryCrossentropy(),
-            metric=keras.metrics.BinaryAccuracy(),
+            metrics=(keras.metrics.BinaryAccuracy(),),
+        )
+    if target_spec.kind == "regression":
+        out = layers.Dense(1, activation="linear", name=target_spec.name)(trunk)
+        return _Head(
+            output=out,
+            loss=keras.losses.MeanSquaredError(),
+            metrics=(
+                keras.metrics.MeanSquaredError(name="mse"),
+                keras.metrics.MeanAbsoluteError(name="mae"),
+            ),
         )
     raise ValueError(f"unsupported target kind {target_spec.kind!r}")
 
@@ -115,7 +125,7 @@ def build_model(
     compile_kwargs: dict[str, Any] = {
         "optimizer": keras.optimizers.Adam(learning_rate=1e-3),
         "loss": head.loss,
-        "weighted_metrics": [head.metric],
+        "weighted_metrics": list(head.metrics),
     }
     model.compile(**compile_kwargs)
     return model

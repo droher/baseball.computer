@@ -185,25 +185,63 @@ predictions written back into DuckDB via a streaming Python `@model`.
   cleaner output schema (`predicted_proba` directly) and a smaller
   model. `predicted_class_bin` is just `proba >= 0.5`.
 
-## Open third-wave targets
+## What landed (third wave — six targets + regression branch, 2026-05-03)
 
-`ml_event_outcomes` provides 6 more targets, each with its own sample
-weight column. Order roughly by feature reuse and reviewability:
+Code-only landing — artifact JSONs need a real training run before the
+`predictions_*` `@model`s can score. Each `scripts/train_<name>.py`
+produces its artifact on first successful run.
 
-| Target column | Type | Sample weight | Notes |
+### Regression branch (one-time extension)
+
+- `bc/python_models/ml/features.py` — `TargetKind` Literal extended to
+  `{"multiclass", "binary", "regression"}`. New `filter_zero_weight:
+  bool = False` field on `TargetSpec` (default keeps existing targets
+  unchanged); enabled on `outcome_batted_trajectory_cat` and
+  `outcome_batted_location_cat` so non-in-play rows fall out at
+  `_select` time.
+- `bc/python_models/ml/model_factory.py::_make_outputs_layer` — new
+  branch: `Dense(1, activation="linear")`, `MeanSquaredError` loss,
+  `MSE`/`MAE` sibling metrics. `_Head.metric` -> `_Head.metrics:
+  tuple[Metric, ...]`; existing multiclass and binary heads wrap their
+  single metric in a 1-tuple.
+- `bc/python_models/ml/training.py` — `_encode_batch` adds a regression
+  branch (`Float32` target, no class-index round-trip).
+  `collect_feature_stats` skips the class-labels query for regression.
+  Weight-0 row drop now also covers regression and any multiclass with
+  `filter_zero_weight=True`.
+- `bc/python_models/ml/prediction.py` — `Scorer` adds a regression
+  schema `(event_key, predicted_value FLOAT64, model_run_id VARCHAR)`.
+- `bc/python_models/ml/hamilton_dag.py::num_classes` — returns 1 for
+  regression and skips class-labels build.
+
+### Per-target additions
+
+| Target | Type | Sample weight | Files |
 |---|---|---|---|
-| `outcome_batted_trajectory_cat` | multiclass | `trajectory_sample_weight` | Conditional on in-play. Either nest under `is_in_play_bin` or accept a "not in play" class. |
-| `outcome_batted_location_cat` | multiclass | `location_sample_weight` | Same conditional structure as trajectory. |
-| `outcome_baserunning_cat` | multiclass | `baserunning_play_sample_weight` | Different feature subset (runners on base matter most). |
-| `outcome_runs_following_num` | regression | `generic_sample_weight` | Needs a `regression` branch in `_make_outputs_layer` (linear head + MSE). |
-| `outcome_is_win_bin` | binary | `win_sample_weight` | Win probability; check meta_train_test_split partitions correctly across game state. |
-| `outcome_has_batting_bin` | binary | `generic_sample_weight` | Lowest priority — already largely deterministic from event type. |
+| `outcome_batted_trajectory_cat` | multiclass | `trajectory_sample_weight` | shim + train + predictions + test |
+| `outcome_batted_location_cat` | multiclass | `location_sample_weight` | shim + train + predictions + test |
+| `outcome_baserunning_cat` | multiclass | `baserunning_play_sample_weight` | shim + train + predictions + test |
+| `outcome_runs_following_num` | regression | `generic_sample_weight` | shim + train + predictions + test |
+| `outcome_is_win_bin` | binary | `win_sample_weight` | shim + train + predictions + test |
+| `outcome_has_batting_bin` | binary | `generic_sample_weight` | shim + train + predictions + test |
 
-For the multiclass + binary targets above, adding a new target is now
-purely additive: declare a `TargetSpec` in `features.py`, add a
-`scripts/train_<name>.py` CLI and a `predictions_<name>.py` `@model`,
-and reuse the existing factory + DAG. Regression needs a small extension
-to `_make_outputs_layer` and `_encode_batch`.
+Per target: `bc/python_models/ml/model_<name>.py` (thin shim binding
+spec to factory), `scripts/train_<name>.py` (CLI), `bc/models/
+intermediate/machine_learning/predictions_<name>.py` (SQLMesh `@model`,
+`kind=FULL`, grain=[event_key], audits matched to output schema),
+`bc/tests/test_<name>_model.py` (factory shape, scorer schema, OOV
+handling, empty-input). Multiclass-conditional targets filter via the
+`_select WHERE <weight_column> > 0` shortcut.
+
+### Open: artifact backfill
+
+Each new target needs `uv run --group migration-ml python
+scripts/train_<name>.py --epochs 1 --rows-per-batch 100000` run once
+to land the artifact JSON. Then the corresponding `predictions_*` model
+is buildable. `outcome_baserunning_cat` left with
+`filter_zero_weight=False` since it has a meaningful `'Other'` label
+for non-baserunning events; flip the flag if downstream metrics get
+noisy on plate-appearance rows.
 
 ## Other follow-ups
 

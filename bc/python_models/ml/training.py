@@ -39,7 +39,6 @@ from python_models.ml.features import (
     Vocabulary,
     build_vocabulary,
 )
-from python_models.ml.model_factory import build_model
 
 _log = logging.getLogger(__name__)
 
@@ -95,13 +94,13 @@ def _select(target_spec: TargetSpec, split: str, schema: str) -> str:
         f"{SPLIT_COLUMN} = '{split}'",
         f"{target_spec.target_column} IS NOT NULL",
     ]
-    # For binary targets, exclude rows that have weight 0 — otherwise
-    # the model would see lots of "outcome_is_in_play_bin = 0 because
-    # the event isn't a plate appearance" rows, which carry no real
-    # signal. For multiclass targets the 'Other' class is meaningful
-    # so we keep weight-0 rows; their gradient contribution is zero
-    # anyway because the loss is sample-weighted.
-    if target_spec.kind == "binary":
+    # Drop weight-0 rows for binary and regression targets — they carry
+    # no signal (e.g. outcome_is_in_play_bin = 0 because the event isn't
+    # a plate appearance). Multiclass targets keep weight-0 rows by
+    # default so the 'Other' class stays representative; targets where
+    # the zero-weight rows are conditioning artifacts (e.g. trajectory
+    # is undefined for non-in-play) opt in via TargetSpec.filter_zero_weight.
+    if target_spec.kind in {"binary", "regression"} or target_spec.filter_zero_weight:
         where.append(f"{target_spec.weight_column} > 0")
     return (
         f"SELECT {cols} FROM {schema}.ml_features WHERE "
@@ -175,14 +174,20 @@ def collect_feature_stats(
         numeric_means[c] = float(row[2 * i])
         numeric_variances[c] = max(float(row[2 * i + 1]), 1e-6)
 
-    _log.info("collecting target class labels")
-    class_rows = con.execute(
-        f"SELECT DISTINCT {target_spec.target_column} AS v "
-        f"FROM ({train_query}) "
-        f"WHERE {target_spec.target_column} IS NOT NULL "
-        f"ORDER BY v"
-    ).fetchall()
-    class_labels = tuple(str(r[0]) for r in class_rows)
+    if target_spec.kind == "regression":
+        # No class labels for regression; class_labels stays empty so
+        # downstream code (`num_classes`, pin write) treats this as
+        # a 1-output model.
+        class_labels: tuple[str, ...] = ()
+    else:
+        _log.info("collecting target class labels")
+        class_rows = con.execute(
+            f"SELECT DISTINCT {target_spec.target_column} AS v "
+            f"FROM ({train_query}) "
+            f"WHERE {target_spec.target_column} IS NOT NULL "
+            f"ORDER BY v"
+        ).fetchall()
+        class_labels = tuple(str(r[0]) for r in class_rows)
 
     train_count = con.execute(f"SELECT COUNT(*) FROM ({train_query})").fetchone()
     test_count = con.execute(
@@ -239,6 +244,12 @@ def _encode_batch(
             df[target_spec.target_column].cast(pl.Float32).fill_null(0.0).to_numpy()
         )
         targets = target_codes.astype(np.float32).reshape(-1, 1)
+        valid = np.ones(targets.shape[0], dtype=bool)
+    elif target_spec.kind == "regression":
+        target_values = (
+            df[target_spec.target_column].cast(pl.Float32).fill_null(0.0).to_numpy()
+        )
+        targets = target_values.astype(np.float32).reshape(-1, 1)
         valid = np.ones(targets.shape[0], dtype=bool)
     else:
         raise ValueError(f"unsupported target kind {target_spec.kind!r}")

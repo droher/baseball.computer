@@ -52,7 +52,7 @@ ALL_FEATURE_COLUMNS: tuple[str, ...] = (
 
 OOV_TOKEN = "<oov>"
 
-TargetKind = Literal["multiclass", "binary"]
+TargetKind = Literal["multiclass", "binary", "regression"]
 
 
 class TargetSpec(BaseModel):
@@ -69,6 +69,9 @@ class TargetSpec(BaseModel):
     target_column: str
     weight_column: str
     kind: TargetKind
+    # When True, training drops rows with weight_column == 0 even for
+    # multiclass targets. Binary and regression targets always drop them.
+    filter_zero_weight: bool = False
 
 
 PLATE_APPEARANCE_CAT = TargetSpec(
@@ -85,7 +88,60 @@ IS_IN_PLAY_BIN = TargetSpec(
     kind="binary",
 )
 
-ALL_TARGETS: tuple[TargetSpec, ...] = (PLATE_APPEARANCE_CAT, IS_IN_PLAY_BIN)
+BATTED_TRAJECTORY_CAT = TargetSpec(
+    name="batted_trajectory_cat",
+    target_column="outcome_batted_trajectory_cat",
+    weight_column="trajectory_sample_weight",
+    kind="multiclass",
+    filter_zero_weight=True,
+)
+
+BATTED_LOCATION_CAT = TargetSpec(
+    name="batted_location_cat",
+    target_column="outcome_batted_location_cat",
+    weight_column="location_sample_weight",
+    kind="multiclass",
+    filter_zero_weight=True,
+)
+
+BASERUNNING_CAT = TargetSpec(
+    name="baserunning_cat",
+    target_column="outcome_baserunning_cat",
+    weight_column="baserunning_play_sample_weight",
+    kind="multiclass",
+)
+
+RUNS_FOLLOWING_NUM = TargetSpec(
+    name="runs_following_num",
+    target_column="outcome_runs_following_num",
+    weight_column="generic_sample_weight",
+    kind="regression",
+)
+
+IS_WIN_BIN = TargetSpec(
+    name="is_win_bin",
+    target_column="outcome_is_win_bin",
+    weight_column="win_sample_weight",
+    kind="binary",
+)
+
+HAS_BATTING_BIN = TargetSpec(
+    name="has_batting_bin",
+    target_column="outcome_has_batting_bin",
+    weight_column="generic_sample_weight",
+    kind="binary",
+)
+
+ALL_TARGETS: tuple[TargetSpec, ...] = (
+    PLATE_APPEARANCE_CAT,
+    IS_IN_PLAY_BIN,
+    BATTED_TRAJECTORY_CAT,
+    BATTED_LOCATION_CAT,
+    BASERUNNING_CAT,
+    RUNS_FOLLOWING_NUM,
+    IS_WIN_BIN,
+    HAS_BATTING_BIN,
+)
 
 
 def target_by_name(name: str) -> TargetSpec:

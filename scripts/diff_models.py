@@ -40,8 +40,14 @@ import duckdb
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "bc.db"
+PROD_DB_PATH = REPO_ROOT / "bc_remote.db"
 BASELINE_PATH = REPO_ROOT / "scripts" / "diff_known_flaky.json"
 
+# Under DEV_ONLY virtual_environment_mode bc.db has no main_models
+# schema (only main_models__dev). bc_remote.db is the small catalog of
+# views over the published parquet — ATTACH it as `prod_remote` so the
+# prod-side comparison resolves to a real rowset.
+PROD_CATALOG = "prod_remote"
 PROD_SCHEMA = "main_models"
 DEV_SCHEMA = "main_models__dev"
 
@@ -123,13 +129,24 @@ def column_tolerance(table: str, column: str, sql_type: str) -> float:
         "INT" in sql_type_upper
         or "SMALLINT" in sql_type_upper
         or "BIGINT" in sql_type_upper
+        or "VARCHAR" in sql_type_upper
+        or "BOOLEAN" in sql_type_upper
+        or "DATE" in sql_type_upper
+        or "ENUM" in sql_type_upper
     ):
+        # Non-numeric columns get exact equality — IS DISTINCT FROM
+        # handles NULL semantics; tolerance only matters for floats.
         return INT_TOL
     return RATE_TOL
 
 
 def _connect(read_only: bool = True) -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(str(DB_PATH), read_only=read_only)
+    con = duckdb.connect(str(DB_PATH), read_only=read_only)
+    if PROD_DB_PATH.exists():
+        con.execute(
+            f"ATTACH '{PROD_DB_PATH}' AS {PROD_CATALOG} (READ_ONLY)"
+        )
+    return con
 
 
 def _scalar_int(row: tuple[Any, ...] | None) -> int:
@@ -139,17 +156,28 @@ def _scalar_int(row: tuple[Any, ...] | None) -> int:
 
 
 def _columns(
-    con: duckdb.DuckDBPyConnection, schema: str, table: str
+    con: duckdb.DuckDBPyConnection, schema: str, table: str, *, catalog: str | None = None
 ) -> list[tuple[str, str]]:
-    rows = con.execute(
-        """
-        SELECT column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = ? AND table_name = ?
-        ORDER BY ordinal_position
-        """,
-        [schema, table],
-    ).fetchall()
+    if catalog:
+        rows = con.execute(
+            """
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_catalog = ? AND table_schema = ? AND table_name = ?
+            ORDER BY ordinal_position
+            """,
+            [catalog, schema, table],
+        ).fetchall()
+    else:
+        rows = con.execute(
+            """
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = ? AND table_name = ?
+            ORDER BY ordinal_position
+            """,
+            [schema, table],
+        ).fetchall()
     return [(name, dtype) for name, dtype in rows]
 
 
@@ -157,8 +185,9 @@ def _quote(ident: str) -> str:
     return '"' + ident.replace('"', '""') + '"'
 
 
-def _qualify(schema: str, table: str) -> str:
-    return f"{_quote(schema)}.{_quote(table)}"
+def _qualify(schema: str, table: str, *, catalog: str | None = None) -> str:
+    base = f"{_quote(schema)}.{_quote(table)}"
+    return f"{_quote(catalog)}.{base}" if catalog else base
 
 
 def _diff_one_model(
@@ -166,7 +195,7 @@ def _diff_one_model(
     table: str,
     grain: list[str],
 ) -> ModelDrift | None:
-    prod_cols = _columns(con, PROD_SCHEMA, table)
+    prod_cols = _columns(con, PROD_SCHEMA, table, catalog=PROD_CATALOG)
     dev_cols = _columns(con, DEV_SCHEMA, table)
     if not prod_cols:
         # Some models (e.g. the calc_park_factor_* analyses) are new
@@ -193,7 +222,7 @@ def _diff_one_model(
             len(only_dev),
             sorted(only_dev),
         )
-    prod_q = _qualify(PROD_SCHEMA, table)
+    prod_q = _qualify(PROD_SCHEMA, table, catalog=PROD_CATALOG)
     dev_q = _qualify(DEV_SCHEMA, table)
     prod_rows = _scalar_int(con.execute(f"SELECT COUNT(*) FROM {prod_q}").fetchone())
     dev_rows = _scalar_int(con.execute(f"SELECT COUNT(*) FROM {dev_q}").fetchone())
@@ -225,9 +254,18 @@ def _diff_one_model(
             continue
         tol = column_tolerance(table, col, dtype)
         col_q = _quote(col)
+        is_numeric = any(
+            tag in dtype.upper()
+            for tag in ("INT", "DECIMAL", "DOUBLE", "FLOAT", "REAL", "NUMERIC")
+        )
         if tol == 0.0:
             mismatch_clause = f"p.{col_q} IS DISTINCT FROM d.{col_q}"
-            max_clause = f"MAX(ABS(COALESCE(p.{col_q}, 0) - COALESCE(d.{col_q}, 0)))"
+            if is_numeric:
+                max_clause = f"MAX(ABS(COALESCE(p.{col_q}, 0) - COALESCE(d.{col_q}, 0)))"
+            else:
+                # Non-numeric column: only rows_diff matters; max_abs is
+                # meaningless (booleans, strings, dates).
+                max_clause = "MAX(0)"
         else:
             # IS DISTINCT FROM correctly treats NaN/NaN and inf/inf as
             # equal. Tolerance only applies to finite-vs-finite pairs;

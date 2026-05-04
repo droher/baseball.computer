@@ -263,3 +263,39 @@ def test_dep_capture_proxy_ignores_dunders():
     p = _DepCaptureProxy(sink)
     _ = _copy.copy(p)  # would explode if __copy__ poisoned the sink
     assert "__copy__" not in sink and "__deepcopy__" not in sink
+
+
+def test_metric_classification_distinguishes_ratio_vs_derived():
+    """``Metric.classification`` recovers the ratio-vs-derived distinction
+    BSL collapses into a single ``[calc]`` bucket.
+
+    BSL flags any BinOp as ``[calc]``, so OBP (numerator/denominator) and
+    OPS (composite of OBP+SLG) both end up in
+    ``get_calculated_measures()``. The classification helper preserves
+    the structural difference.
+    """
+    from python_models.metrics.registry import classifications_for
+
+    season_classes = classifications_for("offense", "season")
+
+    # Raw ratios — single SUM/SUM via numerator+denominator.
+    for name in ("on_base_percentage", "slugging_percentage", "batting_average"):
+        assert season_classes[name] == "ratio", (
+            f"{name!r} should be classified 'ratio' (got {season_classes[name]!r})"
+        )
+
+    # Composites of ratios — derived form referencing other measures.
+    for name in ("on_base_plus_slugging", "isolated_power"):
+        assert season_classes[name] == "derived", (
+            f"{name!r} should be classified 'derived' (got {season_classes[name]!r})"
+        )
+
+    # Pure aggregates live at event grain (Stage B coverage-weighted refactor).
+    event_classes = classifications_for("offense", "event")
+    for name in (
+        "sum_trajectory_broad_air_ball_hits",
+        "sum_trajectory_ground_ball_outs",
+    ):
+        assert event_classes[name] == "sum", (
+            f"{name!r} should be classified 'sum' (got {event_classes[name]!r})"
+        )

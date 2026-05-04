@@ -49,8 +49,9 @@ def feature_stats(
 
 
 def num_classes(target_spec: TargetSpec, feature_stats: Any) -> int:
-    if target_spec.kind == "binary":
-        # Binary head emits one scalar per row; class_labels is unused at fit time.
+    # Binary and regression heads emit one scalar per row; class_labels
+    # is unused at fit time for both.
+    if target_spec.kind in {"binary", "regression"}:
         return 1
     return len(feature_stats.class_labels)
 

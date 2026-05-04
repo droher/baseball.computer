@@ -204,14 +204,21 @@ pieces of work on top of the leverage cleanup:
   data but extreme park factors. Could bump `prior_sample_size` per-league
   (e.g. 5000 for NN1/NN2 vs 1000 default) to dampen further if downstream
   use cases need it.
-- **Custom `relationships` audit broken under DEV_ONLY mode**.
-  `bc/audits/relationships.sql` references `@to_model` which renders to
-  the prod-physical FQN (e.g. `main_models.game_results`); when
-  `virtual_environment_mode=DEV_ONLY`, that schema doesn't exist and
-  the audit fails with a CatalogException after a successful
-  materialization. Pre-existing — surfaced when re-running `sqlmesh
-  plan dev` against player_game_offense_stats / player_game_pitching_stats.
-  Fix needs the audit to resolve `@to_model` through the dev virtualization
-  layer (probably swap to a built-in `forall` audit or rewrite using a
-  resolver helper that consults the env at audit time).
+- **Custom `relationships` audit broken under DEV_ONLY mode** [resolved
+  2026-05-03]. Replaced the audit body's `@to_model` text substitution
+  with a Python `@macro` `relationships_check(@column, @to_column,
+  @to_model)` (`bc/macros/_env_to_model.py`). The macro reads
+  `evaluator.locals['this_model']` (which is env-aware: under DEV_ONLY
+  dev, schema is `sqlmesh__<canonical>`, table name is
+  `<canonical>__<model>__<hash>__<env>`), strips the env suffix off
+  the table name, and rewrites `to_model` to the env-suffixed view
+  (`main_models__dev.X`). Declaring `to_model` as a real `depends_on`
+  was rejected because the project DAG has 12 cyclic FK pairs (e.g.
+  `main_models.people` is supplemented from `stg_box_score_*` lines
+  that themselves FK-check `people`). The macro additionally probes
+  the engine adapter for the rewritten target — when a transitively-
+  referenced model hasn't materialized yet (also a DAG-cycle artifact)
+  the predicate collapses to `TRUE`, surfacing as a 0-row audit. After
+  a full plan dev the env is complete and audits run their real
+  predicate. Prod runs (canonical schema) are unaffected.
 
