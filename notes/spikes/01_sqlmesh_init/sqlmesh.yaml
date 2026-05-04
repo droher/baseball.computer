@@ -1,0 +1,25 @@
+# --- DBT-specific options ---
+dbt:
+  # This configuration ensures that each dbt target gets its own isolated state.
+  # The inferred state schemas are named "sqlmesh_state_<profile name>_<target schema>", eg "sqlmesh_state_jaffle_shop_dev"
+  # If this is undesirable, you may manually configure the gateway to use a specific state schema name
+  # https://sqlmesh.readthedocs.io/en/stable/integrations/dbt/#selecting-a-different-state-connection
+  infer_state_schema_name: True
+
+# --- Virtual Data Environment Mode ---
+# Enable Virtual Data Environments (VDE) for *development* environments.
+# Note that the production environment in dbt projects is not virtual by default to maintain compatibility with existing tooling.
+# https://sqlmesh.readthedocs.io/en/stable/guides/configuration/#virtual-data-environment-modes
+virtual_environment_mode: dev_only
+
+# --- Plan Defaults ---
+# https://sqlmesh.readthedocs.io/en/stable/reference/configuration/#plan
+plan:
+  # For Virtual Data Environments, this ensures that any changes are always considered against prod,
+  # rather than the previous state of that environment
+  always_recreate_environment: True
+
+# --- Model Defaults ---
+# https://sqlmesh.readthedocs.io/en/stable/reference/model_configuration/#model-defaults
+model_defaults:
+  start: 2026-05-01

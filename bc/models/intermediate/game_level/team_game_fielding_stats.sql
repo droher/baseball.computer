@@ -1,8 +1,75 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.team_game_fielding_stats,
+  kind FULL,
+  grain (game_id, team_id),
+  columns (
+    season SMALLINT,
+    game_id VARCHAR,
+    team_id TEAM_ID,
+    outs_played UTINYINT,
+    putouts UTINYINT,
+    assists UTINYINT,
+    errors UTINYINT,
+    fielders_choices UTINYINT,
+    assisted_putouts UTINYINT,
+    in_play_putouts UTINYINT,
+    in_play_assists UTINYINT,
+    passed_balls UTINYINT,
+    stolen_bases UTINYINT,
+    caught_stealing UTINYINT,
+    double_plays UTINYINT,
+    triple_plays UTINYINT,
+    pickoffs UTINYINT,
+    plate_appearances_in_field UTINYINT,
+    plate_appearances_in_field_with_ball_in_play UTINYINT,
+    ground_ball_double_plays UTINYINT,
+    reaching_errors UTINYINT,
+    unknown_putouts UTINYINT,
+    incomplete_events UTINYINT
+  ),
+  column_descriptions (
+    season = @doc('season'),
+    game_id = @doc('game_id'),
+    team_id = @doc('team_id'),
+    outs_played = @doc('outs_played'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    fielders_choices = @doc('fielders_choices'),
+    assisted_putouts = @doc('assisted_putouts'),
+    in_play_putouts = @doc('in_play_putouts'),
+    in_play_assists = @doc('in_play_assists'),
+    passed_balls = @doc('passed_balls'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    double_plays = @doc('double_plays'),
+    triple_plays = @doc('triple_plays'),
+    pickoffs = @doc('pickoffs'),
+    plate_appearances_in_field = @doc('plate_appearances_in_field'),
+    plate_appearances_in_field_with_ball_in_play = @doc('plate_appearances_in_field_with_ball_in_play'),
+    ground_ball_double_plays = @doc('ground_ball_double_plays'),
+    reaching_errors = @doc('reaching_errors'),
+    unknown_putouts = @doc('unknown_putouts'),
+    incomplete_events = @doc('incomplete_events')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_team_game_fielding_stats.parquet'
+  ),
+  audits (
+    not_null(columns := (game_id, team_id)),
+    unique_grain(columns := (game_id, team_id)),
+    valid_baseball_season(column := season),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
+);
+
+
+
+
+
+
+
 -- We don't need to merge in box score data for this like we do with
 -- player-level data, because the event-level data will contain all
 -- info even if it isn't credited to a specific player.
@@ -25,7 +92,7 @@ WITH game_event_agg AS (
         SUM(reaching_errors)::UTINYINT AS reaching_errors,
         SUM(unknown_putouts)::UTINYINT AS unknown_putouts,
         SUM(incomplete_events)::UTINYINT AS incomplete_events,
-    FROM {{ ref('event_fielding_stats') }}
+    FROM main_models.event_fielding_stats
     GROUP BY 1, 2
 ),
 
@@ -35,7 +102,7 @@ game_info AS (
         game_id,
         team_id,
         team_side AS side
-    FROM {{ ref('team_game_start_info') }}
+    FROM main_models.team_game_start_info
 ),
 
 box_sb AS (
@@ -43,7 +110,7 @@ box_sb AS (
         game_id,
         CASE WHEN running_side = 'Away' THEN 'Home' ELSE 'Away' END AS side,
         COUNT(*) AS stolen_bases
-    FROM {{ ref('stg_box_score_stolen_bases') }}
+    FROM main_models.stg_box_score_stolen_bases
     GROUP BY 1, 2
 ),
 
@@ -52,7 +119,7 @@ box_cs AS (
         game_id,
         CASE WHEN running_side = 'Away' THEN 'Home' ELSE 'Away' END AS side,
         COUNT(*) AS caught_stealing
-    FROM {{ ref('stg_box_score_caught_stealing') }}
+    FROM main_models.stg_box_score_caught_stealing
     GROUP BY 1, 2
 ),
 
@@ -61,7 +128,7 @@ box_dp AS (
         game_id,
         defense_side AS side,
         COUNT(*) AS double_plays
-    FROM {{ ref('stg_box_score_double_plays') }}
+    FROM main_models.stg_box_score_double_plays
     GROUP BY 1, 2
 ),
 
@@ -70,7 +137,7 @@ box_tp AS (
         game_id,
         defense_side AS side,
         COUNT(*) AS triple_plays
-    FROM {{ ref('stg_box_score_triple_plays') }}
+    FROM main_models.stg_box_score_triple_plays
     GROUP BY 1, 2
 ),
 
@@ -89,7 +156,7 @@ players AS (
         SUM(in_play_putouts)::UTINYINT AS in_play_putouts,
         SUM(in_play_assists)::UTINYINT AS in_play_assists,
         SUM(passed_balls)::UTINYINT AS passed_balls,
-    FROM {{ ref('player_position_game_fielding_stats') }}
+    FROM main_models.player_position_game_fielding_stats
     GROUP BY 1, 2
 ),
 
@@ -126,7 +193,7 @@ final AS (
     FROM players AS p
     INNER JOIN game_info USING (game_id, team_id)
     LEFT JOIN game_event_agg AS g USING (game_id, team_id)
-    LEFT JOIN {{ ref('stg_box_score_team_fielding_lines') }} AS t USING (game_id, side)
+    LEFT JOIN main_models.stg_box_score_team_fielding_lines AS t USING (game_id, side)
     LEFT JOIN box_sb USING (game_id, side)
     LEFT JOIN box_cs USING (game_id, side)
     LEFT JOIN box_dp USING (game_id, side)

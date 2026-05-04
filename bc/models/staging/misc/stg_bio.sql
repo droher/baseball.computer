@@ -1,5 +1,59 @@
+MODEL (
+  name main_models.stg_bio,
+  kind FULL,
+  description 'Staging table for Retrosheet''s `bio.csv` file, which contains basic demographic information about players, managers, coaches, and umpires.',
+  grain (player_id),
+  columns (
+    player_id VARCHAR,
+    last_name VARCHAR,
+    official_name VARCHAR,
+    first_name VARCHAR,
+    birth_date VARCHAR,
+    birth_city VARCHAR,
+    birth_state VARCHAR,
+    birth_country VARCHAR,
+    player_debut_date VARCHAR,
+    player_last_game_date VARCHAR,
+    manager_debut_date VARCHAR,
+    manager_last_game_date VARCHAR,
+    coach_debut_date VARCHAR,
+    coach_last_game_date VARCHAR,
+    umpire_debut_date VARCHAR,
+    umpire_last_game_date VARCHAR,
+    death_date VARCHAR,
+    death_city VARCHAR,
+    death_state VARCHAR,
+    death_country VARCHAR,
+    bats VARCHAR,
+    throws VARCHAR,
+    height_inches INTEGER,
+    weight_pounds INTEGER,
+    cemetery_name VARCHAR,
+    cemetery_city VARCHAR,
+    cemetery_state VARCHAR,
+    cemetery_country VARCHAR,
+    cemetery_note VARCHAR,
+    birth_name VARCHAR,
+    name_change_notes VARCHAR,
+    batting_hand_change_notes VARCHAR,
+    hall_of_fame_status VARCHAR
+  ),
+  column_descriptions (
+    player_id = @doc('player_id')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_bio.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('misc', 'bio') }}
+    SELECT * FROM misc.bio
 ),
 
 renamed AS (

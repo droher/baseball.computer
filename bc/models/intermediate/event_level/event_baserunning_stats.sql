@@ -1,8 +1,138 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_baserunning_stats,
+  kind FULL,
+  grain (event_key, baserunner),
+  columns (
+    event_key UINTEGER,
+    game_id VARCHAR,
+    batting_team_id TEAM_ID,
+    fielding_team_id TEAM_ID,
+    runner_id VARCHAR,
+    current_pitcher_id VARCHAR,
+    baserunner BASERUNNER,
+    runner_lineup_position UTINYINT,
+    reached_on_event_key UINTEGER,
+    charge_event_key UINTEGER,
+    explicit_charged_pitcher_id VARCHAR,
+    runs UTINYINT,
+    outs_on_basepaths UTINYINT,
+    times_reached_base UTINYINT,
+    times_lead_runner UTINYINT,
+    times_force_on_runner UTINYINT,
+    times_next_base_empty UTINYINT,
+    stolen_base_opportunities UTINYINT,
+    stolen_base_opportunities_second UTINYINT,
+    stolen_base_opportunities_third UTINYINT,
+    stolen_base_opportunities_home UTINYINT,
+    stolen_bases UTINYINT,
+    stolen_bases_second UTINYINT,
+    stolen_bases_third UTINYINT,
+    stolen_bases_home UTINYINT,
+    caught_stealing UTINYINT,
+    caught_stealing_second UTINYINT,
+    caught_stealing_third UTINYINT,
+    caught_stealing_home UTINYINT,
+    picked_off UTINYINT,
+    picked_off_first UTINYINT,
+    picked_off_second UTINYINT,
+    picked_off_third UTINYINT,
+    picked_off_caught_stealing UTINYINT,
+    advances_on_wild_pitches UTINYINT,
+    advances_on_passed_balls UTINYINT,
+    advances_on_balks UTINYINT,
+    advances_on_unspecified_plays UTINYINT,
+    advances_on_defensive_indifference UTINYINT,
+    advances_on_errors UTINYINT,
+    plate_appearances_while_on_base UTINYINT,
+    balls_in_play_while_running UTINYINT,
+    balls_in_play_while_on_base UTINYINT,
+    batter_total_bases_while_running UTINYINT,
+    batter_total_bases_while_on_base UTINYINT,
+    extra_base_advance_attempts UTINYINT,
+    bases_advanced TINYINT,
+    bases_advanced_on_balls_in_play TINYINT,
+    surplus_bases_advanced_on_balls_in_play TINYINT,
+    outs_on_extra_base_advance_attempts UTINYINT,
+    outs_avoided_on_errors UTINYINT,
+    unforced_outs_on_basepaths UTINYINT,
+    extra_base_chances UTINYINT,
+    extra_bases_taken UTINYINT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    game_id = @doc('game_id'),
+    batting_team_id = @doc('team_id'),
+    fielding_team_id = @doc('team_id'),
+    runner_id = @doc('runner_id'),
+    current_pitcher_id = 'Retrosheet person ID of the pitcher on the mount at the end of the event',
+    baserunner = @doc('baserunner'),
+    runner_lineup_position = '1-9 lineup position of the baserunner',
+    reached_on_event_key = @doc('reached_on_event_key'),
+    charge_event_key = @doc('charge_event_key'),
+    explicit_charged_pitcher_id = @doc('explicit_charged_pitcher_id'),
+    runs = @doc('runs'),
+    outs_on_basepaths = @doc('outs_on_basepaths'),
+    times_reached_base = @doc('times_reached_base'),
+    times_lead_runner = @doc('times_lead_runner'),
+    times_force_on_runner = @doc('times_force_on_runner'),
+    times_next_base_empty = @doc('times_next_base_empty'),
+    stolen_base_opportunities = @doc('stolen_base_opportunities'),
+    stolen_base_opportunities_second = @doc('stolen_base_opportunities_second'),
+    stolen_base_opportunities_third = @doc('stolen_base_opportunities_third'),
+    stolen_base_opportunities_home = @doc('stolen_base_opportunities_home'),
+    stolen_bases = @doc('stolen_bases'),
+    stolen_bases_second = @doc('stolen_bases_second'),
+    stolen_bases_third = @doc('stolen_bases_third'),
+    stolen_bases_home = @doc('stolen_bases_home'),
+    caught_stealing = @doc('caught_stealing'),
+    caught_stealing_second = @doc('caught_stealing_second'),
+    caught_stealing_third = @doc('caught_stealing_third'),
+    caught_stealing_home = @doc('caught_stealing_home'),
+    picked_off = @doc('picked_off'),
+    picked_off_first = @doc('picked_off_first'),
+    picked_off_second = @doc('picked_off_second'),
+    picked_off_third = @doc('picked_off_third'),
+    picked_off_caught_stealing = @doc('picked_off_caught_stealing'),
+    advances_on_wild_pitches = @doc('advances_on_wild_pitches'),
+    advances_on_passed_balls = @doc('advances_on_passed_balls'),
+    advances_on_balks = @doc('advances_on_balks'),
+    advances_on_unspecified_plays = @doc('advances_on_unspecified_plays'),
+    advances_on_defensive_indifference = @doc('advances_on_defensive_indifference'),
+    advances_on_errors = @doc('advances_on_errors'),
+    plate_appearances_while_on_base = @doc('plate_appearances_while_on_base'),
+    balls_in_play_while_running = @doc('balls_in_play_while_running'),
+    balls_in_play_while_on_base = @doc('balls_in_play_while_on_base'),
+    batter_total_bases_while_running = @doc('batter_total_bases_while_running'),
+    batter_total_bases_while_on_base = @doc('batter_total_bases_while_on_base'),
+    extra_base_advance_attempts = @doc('extra_base_advance_attempts'),
+    bases_advanced = @doc('bases_advanced'),
+    bases_advanced_on_balls_in_play = @doc('bases_advanced_on_balls_in_play'),
+    surplus_bases_advanced_on_balls_in_play = @doc('surplus_bases_advanced_on_balls_in_play'),
+    outs_on_extra_base_advance_attempts = @doc('outs_on_extra_base_advance_attempts'),
+    outs_avoided_on_errors = @doc('outs_avoided_on_errors'),
+    unforced_outs_on_basepaths = @doc('unforced_outs_on_basepaths'),
+    extra_base_chances = @doc('extra_base_chances'),
+    extra_bases_taken = @doc('extra_bases_taken')
+  ),
+  audits (
+    not_null(columns := (event_key, baserunner)),
+    unique_grain(columns := (event_key, baserunner)),
+    relationships(column := batting_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := fielding_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_baserunning_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH joined AS (
     SELECT
         event_key,
@@ -60,13 +190,13 @@ WITH joined AS (
             ELSE FALSE
         END AS is_extra_base_chance,
 
-    FROM {{ ref('stg_event_baserunners') }} AS b
-    LEFT JOIN {{ ref('stg_events') }} AS e USING (event_key)
-    LEFT JOIN {{ ref('seed_plate_appearance_result_types') }} AS part
+    FROM main_models.stg_event_baserunners AS b
+    LEFT JOIN main_models.stg_events AS e USING (event_key)
+    LEFT JOIN main_seeds.seed_plate_appearance_result_types AS part
         USING (plate_appearance_result)
-    LEFT JOIN {{ ref('seed_baserunner_info') }} AS baserunner_meta
+    LEFT JOIN main_seeds.seed_baserunner_info AS baserunner_meta
         ON b.baserunner = baserunner_meta.baserunner
-    LEFT JOIN {{ ref('seed_bases_info') }} AS bases_meta
+    LEFT JOIN main_seeds.seed_bases_info AS bases_meta
         ON b.attempted_advance_to_base = bases_meta.base
     WHERE NOT e.no_play_flag
 ),

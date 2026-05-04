@@ -1,5 +1,74 @@
+MODEL (
+  name main_models.stg_box_score_pinch_hitting_lines,
+  kind FULL,
+  description 'Box score batting lines that are specific to stats accumulated while a player is pinch hitting.',
+  grain (game_id, pinch_hitter_id, inning),
+  columns (
+    game_id VARCHAR,
+    pinch_hitter_id VARCHAR,
+    inning BIGINT,
+    side SIDE,
+    at_bats BIGINT,
+    runs BIGINT,
+    hits BIGINT,
+    doubles BIGINT,
+    triples BIGINT,
+    home_runs BIGINT,
+    rbi BIGINT,
+    sacrifice_hits BIGINT,
+    sacrifice_flies BIGINT,
+    hit_by_pitches BIGINT,
+    walks BIGINT,
+    intentional_walks BIGINT,
+    strikeouts BIGINT,
+    stolen_bases BIGINT,
+    caught_stealing BIGINT,
+    grounded_into_double_plays BIGINT,
+    reached_on_interference BIGINT
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    inning = @doc('inning'),
+    side = @doc('side'),
+    at_bats = @doc('at_bats'),
+    runs = @doc('runs'),
+    hits = @doc('hits'),
+    doubles = @doc('doubles'),
+    triples = @doc('triples'),
+    home_runs = @doc('home_runs'),
+    sacrifice_hits = @doc('sacrifice_hits'),
+    sacrifice_flies = @doc('sacrifice_flies'),
+    hit_by_pitches = @doc('hit_by_pitches'),
+    walks = @doc('walks'),
+    intentional_walks = @doc('intentional_walks'),
+    strikeouts = @doc('strikeouts'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    grounded_into_double_plays = @doc('grounded_into_double_plays')
+  ),
+  audits (
+    not_null(columns := (game_id, pinch_hitter_id, inning)),
+    unique_grain(columns := (game_id, pinch_hitter_id, inning)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := pinch_hitter_id, to_model := main_models.people, to_column := player_id)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_box_score_pinch_hitting_lines.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('box_score', 'box_score_pinch_hitting_lines') }}
+    -- Drop the 2255 early-1900s box-score rows (mostly 1908-09 NL games)
+    -- that record a pinch-hit appearance without an inning. inning is
+    -- part of the grain, so the rows can't be retained without breaking
+    -- unique_grain. Recover when the source parser fills the gap.
+    SELECT * FROM box_score.box_score_pinch_hitting_lines WHERE inning IS NOT NULL
 ),
 
 renamed AS (
@@ -7,7 +76,7 @@ renamed AS (
         game_id,
         pinch_hitter_id,
         inning,
-        side,
+        side::SIDE AS side,
         at_bats,
         runs,
         hits,

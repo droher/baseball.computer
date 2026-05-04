@@ -1,8 +1,75 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.event_pitch_sequence_stats,
+  kind FULL,
+  grain (event_key),
+  columns (
+    event_key UINTEGER,
+    pitches UTINYINT,
+    swings UTINYINT,
+    swings_with_contact UTINYINT,
+    strikes UTINYINT,
+    strikes_called UTINYINT,
+    strikes_swinging UTINYINT,
+    strikes_foul UTINYINT,
+    strikes_foul_tip UTINYINT,
+    strikes_in_play UTINYINT,
+    strikes_unknown UTINYINT,
+    balls UTINYINT,
+    balls_called UTINYINT,
+    balls_intentional UTINYINT,
+    balls_automatic UTINYINT,
+    unknown_pitches UTINYINT,
+    pitchouts UTINYINT,
+    pitcher_pickoff_attempts UTINYINT,
+    catcher_pickoff_attempts UTINYINT,
+    pitches_blocked_by_catcher UTINYINT,
+    pitches_with_runners_going UTINYINT,
+    passed_balls UTINYINT,
+    wild_pitches UTINYINT,
+    balks UTINYINT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    pitches = @doc('pitches'),
+    swings = @doc('swings'),
+    swings_with_contact = @doc('swings_with_contact'),
+    strikes = @doc('strikes'),
+    strikes_called = @doc('strikes_called'),
+    strikes_swinging = @doc('strikes_swinging'),
+    strikes_foul = @doc('strikes_foul'),
+    strikes_foul_tip = @doc('strikes_foul_tip'),
+    strikes_in_play = @doc('strikes_in_play'),
+    strikes_unknown = @doc('strikes_unknown'),
+    balls = @doc('balls'),
+    balls_called = @doc('balls_called'),
+    balls_intentional = @doc('balls_intentional'),
+    balls_automatic = @doc('balls_automatic'),
+    unknown_pitches = @doc('unknown_pitches'),
+    pitchouts = @doc('pitchouts'),
+    pitcher_pickoff_attempts = @doc('pitcher_pickoff_attempts'),
+    catcher_pickoff_attempts = @doc('catcher_pickoff_attempts'),
+    pitches_blocked_by_catcher = @doc('pitches_blocked_by_catcher'),
+    pitches_with_runners_going = @doc('pitches_with_runners_going'),
+    passed_balls = @doc('passed_balls'),
+    wild_pitches = @doc('wild_pitches'),
+    balks = @doc('balks')
+  ),
+  audits (
+    not_null(columns := (event_key)),
+    unique_values(columns := (event_key)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_event_pitch_sequence_stats.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH add_meta AS (
     SELECT
         pitch_meta.*,
@@ -10,8 +77,8 @@ WITH add_meta AS (
         pitches.runners_going_flag,
         pitches.blocked_by_catcher_flag,
         pitches.catcher_pickoff_attempt_at_base
-    FROM {{ ref('stg_event_pitch_sequences') }} AS pitches
-    INNER JOIN {{ ref('seed_pitch_types') }} AS pitch_meta USING (sequence_item)
+    FROM main_models.stg_event_pitch_sequences AS pitches
+    INNER JOIN main_seeds.seed_pitch_types AS pitch_meta USING (sequence_item)
 ),
 
 other_events AS (
@@ -20,7 +87,7 @@ other_events AS (
         BOOL_OR(baserunning_play_type = 'PassedBall')::UTINYINT AS passed_balls,
         BOOL_OR(baserunning_play_type = 'WildPitch')::UTINYINT AS wild_pitches,
         BOOL_OR(baserunning_play_type = 'Balk')::UTINYINT AS balks,
-    FROM {{ ref('stg_event_baserunners') }}
+    FROM main_models.stg_event_baserunners
     GROUP BY 1
 ),
 

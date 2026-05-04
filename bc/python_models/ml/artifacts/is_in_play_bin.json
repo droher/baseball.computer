@@ -1,0 +1,40 @@
+{
+  "class_labels": [
+    "0",
+    "1"
+  ],
+  "kind": "binary",
+  "numeric_means": {
+    "day_of_year_num": 188.87800407809405,
+    "frame_num": 0.4907910683938127,
+    "inning_num": 4.999789153419898,
+    "is_night_game_num": 0.4790946522417214,
+    "score_batting_team_num": 2.233046536223261,
+    "score_fielding_team_num": 2.2843540699477054,
+    "season_num": 1975.7110242714461
+  },
+  "numeric_variances": {
+    "day_of_year_num": 2638.8121959254804,
+    "frame_num": 0.24991519557867173,
+    "inning_num": 6.8268552824114845,
+    "is_night_game_num": 0.24956296643510573,
+    "score_batting_team_num": 6.424698744878059,
+    "score_fielding_team_num": 6.898288248857566,
+    "season_num": 1084.2336343890092
+  },
+  "run_id": "7815e8119fa84880994a451067d43aba",
+  "target_column": "outcome_is_in_play_bin",
+  "target_name": "is_in_play_bin",
+  "tracking_uri": "sqlite:////Users/davidroher/Repos/baseball.computer/bc/mlflow.db",
+  "vocab_paths": {
+    "base_state_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/base_state_cat.parquet",
+    "batter_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/batter_player.parquet",
+    "game_type_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/game_type_cat.parquet",
+    "league_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/league_cat.parquet",
+    "park_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/park_cat.parquet",
+    "pitcher_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/pitcher_player.parquet",
+    "runner_first_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/runner_first_player.parquet",
+    "runner_second_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/runner_second_player.parquet",
+    "runner_third_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/is_in_play_bin/runner_third_player.parquet"
+  }
+}

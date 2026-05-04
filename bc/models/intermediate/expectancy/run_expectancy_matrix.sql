@@ -1,8 +1,28 @@
-{{ 
-    config(
-        materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.run_expectancy_matrix,
+  kind FULL,
+  grain (run_expectancy_key),
+  columns (
+    run_expectancy_key VARCHAR,
+    league_group VARCHAR,
+    season_group SMALLINT,
+    outs UTINYINT,
+    base_state UTINYINT,
+    avg_runs_scored DECIMAL(18,3),
+    variance_runs_scored DECIMAL(18,3),
+    sample_size BIGINT
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_run_expectancy_matrix.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH next_runs AS (
     SELECT
         run_expectancy_start_key AS run_expectancy_key,
@@ -11,7 +31,7 @@ WITH next_runs AS (
         outs_start,
         base_state_start,
         SUM(runs_on_play) OVER rest_of_inning AS runs_scored,
-    FROM {{ ref('event_states_full') }}
+    FROM main_models.event_states_full
     WHERE game_type = 'RegularSeason'
         -- Final/extra innings have atypical expectencies
         AND inning_start < 9

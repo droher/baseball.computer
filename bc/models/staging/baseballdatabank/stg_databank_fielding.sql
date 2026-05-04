@@ -1,5 +1,61 @@
+MODEL (
+  name main_models.stg_databank_fielding,
+  kind FULL,
+  description 'Aggregate fielding statistics by player, season, and stint with a given team.',
+  grain (databank_player_id, season, stint, fielding_position),
+  columns (
+    databank_player_id VARCHAR,
+    season SMALLINT,
+    stint SMALLINT,
+    team_id VARCHAR,
+    league_id VARCHAR,
+    games SMALLINT,
+    games_started SMALLINT,
+    outs_played SMALLINT,
+    putouts SMALLINT,
+    assists SMALLINT,
+    errors SMALLINT,
+    double_plays SMALLINT,
+    passed_balls SMALLINT,
+    wild_pitches SMALLINT,
+    stolen_bases SMALLINT,
+    caught_stealing SMALLINT,
+    fielding_position INTEGER,
+    fielding_position_category VARCHAR
+  ),
+  column_descriptions (
+    databank_player_id = @doc('databank_player_id'),
+    season = @doc('season'),
+    stint = @doc('stint'),
+    team_id = @doc('team_id'),
+    league_id = @doc('league_id'),
+    games = @doc('games'),
+    games_started = @doc('games_started'),
+    outs_played = @doc('outs_played'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    double_plays = @doc('double_plays'),
+    passed_balls = @doc('passed_balls'),
+    wild_pitches = @doc('wild_pitches'),
+    stolen_bases = @doc('stolen_bases'),
+    caught_stealing = @doc('caught_stealing'),
+    fielding_position = @doc('fielding_position'),
+    fielding_position_category = @doc('fielding_position_category')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_databank_fielding.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH source AS (
-    SELECT * FROM {{ source('baseballdatabank', 'fielding') }}
+    SELECT * FROM baseballdatabank.fielding
 ),
 
 renamed AS (

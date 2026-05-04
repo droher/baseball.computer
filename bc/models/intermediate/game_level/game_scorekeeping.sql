@@ -1,3 +1,48 @@
+MODEL (
+  name main_models.game_scorekeeping,
+  kind FULL,
+  grain (game_id, cleaned_scorer),
+  columns (
+    season SMALLINT,
+    game_id VARCHAR,
+    date DATE,
+    cleaned_scorer VARCHAR,
+    raw_scorer VARCHAR,
+    away_team_id TEAM_ID,
+    home_team_id TEAM_ID,
+    inputter VARCHAR,
+    translator VARCHAR,
+    game_share DOUBLE,
+    scorer_game_count_raw BIGINT,
+    scorer_game_count_weighted DOUBLE,
+    scorer_more_common_team_id TEAM_ID
+  ),
+  column_descriptions (
+    season = @doc('season'),
+    game_id = @doc('game_id'),
+    date = @doc('date'),
+    away_team_id = @doc('away_team_id'),
+    home_team_id = @doc('home_team_id')
+  ),
+  audits (
+    not_null(columns := (game_id, cleaned_scorer)),
+    unique_grain(columns := (game_id, cleaned_scorer)),
+    valid_baseball_season(column := season),
+    relationships(column := away_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := home_team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_game_scorekeeping.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH flattened_init AS (
     SELECT
         season,
@@ -11,7 +56,7 @@ WITH flattened_init AS (
         -- Delimiters aren't consistent, so we need to split on multiple characters
         UNNEST(STRING_SPLIT_REGEX(filled_scorer, '[/&,]|( -(-?) )')) as split_scorer,
         LOWER(TRIM(split_scorer)) AS scorer
-    FROM {{ ref('stg_games') }}
+    FROM main_models.stg_games
 ),
 
 flattened AS (
@@ -60,21 +105,21 @@ counts AS (
         COUNT(*) OVER (PARTITION BY cleaned_scorer) AS scorer_game_count_raw,
         1 / game_scorer_splits AS game_share,
     FROM flattened AS f
-    LEFT JOIN {{ ref('seed_scorer_lookup') }} AS s ON f.scorer = LOWER(TRIM(s.scorer))
-    LEFT JOIN {{ ref('seed_scorer_numerical_ranges') }} AS num_range
+    LEFT JOIN main_seeds.seed_scorer_lookup AS s ON f.scorer = LOWER(TRIM(s.scorer))
+    LEFT JOIN main_seeds.seed_scorer_numerical_ranges AS num_range
         -- TODO: Test assumption that all possible range candidates are 3 digits
         ON REGEXP_FULL_MATCH(f.scorer, '\d{3}')
             AND f.scorer BETWEEN num_range.start::VARCHAR AND num_range.end::VARCHAR
-    LEFT JOIN {{ ref('seed_franchises') }} AS away
+    LEFT JOIN main_seeds.seed_franchises AS away
         ON f.away_team_id = away.team_id
             AND f.date BETWEEN away.date_start AND COALESCE(away.date_end, '9999-12-31')
-    LEFT JOIN {{ ref('seed_franchises') }} AS home
+    LEFT JOIN main_seeds.seed_franchises AS home
         ON f.home_team_id = home.team_id
             AND f.date BETWEEN home.date_start AND COALESCE(home.date_end, '9999-12-31')
-    LEFT JOIN {{ ref('seed_scorer_disambiguation') }} AS dis_away
+    LEFT JOIN main_seeds.seed_scorer_disambiguation AS dis_away
         ON f.scorer = dis_away.scorer
             AND LOWER(f.away_team_id) = dis_away.team_id
-    LEFT JOIN {{ ref('seed_scorer_disambiguation') }} AS dis_home
+    LEFT JOIN main_seeds.seed_scorer_disambiguation AS dis_home
         ON f.scorer = dis_home.scorer
             AND LOWER(f.home_team_id) = dis_home.team_id
     WHERE TRIM(f.scorer) != ''

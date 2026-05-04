@@ -1,8 +1,31 @@
-{{ 
-    config(
-        materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.win_expectancy_matrix,
+  kind FULL,
+  grain (win_expectancy_key),
+  columns (
+    win_expectancy_key VARCHAR,
+    inning VARCHAR,
+    frame FRAME,
+    truncated_home_margin TINYINT,
+    outs UTINYINT,
+    base_state UTINYINT,
+    home_win_rate DECIMAL(4,3)
+  ),
+  column_descriptions (
+    inning = @doc('inning'),
+    frame = @doc('frame')
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_win_expectancy_matrix.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH states AS (
     SELECT
         -- Treat 9th and later as the same to increase sample size
@@ -25,7 +48,7 @@ WITH states AS (
         END, 0) AS home_margin_bucket,
         base_state_start > 0 AS any_runners_on,
         LAST(score_home_end::INT - score_away_end > 0) OVER rest_of_game AS home_team_win
-    FROM {{ ref('event_states_full') }}
+    FROM main_models.event_states_full
     -- Exclude the rare cases where the home team bats first
     -- TODO: Should also exclude/differentiate any bullshit extra innings runner on 2nd stuff
     WHERE bat_first_side = 'Away'

@@ -1,8 +1,58 @@
+MODEL (
+  name main_models.calc_fielding_play_agg,
+  kind FULL,
+  description 'Table containing one row for each fielder who made at least one fielding play on a given event. It serves as the canonical way to calculate fielding data for each fielder on each event. For the most part, the definitions involve conditions based on each individual fielding play, but some definitions require aggregate knowledge of the event as a whole.',
+  grain (event_key, fielding_position),
+  columns (
+    event_key UINTEGER,
+    fielding_position UTINYINT,
+    game_id VARCHAR,
+    putouts UTINYINT,
+    assists UTINYINT,
+    errors UTINYINT,
+    fielders_choices UTINYINT,
+    plays_started UTINYINT,
+    assisted_putouts UTINYINT,
+    first_errors BIGINT,
+    unknown_putouts BIGINT,
+    incomplete_events UTINYINT
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    fielding_position = @doc('fielding_position'),
+    game_id = @doc('game_id'),
+    putouts = @doc('putouts'),
+    assists = @doc('assists'),
+    errors = @doc('errors'),
+    fielders_choices = @doc('fielders_choices'),
+    plays_started = @doc('plays_started'),
+    assisted_putouts = @doc('assisted_putouts'),
+    first_errors = @doc('first_errors'),
+    unknown_putouts = @doc('unknown_putouts'),
+    incomplete_events = @doc('incomplete_events')
+  ),
+  audits (
+    not_null(columns := (event_key, fielding_position)),
+    unique_grain(columns := (event_key, fielding_position)),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_calc_fielding_play_agg.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH grouper_init AS (
     SELECT
         *,
         COUNT(CASE WHEN fielding_play IN ('Putout', 'Error') THEN 1 END) OVER w AS group_id_init
-    FROM {{ ref('stg_event_fielding_plays') }}
+    FROM main_models.stg_event_fielding_plays
     WINDOW w AS (PARTITION BY event_key ORDER BY sequence_id)
 ),
 
@@ -28,7 +78,7 @@ add_batted_ball AS (
         assist_tracker.*,
         e.batted_location_general IS NOT NULL as is_batted_ball,
     FROM assist_tracker
-    INNER JOIN {{ ref('stg_events') }} AS e USING (event_key)
+    INNER JOIN main_models.stg_events AS e USING (event_key)
 ),
 
 final AS (

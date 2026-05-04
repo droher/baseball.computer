@@ -1,11 +1,47 @@
-{{
-  config(
-    materialized = 'table',
-    )
-}}
+MODEL (
+  name main_models.player_game_appearances,
+  kind FULL,
+  grain (game_id, player_id),
+  columns (
+    game_id VARCHAR,
+    player_id VARCHAR,
+    side SIDE,
+    games_started UTINYINT,
+    games_pinch_hit UTINYINT,
+    games_pinch_run UTINYINT,
+    games_defensive_sub UTINYINT,
+    games_ohtani_rule UTINYINT,
+    lineup_position UTINYINT,
+    first_fielding_position UTINYINT,
+    fielding_positions UTINYINT[]
+  ),
+  column_descriptions (
+    game_id = @doc('game_id'),
+    player_id = @doc('player_id'),
+    side = @doc('side'),
+    games_started = @doc('games_started'),
+    lineup_position = @doc('lineup_position')
+  ),
+  audits (
+    not_null(columns := (game_id, player_id)),
+    unique_grain(columns := (game_id, player_id)),
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(column := player_id, to_model := main_models.people, to_column := player_id)
+  ),
+  physical_properties (
+    download_parquet = 'https://data.baseball.computer/dbt/main_models_player_game_appearances.parquet'
+  ),
+);
+
+
+
+
+
+
+
 WITH event_based AS (
     SELECT game_id
-    FROM {{ ref('stg_games') }}
+    FROM main_models.stg_games
     WHERE source_type = 'PlayByPlay'
 ),
 
@@ -22,12 +58,12 @@ box_offense AS (
             ELSE 'DefensiveSubstitution'
         END AS entered_game_as,
         bat.nth_player_at_position AS position_order
-    FROM {{ ref('stg_box_score_batting_lines') }} AS bat
-    LEFT JOIN {{ ref('stg_box_score_pinch_hitting_lines') }} AS pinch_hit
+    FROM main_models.stg_box_score_batting_lines AS bat
+    LEFT JOIN main_models.stg_box_score_pinch_hitting_lines AS pinch_hit
         ON pinch_hit.game_id = bat.game_id
             AND pinch_hit.pinch_hitter_id = bat.batter_id
             AND pinch_hit.side = bat.side
-    LEFT JOIN {{ ref('stg_box_score_pinch_running_lines') }} AS pinch_run
+    LEFT JOIN main_models.stg_box_score_pinch_running_lines AS pinch_run
         ON pinch_run.game_id = bat.game_id
             AND pinch_run.pinch_runner_id = bat.batter_id
             AND pinch_run.side = bat.side
@@ -42,7 +78,7 @@ offense_union AS (
         entered_game_as,
         -- We're just using this to order so gaps don't matter
         start_event_id AS position_order
-    FROM {{ ref('stg_game_lineup_appearances') }}
+    FROM main_models.stg_game_lineup_appearances
     UNION ALL
     SELECT
         game_id,
@@ -62,7 +98,7 @@ fielding_union AS (
         side,
         fielding_position,
         start_event_id AS position_order
-    FROM {{ ref('stg_game_fielding_appearances') }}
+    FROM main_models.stg_game_fielding_appearances
     UNION ALL
     SELECT
         game_id,
@@ -70,7 +106,7 @@ fielding_union AS (
         side,
         fielding_position,
         nth_position_played_by_player AS position_order
-    FROM {{ ref('stg_box_score_fielding_lines') }}
+    FROM main_models.stg_box_score_fielding_lines
     WHERE game_id NOT IN (SELECT game_id FROM event_based)
 ),
 
@@ -96,15 +132,19 @@ fielding_agg AS (
         game_id,
         player_id,
         ANY_VALUE(side) AS side,
-        -- Sort by fielding position to choose pitcher first in event of Ohtani rule
+        -- min_by computes the starting position directly so downstream
+        -- doesn't need to subscript fielding_positions[1]. The ORDER BY
+        -- on the LIST stays so the published parquet's array order is
+        -- stable for external consumers.
+        min_by(fielding_position, (position_order, fielding_position)) AS first_fielding_position,
         LIST(fielding_position ORDER BY position_order, fielding_position) AS fielding_positions,
         (BOOL_OR(fielding_position = 1 AND position_order = 1)
-            AND BOOL_OR(fielding_position = 10 AND position_order = 1) 
+            AND BOOL_OR(fielding_position = 10 AND position_order = 1)
         )::UTINYINT AS games_ohtani_rule
     FROM fielding_union
     -- Keep DH, but ignore PH/PR
     WHERE fielding_position BETWEEN 1 AND 10
-    GROUP BY 1, 2 
+    GROUP BY 1, 2
 ),
 
 final AS (
@@ -118,7 +158,7 @@ final AS (
         offense_agg.games_defensive_sub,
         COALESCE(fielding_agg.games_ohtani_rule, 0)::UTINYINT AS games_ohtani_rule,
         offense_agg.lineup_position,
-        fielding_agg.fielding_positions[1] AS first_fielding_position,
+        fielding_agg.first_fielding_position,
         fielding_agg.fielding_positions,
     FROM offense_agg
     LEFT JOIN fielding_agg USING (game_id, player_id)

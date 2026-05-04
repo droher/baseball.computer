@@ -1,0 +1,48 @@
+{
+  "class_labels": [
+    "Double",
+    "HitByPitch",
+    "HomeRun",
+    "InPlayOut",
+    "IntentionalWalk",
+    "Other",
+    "ReachedOnError",
+    "SacrificeFly",
+    "SacrificeHit",
+    "Single",
+    "StrikeOut",
+    "Triple",
+    "Walk"
+  ],
+  "numeric_means": {
+    "day_of_year_num": 188.8610755797717,
+    "frame_num": 0.49101035742974225,
+    "inning_num": 4.992770495651396,
+    "is_night_game_num": 0.4785111650549501,
+    "score_batting_team_num": 2.239044302143958,
+    "score_fielding_team_num": 2.269519652359332,
+    "season_num": 1975.6131627553839
+  },
+  "numeric_variances": {
+    "day_of_year_num": 2640.5693145196915,
+    "frame_num": 0.24991918632645616,
+    "inning_num": 6.840333472953662,
+    "is_night_game_num": 0.2495382299727019,
+    "score_batting_team_num": 6.424887449276773,
+    "score_fielding_team_num": 6.853153208154542,
+    "season_num": 1089.4501554980338
+  },
+  "run_id": "1634c457eff74e02979d792c74a92f7f",
+  "tracking_uri": "sqlite:////Users/davidroher/Repos/baseball.computer/bc/mlflow.db",
+  "vocab_paths": {
+    "base_state_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/base_state_cat.parquet",
+    "batter_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/batter_player.parquet",
+    "game_type_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/game_type_cat.parquet",
+    "league_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/league_cat.parquet",
+    "park_cat": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/park_cat.parquet",
+    "pitcher_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/pitcher_player.parquet",
+    "runner_first_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/runner_first_player.parquet",
+    "runner_second_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/runner_second_player.parquet",
+    "runner_third_player": "/Users/davidroher/Repos/baseball.computer/bc/hamilton_artifacts/vocabs/plate_appearance_cat/runner_third_player.parquet"
+  }
+}

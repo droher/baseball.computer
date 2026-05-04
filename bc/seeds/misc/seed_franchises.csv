@@ -90,7 +90,8 @@ NYN,NYN,NL,E,New York,Mets,,1969-04-08,,New York,NY
 OAK,PHA,AL,,Philadelphia,Athletics,A's,1901-04-26,1954-09-26,Philadelphia,PA
 OAK,KC1,AL,,Kansas City,Athletics,A's,1955-04-12,1967-10-01,Kansas City,MO
 OAK,OAK,AL,,Oakland,Athletics,A's,1968-04-10,1968-09-29,Oakland,CA
-OAK,OAK,AL,W,Oakland,Athletics,A's,1969-04-08,,Oakland,CA
+OAK,OAK,AL,W,Oakland,Athletics,A's,1969-04-08,2024-09-26,Oakland,CA
+OAK,ATH,AL,W,Sacramento,Athletics,A's,2025-03-27,,West Sacramento,CA
 PHI,PHI,NL,,Philadelphia,Quakers,,1883-05-01,1889-10-05,Philadelphia,PA
 PHI,PHI,NL,,Philadelphia,Phillies,,1890-04-19,1942-09-27,Philadelphia,PA
 PHI,PHI,NL,,Philadelphia,Blue Jays,,1943-04-24,1944-10-01,Philadelphia,PA
@@ -359,3 +360,7 @@ WLE,WLE,ECL,,Wilmington,Potomacs,,1925-01-01,1925-12-31,Wilmington,DE
 WPS,WPS,,,Western Pipe & Steel,Boilermakers,,1943-01-01,1943-12-31,,
 WSE,WSE,ECL,,Washington,Potomacs,,1924-01-01,1924-12-31,Washington,DC
 WSW,WSW,EW,,Washington,Pilots,,1932-01-01,1932-12-31,Washington,DC
+BFA,BFA,NN2,,Buffalo,Black Aces,,1938-01-01,1938-12-31,Buffalo,NY
+CUS,CUS,,,Cuban,Stars (Ind),,1932-01-01,1937-12-31,,
+HOE,HOE,NAL,,Houston,Eagles,,1949-01-01,1949-12-31,Houston,TX
+LCB,LCB,NAL,,Louisville-Cleveland,Buckeyes,,1949-01-01,1949-12-31,Louisville,KY

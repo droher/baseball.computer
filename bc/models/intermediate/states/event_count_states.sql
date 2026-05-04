@@ -1,3 +1,8 @@
+MODEL (
+  name main_models.event_count_states,
+  kind FULL,
+);
+
 -- For each event, pivot out counts that occurred during it,
 -- including same PAs across multiple events (I think), and
 -- the count at which the event occurred. Sample cols:

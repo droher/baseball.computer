@@ -1,0 +1,548 @@
+- name: baseballdatabank.appearances
+- name: baseballdatabank.batting
+  columns:
+    g: USMALLINT
+    ab: USMALLINT
+    r: USMALLINT
+    h: USMALLINT
+    _2b: USMALLINT
+    _3b: USMALLINT
+    hr: USMALLINT
+    rbi: USMALLINT
+    sb: USMALLINT
+    cs: USMALLINT
+    bb: USMALLINT
+    so: USMALLINT
+    ibb: USMALLINT
+    hbp: USMALLINT
+    sh: USMALLINT
+    sf: USMALLINT
+    gidp: USMALLINT
+- name: baseballdatabank.fielding
+- name: baseballdatabank.fielding_of
+  description: 'LF-CF-RF game splits
+
+    '
+  grain:
+  - player_id
+- name: baseballdatabank.people
+  description: 'Biographical information on each player/umpire/manager.
+
+    '
+  columns:
+    retro_id: PLAYER_ID
+  grain:
+  - player_id
+  audits:
+  - - not_null
+    - columns: (player_id)
+  - - unique_values
+    - columns: (bbref_id)
+      condition: bbref_id IS NOT NULL
+  - - unique_values
+    - columns: (player_id)
+      condition: player_id IS NOT NULL
+  - - unique_values
+    - columns: (retro_id)
+      condition: retro_id IS NOT NULL
+- name: baseballdatabank.pitching
+- name: biodata.coaches
+  description: 'Per-coach assignments by year.
+
+    '
+  column_descriptions:
+    id: Retrosheet personnel id (joins biofile.id).
+  grain:
+  - id
+  - year
+  - team
+- name: biodata.ejections
+  description: 'Game ejections.
+
+    '
+  column_descriptions:
+    game_id: 'Retrosheet game ID, A 12-character string structured as follows: - Chars 1-3: Home team ID - Chars 4-11: Date (YYYYMMDD) - Char 12: Game number (0 if only one game was played on that day) Example: MLN195607170'
+    ejectee: Ejected personnel id.
+    job: Role of ejectee (player, manager, coach).
+    inning: -1 if pre-game.
+- name: biodata.managers0
+  description: 'Manager career index.
+
+    '
+  column_descriptions:
+    id: Retrosheet personnel id.
+    first_g: Date of first managed game.
+    last_g: Date of last managed game.
+  grain:
+  - id
+  audits:
+  - - not_null
+    - columns: (id)
+  - - unique_values
+    - columns: (id)
+      condition: id IS NOT NULL
+- name: biodata.relatives
+  description: 'Player-family relationships graph.
+
+    '
+  column_descriptions:
+    id1: First personnel id.
+    relation: Relationship type (father, brother, etc.).
+    id2: Second personnel id.
+- name: biodata.teams
+  description: 'Per-team master. Replaces per-year teams/team{YYYY}*.csv.
+
+    '
+  column_descriptions:
+    team: Retrosheet team id.
+    first_year: First season the team existed.
+    last_year: Last season the team existed.
+  grain:
+  - team
+  audits:
+  - - not_null
+    - columns: (team)
+- name: biodata.umpires0
+  description: 'Umpire career index.
+
+    '
+  column_descriptions:
+    id: Retrosheet personnel id.
+    first_g: Date of first umpired game.
+    last_g: Date of last umpired game.
+  grain:
+  - id
+  audits:
+  - - not_null
+    - columns: (id)
+  - - unique_values
+    - columns: (id)
+      condition: id IS NOT NULL
+- name: box_score.box_score_batting_lines
+  columns:
+    game_id: GAME_ID
+    batter_id: PLAYER_ID
+    side: SIDE
+    lineup_position: UTINYINT
+    nth_player_at_position: UTINYINT
+    at_bats: UTINYINT
+    runs: UTINYINT
+    hits: UTINYINT
+    doubles: UTINYINT
+    triples: UTINYINT
+    home_runs: UTINYINT
+    rbi: UTINYINT
+    sacrifice_hits: UTINYINT
+    sacrifice_flies: UTINYINT
+    hit_by_pitch: UTINYINT
+    walks: UTINYINT
+    intentional_walks: UTINYINT
+    strikeouts: UTINYINT
+    stolen_bases: UTINYINT
+    caught_stealing: UTINYINT
+    grounded_into_double_plays: UTINYINT
+    reached_on_interference: UTINYINT
+  grain:
+  - game_id
+  - batter_id
+  - lineup_position
+  audits:
+  - - not_null
+    - columns: (at_bats, batter_id, game_id, lineup_position, nth_player_at_position, side)
+- name: box_score.box_score_caught_stealing
+  audits:
+  - - not_null
+    - columns: (game_id, runner_id, running_side)
+- name: box_score.box_score_comments
+  columns:
+    game_id: GAME_ID
+  grain:
+  - game_id
+  - sequence_id
+  audits:
+  - - not_null
+    - columns: (comment, game_id, sequence_id)
+- name: box_score.box_score_double_plays
+  audits:
+  - - not_null
+    - columns: (defense_side, game_id)
+- name: box_score.box_score_fielding_lines
+  columns:
+    game_id: GAME_ID
+    fielder_id: PLAYER_ID
+    side: SIDE
+    fielding_position: UTINYINT
+    nth_position_played_by_player: UTINYINT
+    outs_played: UTINYINT
+    putouts: UTINYINT
+    assists: UTINYINT
+    errors: UTINYINT
+    double_plays: UTINYINT
+    triple_plays: UTINYINT
+    passed_balls: UTINYINT
+  grain:
+  - game_id
+  - fielder_id
+  - fielding_position
+  audits:
+  - - not_null
+    - columns: (fielder_id, fielding_position, game_id, nth_position_played_by_player, side)
+- name: box_score.box_score_games
+  columns:
+    game_id: GAME_ID
+    game_key: UINTEGER
+    doubleheader_status: DOUBLEHEADER_STATUS
+    time_of_day: TIME_OF_DAY
+    game_type: GAME_TYPE
+    bat_first_side: SIDE
+    sky: SKY
+    field_condition: FIELD_CONDITION
+    precipitation: PRECIPITATION
+    wind_direction: WIND_DIRECTION
+    park_id: PARK_ID
+    temperature_fahrenheit: INT1
+    attendance: INT
+    wind_speed_mph: utinyint
+    winning_pitcher: PLAYER_ID
+    losing_pitcher: PLAYER_ID
+    save_pitcher: PLAYER_ID
+    game_winning_rbi: PLAYER_ID
+    account_type: ACCOUNT_TYPE
+    away_team_id: TEAM_ID
+    home_team_id: TEAM_ID
+  grain:
+  - game_id
+  audits:
+  - - not_null
+    - columns: (account_type, away_team_id, bat_first_side, date, doubleheader_status, field_condition, game_id, game_key,
+        game_type, home_team_id, precipitation, scoring_method, sky, time_of_day, use_dh, wind_direction)
+  - - unique_values
+    - columns: (game_id)
+      condition: game_id IS NOT NULL
+  - - unique_values
+    - columns: (game_key)
+      condition: game_key IS NOT NULL
+- name: box_score.box_score_hit_by_pitches
+- name: box_score.box_score_home_runs
+  audits:
+  - - not_null
+    - columns: (batter_id, batting_side, game_id, pitcher_id)
+- name: box_score.box_score_line_scores
+- name: box_score.box_score_pinch_hitting_lines
+  grain:
+  - game_id
+  - pinch_hitter_id
+  audits:
+  - - not_null
+    - columns: (game_id, pinch_hitter_id, side)
+- name: box_score.box_score_pinch_running_lines
+  grain:
+  - game_id
+  - pinch_runner_id
+  audits:
+  - - not_null
+    - columns: (game_id, pinch_runner_id)
+- name: box_score.box_score_pitching_lines
+  columns:
+    game_id: GAME_ID
+    pitcher_id: PLAYER_ID
+    side: SIDE
+    nth_pitcher: UTINYINT
+    outs_recorded: UTINYINT
+    no_out_batters: UTINYINT
+    batters_faced: UTINYINT
+    hits: UTINYINT
+    doubles: UTINYINT
+    triples: UTINYINT
+    home_runs: UTINYINT
+    runs: UTINYINT
+    earned_runs: UTINYINT
+    walks: UTINYINT
+    intentional_walks: UTINYINT
+    strikeouts: UTINYINT
+    hit_batsmen: UTINYINT
+    wild_pitches: UTINYINT
+    balks: UTINYINT
+    sacrifice_hits: UTINYINT
+    sacrifice_flies: UTINYINT
+  grain:
+  - game_id
+  - pitcher_id
+  - nth_pitcher
+- name: box_score.box_score_stolen_bases
+  audits:
+  - - not_null
+    - columns: (game_id, runner_id, running_side)
+- name: box_score.box_score_team_batting_lines
+  grain:
+  - game_id
+  - side
+  audits:
+  - - not_null
+    - columns: (at_bats, game_id, hits, runs, side)
+- name: box_score.box_score_team_fielding_lines
+  columns:
+    putouts: UTINYINT
+    assists: UTINYINT
+    errors: UTINYINT
+    double_plays: UTINYINT
+    triple_plays: UTINYINT
+    passed_balls: UTINYINT
+  grain:
+  - game_id
+  - side
+  audits:
+  - - not_null
+    - columns: (game_id, outs_played, side)
+- name: box_score.box_score_team_miscellaneous_lines
+  grain:
+  - game_id
+  - side
+  audits:
+  - - not_null
+    - columns: (game_id, side)
+- name: box_score.box_score_triple_plays
+  audits:
+  - - not_null
+    - columns: (defense_side, game_id)
+- name: event.event_audit
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    filename: varchar
+    line_number: UINTEGER
+- name: event.event_baserunners
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    baserunner: BASERUNNER
+    runner_lineup_position: UTINYINT
+    runner_id: PLAYER_ID
+    charge_event_id: UINTEGER
+    reached_on_event_id: UINTEGER
+    explicit_charged_pitcher_id: PLAYER_ID
+    attempted_advance_to_base: BASE
+    baserunning_play_type: BASERUNNING_PLAY
+    is_out: boolean
+    base_end: BASE
+    advanced_on_error_flag: boolean
+    explicit_out_flag: boolean
+    run_scored_flag: boolean
+    rbi_flag: boolean
+- name: event.event_comments
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    sequence_id: UTINYINT
+    comment: varchar
+- name: event.event_fielding_play
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    sequence_id: UTINYINT
+    fielding_position: UTINYINT
+    fielding_play: varchar
+- name: event.event_flags
+  columns:
+    event_key: UINTEGER
+    sequence_id: UTINYINT
+    flag: varchar
+- name: event.event_pitch_sequences
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    sequence_id: UTINYINT
+    sequence_item: PITCH_SEQUENCE_ITEM
+    runners_going_flag: boolean
+    blocked_by_catcher_flag: boolean
+    catcher_pickoff_attempt_at_base: BASE
+- name: event.events
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    batting_side: SIDE
+    inning: UTINYINT
+    frame: FRAME
+    batter_lineup_position: UTINYINT
+    batter_id: PLAYER_ID
+    pitcher_id: PLAYER_ID
+    batting_team_id: TEAM_ID
+    fielding_team_id: TEAM_ID
+    outs: UTINYINT
+    base_state: UTINYINT
+    count_balls: UTINYINT
+    count_strikes: UTINYINT
+    specified_batter_hand: HAND
+    specified_pitcher_hand: HAND
+    strikeout_responsible_batter_id: PLAYER_ID
+    walk_responsible_pitcher_id: PLAYER_ID
+    plate_appearance_result: PLATE_APPEARANCE_RESULT
+    batted_trajectory: trajectory
+    batted_to_fielder: UTINYINT
+    batted_location_general: LOCATION_GENERAL
+    batted_location_depth: LOCATION_DEPTH
+    batted_location_angle: LOCATION_ANGLE
+    batted_contact_strength: varchar
+    outs_on_play: UTINYINT
+    runs_on_play: UTINYINT
+    runs_batted_in: UTINYINT
+    team_unearned_runs: UTINYINT
+    no_play_flag: BOOLEAN
+- name: game.game_earned_runs
+  columns:
+    game_id: GAME_ID
+    player_id: PLAYER_ID
+    earned_runs: UTINYINT
+  grain:
+  - game_id
+  - player_id
+  audits:
+  - - not_null
+    - columns: (earned_runs, game_id, player_id)
+- name: game.game_fielding_appearances
+  columns:
+    game_id: GAME_ID
+    player_id: PLAYER_ID
+    side: SIDE
+    fielding_position: UTINYINT
+    start_event_id: UTINYINT
+    end_event_id: UTINYINT
+  grain:
+  - game_id
+  - player_id
+  - fielding_position
+  - start_event_id
+  audits:
+  - - not_null
+    - columns: (end_event_id, fielding_position, game_id, player_id, side, start_event_id)
+- name: game.game_lineup_appearances
+  columns:
+    game_id: GAME_ID
+    player_id: PLAYER_ID
+    side: SIDE
+    lineup_position: UTINYINT
+    start_event_id: UTINYINT
+    end_event_id: UTINYINT
+  grain:
+  - game_id
+  - player_id
+  - lineup_position
+  audits:
+  - - not_null
+    - columns: (end_event_id, entered_game_as, game_id, lineup_position, player_id, side, start_event_id)
+- name: game.games
+  columns:
+    game_id: GAME_ID
+    game_key: UINTEGER
+    doubleheader_status: DOUBLEHEADER_STATUS
+    time_of_day: TIME_OF_DAY
+    game_type: GAME_TYPE
+    bat_first_side: SIDE
+    sky: SKY
+    field_condition: FIELD_CONDITION
+    precipitation: PRECIPITATION
+    wind_direction: WIND_DIRECTION
+    park_id: PARK_ID
+    temperature_fahrenheit: INT1
+    attendance: UINTEGER
+    wind_speed_mph: UTINYINT
+    winning_pitcher: PLAYER_ID
+    losing_pitcher: PLAYER_ID
+    save_pitcher: PLAYER_ID
+    game_winning_rbi: PLAYER_ID
+    time_of_game_minutes: USMALLINT
+    account_type: ACCOUNT_TYPE
+    away_team_id: TEAM_ID
+    home_team_id: TEAM_ID
+  grain:
+  - game_id
+  audits:
+  - - not_null
+    - columns: (account_type, away_team_id, bat_first_side, date, doubleheader_status, field_condition, filename, game_id,
+        game_key, game_type, home_team_id, park_id, precipitation, scoring_method, sky, time_of_day, use_dh, wind_direction)
+  - - unique_values
+    - columns: (game_id)
+      condition: game_id IS NOT NULL
+  - - unique_values
+    - columns: (game_key)
+      condition: game_key IS NOT NULL
+- name: misc.bio
+  description: 'Master bio reference for players, managers, coaches, and umpires.
+
+    Modern data refreshed by upstream simple_files.py, kept in legacy
+
+    lowercase column shape (player_id/last/first/...).
+
+    '
+  column_descriptions:
+    player_id: Retrosheet personnel id.
+  grain:
+  - player_id
+  audits:
+  - - not_null
+    - columns: (player_id)
+  - - unique_values
+    - columns: (player_id)
+      condition: player_id IS NOT NULL
+- name: misc.gamelog
+  description: 'A truncated version of Retrosheet''s gamelog file. It includes only
+
+    games prior to 1901 (for which box sores are generally not available).
+
+    This is our only source of info for those games, so it does not conflict
+
+    with any of the later data in the play-by-play.
+
+    '
+- name: misc.park
+  description: 'Information about each ballpark.
+
+    '
+  columns:
+    park_id: PARK_ID
+  grain:
+  - park_id
+  audits:
+  - - not_null
+    - columns: (city, park_id)
+  - - unique_values
+    - columns: (park_id)
+      condition: park_id IS NOT NULL
+- name: misc.roster
+  description: 'Contains one entry for any valid combination of year/team/player.
+
+    The biographical information may conflict with the info in the `people`
+
+    table, as handedness/names are not necessarily the same from year to year.
+
+    '
+  columns:
+    player_id: PLAYER_ID
+    bats: HAND
+    throws: HAND
+    team_id: TEAM_ID
+  grain:
+  - year
+  - player_id
+  - team_id
+  audits:
+  - - not_null
+    - columns: (last_name, player_id, team_id, year)
+- name: misc.schedule
+  description: 'Information about the original scheduled slate of games. Each row
+
+    represents an originally scheduled game. This will
+
+    differ from the `game` table in cases of postponements.
+
+    '
+  columns:
+    park_id: park_id
+  column_descriptions:
+    park_id: 'Retrosheet park ID, 3-character string which identifies the ballpark associated with this entity. See `stg_parks` for full park info.'
