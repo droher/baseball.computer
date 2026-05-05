@@ -1,0 +1,3 @@
+# Managed by claude-primary-sync
+project_doc_fallback_filenames = ["CLAUDE.md", "GEMINI.md"]
+project_doc_max_bytes = 65536
