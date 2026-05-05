@@ -3,7 +3,7 @@
 <!-- claude-primary-sync:managed -->
 
 This file is generated from Claude-native project guidance.
-Edit `CLAUDE.md` sources, then rerun `claude-primary-sync --scope project --write`.
+Edit Claude sources, then rerun `claude-primary-sync --scope project --write`.
 
 Directionality: project Claude sources -> project Codex/OpenCode artifacts.
 Never edit this file by hand.
@@ -11,6 +11,7 @@ Never edit this file by hand.
 Interpretation rules:
 - Later, more specific guidance wins over earlier general guidance.
 - Conditional rules only apply when the files you touch match the listed globs.
+- Mirrored skills and agents are generated from Claude-native sources in this scope chain.
 - This compiled view is for work rooted at `repo root`.
 
 ## Base Claude Guidance
@@ -145,3 +146,12 @@ not import any sqlmesh module.
 ## Open follow-ups
 
 `notes/followups.md`.
+
+## Claude Skills
+
+These skills are mirrored into portable and tool-native skill directories for this scope.
+
+### `sqlmesh`
+
+Source: `.claude/skills/sqlmesh/SKILL.md`
+Description: Use when working with SQLMesh — writing or editing MODEL blocks, Python @model decorators, Python @macros, audits, unit tests, external_models.yaml, or seeds; running `sqlmesh plan/apply/audit/render/evaluate/test`; debugging plans, snapshots, virtual environments, or state issues; configuring `config.py`, gateways, or `before_all`/`after_all` hooks; choosing a model kind (FULL, INCREMENTAL_BY_TIME_RANGE, INCREMENTAL_BY_UNIQUE_KEY, VIEW, SEED, EMBEDDED, SCD_TYPE_2, EXTERNAL, MANAGED); migrating a project from dbt; or asking whether SQLMesh is still maintained. Trigger on these terms even when the user does not name the tool. SQLMesh changes quickly and the model's prior knowledge is often wrong — fetch the canonical docs at https://sqlmesh.readthedocs.io/en/stable/ before answering anything non-trivial.
