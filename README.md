@@ -27,6 +27,8 @@ loader and `_init_db.py`'s DDL emission. Shared docstrings live in
 resolve at parse time via `bc/macros/_docs.py`.
 
 State lives in `bc/bc_state.db` (auto-created, separate from `bc.db`).
+Set `BC_DB_PATH` or `BC_STATE_DB_PATH` to point SQLMesh at temporary or
+alternate DuckDB files when you need an isolated build.
 
 ## Documentation
 

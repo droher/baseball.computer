@@ -30,6 +30,12 @@ from sqlmesh.core.model.kind import FullKind
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 _PERF_MODE = os.environ.get("BC_PERF_MODE") == "1"
+_WAREHOUSE_DB_PATH = Path(
+    os.environ.get("BC_DB_PATH", str(PROJECT_ROOT.parent / "bc.db"))
+)
+_STATE_DB_PATH = Path(
+    os.environ.get("BC_STATE_DB_PATH", str(PROJECT_ROOT / "bc_state.db"))
+)
 
 _DUCKDB_THREADS = int(os.environ.get("BC_DUCKDB_THREADS", "14"))
 
@@ -63,7 +69,7 @@ _DUCKDB_CONNECTION = DuckDBConnectionConfig(
         # for state and intermediate model materializations; only the
         # publish layer uses the bc_publish DuckLake catalog (populated by
         # scripts/publish_ducklake.py post-build).
-        "bc": str(PROJECT_ROOT.parent / "bc.db"),
+        "bc": str(_WAREHOUSE_DB_PATH),
         # Relative data_path so the catalog can be uploaded to R2 and
         # consumers attach by URL — DuckLake resolves relative paths
         # against the catalog's parent URL at attach time. SQLMesh always
@@ -80,7 +86,7 @@ _DUCKDB_CONNECTION = DuckDBConnectionConfig(
 )
 
 _STATE_CONNECTION = DuckDBConnectionConfig(
-    database=str(PROJECT_ROOT / "bc_state.db"),
+    database=str(_STATE_DB_PATH),
 )
 
 config = Config(

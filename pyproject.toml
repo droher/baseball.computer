@@ -13,7 +13,8 @@ dependencies = [
     "statsmodels>=0.14.1",
     "recordlinkage>=0.16.0",
     "pyyaml>=6.0",
-    "sqlmesh[lsp,ui,web]>=0.228.5",
+    "sqlmesh[lsp,web]>=0.234.1",
+    "keras>=3.14.0",
 ]
 
 [dependency-groups]
@@ -26,7 +27,6 @@ dev = [
 # SQLMesh + Ibis build engine. boring-semantic-layer (in `bsl`) pins an
 # incompatible sqlglot, so the groups are mutually exclusive.
 build = [
-    "sqlmesh>=0.234",
     "ibis-framework[duckdb]>=12.0",
     "polars>=1.31",
     "numba>=0.59",
@@ -44,6 +44,7 @@ ml = [
     "keras>=3.7",
     "torch>=2.5",
 ]
+
 bsl = [
     "boring-semantic-layer>=0.3.12",
     "ibis-framework[duckdb]>=11.0",
@@ -51,15 +52,10 @@ bsl = [
 
 [tool.uv]
 package = false
-conflicts = [
-    [
-        { group = "build" },
-        { group = "bsl" },
-    ],
-    [
-        { group = "ml" },
-        { group = "bsl" },
-    ],
+default-groups = "all"
+# This is likely going to cause issues with the bsl group, but it's a temporary workaround to get the latest sqlglot in the build group without breaking bsl. The long-term solution is to split bsl into its own package.
+override-dependencies = [
+    "sqlglot>=30.4.2,<30.5.dev0",
 ]
 
 [tool.pytest.ini_options]

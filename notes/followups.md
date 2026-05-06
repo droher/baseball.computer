@@ -194,3 +194,56 @@ schema) are unaffected.
 Runs only under the `bsl` uv group (the build env can't
 import BSL because xorq pins sqlglot <28). pytest collects-and-skips
 cleanly under the build env via `pytest.importorskip`.
+
+## Synthetic box scores
+
+The `synthetic_box_score.*` schema fills lineup skeletons for the
+~25K games that exist only in `misc.gamelog` (mostly pre-1901 MLB,
+plus a few Negro / minor cases). Game-level metadata, modal lineups,
+listed starting pitchers, and parsed line scores ship today; the
+items below extend the coverage.
+
+### Event-shaped synthetic tables
+
+Out of scope for the initial cut. The gamelog gives no per-event
+signal, so HBP / HR / SB / CS / DP / TP / comments / pinch_* /
+team_*_lines tables stay unwritten. Fabricating per-PA outcomes is
+a separate decision (statistical priors conditioned on park /
+season / batter and pitcher) and not under consideration yet.
+
+### Project gamelog winning / losing / save pitcher
+
+`misc.gamelog` carries `winning_pitcher`, `losing_pitcher`,
+`save_pitcher`, and `game_winning_rbi` columns that
+`stg_gamelog.sql` does not currently project. Once those columns
+land in staging, populate them on
+`synthetic_box_score.box_score_games` and remove their NULL stubs
+from the column list.
+
+### Fold synthetic rows into season-level stats
+
+`player_team_season_offense_stats` and
+`player_position_team_season_fielding_stats` currently treat
+gamelog-only games as silently missing. Plumbing the synthetic
+lineups in would credit each modal regular with one game per
+gamelog-only game — but since stat columns stay NULL, the season
+totals would not move. Decide whether the model layer should prefer
+"real but missing" over "synthetic but inferred" before touching
+the existing season models.
+
+### Negro / minor coverage gap
+
+Team-seasons with no `baseballdatabank.appearances` rows are
+dropped silently by `team_season_modal_lineups`. For Negro-League
+seasons in scope, this means a gamelog game with no synthetic
+shell. Either log the dropped team-seasons prominently or attempt
+a roster-only fallback (use `misc.roster` to pick nine players,
+without the modal-fielder ranking).
+
+### Pre-1973 DH assumption
+
+`stg_databank_appearances` skips the `g_dh` column on the
+assumption that every gamelog-only game in scope is pre-DH. If a
+gamelog-only DH game ever surfaces, restore `g_dh` in the pivot
+(maps to `fielding_position = 10`) and teach the modal-lineup
+picker how to handle the DH slot.
