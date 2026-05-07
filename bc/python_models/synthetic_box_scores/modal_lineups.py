@@ -242,28 +242,75 @@ def _build_team_season_lineup(
                 )
                 .to_dicts()
             )
-            if not replacement_pool:
-                return None
+            if replacement_pool:
+                drop_player = drop_candidates[0]
+                replacement = replacement_pool[0]
+                lineup = [
+                    player
+                    for player in lineup
+                    if str(player["player_id"]) != str(drop_player["player_id"])
+                ]
+                lineup.append(
+                    {
+                        "season": replacement["season"],
+                        "team_id": replacement["team_id"],
+                        "player_id": replacement["player_id"],
+                        "total_games": replacement["total_games"],
+                        "plate_appearances": replacement["plate_appearances"],
+                        "games_played": replacement["games_played"],
+                        "fielding_position": missing_position,
+                        "games_at_assigned_position": replacement["games_at_position"],
+                    }
+                )
+                continue
 
-            drop_player = drop_candidates[0]
-            replacement = replacement_pool[0]
-            lineup = [
-                player
-                for player in lineup
-                if str(player["player_id"]) != str(drop_player["player_id"])
-            ]
-            lineup.append(
-                {
-                    "season": replacement["season"],
-                    "team_id": replacement["team_id"],
-                    "player_id": replacement["player_id"],
-                    "total_games": replacement["total_games"],
-                    "plate_appearances": replacement["plate_appearances"],
-                    "games_played": replacement["games_played"],
-                    "fielding_position": missing_position,
-                    "games_at_assigned_position": replacement["games_at_position"],
-                }
+            swap_pool = (
+                candidate_rows.filter(
+                    (pl.col("fielding_position") == missing_position)
+                    & (
+                        pl.col("player_id").is_in(
+                            [str(player["player_id"]) for player in lineup]
+                        )
+                    )
+                )
+                .sort(
+                    [
+                        "games_at_position",
+                        "total_games",
+                        "plate_appearances",
+                        "player_id",
+                    ],
+                    descending=[True, True, True, False],
+                )
+                .to_dicts()
             )
+            swapped = False
+            for swap in swap_pool:
+                swap_player_id = str(swap["player_id"])
+                old_position = next(
+                    (
+                        int(player["fielding_position"])
+                        for player in lineup
+                        if str(player["player_id"]) == swap_player_id
+                    ),
+                    None,
+                )
+                if old_position is None:
+                    continue
+                if position_counts.get(old_position, 0) <= 1:
+                    continue
+                for player in lineup:
+                    if str(player["player_id"]) == swap_player_id:
+                        player["fielding_position"] = missing_position
+                        player["games_at_assigned_position"] = swap[
+                            "games_at_position"
+                        ]
+                        break
+                swapped = True
+                break
+
+            if not swapped:
+                return None
 
     if len(lineup) != len(_FIELDING_POSITIONS):
         return None

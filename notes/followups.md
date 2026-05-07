@@ -199,9 +199,10 @@ cleanly under the build env via `pytest.importorskip`.
 
 The `synthetic_box_score.*` schema fills lineup skeletons for the
 ~25K games that exist only in `misc.gamelog` (mostly pre-1901 MLB,
-plus a few Negro / minor cases). Game-level metadata, modal lineups,
-listed starting pitchers, and parsed line scores ship today; the
-items below extend the coverage.
+plus a few NLB cases). Game-level metadata, default
+seasonal lineups, optimized non-pitcher starters, listed starting
+pitchers, and parsed line scores ship today; the items below extend
+the coverage.
 
 ### Event-shaped synthetic tables
 
@@ -231,7 +232,7 @@ totals would not move. Decide whether the model layer should prefer
 "real but missing" over "synthetic but inferred" before touching
 the existing season models.
 
-### Negro / minor coverage gap
+### NLB coverage gap
 
 Team-seasons with no `baseballdatabank.appearances` rows are
 dropped silently by `team_season_modal_lineups`. For Negro-League

@@ -25,7 +25,7 @@ Source: `CLAUDE.md`
 ## What this repo is
 
 `baseball.computer` builds a 40+ GB DuckDB database (`bc.db`) of every
-documented MLB / minor / Negro League play-by-play event, plus
+documented MLB play-by-play event, plus
 aggregated season and career metrics. Source data lands in R2 as
 parquet via the [Rust parser](https://github.com/droher/baseball.computer.rs);
 this repo turns it into the published model layer.

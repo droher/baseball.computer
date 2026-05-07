@@ -251,6 +251,7 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "recordlinkage" },
+    { name = "scipy" },
     { name = "sqlmesh", extra = ["lsp", "web"] },
     { name = "statsmodels" },
 ]
@@ -294,6 +295,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=15.0.2" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "recordlinkage", specifier = ">=0.16.0" },
+    { name = "scipy", specifier = ">=1.15" },
     { name = "sqlmesh", extras = ["lsp", "web"], specifier = ">=0.234.1" },
     { name = "statsmodels", specifier = ">=0.14.1" },
 ]

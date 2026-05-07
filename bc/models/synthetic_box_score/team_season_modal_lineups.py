@@ -1,8 +1,8 @@
-"""Modal seasonal lineup per (season, team_id).
+"""Default seasonal lineup per (season, team_id).
 
-Drives the synthetic_box_score.* models for gamelog-only games. The
-modal lineup starts with the team's nine most-used players, assigns their
-most common positions, fills uncovered positions from the remaining
+Seeds the synthetic_box_score.* optimizer for gamelog-only games. The
+default lineup starts with the team's nine most-used players, assigns
+their most common positions, fills uncovered positions from the remaining
 candidate pool, and bats the final nine by plate appearances per game.
 See ``python_models/synthetic_box_scores/modal_lineups.py`` for the
 ranking rules and tiebreakers.
@@ -10,7 +10,7 @@ ranking rules and tiebreakers.
 Filtered to (season, team_id) pairs that actually played a game per
 ``team_game_start_info`` so casts to TEAM_ID succeed on every row.
 Team-seasons that don't fill all nine fielding positions are dropped
-silently — see ``notes/followups.md`` for the Negro / minor coverage
+silently; see ``notes/followups.md`` for the NLB coverage
 gap follow-up.
 """
 
@@ -110,14 +110,13 @@ _AUDITS = [
 
 
 @model(
-    "main_models.team_season_modal_lineups",
+    "synthetic_box_score.team_season_modal_lineups",
     kind="FULL",
     description=(
-        "Modal seasonal lineup for every (season, team_id) where databank "
-        "appearances cover all nine fielding positions. Synthesizes the "
-        "lineup-shaped tables under the synthetic_box_score schema for the "
-        "~25K games that exist only in misc.gamelog. Stat columns are NULL "
-        "downstream."
+        "Default seasonal lineup for every (season, team_id) where databank "
+        "appearances cover all nine fielding positions. Seeds the "
+        "synthetic_box_score optimizer for the ~25K games that exist only "
+        "in misc.gamelog. Stat columns are NULL downstream."
     ),
     columns={
         "season": "SMALLINT",
@@ -137,7 +136,7 @@ _AUDITS = [
     physical_properties={
         "download_parquet": (
             "https://data.baseball.computer/dbt/"
-            "main_models_team_season_modal_lineups.parquet"
+            "synthetic_box_score_team_season_modal_lineups.parquet"
         ),
     },
     depends_on={
