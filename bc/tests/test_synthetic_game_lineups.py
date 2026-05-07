@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 import polars as pl
+import pytest
 
 from python_models.synthetic_box_scores import (
     build_synthetic_batting_core,
@@ -185,6 +186,87 @@ def test_batting_dh_game_does_not_insert_pitcher() -> None:
     assert away.shape[0] == 9
     assert "modal_pitcher" in away["batter_id"].to_list()
     assert "right_backup" not in away["batter_id"].to_list()
+
+
+def test_modal_off_pitcher_assigned_lineup_position_nine() -> None:
+    """With disable_modal=True, the pitcher must end up at lineup_position 9
+    regardless of where the modal lineup placed him. Non-pitchers occupy
+    lineup_position 1..8 ranked by season PA/G."""
+    games = _games(
+        [
+            _game("AAA188504010", "1885-04-01"),
+        ]
+    )
+    out = build_synthetic_lineup_assignments(
+        games,
+        _lineups(),
+        _candidates(),
+        disable_modal=True,
+    )
+    away = out.filter(pl.col("side") == "Away")
+    assert away.shape[0] == 9
+    pitcher_row = away.filter(pl.col("fielding_position") == 1)
+    assert pitcher_row.height == 1
+    assert int(pitcher_row.item(0, "lineup_position")) == 9
+    non_pitcher = away.filter(pl.col("fielding_position") != 1)
+    assert sorted(int(p) for p in non_pitcher["lineup_position"].to_list()) == list(
+        range(1, 9)
+    )
+
+
+def test_modal_off_two_catcher_team_allows_both_at_c_slot() -> None:
+    """Two catchers with equal claims should each start once across two
+    games when their per-position target is 1 each. The modal lineup pins
+    one C, but disable_modal removes the bias so both can occupy the C slot."""
+    games = _games(
+        [
+            _game("AAA188504010", "1885-04-01"),
+            _game("AAA188504020", "1885-04-02"),
+        ]
+    )
+    rows = _base_candidates(games=2)
+    rows = [
+        row
+        for row in rows
+        if not (row["player_id"] == "catcher" and row["fielding_position"] == 2)
+    ]
+    rows.extend(
+        [
+            _candidate("catcher", 2, 1, games_total=1),
+            _candidate("backup_catcher", 2, 1, games_total=1),
+        ]
+    )
+
+    out = build_synthetic_lineup_assignments(
+        games,
+        _lineups(),
+        _candidates(rows),
+        disable_modal=True,
+    )
+    away = out.filter(pl.col("side") == "Away")
+    catcher_rows = away.filter(pl.col("fielding_position") == 2)
+    assert catcher_rows.height == 2
+    assert set(catcher_rows["player_id"].to_list()) == {"catcher", "backup_catcher"}
+
+
+def test_modal_off_disable_modal_kwarg_does_not_change_default_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """disable_modal=False (default) must reproduce the existing behavior
+    bit-for-bit. Locks in the no-op contract for the flag-off path."""
+    monkeypatch.delenv("BC_OPTIMIZER_NO_MODAL", raising=False)
+    games = _games(
+        [
+            _game("AAA188504010", "1885-04-01"),
+        ]
+    )
+    default_out = build_synthetic_lineup_assignments(
+        games, _lineups(), _candidates()
+    ).sort(["game_id", "side", "lineup_position"])
+    explicit_off = build_synthetic_lineup_assignments(
+        games, _lineups(), _candidates(), disable_modal=False
+    ).sort(["game_id", "side", "lineup_position"])
+    assert default_out.equals(explicit_off)
 
 
 def test_solver_exactly_matches_feasible_position_targets() -> None:
@@ -506,5 +588,3 @@ def test_player_with_full_game_outs_gets_at_least_one_appearance() -> None:
 
     deep_bench_assignments = away.filter(pl.col("player_id") == "deep_bench")
     assert deep_bench_assignments.height >= 1
-
-

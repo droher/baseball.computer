@@ -271,6 +271,41 @@ need a per-game C signal (e.g. caught-stealing/pitch-framing prior tied
 to the gamelog's starting pitcher) or transaction-driven stint windows
 (Step 4 of that plan).
 
+### Modal-prior retire flag (Round 2 Idea B) — confirmed no-op
+
+`build_synthetic_lineup_assignments(disable_modal=True)` (also
+`BC_OPTIMIZER_NO_MODAL=1`, also `--disable-modal` on the backtest CLI)
+drops the modal-default cost bonus and the `default_slot` slot-pin from
+the eligibility predicate, then assigns `lineup_position` post-hoc per
+game-side by ranking non-pitcher starters by season PA/G (pitcher pinned
+at 9, pre-1973 NL no-DH convention).
+
+Full 1871-1910 backtest, modal-on vs modal-off:
+
+| metric | modal-on | modal-off | delta |
+|---|---|---|---|
+| wrong_starters_per_game | 3.999 | 3.996 | -0.003 |
+| wrong_positions_per_game | 1.449 | 1.453 | +0.004 |
+| set_miss_rate | 1.43% | 1.43% | 0.00 |
+| pos_set_miss_rate | 1.91% | 1.91% | 0.00 |
+| C wrong_per_game | 1.072 | 1.072 | 0.00 |
+
+Every delta sits inside the MILP tiebreak noise floor. The modal prior
+is dead weight at the metric level — keeping it costs ~0.01% in cost
+bonus that the position-target slack penalty (1.0) overrides. The flag
+ships as a diagnostic; we don't delete the modal path since
+`compute_modal_lineups` is also exported and used as the no-optimizer
+fallback for orphan team-seasons and fallback infeasible sides. A future
+cleanup commit could drop the modal-bonus cost term unconditionally
+without removing the modal lineup itself.
+
+The full 1871-1910 result confirms the Round 2 Idea A diagnosis: the
+remaining ~4 wrong starters / game is dominated by date-allocation
+error, not player-set or position-set selection. The structural ceiling
+is reached without external data (per-game C signal, scheduled-rest
+priors, or transaction logs beyond what tranDB provides). Round 2 Ideas
+C, D1, D2, D3 are deferred — see plan for the full menu.
+
 The `synthetic_box_score.*` schema fills lineup skeletons for the
 ~25K games that exist only in `misc.gamelog` (mostly pre-1901 MLB,
 plus a few NLB cases). Game-level metadata, default

@@ -99,6 +99,8 @@ def _effective_pitcher_id(
         if slot.fielding_position == 1:
             return slot.player_id
     return None
+
+
 _SIDE_SPECS: tuple[tuple[str, str, str], ...] = (
     ("Away", "away_team_id", "away_starting_pitcher_id"),
     ("Home", "home_team_id", "home_starting_pitcher_id"),
@@ -108,6 +110,16 @@ _ASSIGNMENT_TIEBREAK_EPSILON = 1e-6
 _MODAL_DEFAULT_SLOT_BONUS = 0.01
 _MIN_OUTS_FOR_REQUIRED_APPEARANCE = 23
 _TOTAL_OVER_PENALTY = 100.0
+_MODAL_DISABLE_ENV = "BC_OPTIMIZER_NO_MODAL"
+_PITCHER_LINEUP_POSITION_NO_DH = 9
+
+
+def _modal_disabled_default() -> bool:
+    return os.environ.get(_MODAL_DISABLE_ENV, "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 @dataclass(frozen=True)
@@ -324,8 +336,12 @@ def build_synthetic_lineup_assignments(
     lineups: pl.DataFrame,
     candidates: pl.DataFrame,
     *,
-    transaction_windows: Mapping[tuple[int, str, str, int], tuple[int, int]] | None = None,
+    transaction_windows: Mapping[tuple[int, str, str, int], tuple[int, int]]
+    | None = None,
+    disable_modal: bool | None = None,
 ) -> pl.DataFrame:
+    if disable_modal is None:
+        disable_modal = _modal_disabled_default()
     games = _with_required_game_columns(games)
     _validate_columns(games, GAME_INPUT_COLUMNS)
     if games.is_empty():
@@ -372,6 +388,7 @@ def build_synthetic_lineup_assignments(
             {(season, team_id): team_candidates},
             stint_windows=stint_windows,
             season_date_index=season_date_index,
+            disable_modal=disable_modal,
         )
         if infeasible_sides:
             fallback_sides.extend(infeasible_sides)
@@ -382,9 +399,7 @@ def build_synthetic_lineup_assignments(
 
     def _solve_one(
         item: tuple[int, str, list[_GameSide], list[_Candidate]],
-    ) -> tuple[
-        int, str, list[dict[str, object]], list[_GameSide]
-    ]:
+    ) -> tuple[int, str, list[dict[str, object]], list[_GameSide]]:
         season, team_id, solvable_sides, team_candidates = item
         solved_rows, sides_to_fallback = _solve_team_season(
             season=season,
@@ -394,14 +409,15 @@ def build_synthetic_lineup_assignments(
             candidates=team_candidates,
             stint_windows=stint_windows,
             season_date_index=season_date_index,
+            disable_modal=disable_modal,
         )
         return season, team_id, solved_rows, sides_to_fallback
 
     workers = _resolve_worker_count(len(work_items))
     if workers <= 1 or len(work_items) <= 1:
-        results: list[
-            tuple[int, str, list[dict[str, object]], list[_GameSide]]
-        ] = [_solve_one(item) for item in work_items]
+        results: list[tuple[int, str, list[dict[str, object]], list[_GameSide]]] = [
+            _solve_one(item) for item in work_items
+        ]
     else:
         _logger().info(
             "solving %d team-seasons in parallel with %d workers",
@@ -476,9 +492,7 @@ def build_synthetic_lineup_report_from_assignments(
 
     sides_count_by_team: dict[tuple[int, str], int] = defaultdict(int)
     for row in (
-        assignments.select(["season", "team_id", "game_id", "side"])
-        .unique()
-        .to_dicts()
+        assignments.select(["season", "team_id", "game_id", "side"]).unique().to_dicts()
     ):
         sides_count_by_team[(_as_int(row["season"]), str(row["team_id"]))] += 1
     candidate_rows = _allocate_games_total_per_stint(candidate_rows)
@@ -555,6 +569,7 @@ def _partition_game_sides(
     *,
     stint_windows: dict[tuple[int, str, str, int], _StintWindow],
     season_date_index: dict[int, dict[str, int]],
+    disable_modal: bool = False,
 ) -> tuple[list[_GameSide], list[_GameSide]]:
     solvable: list[_GameSide] = []
     fallback: list[_GameSide] = []
@@ -565,6 +580,7 @@ def _partition_game_sides(
             candidates_by_team,
             stint_windows=stint_windows,
             season_date_index=season_date_index,
+            disable_modal=disable_modal,
         ):
             solvable.append(game_side)
         else:
@@ -579,6 +595,7 @@ def _game_side_has_optimizer_inputs(
     *,
     stint_windows: dict[tuple[int, str, str, int], _StintWindow],
     season_date_index: dict[int, dict[str, int]],
+    disable_modal: bool = False,
 ) -> bool:
     lineup = lineup_lookup.get((game_side.season, game_side.team_id))
     if lineup is None:
@@ -607,15 +624,19 @@ def _game_side_has_optimizer_inputs(
                 and candidate.player_id == excluded_pitcher_id
             ):
                 continue
-            default_slot = default_slot_by_player.get(candidate.player_id)
-            if default_slot is None:
+            if disable_modal:
                 if candidate.fielding_position != slot.fielding_position:
                     continue
-            elif (
-                default_slot != slot.lineup_position
-                and candidate.fielding_position != slot.fielding_position
-            ):
-                continue
+            else:
+                default_slot = default_slot_by_player.get(candidate.player_id)
+                if default_slot is None:
+                    if candidate.fielding_position != slot.fielding_position:
+                        continue
+                elif (
+                    default_slot != slot.lineup_position
+                    and candidate.fielding_position != slot.fielding_position
+                ):
+                    continue
             if not _candidate_eligible_for_side(
                 candidate, game_side, stint_windows, season_date_index
             ):
@@ -661,6 +682,7 @@ def _solve_team_season(
     season_date_index: dict[int, dict[str, int]],
     enforce_must_appear: bool = True,
     presolve_done: bool = False,
+    disable_modal: bool = False,
 ) -> tuple[list[dict[str, object]], list[_GameSide]]:
     """Solve a team-season MILP. Returns (assigned_rows, sides_needing_fallback).
 
@@ -677,6 +699,7 @@ def _solve_team_season(
         stint_windows=stint_windows,
         season_date_index=season_date_index,
         enforce_must_appear=enforce_must_appear,
+        disable_modal=disable_modal,
     )
     if problem is None or not problem.variables:
         return [], list(game_sides)
@@ -717,6 +740,7 @@ def _solve_team_season(
                 season_date_index=season_date_index,
                 enforce_must_appear=False,
                 presolve_done=presolve_done,
+                disable_modal=disable_modal,
             )
         if not presolve_done:
             feasible_sides, infeasible_sides = _presolve_filter_matchable_sides(
@@ -725,6 +749,7 @@ def _solve_team_season(
                 candidates,
                 stint_windows,
                 season_date_index,
+                disable_modal=disable_modal,
             )
             if infeasible_sides and feasible_sides:
                 _logger().warning(
@@ -746,6 +771,7 @@ def _solve_team_season(
                     season_date_index=season_date_index,
                     enforce_must_appear=False,
                     presolve_done=True,
+                    disable_modal=disable_modal,
                 )
                 return rows, fallback_sides + infeasible_sides
         _logger().warning(
@@ -779,8 +805,7 @@ def _solve_team_season(
     solution = tied.x if tied.success and tied.x is not None else result.x
 
     total_slack = sum(
-        float(solution[index])
-        for index in range(num_assignment_vars, num_total_vars)
+        float(solution[index]) for index in range(num_assignment_vars, num_total_vars)
     )
     _logger().info(
         "season %s team %s: %d sides, %d asn-vars, %d slack-vars, "
@@ -804,7 +829,10 @@ def _solve_team_season(
     ]
     rows = [_pitcher_assignment_row(side, lineup_lookup) for side in game_sides]
     rows.extend(_assignment_row(variable) for variable in selected)
-    return [row for row in rows if row is not None], []
+    final_rows = [row for row in rows if row is not None]
+    if disable_modal:
+        final_rows = _rewrite_lineup_positions_by_pa(final_rows, candidates)
+    return final_rows, []
 
 
 def _presolve_filter_matchable_sides(
@@ -813,6 +841,8 @@ def _presolve_filter_matchable_sides(
     candidates: list[_Candidate],
     stint_windows: dict[tuple[int, str, str, int], _StintWindow],
     season_date_index: dict[int, dict[str, int]],
+    *,
+    disable_modal: bool = False,
 ) -> tuple[list[_GameSide], list[_GameSide]]:
     """Per-side bipartite matching feasibility check. A side is feasible if
     we can assign 8 distinct candidates to its 8 non-pitcher slots, where
@@ -832,6 +862,7 @@ def _presolve_filter_matchable_sides(
             candidates_by_team.get((game_side.season, game_side.team_id), []),
             stint_windows,
             season_date_index,
+            disable_modal=disable_modal,
         ):
             feasible.append(game_side)
         else:
@@ -845,6 +876,8 @@ def _side_has_perfect_matching(
     team_candidates: list[_Candidate],
     stint_windows: dict[tuple[int, str, str, int], _StintWindow],
     season_date_index: dict[int, dict[str, int]],
+    *,
+    disable_modal: bool = False,
 ) -> bool:
     lineup = lineup_lookup.get((game_side.season, game_side.team_id))
     if lineup is None:
@@ -872,15 +905,19 @@ def _side_has_perfect_matching(
                 and candidate.player_id == excluded_pitcher_id
             ):
                 continue
-            default_slot = default_slot_by_player.get(candidate.player_id)
-            if default_slot is None:
+            if disable_modal:
                 if candidate.fielding_position != slot.fielding_position:
                     continue
-            elif (
-                default_slot != slot.lineup_position
-                and candidate.fielding_position != slot.fielding_position
-            ):
-                continue
+            else:
+                default_slot = default_slot_by_player.get(candidate.player_id)
+                if default_slot is None:
+                    if candidate.fielding_position != slot.fielding_position:
+                        continue
+                elif (
+                    default_slot != slot.lineup_position
+                    and candidate.fielding_position != slot.fielding_position
+                ):
+                    continue
             if not _candidate_eligible_for_side(
                 candidate, game_side, stint_windows, season_date_index
             ):
@@ -910,6 +947,7 @@ def _build_milp_problem(
     stint_windows: dict[tuple[int, str, str, int], _StintWindow],
     season_date_index: dict[int, dict[str, int]],
     enforce_must_appear: bool = True,
+    disable_modal: bool = False,
 ) -> _MilpProblem | None:
     del team_id
     variables: list[_AssignmentVariable] = []
@@ -932,9 +970,9 @@ def _build_milp_problem(
     for candidate in candidates:
         position_targets[_position_key(candidate)] = candidate.games_at_position
         if candidate.fielding_position in _NON_PITCHER_POSITIONS:
-            non_pitcher_fielding[
-                _player_stint_key(candidate)
-            ] += candidate.games_at_position
+            non_pitcher_fielding[_player_stint_key(candidate)] += (
+                candidate.games_at_position
+            )
     for key, total in non_pitcher_fielding.items():
         total_targets[key] = total
 
@@ -962,15 +1000,20 @@ def _build_milp_problem(
                     and candidate.player_id == excluded_pitcher_id
                 ):
                     continue
-                default_slot = default_slot_by_player.get(candidate.player_id)
-                if default_slot is None:
+                if disable_modal:
                     if candidate.fielding_position != slot.fielding_position:
                         continue
-                elif (
-                    default_slot != slot.lineup_position
-                    and candidate.fielding_position != slot.fielding_position
-                ):
-                    continue
+                    default_slot: int | None = None
+                else:
+                    default_slot = default_slot_by_player.get(candidate.player_id)
+                    if default_slot is None:
+                        if candidate.fielding_position != slot.fielding_position:
+                            continue
+                    elif (
+                        default_slot != slot.lineup_position
+                        and candidate.fielding_position != slot.fielding_position
+                    ):
+                        continue
                 if not _candidate_eligible_for_side(
                     candidate, game_side, stint_windows, season_date_index
                 ):
@@ -990,7 +1033,8 @@ def _build_milp_problem(
                 tiebreak = _stable_random_cost(variable)
                 modal_default_bonus = (
                     -_MODAL_DEFAULT_SLOT_BONUS
-                    if default_slot is not None
+                    if not disable_modal
+                    and default_slot is not None
                     and default_slot == slot.lineup_position
                     else 0.0
                 )
@@ -1169,7 +1213,8 @@ def _build_stint_windows(
     game_sides: list[_GameSide],
     candidate_rows: list[_Candidate],
     *,
-    transaction_windows: Mapping[tuple[int, str, str, int], tuple[int, int]] | None = None,
+    transaction_windows: Mapping[tuple[int, str, str, int], tuple[int, int]]
+    | None = None,
 ) -> tuple[
     dict[int, dict[str, int]],
     dict[tuple[int, str, str, int], _StintWindow],
@@ -1731,9 +1776,9 @@ def _scale_position_targets(
 
     sums_by_position: dict[tuple[int, str, int], float] = defaultdict(float)
     for cand in candidates:
-        sums_by_position[
-            (cand.season, cand.team_id, cand.fielding_position)
-        ] += cand.games_at_position
+        sums_by_position[(cand.season, cand.team_id, cand.fielding_position)] += (
+            cand.games_at_position
+        )
 
     position_scale: dict[tuple[int, str, int], float] = {}
     for key, total in sums_by_position.items():
@@ -1746,9 +1791,7 @@ def _scale_position_targets(
 
     scaled_position: list[float] = []
     for cand in candidates:
-        scale = position_scale[
-            (cand.season, cand.team_id, cand.fielding_position)
-        ]
+        scale = position_scale[(cand.season, cand.team_id, cand.fielding_position)]
         new_value = cand.games_at_position * scale
         scaled_position.append(new_value)
 
@@ -1880,6 +1923,65 @@ def _game_sides(games: pl.DataFrame) -> Iterable[_GameSide]:
                 use_dh=bool(game.get("use_dh", False)),
             )
             index += 1
+
+
+def _rewrite_lineup_positions_by_pa(
+    rows: list[dict[str, object]],
+    candidates: list[_Candidate],
+) -> list[dict[str, object]]:
+    """Reassign lineup_position post-hoc per game-side: rank the 8 chosen
+    non-pitcher starters by season PA/G (ties: total PA, then player_id),
+    assign 1-8 in that order; pin the pitcher at lineup_position 9.
+
+    Used only on the modal-off (BC_OPTIMIZER_NO_MODAL) path. The modal-on
+    path keeps the original modal-derived lineup_position from the slot.
+    """
+    seen_stints: set[tuple[int, str, str, int]] = set()
+    pa_totals: dict[tuple[int, str, str], list[int]] = defaultdict(lambda: [0, 0])
+    for candidate in candidates:
+        stint_key = (
+            candidate.season,
+            candidate.team_id,
+            candidate.player_id,
+            candidate.stint,
+        )
+        if stint_key in seen_stints:
+            continue
+        seen_stints.add(stint_key)
+        player_key = (candidate.season, candidate.team_id, candidate.player_id)
+        totals = pa_totals[player_key]
+        totals[0] += candidate.plate_appearances
+        totals[1] += candidate.games_played
+
+    def _rank_key(row: dict[str, object]) -> tuple[float, int, str]:
+        season = _as_int(row["season"])
+        team_id = str(row["team_id"])
+        player_id = str(row["player_id"])
+        totals = pa_totals.get((season, team_id, player_id), [0, 0])
+        pa, games = totals[0], totals[1]
+        pa_per_game = pa / games if games > 0 else 0.0
+        return (-pa_per_game, -pa, player_id)
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
+    for row in rows:
+        grouped[(str(row["game_id"]), str(row["side"]))].append(row)
+
+    output: list[dict[str, object]] = []
+    for group in grouped.values():
+        non_pitcher = sorted(
+            [r for r in group if _as_int(r["fielding_position"]) != 1],
+            key=_rank_key,
+        )
+        for index, row in enumerate(non_pitcher, start=1):
+            updated = dict(row)
+            updated["lineup_position"] = index
+            output.append(updated)
+        for row in group:
+            if _as_int(row["fielding_position"]) == 1:
+                updated = dict(row)
+                updated["lineup_position"] = _PITCHER_LINEUP_POSITION_NO_DH
+                output.append(updated)
+    return output
 
 
 def _pitcher_assignment_row(

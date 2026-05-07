@@ -1481,6 +1481,12 @@ def main() -> int:
         "--report-out",
         default=str(REPO_ROOT / "notes" / "synthetic-lineup-backtest-1871-1910.md"),
     )
+    _ = parser.add_argument(
+        "--disable-modal",
+        action="store_true",
+        help="Drop the modal-prior cost bonus and slot-pin in the optimizer; "
+        "assign lineup_position post-hoc by season PA/G (Round 2 Idea B).",
+    )
     _ = parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args()
 
@@ -1576,7 +1582,11 @@ def main() -> int:
 
     started = time.monotonic()
     synthetic = build_synthetic_lineup_assignments(
-        games, lineups, candidates, transaction_windows=txn_windows
+        games,
+        lineups,
+        candidates,
+        transaction_windows=txn_windows,
+        disable_modal=args.disable_modal,
     )
     runtime = time.monotonic() - started
     _LOG.info(
