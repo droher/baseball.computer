@@ -1,18 +1,18 @@
-# GEMINI.md
+# AGENTS.md
 
 <!-- claude-primary-sync:managed -->
 
 This file is generated from Claude-native project guidance.
 Edit Claude sources, then rerun `claude-primary-sync --scope project --write`.
 
-Directionality: project Claude sources -> project Gemini artifacts.
+Directionality: project Claude sources -> project Codex/OpenCode artifacts.
 Never edit this file by hand.
 
 Interpretation rules:
 - Later, more specific guidance wins over earlier general guidance.
 - Conditional rules only apply when the files you touch match the listed globs.
 - Mirrored skills and agents are generated from Claude-native sources in this scope chain.
-- This compiled view is for work rooted at `repo root`.
+- This compiled view is for work rooted at `bc/semantic`.
 
 ## Base Claude Guidance
 
@@ -45,6 +45,17 @@ Dev work targets `bc_dev.db` + `bc/bc_state_dev.db`; prod targets `bc.db` + `bc/
 - `bc/semantic/CLAUDE.md` — BSL `SemanticTable` constraints.
 - `scripts/CLAUDE.md` — publish / upload / web-db pipeline.
 - `notes/followups.md` — open follow-ups.
+
+### bc/semantic/CLAUDE.md
+
+Source: `bc/semantic/CLAUDE.md`
+
+# Semantic layer (BSL)
+
+- Exposes 6 BSL `SemanticTable` factories: offense / pitching / fielding × event / season.
+- Runs under `uv --group bsl` only. The `bsl` group's xorq dep pins `sqlglot <28`; SQLMesh needs 30+. The two groups are mutually exclusive in one env.
+- The Pydantic `Metric` registry is shared between build and BSL paths; the import paths are not.
+- `bc/semantic/` must not import any `sqlmesh` module.
 
 ## Always-On Claude Rules
 

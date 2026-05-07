@@ -12,7 +12,7 @@ Interpretation rules:
 - Later, more specific guidance wins over earlier general guidance.
 - Conditional rules only apply when the files you touch match the listed globs.
 - Mirrored skills and agents are generated from Claude-native sources in this scope chain.
-- This compiled view is for work rooted at `repo root`.
+- This compiled view is for work rooted at `bc/python_models/ml`.
 
 ## Base Claude Guidance
 
@@ -45,6 +45,19 @@ Dev work targets `bc_dev.db` + `bc/bc_state_dev.db`; prod targets `bc.db` + `bc/
 - `bc/semantic/CLAUDE.md` — BSL `SemanticTable` constraints.
 - `scripts/CLAUDE.md` — publish / upload / web-db pipeline.
 - `notes/followups.md` — open follow-ups.
+
+### bc/python_models/ml/CLAUDE.md
+
+Source: `bc/python_models/ml/CLAUDE.md`
+
+# ML pipeline (Keras 3 + PyTorch + MLflow)
+
+- `KERAS_BACKEND=torch` is set once in `ml/__init__.py`. Don't re-set it elsewhere.
+- `TargetSpec` (`features.py`) carries `kind ∈ {multiclass, binary, regression}`. `model_factory._make_outputs_layer` dispatches softmax / sigmoid / linear heads off `kind`. Per-target wrappers stay thin: `model_<target>.py`, `scripts/train_<target>.py`, `predictions_<target>.py`.
+- Training is offline. Run `scripts/train_<name>.py` to produce the artifact JSON at `bc/python_models/ml/artifacts/<name>.json`.
+- The `predictions_<target>.py` `@model` gates on `artifact_exists(target)`, so a fresh prod plan skips untrained targets cleanly. Don't break this gate.
+- Predictions stream via DuckDB Arrow `to_batches` with `_BATCH_ROWS=500_000`.
+- ML deps live in the `ml` uv group (`apache-hamilton`, `mlflow`, `keras`, `torch`, `scikit-learn`). Mutually exclusive with the `bsl` group — don't try to install both into the same env.
 
 ## Always-On Claude Rules
 
