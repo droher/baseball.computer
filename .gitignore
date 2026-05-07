@@ -4,6 +4,7 @@ logs/
 bc*.db*
 example.db
 bc/.cache/
+.cache/
 bc/bc_publish.ducklake
 bc/bc_publish.ducklake.wal
 bc/bc_publish_data/

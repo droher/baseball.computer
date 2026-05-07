@@ -323,6 +323,8 @@ def build_synthetic_lineup_assignments(
     games: pl.DataFrame,
     lineups: pl.DataFrame,
     candidates: pl.DataFrame,
+    *,
+    transaction_windows: Mapping[tuple[int, str, str, int], tuple[int, int]] | None = None,
 ) -> pl.DataFrame:
     games = _with_required_game_columns(games)
     _validate_columns(games, GAME_INPUT_COLUMNS)
@@ -355,7 +357,7 @@ def build_synthetic_lineup_assignments(
             sides_by_team[(game_side.season, game_side.team_id)].append(game_side)
 
     season_date_index, stint_windows = _build_stint_windows(
-        all_game_sides, candidate_rows
+        all_game_sides, candidate_rows, transaction_windows=transaction_windows
     )
 
     rows: list[dict[str, object]] = []
@@ -1166,6 +1168,8 @@ def _add_capped_error_constraints(
 def _build_stint_windows(
     game_sides: list[_GameSide],
     candidate_rows: list[_Candidate],
+    *,
+    transaction_windows: Mapping[tuple[int, str, str, int], tuple[int, int]] | None = None,
 ) -> tuple[
     dict[int, dict[str, int]],
     dict[tuple[int, str, str, int], _StintWindow],
@@ -1186,6 +1190,17 @@ def _build_stint_windows(
     team_dates_ordered: dict[tuple[int, str], list[str]] = {
         key: sorted(dates) for key, dates in team_dates_set.items()
     }
+
+    txn_overrides: dict[tuple[int, str, str, int], _StintWindow] = {}
+    if transaction_windows:
+        for key, (start_index, end_index) in transaction_windows.items():
+            season = key[0]
+            n = season_count.get(season, 0)
+            if n == 0:
+                continue
+            si = max(0, min(n - 1, start_index))
+            ei = max(si, min(n - 1, end_index))
+            txn_overrides[key] = _StintWindow(start_index=si, end_index=ei)
 
     share_by_player: dict[tuple[int, str], dict[int, dict[str, float]]] = defaultdict(
         lambda: defaultdict(dict)
@@ -1231,6 +1246,10 @@ def _build_stint_windows(
                 fraction = cumulative / total
                 end_index = max(cursor, min(n - 1, round(fraction * n) - 1))
             for team_id, games in team_map.items():
+                window_key = (season, team_id, player_id, stint)
+                if window_key in txn_overrides:
+                    windows[window_key] = txn_overrides[window_key]
+                    continue
                 start_index, final_end = _ensure_window_covers_team(
                     cursor,
                     end_index,
@@ -1239,7 +1258,7 @@ def _build_stint_windows(
                     team_dates_ordered.get((season, team_id), []),
                     int(round(games)),
                 )
-                windows[(season, team_id, player_id, stint)] = _StintWindow(
+                windows[window_key] = _StintWindow(
                     start_index=start_index,
                     end_index=final_end,
                 )

@@ -41,8 +41,55 @@ from python_models.synthetic_box_scores.game_lineups import (  # noqa: E402
     GAME_INPUT_COLUMNS,
     LINEUP_INPUT_COLUMNS,
 )
+from python_models.synthetic_box_scores.transactions import (  # noqa: E402
+    fetch_tran_db,
+    parse_team_changes,
+    transaction_stint_windows,
+)
 
 _LOG = logging.getLogger("backtest_synthetic_lineups")
+
+_TRAN_DB_CACHE = REPO_ROOT / ".cache" / "tranDB.zip"
+
+
+def _build_transaction_windows(
+    games: pl.DataFrame,
+    candidates: pl.DataFrame,
+) -> dict[tuple[int, str, str, int], tuple[int, int]]:
+    """Materialize the season → ordered date list and ask the transactions
+    module for date-bounded stint windows. Returns an empty dict if any
+    upstream step fails so the optimizer falls back to proportional."""
+    try:
+        zip_path = fetch_tran_db(_TRAN_DB_CACHE)
+        team_changes = parse_team_changes(zip_path)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.warning("transaction fetch/parse failed (%s); falling back", exc)
+        return {}
+
+    season_dates_df = (
+        games.select(["season", "date"])
+        .unique()
+        .with_columns(pl.col("date").dt.strftime("%Y-%m-%d").alias("date_key"))
+        .sort(["season", "date_key"])
+    )
+    season_dates: dict[int, list[str]] = {}
+    for season, frame in season_dates_df.group_by("season"):
+        season_dates[int(season[0])] = frame["date_key"].to_list()
+
+    candidate_stints: list[tuple[int, str, str, int]] = [
+        (int(season), str(team_id), str(player_id), int(stint))
+        for season, team_id, player_id, stint in candidates.select(
+            ["season", "team_id", "player_id", "stint"]
+        )
+        .unique()
+        .iter_rows()
+    ]
+
+    return transaction_stint_windows(
+        candidate_stints=candidate_stints,
+        season_dates=season_dates,
+        team_changes=team_changes,
+    )
 
 _BACKTEST_SEASONS: tuple[int, ...] = (
     1871,
@@ -1340,8 +1387,17 @@ def main() -> int:
     _validate_input("lineups", lineups, LINEUP_INPUT_COLUMNS)
     _validate_input("candidates", candidates, CANDIDATE_INPUT_COLUMNS)
 
+    txn_windows = _build_transaction_windows(games, candidates)
+    _LOG.info(
+        "transaction-derived stint windows: %d (out of %d candidate stint keys)",
+        len(txn_windows),
+        candidates.select(["season", "team_id", "player_id", "stint"]).n_unique(),
+    )
+
     started = time.monotonic()
-    synthetic = build_synthetic_lineup_assignments(games, lineups, candidates)
+    synthetic = build_synthetic_lineup_assignments(
+        games, lineups, candidates, transaction_windows=txn_windows
+    )
     runtime = time.monotonic() - started
     _LOG.info(
         "optimizer produced %d synthetic assignment rows in %.1fs",
