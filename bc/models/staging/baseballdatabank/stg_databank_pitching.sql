@@ -1,7 +1,7 @@
 MODEL (
   name main_models.stg_databank_pitching,
   kind FULL,
-  description 'Aggregate pitching statistics by player, season, and stint with a given team.',
+  description 'Aggregate pitching statistics by player, season, and stint with a given team. team_id is translated from Databank to Retrosheet via baseballdatabank.teams.team_id_retro and the not_null audit on team_id fails the build if any row is missing from the crosswalk.',
   grain (databank_player_id, season, stint),
   columns (
     databank_player_id VARCHAR,
@@ -66,6 +66,9 @@ MODEL (
     sacrifice_flies = @doc('sacrifice_flies'),
     grounded_into_double_plays = @doc('grounded_into_double_plays')
   ),
+  audits (
+    not_null(columns := (databank_player_id, season, stint, team_id))
+  ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_databank_pitching.parquet'
   ),
@@ -77,8 +80,21 @@ MODEL (
 
 
 
-WITH source AS (
-    SELECT * FROM baseballdatabank.pitching
+WITH team_id_crosswalk AS (
+    SELECT
+        year_id,
+        team_id AS databank_team_id,
+        team_id_retro AS team_id
+    FROM baseballdatabank.teams
+),
+
+source AS (
+    SELECT
+        p.* EXCLUDE (team_id),
+        t.team_id AS team_id
+    FROM baseballdatabank.pitching AS p
+    LEFT JOIN team_id_crosswalk AS t
+        ON p.year_id = t.year_id AND p.team_id = t.databank_team_id
 ),
 
 renamed AS (

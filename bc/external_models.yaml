@@ -46,6 +46,16 @@
     - columns: (retro_id)
       condition: retro_id IS NOT NULL
 - name: baseballdatabank.pitching
+- name: baseballdatabank.teams
+  description: 'Per-team-season Lahman master with the team_id_retro crosswalk used to translate Databank team codes to Retrosheet team codes.'
+  grain:
+  - year_id
+  - team_id
+  audits:
+  - - not_null
+    - columns: (year_id, team_id, team_id_retro)
+  - - unique_grain
+    - columns: (year_id, team_id)
 - name: biodata.coaches
   description: 'Per-coach assignments by year.
 

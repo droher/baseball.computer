@@ -248,3 +248,13 @@ assumption that every gamelog-only game in scope is pre-DH. If a
 gamelog-only DH game ever surfaces, restore `g_dh` in the pivot
 (maps to `fielding_position = 10`) and teach the modal-lineup
 picker how to handle the DH slot.
+
+### Lahman/Databank ↔ Retrosheet team_id mismatches
+
+Resolved. The four Databank stagings
+(`stg_databank_appearances`, `stg_databank_batting`,
+`stg_databank_fielding`, `stg_databank_pitching`) now translate
+`team_id` via `baseballdatabank.teams.team_id_retro` (joined on
+`(year_id, team_id)`) and project `team_id_retro` directly with no
+fallback. The `not_null(team_id)` audit on each staging fails the
+build loudly if a row ever lacks a crosswalk match.
