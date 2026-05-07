@@ -91,6 +91,7 @@ def _build_transaction_windows(
         team_changes=team_changes,
     )
 
+
 _BACKTEST_SEASONS: tuple[int, ...] = (
     1871,
     1872,
@@ -591,17 +592,15 @@ def _position_match(synthetic: pl.DataFrame, truth: pl.DataFrame) -> pl.DataFram
     )
 
 
-def _per_player_season(
-    per_player: pl.DataFrame, games_full: pl.DataFrame
-) -> pl.DataFrame:
-    """Per (season, team, player): aggregate the four error counts."""
+def _attach_team_id(per_player: pl.DataFrame, games_full: pl.DataFrame) -> pl.DataFrame:
+    """Resolve (season, team_id) per row by joining games_full and picking by side."""
     games_lookup = games_full.select(
         pl.col("game_id"),
         pl.col("season").cast(pl.Int16).alias("game_season"),
         pl.col("home_team_id"),
         pl.col("away_team_id"),
     )
-    enriched = (
+    return (
         per_player.drop("season", "team_id", strict=False)
         .join(games_lookup, on="game_id", how="left")
         .with_columns(
@@ -609,20 +608,109 @@ def _per_player_season(
             team_id=pl.when(pl.col("side") == "Home")
             .then(pl.col("home_team_id"))
             .otherwise(pl.col("away_team_id")),
-            in_syn=pl.col("syn_pos").is_not_null(),
-            in_real=pl.col("real_pos").is_not_null(),
-            in_both=pl.col("syn_pos").is_not_null() & pl.col("real_pos").is_not_null(),
-            pos_match=(
-                pl.col("syn_pos").is_not_null()
-                & pl.col("real_pos").is_not_null()
-                & (pl.col("syn_pos") == pl.col("real_pos"))
-            ),
-            pos_mismatch=(
-                pl.col("syn_pos").is_not_null()
-                & pl.col("real_pos").is_not_null()
-                & (pl.col("syn_pos") != pl.col("real_pos"))
-            ),
         )
+        .drop("game_season", "home_team_id", "away_team_id")
+    )
+
+
+def _set_miss_metrics(
+    per_player: pl.DataFrame, games_full: pl.DataFrame
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Date-independent start tallies per (season, team, player) and per
+    (season, team, player, fielding_position).
+
+    The pitcher exclusion is on the (syn_pos, real_pos) axis, not on the
+    season-player axis: drop rows where syn_pos == 1 or real_pos == 1.
+    A two-way player who pitched 5 games and played 1B 100 still scores
+    on his 1B bucket.
+    """
+    enriched = _attach_team_id(per_player, games_full).filter(
+        (pl.col("syn_pos").fill_null(0) != 1) & (pl.col("real_pos").fill_null(0) != 1)
+    )
+    player_level = (
+        enriched.group_by(["season", "team_id", "player_id"])
+        .agg(
+            pl.col("syn_pos").is_not_null().sum().cast(pl.Int32).alias("syn_starts"),
+            pl.col("real_pos").is_not_null().sum().cast(pl.Int32).alias("real_starts"),
+        )
+        .filter(pl.col("season").is_not_null())
+    )
+    syn_by_pos = (
+        enriched.filter(pl.col("syn_pos").is_not_null())
+        .group_by(["season", "team_id", "player_id", "syn_pos"])
+        .len()
+        .rename({"syn_pos": "fielding_position", "len": "syn_starts"})
+    )
+    real_by_pos = (
+        enriched.filter(pl.col("real_pos").is_not_null())
+        .group_by(["season", "team_id", "player_id", "real_pos"])
+        .len()
+        .rename({"real_pos": "fielding_position", "len": "real_starts"})
+    )
+    pos_level = (
+        syn_by_pos.join(
+            real_by_pos,
+            on=["season", "team_id", "player_id", "fielding_position"],
+            how="full",
+            coalesce=True,
+        )
+        .with_columns(
+            syn_starts=pl.col("syn_starts").fill_null(0).cast(pl.Int32),
+            real_starts=pl.col("real_starts").fill_null(0).cast(pl.Int32),
+        )
+        .filter(pl.col("season").is_not_null())
+    )
+    return player_level, pos_level
+
+
+def _set_miss_rate(level: pl.DataFrame) -> float:
+    """1 − Σ_p min(syn_starts, real_starts) / Σ_p real_starts.
+
+    Higher = worse player selection. Date-axis-independent.
+    """
+    if level.is_empty():
+        return 0.0
+    matched_col = level.select(matched=pl.min_horizontal("syn_starts", "real_starts"))
+    matched = int(matched_col["matched"].sum() or 0)
+    total = int(level["real_starts"].sum() or 0)
+    if total == 0:
+        return 0.0
+    return 1.0 - matched / total
+
+
+def _drop_orphan_keys(
+    level: pl.DataFrame, orphan_keys: set[tuple[int, str]]
+) -> pl.DataFrame:
+    """Filter out (season, team_id) pairs that are orphaned from synthetic."""
+    if not orphan_keys or level.is_empty():
+        return level
+    orphan_df = pl.DataFrame(
+        {
+            "season": pl.Series([s for s, _ in orphan_keys], dtype=pl.Int16),
+            "team_id": pl.Series([t for _, t in orphan_keys], dtype=pl.String),
+        }
+    )
+    return level.join(orphan_df, on=["season", "team_id"], how="anti")
+
+
+def _per_player_season(
+    per_player: pl.DataFrame, games_full: pl.DataFrame
+) -> pl.DataFrame:
+    """Per (season, team, player): aggregate the four error counts."""
+    enriched = _attach_team_id(per_player, games_full).with_columns(
+        in_syn=pl.col("syn_pos").is_not_null(),
+        in_real=pl.col("real_pos").is_not_null(),
+        in_both=pl.col("syn_pos").is_not_null() & pl.col("real_pos").is_not_null(),
+        pos_match=(
+            pl.col("syn_pos").is_not_null()
+            & pl.col("real_pos").is_not_null()
+            & (pl.col("syn_pos") == pl.col("real_pos"))
+        ),
+        pos_mismatch=(
+            pl.col("syn_pos").is_not_null()
+            & pl.col("real_pos").is_not_null()
+            & (pl.col("syn_pos") != pl.col("real_pos"))
+        ),
     )
     return (
         enriched.group_by(["season", "team_id", "player_id"])
@@ -891,6 +979,8 @@ def _render_report(
     per_player_season: pl.DataFrame,
     position_match: pl.DataFrame,
     comparison_enriched: pl.DataFrame,
+    set_miss_player_level: pl.DataFrame,
+    set_miss_pos_level: pl.DataFrame,
     games_count: int,
     sides_count: int,
     seasons_present: list[int],
@@ -1028,6 +1118,37 @@ def _render_report(
         )
         lines.append("")
 
+    lines.append("## Date-independent error rates")
+    lines.append("")
+    lines.append(
+        "Set-based recall metrics, independent of which date the optimizer chose to start each player. The pitcher is excluded on the (syn_pos, real_pos) axis: rows where syn_pos == 1 or real_pos == 1 are dropped before aggregation."
+    )
+    lines.append("")
+    lines.append(
+        "- `set_miss_rate` = `1 − Σ_p min(syn_starts, real_starts) / Σ_p real_starts`, summed across all (season, team, player). Captures whether the optimizer picked the right people, regardless of dates or positions."
+    )
+    lines.append(
+        "- `pos_set_miss_rate` = same construction but on (player, fielding_position) buckets. A player who started 50 at SS and 10 at 2B scores against the SS bucket and the 2B bucket independently. Captures position-conviction without date alignment."
+    )
+    lines.append("")
+    set_miss_all = _set_miss_rate(set_miss_player_level) * 100
+    pos_set_miss_all = _set_miss_rate(set_miss_pos_level) * 100
+    lines.append("Across all sides (orphans included):")
+    lines.append("")
+    lines.append(f"- set_miss_rate: {set_miss_all:.2f}%")
+    lines.append(f"- pos_set_miss_rate: {pos_set_miss_all:.2f}%")
+    lines.append("")
+    if orphan_keys:
+        player_in = _drop_orphan_keys(set_miss_player_level, orphan_keys)
+        pos_in = _drop_orphan_keys(set_miss_pos_level, orphan_keys)
+        set_miss_in = _set_miss_rate(player_in) * 100
+        pos_set_miss_in = _set_miss_rate(pos_in) * 100
+        lines.append("Restricted to in-scope sides:")
+        lines.append("")
+        lines.append(f"- set_miss_rate: {set_miss_in:.2f}%")
+        lines.append(f"- pos_set_miss_rate: {pos_set_miss_in:.2f}%")
+        lines.append("")
+
     # Era × league.
     lines.append("## Errors per game by era × league")
     lines.append("")
@@ -1122,6 +1243,65 @@ def _render_report(
         .sort("churn")
     )
     lines.append(_frame_md(churn_summary))
+    lines.append("")
+
+    # Date-independent decomposition: per bucket, contribution to
+    # wrong_starters_per_game (date-aligned) next to set_miss_rate and
+    # pos_set_miss_rate (both date-independent). The wrong_starters_per_game
+    # column attributes each missed real-start to the missed real player's
+    # bucket and divides by total games (so columns sum to the headline).
+    lines.append("## Date-independent decomposition by churn bucket")
+    lines.append("")
+    lines.append(
+        "Per bucket: `wrong_starters_per_game` is the bucket's contribution to the headline (sum across rows = the headline `wrong_starters_per_game`). `set_miss_rate` and `pos_set_miss_rate` are computed over the bucket's (season, team, player) — and (..., fielding_position) — tuples using the same `1 − Σ_min / Σ_real` formula as the headline, so they are *not* additive across buckets."
+    )
+    lines.append("")
+    bucket_starts = (
+        per_player_with_churn.filter(
+            pl.col("churn").is_not_null() & (pl.col("real_starts") > 0)
+        )
+        .group_by("churn")
+        .agg(pl.col("missed").sum().alias("missed_total"))
+        .with_columns(
+            wrong_starters_per_game=(
+                pl.col("missed_total") / max(games_count, 1)
+            ).round(3),
+        )
+        .select("churn", "wrong_starters_per_game")
+    )
+    player_with_churn = set_miss_player_level.join(
+        churn_lookup, on=["season", "team_id", "player_id"], how="left"
+    )
+    pos_with_churn = set_miss_pos_level.join(
+        churn_lookup, on=["season", "team_id", "player_id"], how="left"
+    )
+    bucket_rows: list[tuple[str, float, float, float]] = []
+    for churn_value in ("multi-stint", "single-stint full", "single-stint partial"):
+        wrong_per_game_row = bucket_starts.filter(pl.col("churn") == churn_value)
+        wrong_per_game = (
+            float(wrong_per_game_row["wrong_starters_per_game"].item(0))
+            if wrong_per_game_row.height
+            else 0.0
+        )
+        bucket_player = player_with_churn.filter(pl.col("churn") == churn_value)
+        bucket_pos = pos_with_churn.filter(pl.col("churn") == churn_value)
+        bucket_rows.append(
+            (
+                churn_value,
+                wrong_per_game,
+                _set_miss_rate(bucket_player) * 100,
+                _set_miss_rate(bucket_pos) * 100,
+            )
+        )
+    bucket_table = pl.DataFrame(
+        {
+            "churn": [r[0] for r in bucket_rows],
+            "wrong_starters_per_game": [round(r[1], 3) for r in bucket_rows],
+            "set_miss_rate_pct": [round(r[2], 2) for r in bucket_rows],
+            "pos_set_miss_rate_pct": [round(r[3], 2) for r in bucket_rows],
+        }
+    )
+    lines.append(_frame_md(bucket_table))
     lines.append("")
 
     # Team games-played bin.
@@ -1419,6 +1599,9 @@ def main() -> int:
     side_errors_enriched = _enrich_side_errors(side_errors, games_full, team_games)
     pos_match = _position_match(synthetic, truth)
     per_player_season = _per_player_season(per_player, games_full)
+    set_miss_player_level, set_miss_pos_level = _set_miss_metrics(
+        per_player, games_full
+    )
 
     enriched_sorted = enriched.sort(
         ["season", "team_id", "game_id", "side", "lineup_position"],
@@ -1452,6 +1635,8 @@ def main() -> int:
         per_player_season=per_player_season,
         position_match=pos_match,
         comparison_enriched=enriched,
+        set_miss_player_level=set_miss_player_level,
+        set_miss_pos_level=set_miss_pos_level,
         games_count=games_count,
         sides_count=sides_count,
         seasons_present=seasons_present,

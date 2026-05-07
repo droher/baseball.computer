@@ -197,6 +197,43 @@ cleanly under the build env via `pytest.importorskip`.
 
 ## Synthetic box scores
 
+### Date-independent metric (Round 2 Idea A) — date allocation dominates
+
+`scripts/backtest_synthetic_lineups.py` now reports two date-independent
+recall rates next to the headline `wrong_starters_per_game`:
+
+- `set_miss_rate = 1 − Σ_p min(syn_starts, real_starts) / Σ_p real_starts`
+- `pos_set_miss_rate` = same on (player, fielding_position) buckets.
+
+Pitcher rows are dropped on the (syn_pos, real_pos) axis, not on the
+season-player axis, so a two-way player still scores on his non-P bucket.
+
+Full 1871-1910 numbers (post-Round-1):
+
+- `wrong_starters_per_game = 3.999`
+- `set_miss_rate = 1.43%`
+- `pos_set_miss_rate = 1.91%`
+
+Per-bucket decomposition:
+
+| churn | wrong_starters_per_game | set_miss_rate_pct | pos_set_miss_rate_pct |
+|---|---|---|---|
+| multi-stint | 0.421 | 1.5 | 2.12 |
+| single-stint full | 0.725 | 1.52 | 1.89 |
+| single-stint partial | 2.852 | 1.29 | 1.9 |
+
+Diagnosis: player selection is essentially right (set_miss flat at
+~1.3-1.5% across all buckets); the dominant remaining error is which
+date the optimizer assigns each chosen player to. The single-stint
+partial bucket carries 2.85 of the 4.00 headline wrong-starters with
+the *lowest* set_miss — pure date-axis error.
+
+Round 2 sequence still calls for shipping Idea B (retire modal prior)
+behind a flag and re-judging; given how flat set_miss is, B is unlikely
+to move it materially, in which case the remaining ceiling is structural
+and the next moves are D1 (bench-game accounting), D2 (catcher pair
+detection), D3 (rest-day priors).
+
 ### Per-position fair-share scaling already implemented
 
 Step 3 of the synthetic-lineup-algorithm-improvements plan proposes
