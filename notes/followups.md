@@ -197,6 +197,26 @@ cleanly under the build env via `pytest.importorskip`.
 
 ## Synthetic box scores
 
+### Catcher wrong-defender rate (1.07 / game)
+
+Tried relaxing the MILP `default_slot` exclusion at `slot.fielding_position
+== 2` so any C-eligible candidate could occupy the C slot regardless of
+modal-lineup status (proposed as Step 2 of the synthetic-lineup-algorithm-
+improvements plan). It is a no-op: the existing predicate
+`default_slot != lineup_position AND fielding_position != slot.fielding_
+position` already lets backup catchers and dual-eligibility modal players
+into the C slot via the second clause, and the modal-default bonus (0.01)
+is two orders of magnitude smaller than the position-target slack penalty
+(1.0) so it can't be dominating.
+
+The high C error rate is a date-allocation problem, not a slot-eligibility
+one. Per-game C choice between the modal C and the backup C has no signal
+beyond starting pitcher and DH, so the MILP's date assignment within the
+season-long position target is effectively arbitrary. Real fixes would
+need a per-game C signal (e.g. caught-stealing/pitch-framing prior tied
+to the gamelog's starting pitcher) or transaction-driven stint windows
+(Step 4 of that plan).
+
 The `synthetic_box_score.*` schema fills lineup skeletons for the
 ~25K games that exist only in `misc.gamelog` (mostly pre-1901 MLB,
 plus a few NLB cases). Game-level metadata, default
