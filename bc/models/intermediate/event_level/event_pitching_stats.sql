@@ -171,6 +171,16 @@ WITH baserunning_agg AS (
     GROUP BY 1
 ),
 
+other_events AS (
+    SELECT
+        event_key,
+        BOOL_OR(baserunning_play_type = 'PassedBall')::UTINYINT AS passed_balls,
+        BOOL_OR(baserunning_play_type = 'WildPitch')::UTINYINT AS wild_pitches,
+        BOOL_OR(baserunning_play_type = 'Balk')::UTINYINT AS balks,
+    FROM main_models.stg_event_baserunners
+    GROUP BY 1
+),
+
 joined_stats AS (
     SELECT
         event_key,
@@ -181,13 +191,17 @@ joined_stats AS (
         bat.* EXCLUDE (event_key),
         -- Populate runs with the CTE below
         baserunning_agg.* EXCLUDE (event_key, runs),
-        pitch.* EXCLUDE (event_key),
+        pitch.* EXCLUDE (event_key, balks, wild_pitches, passed_balls),
+        other_events.balks,
+        other_events.wild_pitches,
+        other_events.passed_balls,
         hit.plate_appearances AS batters_faced,
         COALESCE(hit.outs_on_play, baserunning_agg.outs_on_basepaths) AS outs_recorded,
     FROM main_models.event_batting_stats AS hit
     FULL OUTER JOIN baserunning_agg USING (event_key)
     LEFT JOIN main_models.event_batted_ball_stats AS bat USING (event_key)
     LEFT JOIN main_models.event_pitch_sequence_stats AS pitch USING (event_key)
+    LEFT JOIN other_events USING (event_key)
 ),
 
 add_current_pitcher_runs AS (

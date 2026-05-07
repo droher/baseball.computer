@@ -168,6 +168,16 @@ WITH batter_baserunning AS (
     WHERE baserunner = 'Batter'
 ),
 
+other_events AS (
+    SELECT
+        event_key,
+        BOOL_OR(baserunning_play_type = 'PassedBall')::UTINYINT AS passed_balls,
+        BOOL_OR(baserunning_play_type = 'WildPitch')::UTINYINT AS wild_pitches,
+        BOOL_OR(baserunning_play_type = 'Balk')::UTINYINT AS balks,
+    FROM main_models.stg_event_baserunners
+    GROUP BY 1
+),
+
 batter_stats AS (
     SELECT
         COALESCE(hit.batter_id, batter_baserunning.runner_id) AS player_id,
@@ -177,10 +187,14 @@ batter_stats AS (
         hit.* EXCLUDE (event_key),
         bat.* EXCLUDE (event_key),
         batter_baserunning.* EXCLUDE (event_key, baserunner, game_id, batting_team_id, fielding_team_id),
-        pitch.* EXCLUDE (event_key),
+        pitch.* EXCLUDE (event_key, balks, wild_pitches, passed_balls),
+        other_events.balks,
+        other_events.wild_pitches,
+        other_events.passed_balls,
     FROM main_models.event_batting_stats AS hit
     LEFT JOIN main_models.event_batted_ball_stats AS bat USING (event_key)
     LEFT JOIN main_models.event_pitch_sequence_stats AS pitch USING (event_key)
+    LEFT JOIN other_events USING (event_key)
     FULL OUTER JOIN batter_baserunning USING (event_key)
 ),
 
