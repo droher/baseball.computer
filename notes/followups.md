@@ -197,6 +197,23 @@ cleanly under the build env via `pytest.importorskip`.
 
 ## Synthetic box scores
 
+### Per-position fair-share scaling already implemented
+
+Step 3 of the synthetic-lineup-algorithm-improvements plan proposes
+scaling `position_target` down by `team_games_F / sum_p games_at_position[p, F]`
+and using `sum_F games_at_position[p]` as the total target. Both already
+exist in `game_lineups.py` — `_scale_position_targets` (called at line
+346) does the position scaling, and `_build_milp_problem` already
+derives `total_targets` from `sum_F non_pitcher_fielding` over the
+scaled candidates. No code change available.
+
+The remaining over-allocation (e.g. raubt101 1903 CHN: syn=26, real=15)
+is driven by individual fielding-position appearance counts that exceed
+real starts (Lahman `fielding.g` includes relief / defensive subs),
+not by team-level position over-count. Closing it needs a real-vs-
+appearance signal — `Appearances.GS` would do it but is NULL for
+non-pitchers pre-1904. No clean fix without new data.
+
 ### Catcher wrong-defender rate (1.07 / game)
 
 Tried relaxing the MILP `default_slot` exclusion at `slot.fielding_position
