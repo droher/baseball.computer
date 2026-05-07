@@ -1245,10 +1245,14 @@ def _build_stint_windows(
             else:
                 fraction = cumulative / total
                 end_index = max(cursor, min(n - 1, round(fraction * n) - 1))
+            override_end_max = -1
             for team_id, games in team_map.items():
                 window_key = (season, team_id, player_id, stint)
                 if window_key in txn_overrides:
-                    windows[window_key] = txn_overrides[window_key]
+                    override = txn_overrides[window_key]
+                    windows[window_key] = override
+                    if override.end_index > override_end_max:
+                        override_end_max = override.end_index
                     continue
                 start_index, final_end = _ensure_window_covers_team(
                     cursor,
@@ -1262,7 +1266,10 @@ def _build_stint_windows(
                     start_index=start_index,
                     end_index=final_end,
                 )
-            cursor = min(n - 1, end_index + 1)
+            if override_end_max >= 0:
+                cursor = min(n - 1, max(cursor, override_end_max + 1))
+            else:
+                cursor = min(n - 1, end_index + 1)
     return season_index, windows
 
 

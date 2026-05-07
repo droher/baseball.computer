@@ -78,7 +78,6 @@ def parse_team_changes(zip_path: Path) -> list[TeamChange]:
                 if len(row) < 12:
                     continue
                 primary_date = row[0]
-                txn_id = row[5]
                 player = row[6]
                 txn_type = row[7].strip()
                 from_team = row[8]
@@ -91,7 +90,6 @@ def parse_team_changes(zip_path: Path) -> list[TeamChange]:
                     continue
                 if not _is_full_date(primary_date):
                     continue
-                del txn_id
                 out.append(
                     TeamChange(
                         season=int(primary_date[:4]),
@@ -194,10 +192,17 @@ def _match_boundaries(
     (team_sequence[i], team_sequence[i+1]) we look for the next txn
     matching from_team==team_sequence[i] and to_team==team_sequence[i+1].
     If we can't find one, return None (caller falls back).
+
+    Bails on repeated team_ids in the sequence: if Lahman compresses a
+    real round-trip (A → B → A → B) into a 2-stint [A, B], the greedy
+    match would pick the earliest A→B date and lose the intervening
+    appearances. Falling back to proportional is safer.
     """
     needed = len(team_sequence) - 1
     if needed == 0:
         return []
+    if len(set(team_sequence)) != len(team_sequence):
+        return None
     boundaries: list[str] = []
     txn_idx = 0
     for i in range(needed):
