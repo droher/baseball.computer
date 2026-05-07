@@ -19,8 +19,20 @@ from python_models.metrics._constants import (
 )
 
 MetricKind = Literal["offense", "pitching", "fielding"]
+MetricGrain = Literal["season", "event"]
 Env = Literal["dev", "prod"]
 TableExpr = Any
+
+
+def backing_model_name(kind: MetricKind, grain: MetricGrain) -> str:
+    """Physical SQLMesh model name underneath a BSL semantic table.
+
+    Pure data — no DB connection required, so the LSF generator can call
+    it without booting BSL or DuckDB.
+    """
+    if grain == "season":
+        return SEASON_MODELS[kind]
+    return EVENT_MODELS[kind]
 
 
 def schema_for(env: Env) -> str:

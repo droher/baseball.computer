@@ -1,0 +1,98 @@
+domain:
+  id: domain.baseball
+  description: Major-league play-by-play, season, and career analytics.
+
+tz: America/New_York
+
+coverage: >-
+  Event-level play-by-play complete from 1912; sparse 1871-1911.
+  Season/career stats from 1871. Lahman-supplemented batters_faced for
+  1872/1874. Earned runs absent 1903-1909, BFP partial 1901-1907 even
+  with the supplement. Negro Leagues data integrated where available.
+
+table_synonyms:
+  main_models.player_offense_season_stats: [batters, hitters, hitting]
+  main_models.player_team_season_pitching_stats: [pitching season, pitcher seasons]
+  main_models.player_position_team_season_fielding_stats: [fielding, defense]
+  main_seeds.seed_franchises: [franchises, teams, team history]
+  main_seeds.seed_game_types: [game type, postseason flag]
+
+ambiguities:
+  - term: HR
+    meanings:
+      - table.offense_seasons.home_runs
+      - table.pitching_seasons.home_runs
+    default: table.offense_seasons.home_runs
+    clarify_when: question contrasts hitters and pitchers ("HR allowed" → pitching).
+  - term: average
+    meanings:
+      - metric.batting_average_offense_season
+      - arithmetic mean
+    default: metric.batting_average_offense_season
+    clarify_when: subject is not a hitting context (salary, attendance, etc.).
+  - term: AVG
+    meanings:
+      - metric.batting_average_offense_season
+      - aggregate avg() function
+    default: metric.batting_average_offense_season
+    clarify_when: question asks for SQL `avg()` over an arbitrary numeric column.
+  - term: ERA
+    meanings:
+      - metric.earned_run_average_pitching_season
+    default: metric.earned_run_average_pitching_season
+    clarify_when: never (unambiguous).
+  - term: team
+    meanings:
+      - table.main_seeds_seed_franchises.team_id
+      - franchise (multi-era)
+    default: table.main_seeds_seed_franchises.team_id
+    clarify_when: question concerns franchise history rather than a single team-era.
+
+rules:
+  - severity: must
+    scope: global
+    text: Generate read-only SELECT queries against bc.db.
+  - severity: must
+    scope: global
+    text: Do not use columns not present in DB_CONTEXT.
+  - severity: should
+    scope: global
+    text: Prefer the BSL semantic tables (offense_seasons, offense_events, pitching_seasons, pitching_events, fielding_seasons, fielding_events) over main_models.metrics_* directly. The semantic tables apply consistent league joining and regular-season filtering.
+  - severity: should
+    scope: global
+    text: Prefer published main_models.* tables over staging stg_* tables.
+  - severity: should
+    scope: global
+    text: For rate stats (batting_average, obp, slg, era, whip, ...), recompute from underlying counting stats when grouping. Never SUM or AVG a stored rate column across rows.
+  - severity: warn
+    scope: global
+    text: Season-grain BSL tables filter to regular-season game types by default. Pass game_type explicitly when postseason data is wanted.
+  - severity: warn
+    scope: global
+    text: Event-level data is sparse before 1912. Restrict event-grain queries to season >= 1912 unless the question specifically targets the early era.
+
+verified_queries:
+  - id: vq.trout_2018_obp
+    question: What was Mike Trout's OBP in 2018?
+    notes: Single-player season, AL regular season; canonical use of the offense season metric.
+    sql: |
+      select obp
+      from main_models.metrics_player_season_league_offense
+      where player_id = 'troum001' and season = 2018 and league = 'AL'
+  - id: vq.team_ops_2003
+    question: What was the lowest team OPS in 2003?
+    notes: Team-season aggregate. Uses main_models.metrics_team_season_league_offense (regular season only).
+    sql: |
+      select team_id, ops
+      from main_models.metrics_team_season_league_offense
+      where season = 2003
+      order by ops asc
+      limit 1
+  - id: vq.most_hr_career
+    question: Who has the most career home runs?
+    notes: Career-grain table; counts only documented MLB seasons.
+    sql: |
+      select player_id, home_runs
+      from main_models.metrics_player_career_offense
+      order by home_runs desc
+      limit 5

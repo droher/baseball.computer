@@ -18,6 +18,11 @@ import ibis
 from python_models.metrics import _metric_registrations  # noqa: F401  (registry side-effect)
 from python_models.metrics.registry import metrics_for
 
+from ._layout import (
+    EVENT_DIM_NAMES,
+    FIELDING_SEASON_DIM_NAMES,
+    OFFENSE_PITCHING_SEASON_DIM_NAMES,
+)
 from ._tables_common import (
     Env,
     MetricKind,
@@ -76,29 +81,15 @@ def _build_table(
     return table
 
 
-_OFFENSE_PITCHING_SEASON_DIMS: dict[str, Any] = {
-    "player_id": lambda t: t.player_id,
-    "team_id": lambda t: t.team_id,
-    "season": lambda t: t.season,
-    "league": lambda t: t.league,
-    "game_type": lambda t: t.game_type,
-}
+def _attr_dims(names: list[str]) -> dict[str, Any]:
+    return {n: (lambda t, _n=n: getattr(t, _n)) for n in names}
 
-_FIELDING_SEASON_DIMS: dict[str, Any] = {
-    **_OFFENSE_PITCHING_SEASON_DIMS,
-    "fielding_position": lambda t: t.fielding_position,
-}
 
-_EVENT_DIMS: dict[str, Any] = {
-    "player_id": lambda t: t.player_id,
-    "team_id": lambda t: t.team_id,
-    "game_id": lambda t: t.game_id,
-    "season": lambda t: t.season,
-    "league": lambda t: t.league,
-    "park_id": lambda t: t.park_id,
-    "game_type": lambda t: t.game_type,
-    "is_regular_season": lambda t: t.is_regular_season,
-}
+_OFFENSE_PITCHING_SEASON_DIMS: dict[str, Any] = _attr_dims(
+    OFFENSE_PITCHING_SEASON_DIM_NAMES
+)
+_FIELDING_SEASON_DIMS: dict[str, Any] = _attr_dims(FIELDING_SEASON_DIM_NAMES)
+_EVENT_DIMS: dict[str, Any] = _attr_dims(EVENT_DIM_NAMES)
 
 
 def offense_seasons(con: Any, env: Env = "dev") -> Any:

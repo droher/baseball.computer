@@ -96,6 +96,12 @@ lineage MODEL:
 diff MODEL SRC TGT:
     cd bc && {{ _dev_env }} uv run --group build sqlmesh table_diff '{{ SRC }}:{{ TGT }}' --select-model {{ MODEL }}
 
+# --- LLM context ---
+
+# Generate the LSF-1 context packet at docs/llm/baseball.lsf. Read-only against bc.db.
+gen-llm-context *ARGS:
+    uv run --group build python scripts/generate_llm_context.py --validate "$@"
+
 # --- Tests ---
 
 # pytest under bc/tests (dev DB env).
