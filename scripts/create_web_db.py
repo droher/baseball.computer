@@ -1,7 +1,10 @@
 import duckdb
 import boto3
+import json
 import os
 import time
+import urllib.error
+import urllib.request
 
 def export_table_to_parquet(conn, schema_name, table_name, file_name):
     row_group_size = 1966080 if table_name != "event_states_full" else 262144
@@ -17,7 +20,7 @@ def get_url(file_name, prefix, cache_bust=None):
         url = f"{url}?v={cache_bust}"
     return url
 
-def upload_to_r2(file_name, bucket_name, prefix, cache_bust=None):
+def upload_to_r2(file_name, bucket_name, prefix, cache_bust=None, cache_control=None):
     print(f"Uploading {file_name} to R2 bucket {bucket_name}")
     account_id = os.environ["R2_ACCOUNT_ID"]
     access_key_id = os.environ["R2_ACCESS_KEY_ID"]
@@ -29,8 +32,37 @@ def upload_to_r2(file_name, bucket_name, prefix, cache_bust=None):
         aws_secret_access_key=secret_access_key,
     )
     name_only = file_name.split("/")[-1]
-    s3.meta.client.upload_file(file_name, bucket_name, f"{prefix}/{name_only}")
+    extra = {"CacheControl": cache_control} if cache_control else None
+    s3.meta.client.upload_file(file_name, bucket_name, f"{prefix}/{name_only}", ExtraArgs=extra)
     return get_url(file_name, prefix, cache_bust=cache_bust)
+
+
+def cloudflare_purge(urls):
+    zone_id = os.environ.get("CLOUDFLARE_ZONE_ID")
+    token = os.environ.get("CLOUDFLARE_API_TOKEN")
+    if not zone_id or not token:
+        print("CLOUDFLARE_ZONE_ID/CLOUDFLARE_API_TOKEN not set; skipping cache purge")
+        return
+    req = urllib.request.Request(
+        f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        data=json.dumps({"files": list(urls)}).encode("utf-8"),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise SystemExit(
+            f"Cloudflare purge failed: status={e.code} body={e.read().decode('utf-8', 'replace')}"
+        ) from e
+    if not body.get("success"):
+        raise SystemExit(f"Cloudflare purge failed: body={body}")
+    for u in urls:
+        print(f"Cloudflare purged {u}")
 
 
 def create_view_with_url(new_conn, schema_name, view_name, url):
@@ -90,8 +122,9 @@ def main():
 
     conn.close()
     new_conn.close()
-    url = upload_to_r2(new_db_path, bucket_name, prefix)
+    url = upload_to_r2(new_db_path, bucket_name, prefix, cache_control="public, max-age=60")
     print(f"URL: {url}")
+    cloudflare_purge([url])
 
 
 if __name__ == "__main__":
