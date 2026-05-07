@@ -40,10 +40,12 @@ def create_view_with_url(new_conn, schema_name, view_name, url):
     new_conn.execute(query)
 
 
+REQUIRED_SCHEMAS = {"main_models", "main_seeds"}
+
+
 def main():
     original_db_path = "bc.db"
     new_db_path = "bc_remote.db"
-    # Delete the new database if it exists
     if os.path.exists(new_db_path):
         os.remove(new_db_path)
     bucket_name = "timeball"
@@ -51,47 +53,41 @@ def main():
     cache_bust = str(int(time.time()))
 
     conn = duckdb.connect(original_db_path)
-    new_conn = duckdb.connect(new_db_path)
     conn.execute("SET memory_limit='25GB'")
 
     schema_query = "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('main', 'pg_catalog', 'information_schema')"
-    # Retrieve list of schemas
-    schemas = conn.execute(schema_query).fetchall()
+    schemas = [row[0] for row in conn.execute(schema_query).fetchall()]
 
-    for schema in schemas:
-        schema_name = schema[0]
-        # Retrieve list of tables in each schema
-        query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
-        tables = conn.execute(query).fetchall()
+    missing = REQUIRED_SCHEMAS - set(schemas)
+    if missing:
+        raise RuntimeError(
+            f"refusing to publish: {original_db_path} (cwd={os.getcwd()}, "
+            f"size={os.path.getsize(original_db_path)} bytes) is missing required "
+            f"schemas {sorted(missing)}; found only {sorted(schemas)}"
+        )
 
-        for table in tables:
-            table_name = table[0]
+    schema_tables: dict[str, list[str]] = {}
+    for schema_name in schemas:
+        tables_query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
+        tables = [row[0] for row in conn.execute(tables_query).fetchall()]
+        if not tables:
+            raise RuntimeError(f"refusing to publish: schema {schema_name} has no tables")
+        schema_tables[schema_name] = tables
+
+    for schema_name, tables in schema_tables.items():
+        for table_name in tables:
             parquet_file = f"/tmp/{schema_name}_{table_name}.parquet"
-
-            # Export table to Parquet
             export_table_to_parquet(conn, schema_name, table_name, parquet_file)
 
-
-    for schema in schemas:
-        schema_name = schema[0]
-        # Retrieve list of tables in each schema
-        query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}'"
-        tables = conn.execute(query).fetchall()
-
-        for table in tables:
-            table_name = table[0]
+    new_conn = duckdb.connect(new_db_path)
+    for schema_name, tables in schema_tables.items():
+        for table_name in tables:
             parquet_file = f"/tmp/{schema_name}_{table_name}.parquet"
-
-            # Upload to R2 and get URL (with cache-bust query so views read fresh past stale CF cache)
             url = upload_to_r2(parquet_file, bucket_name, prefix, cache_bust=cache_bust)
             print(f"URL: {url}")
-
-            # Create view in new database
             create_view_with_url(new_conn, schema_name, table_name, url)
-
-            # Clean up local file
             os.remove(parquet_file)
-    
+
     conn.close()
     new_conn.close()
     url = upload_to_r2(new_db_path, bucket_name, prefix)
