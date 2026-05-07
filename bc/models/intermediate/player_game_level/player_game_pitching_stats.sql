@@ -167,7 +167,14 @@ MODEL (
     unique_grain(columns := (game_id, player_id)),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    team_game_has_one_starter(),
+    bounded_range(column := walks, min_v := 0, max_v := batters_faced, condition := batters_faced IS NOT NULL),
+    bounded_range(column := complete_games, min_v := 0, max_v := games_started, condition := NOT @team_game_data_issue_match(game_id, team_id, 'starting_pitcher_no_appearance')),
+    bounded_range(column := perfect_games, min_v := 0, max_v := no_hitters),
+    bounded_excluding_data_issues(column := hits, min_v := 0, max_v := batters_faced, issue_type := 'hits_gt_batters_faced', condition := batters_faced IS NOT NULL),
+    bounded_excluding_data_issues(column := strikeouts, min_v := 0, max_v := batters_faced, issue_type := 'strikeouts_gt_batters_faced', condition := batters_faced IS NOT NULL),
+    bounded_excluding_data_issues(column := home_runs, min_v := 0, max_v := hits, issue_type := 'home_runs_gt_hits')
   ),
 );
 

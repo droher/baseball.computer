@@ -187,6 +187,62 @@ referenced model hasn't materialized yet, the predicate collapses to
 complete and audits run their real predicate. Prod runs (canonical
 schema) are unaffected.
 
+### `earned_runs > runs` residue, ~10 cases per modern season
+
+The `bounded_range(earned_runs ≤ runs)` audit on
+`player_game_pitching_stats` (and the planned sweep onto
+`team_game_pitching_stats` / `player_team_season_pitching_stats`) was
+spec'd with a `season >= 1948` Lahman-supplement carve-out, but the
+audit still surfaces ~816 rows distributed evenly across 1948→2025
+(roughly 4–23 per season) — not the 1,031 pre-1948 Lahman residue
+the plan expected. Spot-check `LAN202505300` `friem001`:
+`stg_game_earned_runs.earned_runs = 6` against event-derived
+`runs = 5`. The likely cause is Retrosheet's bequeathed/inherited
+runner accounting in the official ER files diverging from the run-
+assignment logic in `event_pitching_stats.runs`: a runner who was
+on base when the pitcher left and later scored gets charged ER to
+the original pitcher, but the run-assignment logic credits the run
+to whichever pitcher was on the mound when it scored.
+
+Validated 2026-05-07: every offending team-game has matching team
+totals (team R = team ER), with one pitcher's ER>R offset by another
+pitcher's R>ER on the same team. The per-pitcher invariant
+`earned_runs ≤ runs` simply doesn't hold by construction — ER and R
+follow different attribution rules. The audit was dropped from
+`player_game_pitching_stats`. The team-game-grain version (team R ≥
+team ER, modulo Lahman-supplement era) is still candidate for
+`team_game_pitching_stats`; spec'd, not added in this change.
+
+Pre-1948, the carve-out target was Lahman-supplemented ER exceeding
+Retrosheet partial-game R sums — separate root cause, same shape.
+Real fix is the per-stat per-row gate sketched under "Partial-
+coverage SUMs". Both eras converge once that gate exists.
+
+### Umpire FK audits dropped — 4 unknown umpires not in `main_models.people`
+
+Dropped 2026-05-07. The 6 `relationships(umpire_*_id → main_models.people.person_id)` audits I tried to add to `game_start_info` fail on 18 rows (7 home, 8 first, 3 third) caused by 4 umpires absent from `main_models.people`: `wasnu90`, `Gockle`, `fambu091`, `harrm201`. Two of these (`Gockle`, `wasnu90`) don't even match the standard 8-char Retrosheet person-id shape, so they look like upstream parser errors. Fix path is in `baseball.computer.rs` (or a manual people-supplement seed) so the audits land cleanly when re-added.
+
+### Box-score within-row issues (operationalized via `box_score_data_issues`)
+
+Resolved 2026-05-07. The 26 known box-score within-row violations
+(15 `hits_gt_at_bats`, 3 each `home_runs_gt_hits` / `strikeouts_gt_batters_faced`,
+2 `strikeouts_gt_plate_appearances`, and one each of
+`hits_gt_batters_faced` / `extra_base_hits_gt_hits` / `earned_runs_gt_runs`,
+all 1899–1948 box scores) are now enumerated by
+`main_models.box_score_data_issues`. The new
+`bounded_excluding_data_issues` audit lets game-grain stat models
+add the same definitional bound checks while carving out the listed
+rows, so audits land cleanly today and any *new* violation
+introduced post-staging fails the build. Fix path for the 26 rows
+themselves is still in the parser at
+[baseball.computer.rs](https://github.com/droher/baseball.computer.rs)
+or a manual override seed; once those land, drop them from
+`box_score_data_issues` and the audits tighten automatically.
+
+### Scratched starting pitchers (operationalized via `team_game_data_issues`)
+
+Resolved 2026-05-07. 59 PlayByPlay-source team-games where `game_start_info` records a starting pitcher who never threw a pitch (scratched at the last minute, still the SP per MLB rules) are enumerated by `main_models.team_game_data_issues` with `issue_type = 'starting_pitcher_no_appearance'`. The `team_game_has_one_starter` audit and the `bounded_range(complete_games, 0, games_started)` audit on `player_game_pitching_stats` consume the carve-out via `@team_game_data_issue_match`. The 5 pitchers with `CG=1, GS=0` are the relievers who covered all 27 outs after the SP was scratched (Ernie Shore-style); they sit naturally inside the carve-out. New scratched-SP cases are picked up by the issues model on each plan; new audit failures outside the listed team-games will fail the build.
+
 ## Tests
 
 ### `bc/tests/test_bsl_semantic.py`

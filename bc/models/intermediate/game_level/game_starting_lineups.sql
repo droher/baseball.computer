@@ -122,9 +122,6 @@ unioned AS (
 ),
 
 agged AS (
-    -- DuckDB 1.x: LIST(...) FILTER (...) where all rows are filtered out returns
-    -- NULL, and MAP(NULL, NULL) is NULL. COALESCE to empty list keeps MAP non-null
-    -- so the contract NOT NULL holds for games where one side is missing.
     SELECT
         game_id,
         MAP(

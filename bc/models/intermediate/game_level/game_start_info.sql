@@ -57,7 +57,9 @@ MODEL (
     relationships(column := away_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := home_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
-    relationships(column := park_id, to_model := main_models.stg_parks, to_column := park_id)
+    relationships(column := park_id, to_model := main_models.stg_parks, to_column := park_id),
+    relationships(column := home_starting_pitcher_id, to_model := main_models.people, to_column := player_id),
+    relationships(column := away_starting_pitcher_id, to_model := main_models.people, to_column := player_id)
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_game_start_info.parquet'
@@ -141,9 +143,9 @@ add_gamelog AS (
 add_rest AS (
     SELECT
         add_gamelog.* REPLACE (
-            COALESCE(add_gamelog.away_starting_pitcher_id, lineups.fielding_map_away[1][1])
+            COALESCE(add_gamelog.away_starting_pitcher_id, lineups.fielding_map_away[1])
             AS away_starting_pitcher_id,
-            COALESCE(add_gamelog.home_starting_pitcher_id, lineups.fielding_map_home[1][1])
+            COALESCE(add_gamelog.home_starting_pitcher_id, lineups.fielding_map_home[1])
             AS home_starting_pitcher_id,
             COALESCE(add_gamelog.park_id, missing_parks.park_id) AS park_id,
         ),

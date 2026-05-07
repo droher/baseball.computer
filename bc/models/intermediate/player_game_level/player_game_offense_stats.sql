@@ -148,7 +148,13 @@ MODEL (
     unique_grain(columns := (game_id, player_id, team_id)),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    bounded_range(column := home_runs, min_v := 0, max_v := hits),
+    bounded_range(column := walks, min_v := 0, max_v := plate_appearances, condition := plate_appearances IS NOT NULL),
+    bounded_range(column := caught_stealing, min_v := 0, max_v := stolen_base_opportunities, condition := stolen_base_opportunities IS NOT NULL),
+    bounded_excluding_data_issues(column := hits, min_v := 0, max_v := at_bats, issue_type := 'hits_gt_at_bats'),
+    bounded_excluding_data_issues(column := strikeouts, min_v := 0, max_v := plate_appearances, issue_type := 'strikeouts_gt_plate_appearances', condition := plate_appearances IS NOT NULL),
+    bounded_excluding_data_issues(column := (COALESCE(doubles, 0) + COALESCE(triples, 0) + COALESCE(home_runs, 0)), min_v := 0, max_v := hits, issue_type := 'extra_base_hits_gt_hits')
   ),
 );
 
