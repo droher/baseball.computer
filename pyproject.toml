@@ -51,6 +51,15 @@ bsl = [
     "ibis-framework[duckdb]>=11.0",
 ]
 
+stats = [
+    {include-group = "build"},
+    "pymc>=5",
+    "arviz>=0.20",
+    "xarray>=2025.1",
+    "zarr>=2.18",
+    "scikit-learn>=1.5",
+]
+
 [tool.uv]
 package = false
 default-groups = "all"

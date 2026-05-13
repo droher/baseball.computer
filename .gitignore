@@ -28,6 +28,7 @@ bc/mlflow.db
 bc/mlflow.db-*
 bc/hamilton_artifacts/
 bc/.lineup_cache/
+artifacts/
 docs/llm/baseball.lsf
 *.bak.*
 

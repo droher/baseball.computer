@@ -8,6 +8,13 @@ last-verified: 2026-05-13
 
 # Data Coverage Implementation Checklist
 
+## Where We Are (2026-05-13)
+
+- **Done:** Phase 0 baseline + Phase 1 runtime scaffolding sub-gate. Squash-merged into `data_coverage`.
+- **Next PR:** `main_models.source_acquisition_ledger` (see Phase 1 §"Source Availability"). Cut branch off `data_coverage`, squash-merge back to `data_coverage`. **Do NOT merge into `main`** until the whole initiative graduates.
+- **Read before opening the next PR:** `01-prep-ledgers.md` §"Shared Status Seeds" + §"`source_acquisition_ledger`"; this file's Phase 1 ledger checklist; `bc/.claude/rules/sqlmesh.md`.
+- **Settled decisions (do not re-litigate):** see the Decision Log below, plus the `data-coverage-review-decisions` + `data-coverage-shift-model` auto-memory entries.
+
 ## TL;DR
 
 Use this checklist to implement the 1910-2025 data coverage plan in dependency order. The implementation starts with branch setup, baseline measurement, deterministic provenance ledgers, shared runtime code, and frozen modeling datasets. Probabilistic values are published only after source reliability, data-error risk, personnel eligibility, aggregate constraints, grouped holdouts, conservation audits, calibration reports, and posterior diagnostics pass.
@@ -78,32 +85,32 @@ Purpose: capture the current data state before adding ledgers or fitting models.
 
 ### Setup
 
-- [ ] Create or confirm an implementation branch before code changes begin.
-- [ ] Confirm dev DB and SQLMesh state paths target `bc_dev.db` and `bc/bc_state_dev.db`.
-- [ ] Confirm target span variables: `start_season = 1910`, `end_season = 2025`.
-- [ ] Confirm PyMC/ArviZ are the first Bayesian backend and `stats` is the optional dependency group.
-- [ ] Confirm the first publication namespace for estimates. Default: estimated namespace only, no replacement of official stat lines.
-- [ ] Confirm follow-up location for implementation discoveries. Default: `notes/followups.md`.
+- [x] Create or confirm an implementation branch before code changes begin.
+- [x] Confirm dev DB and SQLMesh state paths target `bc_dev.db` and `bc/bc_state_dev.db`.
+- [x] Confirm target span variables: `start_season = 1910`, `end_season = 2025`.
+- [x] Confirm PyMC/ArviZ are the first Bayesian backend and `stats` is the optional dependency group.
+- [x] Confirm the first publication namespace for estimates. Default: estimated namespace only, no replacement of official stat lines.
+- [x] Confirm follow-up location for implementation discoveries. Default: `notes/followups.md`.
 
 ### Baseline Report
 
-- [ ] Record game counts by `game_start_info.source_type`.
-- [ ] Record event count and game count from `event_states_full`.
-- [ ] Record batted-ball row count, unknown final trajectory count, and unknown recorded location count from `calc_batted_ball_type`.
-- [ ] Record unknown putout count and incomplete-event count from `calc_fielding_play_agg`.
-- [ ] Record fielding residual counts from `player_position_game_fielding_stats` and discrepancy views.
-- [ ] Snapshot current `unknown_fielding_play_shares` outputs.
-- [ ] Snapshot current `park_factors` and `calc_park_factor_*` outputs.
-- [ ] Snapshot current `linear_weights` sparse-cell behavior.
-- [ ] Compare LSF coverage metadata against current DB source counts.
-- [ ] File or fix metadata drift when source reality contradicts generated LSF metadata.
+- [x] Record game counts by `game_start_info.source_type`.
+- [x] Record event count and game count from `event_states_full`.
+- [x] Record batted-ball row count, unknown final trajectory count, and unknown recorded location count from `calc_batted_ball_type`.
+- [x] Record unknown putout count and incomplete-event count from `calc_fielding_play_agg`.
+- [x] Record fielding residual counts from `player_position_game_fielding_stats` and discrepancy views.
+- [x] Snapshot current `unknown_fielding_play_shares` outputs.
+- [x] Snapshot current `park_factors` and `calc_park_factor_*` outputs.
+- [x] Snapshot current `linear_weights` sparse-cell behavior.
+- [~] Compare LSF coverage metadata against current DB source counts. _(baseline records the season span; the 1910-1911 LSF metadata flip lands in its own PR per the 2026-05-13 review decision.)_
+- [~] File or fix metadata drift when source reality contradicts generated LSF metadata. _(deferred to the 1910-1911 LSF flip PR.)_
 
 ### Phase 0 Exit Gate
 
-- [ ] Baseline report exists under the statistical output root.
-- [ ] Baseline report records query text, row counts, DB path, source snapshot ID, and command/environment metadata.
-- [ ] Later validation reports have a stable baseline ID to reference.
-- [ ] Any stale documentation or metadata discovered in the baseline pass is recorded before Phase 1 starts.
+- [x] Baseline report exists under the statistical output root.
+- [x] Baseline report records query text, row counts, DB path, source snapshot ID, and command/environment metadata.
+- [x] Later validation reports have a stable baseline ID to reference.
+- [x] Any stale documentation or metadata discovered in the baseline pass is recorded before Phase 1 starts.
 
 ## Phase 1: Deterministic Prep (Runtime Scaffolding, Ledgers, Observation, Gaps)
 
@@ -111,54 +118,54 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Canonical Enum Seeds
 
-- [ ] Create `bc/seeds/misc/seed_observed_status.csv` with canonical values consumed by every event observation ledger and modeling dataset.
-- [ ] Create `bc/seeds/misc/seed_reliability_class.csv` with canonical values consumed by entity, personnel, context, and exposure reliability tables.
+- [x] Create `bc/seeds/misc/seed_observed_status.csv` with canonical values consumed by every event observation ledger and modeling dataset.
+- [x] Create `bc/seeds/misc/seed_reliability_class.csv` with canonical values consumed by entity, personnel, context, and exposure reliability tables.
 
 ### Dependency Group
 
-- [ ] Add optional `stats` dependency group with `pymc`, `arviz`, `xarray`, `zarr`, and calibration dependencies.
-- [ ] Keep `stats` separate from `ml`; do not import Keras, Torch, or MLflow for Bayesian-only commands.
-- [ ] Confirm SQLMesh ingestion modules can import lightweight manifest/schema code without importing PyMC.
-- [ ] Add a smoke command that imports the statistical package under the `stats` group.
+- [x] Add optional `stats` dependency group with `pymc`, `arviz`, `xarray`, `zarr`, and calibration dependencies.
+- [x] Keep `stats` separate from `ml`; do not import Keras, Torch, or MLflow for Bayesian-only commands.
+- [x] Confirm SQLMesh ingestion modules can import lightweight manifest/schema code without importing PyMC.
+- [x] Add a smoke command that imports the statistical package under the `stats` group.
 
 ### Package Skeleton
 
-- [ ] Create `bc/python_models/statistical/__init__.py`.
-- [ ] Create `config.py` for repo paths, DB paths, output roots, and default vars.
-- [ ] Create `schemas.py` with Pydantic models for dataset metadata, model configs, output manifests, diagnostics, and validation status.
-- [ ] Create `duckdb_io.py` for read-only DuckDB connections and query/export helpers.
-- [ ] Create `datasets.py` for dataset export, schema validation, category-map creation, and query hashing.
-- [ ] Create `splits.py` for grouped split registry and split-leakage checks.
-- [ ] Create `manifests.py` for output IDs, published pointers, dependency IDs, and version checks.
-- [ ] Create `artifacts.py` or `outputs.py` for atomic writes and SQL-consumable exports.
-- [ ] Create `logging.py` for structured stdlib logging.
-- [ ] Create `orchestration.py` for idempotent step execution and step status.
-- [ ] Create `diagnostics.py` for ArviZ summaries, posterior predictive checks, and simulation recovery.
-- [ ] Create `validation.py` for conservation and calibration blocking findings.
-- [ ] Create `calibration.py` for ECE, Brier/log loss, reliability curves, temperature scaling, and binary isotonic helpers.
-- [ ] Create `pymc_utils.py` for shared sampler configuration, prior predictive, posterior predictive, diagnostics extraction, and smoke-run settings.
-- [ ] Create model modules: `observation.py`, `fielding_credit.py`, `geometry.py`, `park_factors.py`, `run_values.py`, `advancement.py`, `pitch_summary.py`.
-- [ ] Create deep supplement modules: `deep/proposals.py`, `deep/embeddings.py`, `deep/calibrators.py`.
-- [ ] Create `cli.py` with subcommands for `prepare-dataset`, `run-eda`, `fit-deep`, `fit-bayes`, `export-sql`, `validate`, and `publish-manifest`.
+- [x] Create `bc/python_models/statistical/__init__.py`.
+- [x] Create `config.py` for repo paths, DB paths, output roots, and default vars.
+- [x] Create `schemas.py` with Pydantic models for dataset metadata, model configs, output manifests, diagnostics, and validation status.
+- [x] Create `duckdb_io.py` for read-only DuckDB connections and query/export helpers.
+- [x] Create `datasets.py` for dataset export, schema validation, category-map creation, and query hashing.
+- [x] Create `splits.py` for grouped split registry and split-leakage checks.
+- [x] Create `manifests.py` for output IDs, published pointers, dependency IDs, and version checks.
+- [x] Create `artifacts.py` or `outputs.py` for atomic writes and SQL-consumable exports.
+- [x] Create `logging.py` for structured stdlib logging.
+- [x] Create `orchestration.py` for idempotent step execution and step status.
+- [x] Create `diagnostics.py` for ArviZ summaries, posterior predictive checks, and simulation recovery.
+- [x] Create `validation.py` for conservation and calibration blocking findings.
+- [x] Create `calibration.py` for ECE, Brier/log loss, reliability curves, temperature scaling, and binary isotonic helpers.
+- [x] Create `pymc_utils.py` for shared sampler configuration, prior predictive, posterior predictive, diagnostics extraction, and smoke-run settings.
+- [x] Create model modules: `observation.py`, `fielding_credit.py`, `geometry.py`, `park_factors.py`, `run_values.py`, `advancement.py`, `pitch_summary.py`. _(Plus `shift_propensity.py` per the 2026-05-13 Model-K decision.)_
+- [x] Create deep supplement modules: `deep/proposals.py`, `deep/embeddings.py`, `deep/calibrators.py`.
+- [x] Create `cli.py` with subcommands for `prepare-dataset`, `run-eda`, `fit-deep`, `fit-bayes`, `export-sql`, `validate`, and `publish-manifest`.
 
 ### Runtime Tests
 
-- [ ] Add unit tests for path resolution.
-- [ ] Add unit tests for output ID generation and manifest read/write.
-- [ ] Add unit tests for atomic output writes.
-- [ ] Add unit tests for category-map generation.
-- [ ] Add unit tests for split registry grouping and leakage detection.
-- [ ] Add unit tests for calibration metrics.
-- [ ] Add a tiny PyMC smoke model test under the `stats` group.
-- [ ] Add a tiny SQLMesh ingestion fixture that reads a local model-output manifest without importing heavy fitting dependencies.
+- [x] Add unit tests for path resolution.
+- [x] Add unit tests for output ID generation and manifest read/write.
+- [x] Add unit tests for atomic output writes.
+- [x] Add unit tests for category-map generation.
+- [x] Add unit tests for split registry grouping and leakage detection.
+- [x] Add unit tests for calibration metrics.
+- [x] Add a tiny PyMC smoke model test under the `stats` group.
+- [x] Add a tiny SQLMesh ingestion fixture that reads a local model-output manifest without importing heavy fitting dependencies.
 
 ### Runtime Scaffolding Sub-Gate
 
-- [ ] Statistical package imports under the `stats` group.
-- [ ] CLI help works for every planned subcommand.
-- [ ] Manifest schema can represent dataset snapshots, deep outputs, posterior outputs, validation reports, and published pointers.
-- [ ] Unit tests for shared runtime pass.
-- [ ] Runtime docs in `05-runtime-artifacts-and-library.md` match the implemented package names.
+- [x] Statistical package imports under the `stats` group.
+- [x] CLI help works for every planned subcommand.
+- [x] Manifest schema can represent dataset snapshots, deep outputs, posterior outputs, validation reports, and published pointers.
+- [x] Unit tests for shared runtime pass.
+- [x] Runtime docs in `05-runtime-artifacts-and-library.md` match the implemented package names.
 
 ### Source Availability
 
@@ -841,8 +848,8 @@ Update this table as implementation proceeds.
 
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
-| 0. Setup + baseline | `[ ]` |  |  |  |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[ ]` |  |  |  |
+| 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | runtime scaffolding sub-gate complete on `data-coverage-phase-0-1-scaffolding`; ledgers unstarted |  | Implement `source_acquisition_ledger` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
@@ -862,7 +869,10 @@ Record decisions here when they become concrete.
 
 | Date | Decision | Rationale | Follow-up |
 | --- | --- | --- | --- |
-|  |  |  |  |
+| 2026-05-13 | Implementation branch is `data-coverage-phase-0-1-scaffolding`. | Per global workflow rule, cut a new branch before code changes. | Squash-merge back to `main` once Phase 0 + runtime scaffolding sub-gate is reviewed. |
+| 2026-05-13 | Baseline JSON lives at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json`; recipe: `just baseline-data-coverage`. | Co-locates baseline with other statistical artifacts; deterministic filename lets later validation reports cite a stable ID. | Re-run after any prod rebuild to refresh the baseline. |
+| 2026-05-13 | Ledger SQL (`source_acquisition_ledger` and siblings) stays out of this PR. | Each ledger is its own design surface; keeping runtime scaffolding separate unblocks parallel ledger work without coupling. | Open follow-up PR(s) per ledger family. |
+| 2026-05-13 | Boolean flag semantics in `seed_observed_status` and `seed_reliability_class` chosen during seed-write. | Doc 01 enumerated tokens but not flag truth tables; chose `is_observed = true` only for `observed`, `is_training_eligible = true` for `observed` + `derived`, `is_hard_mask_eligible = true` for `direct` + `derived`. | Confirm during first ledger review; adjust if a ledger needs different gating. |
 
 ## Blocker Log To Fill During Implementation
 

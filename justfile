@@ -96,6 +96,12 @@ lineage MODEL:
 diff MODEL SRC TGT:
     cd bc && {{ _dev_env }} uv run --group build sqlmesh table_diff '{{ SRC }}:{{ TGT }}' --select-model {{ MODEL }}
 
+# --- Data-coverage baseline ---
+
+# Phase 0 baseline: read-only DuckDB snapshot under artifacts/statistical/baseline/.
+baseline-data-coverage *ARGS:
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/baseline_data_coverage.py "$@"
+
 # --- LLM context ---
 
 # Generate the LSF-1 context packet at docs/llm/baseball.lsf. Read-only against bc.db.
