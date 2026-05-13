@@ -1,0 +1,4 @@
+interface:
+  display_name: "Baseball Data Provenance"
+  short_description: "Project source and coverage provenance"
+  default_prompt: "Use $baseball-data-provenance to reason about baseball.computer source coverage and missingness before modeling or imputation."

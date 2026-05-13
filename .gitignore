@@ -23,10 +23,18 @@ __pycache__/
 !.env.example
 .claude/*
 !.claude/skills/
-CLAUDE.md
 bc/mlruns/
 bc/mlflow.db
 bc/mlflow.db-*
 bc/hamilton_artifacts/
 bc/.lineup_cache/
 docs/llm/baseball.lsf
+*.bak.*
+
+# Synced so no need for version control
+.agents
+.codex
+.gemini
+.opencode
+AGENTS.md
+GEMINI.md
