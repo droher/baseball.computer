@@ -189,12 +189,12 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Official Aggregate Availability And Authority
 
-- [ ] Implement `main_models.official_aggregate_availability`.
-- [ ] Include game/team/player/position/stat grain, aggregate grain, aggregate status, aggregate value, event value, residual value, authority rank, and data-error risk.
-- [ ] Cover fielding stats first: putouts, assists, errors, double plays.
+- [x] Implement `main_models.official_aggregate_availability`.
+- [x] Include game/team/player/position/stat grain, aggregate grain, aggregate status, aggregate value, event value, residual value, authority rank, and data-error risk.
+- [x] Cover fielding stats first: putouts, assists, errors, double plays.
 - [ ] Add batting, pitching, line score, earned runs, and decisions after fielding contract validates.
-- [ ] Distinguish primary `BoxScore` games from usable official aggregate totals in `PlayByPlay` games.
-- [ ] Separate missing aggregate totals, clean positive residuals, clean zero residuals, negative residuals, contradicted totals, issue-flagged totals, and not-applicable stats.
+- [x] Distinguish primary `BoxScore` games from usable official aggregate totals in `PlayByPlay` games.
+- [x] Separate missing aggregate totals, clean positive residuals, clean zero residuals, negative residuals, contradicted totals, issue-flagged totals, and not-applicable stats.
 - [ ] Implement `main_models.official_credit_authority`.
 - [ ] Encode authority source: event, box, event-box reconciled, estimated with aggregate constraint, estimated without aggregate constraint, withheld.
 
@@ -849,7 +849,7 @@ Update this table as implementation proceeds.
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
 | 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `source_data_error_risk_ledger` on branch `data-coverage-source-data-error-risk-ledger`; ledgers #1-#2 done, remaining ledgers unstarted |  | Implement `official_aggregate_availability` |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `official_aggregate_availability` on branch `data-coverage-official-aggregate-availability`; ledgers #1-#3 done (#3 also bundles AAP into the risk ledger), remaining ledgers unstarted |  | Implement `personnel_state_reliability` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
@@ -877,6 +877,9 @@ Record decisions here when they become concrete.
 | 2026-05-13 | Reconciled `source_acquisition_ledger` column names against the real `game_data_completeness` view; doc 01 sketch updated in the same PR. | Doc-only names `has_pitch_sequence`/`has_pitch_count_data`/`has_offense_batted_ball`/`has_defense_batted_ball` never existed in the DB. Real columns: `has_pitches`, `has_count`, plus `has_trajectory OR has_location OR has_batted_to_fielder` for batted-ball signal. | None — zero downstream consumers referenced the doc-only names. |
 | 2026-05-13 | New SQLMesh model directory `bc/models/intermediate/coverage/`. | Phase 1 will land 8+ data-coverage ledgers; co-locating them keeps the SQLMesh tree navigable. | Each subsequent ledger PR lands its `.sql` file alongside `source_acquisition_ledger.sql`. |
 | 2026-05-13 | Dropped `relationships` FK audit on `source_acquisition_ledger.team_id`. | Game-wide dimensions (`event`, `pitch_sequence`, `batted_ball`, `gamelog`) carry `team_id IS NULL` by design, which would fail any standard FK audit. The `not_null` audit deliberately omits `team_id`. | Revisit when the side-dependent / game-wide split is closed by a separate table or a `team_id` value. |
+| 2026-05-13 | `official_aggregate_availability.data_error_risk` is the worst `training_action` from `source_data_error_risk_ledger` joined on `(game_id, team_id, player_id, stat_name)` with NULL-tolerant fan-out. Composite risk-ledger `field_name` values (`fielding_putouts_assists`, `fielding_putouts_assists_errors`) expand via `CROSS JOIN VALUES` to the stats they touch. | Doc 01 sketch hardcoded `'none'`; downstream credit-authority + imputation models need a single actionable signal per row. Worst `training_action` matches the verb downstream code keys off of. | None - revisit only if a future risk signal needs a non-stat-fan-out join shape. |
+| 2026-05-13 | Bundled `assists_as_putouts_finder` rows into `source_data_error_risk_ledger` with `field_name = 'fielding_putouts_assists'` (composite). | The pattern miscodes assists into putouts - affects both stats. Composite matches the existing `'fielding_putouts_assists_errors'` style from `box_event_fielding_discrepancies`. Bundling in the same PR as `official_aggregate_availability` means the new ledger's `data_error_risk` column is complete on day one. | None. |
+| 2026-05-13 | Corrected two doc-sketch inaccuracies in `01-prep-ledgers.md` §`official_aggregate_availability` during implementation: `personnel_fielding_states` has no `event_key` / `team_id` (use `fielding_team_id` directly, no `event_states_full` join); `stg_box_score_fielding_lines` has no `team_id` (derive via `side` + `stg_games`). | Doc sketch was aspirational on upstream column names. Real model contracts verified before writing the ledger SQL. | None - implementation file is the source of truth going forward. |
 
 ## Blocker Log To Fill During Implementation
 

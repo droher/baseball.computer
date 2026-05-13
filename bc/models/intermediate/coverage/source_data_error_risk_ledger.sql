@@ -1,7 +1,7 @@
 MODEL (
   name main_models.source_data_error_risk_ledger,
   kind FULL,
-  description 'Per (source_table, game, team, player, field, issue_source) ledger of known data-error risk on source rows. Confirmed arithmetic violations (box_score_data_issues), audit-exempt artifacts (team_game_data_issues), box-vs-event contradictions (box_event_fielding_discrepancies), and suspected source/parser issues (unknown_play_no_box). Sibling to source_acquisition_ledger: that ledger says whether a source exists, this one says whether — when it exists — it is trustworthy. Every downstream Phase 1 event-observation ledger joins to both ledgers to compute model_input_eligible. data_error_key is a stable MD5 hex digest over the natural-key columns and is the unique grain.',
+  description 'Per (source_table, game, team, player, field, issue_source) ledger of known data-error risk on source rows. Confirmed arithmetic violations (box_score_data_issues), audit-exempt artifacts (team_game_data_issues), box-vs-event contradictions (box_event_fielding_discrepancies), suspected source/parser issues for missing box rows (unknown_play_no_box), and suspected assists-miscoded-as-putouts scorer/parser pattern (assists_as_putouts_finder). Sibling to source_acquisition_ledger: that ledger says whether a source exists, this one says whether — when it exists — it is trustworthy. Every downstream Phase 1 event-observation ledger joins to both ledgers to compute model_input_eligible. data_error_key is a stable MD5 hex digest over the natural-key columns and is the unique grain.',
   grain (data_error_key),
   columns (
     data_error_key VARCHAR,
@@ -103,6 +103,20 @@ unknown_play AS (
     FROM main_models.unknown_play_no_box AS upnb
 ),
 
+assists_as_putouts AS (
+    SELECT
+        'main_models.assists_as_putouts_finder' AS source_table,
+        aap.game_id,
+        aap.team_id,
+        CAST(NULL AS VARCHAR) AS player_id,
+        'fielding_putouts_assists' AS field_name,
+        'suspected_source_issue' AS data_error_class,
+        'downweight' AS training_action,
+        0.25 AS training_weight,
+        'assists_as_putouts_finder' AS issue_source
+    FROM main_models.assists_as_putouts_finder AS aap
+),
+
 unioned AS (
     SELECT * FROM box_score_issues
     UNION ALL BY NAME
@@ -111,6 +125,8 @@ unioned AS (
     SELECT * FROM fielding_discrepancies
     UNION ALL BY NAME
     SELECT * FROM unknown_play
+    UNION ALL BY NAME
+    SELECT * FROM assists_as_putouts
 )
 
 SELECT
