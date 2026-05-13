@@ -178,14 +178,14 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Source Data-Error Risk
 
-- [ ] Implement `main_models.source_data_error_risk_ledger`.
-- [ ] Include stable row/field keys, source table, game/team/player keys, field name, data-error class, training action, training weight, and issue source.
-- [ ] Load confirmed issues from `box_score_data_issues`.
-- [ ] Load confirmed issues from `team_game_data_issues`.
-- [ ] Load contradiction signals from `box_event_fielding_discrepancies`.
-- [ ] Add known diagnostic issue sources such as `unknown_play_no_box` and promoted analysis views where appropriate.
-- [ ] Ensure data-error risk is not treated as missingness.
-- [ ] Verify no confirmed issue has `training_action = allow`.
+- [x] Implement `main_models.source_data_error_risk_ledger`.
+- [x] Include stable row/field keys, source table, game/team/player keys, field name, data-error class, training action, training weight, and issue source.
+- [x] Load confirmed issues from `box_score_data_issues`.
+- [x] Load confirmed issues from `team_game_data_issues`.
+- [x] Load contradiction signals from `box_event_fielding_discrepancies`.
+- [x] Add known diagnostic issue sources such as `unknown_play_no_box` and promoted analysis views where appropriate.
+- [x] Ensure data-error risk is not treated as missingness.
+- [x] Verify no confirmed issue has `training_action = allow`.
 
 ### Official Aggregate Availability And Authority
 
@@ -849,7 +849,7 @@ Update this table as implementation proceeds.
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
 | 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `source_acquisition_ledger` on branch `data-coverage-source-acquisition-ledger`; remaining ledgers unstarted |  | Implement `source_data_error_risk_ledger` |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `source_data_error_risk_ledger` on branch `data-coverage-source-data-error-risk-ledger`; ledgers #1-#2 done, remaining ledgers unstarted |  | Implement `official_aggregate_availability` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
