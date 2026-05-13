@@ -3,7 +3,7 @@ title: Statistical Models For Coverage And Context Adjustment
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Statistical Models For Coverage And Context Adjustment
@@ -383,7 +383,7 @@ exposure_g ~ deterministic_rules(game_results, line_scores, forfeits, suspended_
 
 Subject-matter boundary:
 
-- Exposure should usually be deterministic after source reconciliation. Bayesian modeling belongs in missing context values, not in the official fact that a game was shortened or forfeited.
+- Exposure should usually be deterministic after source reconciliation. Missing context values start with observed-status flags, missing indicators, deterministic fallbacks, and simple tabular imputation baselines. Bayesian context imputation is reserved for high-impact covariates that materially change park, advancement, or run-value estimates; it does not override official facts that a game was shortened or forfeited.
 - Official convention regimes are metadata and authority rules first; only model convention behavior when the official source is unavailable.
 
 ### Event Observation Ledger
@@ -394,7 +394,9 @@ Target table family:
 
 | Table | Grain | Purpose |
 | --- | --- | --- |
-| `event_observation_ledger` | `event_key, dimension` | Raw recorded value, deduced value, sentinel type, source layer, observed flag, structural-applicability flag, scorer/source metadata, and deterministic confidence. |
+| `event_observation_geometry` | `event_key, dimension` | Geometry observations (trajectory, location side/depth/edge, general location, `ball_handler_position`, pulled/opposite). Raw recorded value, deduced value, sentinel type, source layer, observed flag, structural-applicability flag, scorer/source metadata, and deterministic confidence. |
+| `event_observation_pitch` | `event_key, dimension` | Pitch observations (count balls/strikes, pitch sequence, pitch results, strike types, pitch count total). Same schema columns as the geometry sibling. |
+| `event_observation_credit` | `event_key, dimension` | Fielding-credit observations (putout/assist/error/double-play/triple-play/passed-ball credit). Same schema columns as the geometry sibling. |
 | `event_observation_context` | `event_key` | Shared covariates: season, era, league, park, scorer, inputter, translator, team affiliation, game state, result, leverage, personnel, hands, and source type. |
 
 The ledger should preserve separate meanings for null, `Unknown`, `Default`, `0`, aggregate-only, not applicable, and known source issue. Flattening these into one missing marker destroys the missingness model.
@@ -496,10 +498,14 @@ box_residual_game_player_position_credit
 
 Games without usable aggregate totals use the same event likelihood without aggregate constraints and must carry lower confidence.
 
+Assist count likelihood:
+
+Assist counts are modeled as state-conditioned discrete distributions — not as a Categorical over a fixed support and not as a Binomial on a fielder-by-fielder basis. Each event-class × base/out state combination has its own discrete distribution over assist counts; these distributions are fit as a Dirichlet-multinomial with a shared hyperprior across event classes. The hyperprior lets sparse event-class × state cells borrow strength from related cells while preserving the actual count shape (which is neither geometric nor binomial in the data). Total assist mass on each event then gates how the putout/assist allocation softmax is normalized for that event.
+
 Constraints:
 
 - Expected putouts by event sum to known unknown putouts plus explicit known putouts.
-- Expected assists are modeled separately from putouts.
+- Expected assists are modeled separately from putouts and respect the state-conditioned assist-count distribution above.
 - No probability mass goes to players not in the fielding personnel state.
 - Catcher, pitcher, strikeout, pickoff, bunt, passed-ball, and steal-related credits use separate submodels or explicit strata.
 - Official credit estimates never overwrite event geometry or responsibility estimates.
@@ -585,8 +591,27 @@ mu_i,o =
   + pitcher_o[pitcher_i]
   + beta_hand_o[batter_hand_i, pitcher_hand_i]
   + beta_context_o[base_out_state_i, inning_i, score_state_i]
+  + umpire_o[umpire_i]
+  + beta_weather_o * weather_i
+  + beta_surface_o[surface_i, era_i]
+  + beta_day_night_o[day_night_i]
+  + home_advantage_o[park_i, season_i]
   + park_effect_o[park_i, season_i, league_i]
 ```
+
+Required covariates for the park-factor model:
+
+| Covariate | Form | Notes |
+| --- | --- | --- |
+| Umpire | Random effect | Catches strike-zone and call-pattern variance that otherwise collapses into park or scorer effects. |
+| Weather | Continuous (temperature, wind) | Run environment shifts with conditions; coverage starts in `game_start_info`. |
+| Surface | Turf/grass × era | Surface interacts with era because both the surface mix and how it played changed over time. |
+| Day/night | Fixed effect post-1935 | Pre-1935 the indicator is structurally `not_applicable`; do not let the model fit a coefficient there. |
+| Home advantage | Per-park per-season random effect, or global fixed | Choice depends on identifiability; default to per-park per-season with shrinkage toward a league-season mean, drop to global fixed when connectivity is too thin. |
+
+Missingness backoff:
+
+`context_observation_ledger` gates inclusion — missing fields get `not_applicable` for events before observability eras (e.g., `day_night` pre-1935 = `not_applicable`). The model treats `not_applicable` as a structural absence rather than an MCAR null: the coefficient is not identified for those rows and they enter the likelihood without that term. Rows where the covariate is observable-in-principle but missing-in-fact go through the normal missingness machinery (observation propensity, imputation with uncertainty, or exclusion with weighting), not through `not_applicable`.
 
 For runs or team-game scoring:
 
@@ -649,23 +674,36 @@ V[state, season, league] =
   + season_league_adjustment[season, league, state]
 ```
 
-Play values are generated quantities:
+Play values are generated quantities, but they should not be averaged over the realized transitions in the training sample. Run-value linear weights are context-neutral in the strict sense, derived from a fitted Markov state-transition submodel `P(end_state | start_state, season, league, era_regime)` rather than from realized empirical transitions in the sample. The published Δ for an event is
 
 ```text
-delta_run_i =
-  runs_on_play_i + V[end_state_i] - V[start_state_i]
+Δ = E[runs_on_play | start, end]
+  + E_{end ~ P_LW(end | start)}[V_end]
+  - V_start
 ```
+
+where `P_LW` is the modeled league-marginal transition. This differs from the marginal LW commonly published in baseball analysis (averaged over realized transitions) — flag this explicitly to consumers so they do not silently reconcile our weights against externally published values that mix in realized-transition selection.
+
+Era-regime list for the `P_LW` submodel:
+
+- `pre-DH`
+- `DH-AL-only`
+- `full-DH`
+- `ghost-runner-extra-innings`
+- `expanded-DH+ghost`
+
+Era regimes partition the league-season space for the Markov submodel so abrupt rule changes do not bleed across run environments through partial pooling. Within a regime, season/league effects pool as usual.
 
 Priors:
 
-- Adjacent seasons and same-league states partially pool.
-- Rare states shrink toward structurally similar base/out states and the league-season baseline.
+- Adjacent seasons and same-league states partially pool within an era regime.
+- Rare states shrink toward structurally similar base/out states and the league-season-regime baseline.
 - Win values should respect game-state boundaries and use stronger pooling in sparse early seasons.
 
 Outputs:
 
 - Posterior summaries for run/win expectancy matrices.
-- Posterior play-value summaries.
+- Posterior play-value summaries derived from the Markov-modeled `P_LW`, with a documented note that these are model-marginal not sample-marginal weights.
 - `is_imputed` should be replaced or supplemented with `posterior_source`, `sample_size`, and uncertainty intervals.
 
 ### Runner And Fielder Advancement
@@ -721,6 +759,43 @@ Validation:
 - Compare responsibility estimates against known high-coverage location slices.
 - Hold out alignment regimes.
 - Audit the difference between official credit and responsibility by position so downstream users do not confuse the two.
+
+### Shift Propensity (Model K)
+
+Defensive shift is too consequential to fold into a coarse `alignment_regime` covariate inside the geometry, responsibility, and run-value models. From 2009 the data is rich enough to support a dedicated propensity model, and from 2015 the event grain is reliable for nearly every plate appearance. Treating shift as its own model lets downstream consumers carry shift uncertainty as a posterior rather than a deterministic regime label.
+
+Estimand:
+
+- `P(shift | player, batter_hand, defending_team, count, outs, base_state, season)`.
+
+Grain:
+
+- Event-level for 2015+ where modern Statcast-aligned event records carry positioning evidence.
+- Pitch-level for 2009-2014 where positioning is observed pitch-by-pitch but the event grain is too coarse to capture mid-PA repositioning.
+- Earlier seasons fall back to the categorical `alignment_regime` covariate; Model K is not fit there because the data does not identify it.
+
+Why separate model:
+
+- Shift is too important to treat as a discrete `alignment_regime` covariate; coverage is rich enough to support its own model.
+- Categorical regime stays as fallback for older seasons where the shift model is weakly identified.
+- Isolating the shift propensity gives a clean posterior over a single, well-defined defensive decision rather than entangling it with geometry latent state.
+
+Consumers:
+
+- Geometry (E): conditioning covariate for the latent location and handler distribution.
+- Responsibility (I): primary alignment input, with era-normal alignment as fallback prior where Model K is unavailable or weakly identified.
+- Run Values (G): optional covariate where shift posterior materially shifts the conditional run-value surface.
+
+Cut-feedback boundary:
+
+- K is fit independently from E, G, and I.
+- Downstream models consume K's posterior (draws or expected probabilities) but K does NOT consume their posteriors back. This avoids circular updating between the shift propensity and the geometry/responsibility/run-value layers that depend on it.
+
+Validation:
+
+- Hold out teams and seasons to test transport of shift propensity across roster and coaching turnover.
+- Compare event-grain (2015+) and pitch-grain (2009-2014) posteriors on the 2014-2015 boundary to check grain consistency.
+- For pre-2009 seasons, audit that downstream models treating Model K as unavailable correctly fall back to the categorical regime prior and do not silently extrapolate Model K's posterior.
 
 ### Pitch Sequence Models
 
@@ -813,6 +888,10 @@ Validation requirements:
 - Check that downstream conservation constraints still pass after using deep proposals.
 
 Deep model outputs should be stored like other statistical model outputs: versioned model metadata, training schema, split policy, calibration summaries, probability tables, and feature/embedding maps.
+
+Per-model `gamma_dl` ablation:
+
+Each Bayesian model is fit twice — `gamma_dl=0` (DL covariates omitted) and `gamma_dl ~ Normal(0, 0.5)` (shrunk). Publication tier per-model is selected based on posterior change magnitude across publication-tier random-effect cells. Both artifacts are stored; the published tier is named in the manifest. This is empirical resolution of a per-model leakage question, not a global policy. Some models will publish with DL covariates on, others with them off — the manifest records which, with the ablation diagnostic that drove the choice.
 
 ## Model Scrutiny
 
@@ -919,6 +998,10 @@ Decision rule:
 
 - Publish broad ground/air normalization before detailed fly/line/pop normalization.
 - Treat detailed contact as a scorer-adjusted label distribution, not a claim about measured launch angle.
+
+Publication shape for detailed contact labels:
+
+Publication tier = scorer-adjusted broad classes (GroundBall / AirBall) point estimates + detailed-label posterior probability distribution as a separate column. Argmax is convenience-only, never the only representation. Downstream consumers that need a single label can read the argmax column with their eyes open; consumers that need calibrated detailed-label uncertainty read the probability vector. This applies both at the event grain and at aggregated rates that flow from event-level expected counters.
 
 ### Fielding Credit Allocation
 
@@ -1288,7 +1371,7 @@ Add a separate statistical model-output layer:
 | Model metadata | JSON or YAML | Priors, formulas, dimensions, category maps, seeds, package versions, diagnostics. |
 | SQL-consumable summaries | Parquet | Posterior means, intervals, probabilities, expected counters, and validation summaries. |
 
-PyMC and ArviZ are not currently project dependencies. If PyMC becomes the backend, add a separate dependency group such as `stats` rather than mixing Bayesian inference into the existing build or ML group.
+Decision: the first Bayesian implementation uses PyMC and ArviZ through a separate optional `stats` dependency group. Keep Bayesian inference outside ordinary SQLMesh execution and outside the neural-model training dependency group.
 
 ### Modeling Dataset Contracts
 
@@ -1393,6 +1476,10 @@ Use multiple masking designs:
 | No-box slice validation | Tests low-confidence priors on the hardest games. |
 
 Artificial masking only proves performance under the simulated mechanism. MNAR-sensitive outputs must also include sensitivity intervals.
+
+MNAR delta grid:
+
+A canonical pattern-mixture sensitivity grid applies across all models so sensitivity reports are comparable. The grid is `{-2, -1, -0.5, 0, +0.5, +1, +2}` SD shifts in latent-class probability for the unobserved subset, expressed in standard deviations of the relevant latent-class logit. Each model reports its publication-tier estimand at each grid point. Models that turn out to be insensitive across the grid pass through with a single point estimate plus an "insensitive" tag; models whose estimands move meaningfully across the grid publish the grid as a sensitivity ribbon alongside the headline posterior.
 
 ### Conservation Audits
 
@@ -1544,13 +1631,21 @@ Rollback:
 
 ## Open Questions
 
-1. Should official-credit estimates ever flow into public fielding stat lines, or only into an estimated namespace?
-2. What shift/alignment regimes should be canonical for 1910-2025 modeling?
-3. Which scorer/source dimensions are stable enough for partial pooling: scorer, inputter, translator, filename family, or likely affiliated team?
-4. Should park factors expose posterior intervals in the public database, or keep intervals in an analysis namespace with rounded compatibility columns?
-5. What confidence cap should apply to no-box fielding credit estimates?
-6. Should PyMC/ArviZ become a new `stats` dependency group, or should first prototypes live outside the project environment?
-7. Which downstream user-facing metrics should be first to consume expected counters rather than current deterministic counters?
+The 2026-05-13 pre-implementation review resolved several earlier open questions. Resolutions are recorded here in summary; the canonical decision log lives in the consolidated README open-decisions section.
+
+Resolved by the 2026-05-13 review:
+
+- Official-credit flow into public fielding stat lines: always included, accompanied by a `fielding_credit_confidence` column. The estimated-namespace-only option was rejected.
+- Park-factor and run-value uncertainty representation: posterior intervals on park-factor and run-value outputs; counters plus a confidence column elsewhere. Intervals do not stay siloed in an analysis namespace.
+- First PyMC/ArviZ smoke-run target: the observation / scorer model. Fielding credit and park factors follow.
+- No-box fielding credit confidence: always included, with a confidence column rather than a hard cap on inclusion.
+- Shift/alignment regimes: partially resolved by Model K (Shift Propensity), which replaces the discrete `alignment_regime` covariate for 2009+ where coverage supports it. The categorical regime list for pre-2009 seasons remains an open specification question.
+
+Still open:
+
+1. Which categorical shift/alignment regimes are canonical for pre-2009 modeling, where Model K is not identified and downstream consumers need a discrete fallback prior.
+2. Which scorer/source dimensions are stable enough for partial pooling: scorer, inputter, translator, filename family, or likely affiliated team.
+3. Which downstream user-facing metrics should be first to consume expected counters rather than current deterministic counters.
 
 ## References
 

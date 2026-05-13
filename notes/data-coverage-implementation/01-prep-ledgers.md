@@ -3,7 +3,7 @@ title: Data Coverage Prep Ledgers
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Data Coverage Prep Ledgers
@@ -24,6 +24,8 @@ This doc specifies deterministic SQLMesh prep work. It does not fit probabilisti
 
 Invariant: a missing value is not eligible for imputation until the relevant ledger distinguishes source-family block absence, structural absence, field-level unknown, not-applicable, aggregate-only coverage, contradicted evidence, and source/parser data-error risk.
 
+Invariant: season bounds in SQL sketches are placeholders for SQLMesh vars. Production models should use `@VAR('start_season', 1910)` and `@VAR('end_season', 2025)`, not hardcoded literals.
+
 ## Ledger Dependency DAG
 
 ```mermaid
@@ -35,14 +37,22 @@ flowchart TD
   I["people, rosters, teams, parks, scorekeepers, umpires"] --> J["entity_link_reliability"]
   K["game_results, game_line_scores, game_forfeits, game_suspensions"] --> L["game_exposure_ledger"]
   M["game_start_info, game_scorekeeping, weather/context fields"] --> N["game_context_observation_ledger"]
-  B --> O["event_observation_ledger"]
-  D --> O
+  B --> O1["event_observation_geometry"]
+  B --> O2["event_observation_pitch"]
+  B --> O3["event_observation_credit"]
+  D --> O1
+  D --> O2
+  D --> O3
   F --> P["official_credit_authority"]
-  H --> O
-  J --> O
-  L --> O
-  N --> O
-  O --> Q["fielding_credit_gaps"]
+  H --> O1
+  H --> O3
+  J --> O1
+  L --> O1
+  L --> O2
+  L --> O3
+  N --> O1
+  O1 --> Q["fielding_credit_gaps"]
+  O3 --> Q
   P --> Q
 ```
 
@@ -52,8 +62,26 @@ The same sequence in prose:
 2. Mark confirmed and suspected source/parser data errors before those rows can train models.
 3. Build official aggregate-total availability by stat and grain.
 4. Build reliability ledgers for identities, personnel, context, and exposure.
-5. Build an event observation ledger that preserves field-specific sentinel meanings.
+5. Build three sibling event observation ledgers — geometry, pitch, credit — that preserve field-specific sentinel meanings within tight per-family dimension enums.
 6. Build gap tables that translate raw observation status into model-specific target populations.
+
+## Shared Status Seeds
+
+Every ledger that carries a `observed_status` or `reliability_class` column FKs to one of two shared seeds (to be created later in this phase). Each ledger uses a `relationships(...)` audit pointing at the relevant seed instead of restating an inline `accepted_values(... is_in := (...))` list. Inline `is_in` is reserved for ledger-local enums that do not belong in a shared vocabulary (e.g., `target_population_status`, `source_block_status`, `gap_class`).
+
+- `main_seeds.seed_observed_status` — canonical values: `observed`, `derived`, `aggregate_only`, `missing`, `unknown_code`, `default_code`, `not_applicable`, `contradicted`, `data_error_prone`.
+- `main_seeds.seed_reliability_class` — canonical values: `direct`, `derived`, `inferred`, `synthetic`, `ambiguous`.
+
+Per-ledger enums that diverged in Batch 1 review (`personnel_state_reliability.eligibility_status`, `entity_link_reliability.link_status`, `game_context_observation_ledger.observed_status`) should be reconciled against these seeds. If a ledger needs ledger-specific status values, it must include the canonical seed values first and document the extensions explicitly; the FK still resolves on the canonical subset and the ledger-local extension lives in a separate column or sub-enum.
+
+Audit pattern (matches the existing `relationships` FK style elsewhere in this repo):
+
+```
+audits (
+  relationships(column := observed_status, to_model := main_seeds.seed_observed_status, to_column := observed_status),
+  relationships(column := reliability_class, to_model := main_seeds.seed_reliability_class, to_column := reliability_class)
+)
+```
 
 ## Ledger Table Contracts
 
@@ -62,13 +90,14 @@ The same sequence in prose:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `game_id` | `VARCHAR` | Game key. |
-| `team_id` | `TEAM_ID` | Team key when source status differs by side. |
+| `team_id` | `TEAM_ID` | Team key for side-dependent dimensions (`box_batting`, `box_pitching`, `box_fielding`, `line_score`). `NULL` for game-wide dimensions (`event`, `pitch_sequence`, `batted_ball`, `gamelog`). |
 | `dimension` | `VARCHAR` | `event`, `box_batting`, `box_pitching`, `box_fielding`, `line_score`, `pitch_sequence`, `batted_ball`, `gamelog`, etc. |
 | `source_family` | `VARCHAR` | `play_by_play`, `box_score`, `gamelog`, `schedule`, `databank`, `derived`, `absent`. |
 | `source_type` | `VARCHAR` | Existing `game_start_info.source_type` where applicable. |
-| `target_population_status` | `VARCHAR` | `event_level`, `aggregate_only`, `gamelog_only`, `structural_absence`, `out_of_scope`. |
+| `target_population_status` | `VARCHAR` | `event_level`, `aggregate_only`, `gamelog_only`, `structural_absence`, `out_of_scope`, `coverage_within_source_sparse`. |
+| `source_block_status` | `VARCHAR` | `present_fully_populated`, `present_partial_coverage`, `coverage_within_source_sparse`, `block_missing`, `not_applicable`. Distinguishes "dim is fully populated", "dim is technically possible from source but sparse", and "block missing entirely." |
 | `source_availability_status` | `VARCHAR` | `observed`, `not_acquired`, `not_applicable`, `contradicted`, `data_error_prone`. |
-| `usable_for_event_imputation` | `BOOLEAN` | True only for event-level rows and dimensions. |
+| `usable_for_event_imputation` | `BOOLEAN` | True only for event-level rows and dimensions with non-sparse coverage. |
 | `usable_as_aggregate_constraint` | `BOOLEAN` | True when the source can constrain aggregate outputs. |
 | `authority_rank` | `UTINYINT` | Lower rank wins for target grain and dimension. |
 
@@ -86,32 +115,40 @@ MODEL (
     source_family VARCHAR,
     source_type VARCHAR,
     target_population_status VARCHAR,
+    source_block_status VARCHAR,
     source_availability_status VARCHAR,
     usable_for_event_imputation BOOLEAN,
     usable_as_aggregate_constraint BOOLEAN,
     authority_rank UTINYINT
   ),
   audits (
-    not_null(columns := (game_id, team_id, dimension)),
-    unique_values(columns := (game_id, team_id, dimension)),
+    not_null(columns := (game_id, dimension)),
+    unique_grain(columns := (game_id, team_id, dimension)),
     accepted_values(column := target_population_status, is_in := (
       'event_level',
       'aggregate_only',
       'gamelog_only',
       'structural_absence',
-      'out_of_scope'
+      'out_of_scope',
+      'coverage_within_source_sparse'
     ))
   )
 );
 
-WITH dimensions AS (
+WITH side_dependent_dimensions AS (
     SELECT *
     FROM (VALUES
-        ('event'),
         ('box_batting'),
         ('box_pitching'),
         ('box_fielding'),
-        ('line_score'),
+        ('line_score')
+    ) AS t(dimension)
+),
+
+game_wide_dimensions AS (
+    SELECT *
+    FROM (VALUES
+        ('event'),
         ('pitch_sequence'),
         ('batted_ball'),
         ('gamelog')
@@ -125,10 +162,35 @@ team_games AS (
         team_id,
         source_type
     FROM main_models.team_game_start_info
-    WHERE season BETWEEN 1910 AND 2025
+    WHERE season BETWEEN @VAR('start_season', 1910) AND @VAR('end_season', 2025)
 ),
 
-classified AS (
+game_source AS (
+    SELECT
+        game_id,
+        season,
+        MIN(source_type) AS source_type
+    FROM team_games
+    GROUP BY 1, 2
+),
+
+pitch_coverage AS (
+    SELECT
+        game_id,
+        has_pitch_sequence,
+        has_pitch_count_data
+    FROM main_models.game_data_completeness
+),
+
+batted_ball_coverage AS (
+    SELECT
+        game_id,
+        has_offense_batted_ball,
+        has_defense_batted_ball
+    FROM main_models.game_data_completeness
+),
+
+side_dependent_dims AS (
     SELECT
         tg.game_id,
         tg.team_id,
@@ -141,23 +203,84 @@ classified AS (
         END AS source_family,
         tg.source_type,
         CASE
-            WHEN tg.source_type = 'PlayByPlay' THEN 'event_level'
+            WHEN tg.source_type = 'PlayByPlay' AND d.dimension IN ('box_batting', 'box_pitching', 'box_fielding') THEN 'aggregate_only'
+            WHEN tg.source_type = 'PlayByPlay' AND d.dimension = 'line_score' THEN 'aggregate_only'
             WHEN tg.source_type = 'BoxScore' THEN 'aggregate_only'
-            WHEN tg.source_type = 'GameLog' THEN 'gamelog_only'
+            WHEN tg.source_type = 'GameLog' AND d.dimension = 'line_score' THEN 'aggregate_only'
+            WHEN tg.source_type = 'GameLog' THEN 'structural_absence'
             ELSE 'structural_absence'
         END AS target_population_status,
+        CASE
+            WHEN tg.source_type IN ('PlayByPlay', 'BoxScore') THEN 'present_fully_populated'
+            WHEN tg.source_type = 'GameLog' AND d.dimension = 'line_score' THEN 'present_fully_populated'
+            WHEN tg.source_type IS NULL THEN 'block_missing'
+            ELSE 'not_applicable'
+        END AS source_block_status,
         CASE
             WHEN tg.source_type IS NULL THEN 'not_acquired'
             WHEN tg.source_type IN ('PlayByPlay', 'BoxScore', 'GameLog') THEN 'observed'
             ELSE 'contradicted'
         END AS source_availability_status
     FROM team_games AS tg
-    CROSS JOIN dimensions AS d
+    CROSS JOIN side_dependent_dimensions AS d
+),
+
+game_wide_dims AS (
+    SELECT
+        gs.game_id,
+        CAST(NULL AS TEAM_ID) AS team_id,
+        d.dimension,
+        CASE
+            WHEN gs.source_type = 'PlayByPlay' THEN 'play_by_play'
+            WHEN gs.source_type = 'BoxScore' THEN 'box_score'
+            WHEN gs.source_type = 'GameLog' THEN 'gamelog'
+            ELSE 'absent'
+        END AS source_family,
+        gs.source_type,
+        CASE
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'event' THEN 'event_level'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(pc.has_pitch_sequence, false) THEN 'event_level'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' THEN 'coverage_within_source_sparse'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball'
+                AND (COALESCE(bc.has_offense_batted_ball, false) OR COALESCE(bc.has_defense_batted_ball, false)) THEN 'event_level'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' THEN 'coverage_within_source_sparse'
+            WHEN gs.source_type = 'GameLog' AND d.dimension = 'gamelog' THEN 'gamelog_only'
+            WHEN gs.source_type = 'BoxScore' AND d.dimension = 'gamelog' THEN 'gamelog_only'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'gamelog' THEN 'gamelog_only'
+            ELSE 'structural_absence'
+        END AS target_population_status,
+        CASE
+            WHEN gs.source_type IS NULL THEN 'block_missing'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'event' THEN 'present_fully_populated'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(pc.has_pitch_sequence, false) THEN 'present_fully_populated'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' THEN 'coverage_within_source_sparse'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball'
+                AND (COALESCE(bc.has_offense_batted_ball, false) OR COALESCE(bc.has_defense_batted_ball, false)) THEN 'present_partial_coverage'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' THEN 'coverage_within_source_sparse'
+            WHEN gs.source_type IN ('PlayByPlay', 'BoxScore', 'GameLog') AND d.dimension = 'gamelog' THEN 'present_fully_populated'
+            ELSE 'not_applicable'
+        END AS source_block_status,
+        CASE
+            WHEN gs.source_type IS NULL THEN 'not_acquired'
+            WHEN gs.source_type IN ('PlayByPlay', 'BoxScore', 'GameLog') THEN 'observed'
+            ELSE 'contradicted'
+        END AS source_availability_status
+    FROM game_source AS gs
+    CROSS JOIN game_wide_dimensions AS d
+    LEFT JOIN pitch_coverage AS pc USING (game_id)
+    LEFT JOIN batted_ball_coverage AS bc USING (game_id)
+),
+
+classified AS (
+    SELECT * FROM side_dependent_dims
+    UNION ALL BY NAME
+    SELECT * FROM game_wide_dims
 )
 
 SELECT
     *,
-    target_population_status = 'event_level' AS usable_for_event_imputation,
+    target_population_status = 'event_level'
+        AND source_block_status NOT IN ('coverage_within_source_sparse', 'block_missing') AS usable_for_event_imputation,
     target_population_status IN ('event_level', 'aggregate_only') AS usable_as_aggregate_constraint,
     CASE source_family
         WHEN 'play_by_play' THEN 1
@@ -173,6 +296,8 @@ Validation checks:
 - Reconcile the ledger against `season_team_coverage`, `game_start_info.source_type`, `stg_schedule`, `stg_gamelog`, and `stg_games`.
 - Verify that 1910 and 1911 are not accidentally filtered out by stale "complete from 1912" metadata.
 - Separate source availability by dimension instead of assuming `PlayByPlay` means pitch, batted-ball, and official aggregate totals are all available.
+- Confirm `target_population_status = 'event_level'` for `pitch_sequence` and `batted_ball` only when the game-level coverage flags in `game_data_completeness` (or the `event_completeness_pitches` / `event_completeness_batted_balls` rollups) confirm non-sparse coverage.
+- Confirm `team_id IS NULL` for game-wide dimensions and non-null for side-dependent dimensions.
 
 ### `source_data_error_risk_ledger`
 
@@ -245,44 +370,60 @@ MODEL (
 WITH box_agg AS (
     SELECT
         b.game_id,
+        CASE WHEN b.side = 'Home' THEN g.home_team_id ELSE g.away_team_id END AS team_id,
         b.fielder_id AS player_id,
         b.fielding_position,
-        MIN(CASE WHEN b.side = 'Home' THEN g.home_team_id ELSE g.away_team_id END) AS team_id,
         SUM(b.putouts)::DOUBLE AS putouts,
         SUM(b.assists)::DOUBLE AS assists,
         SUM(b.errors)::DOUBLE AS errors
     FROM main_models.stg_box_score_fielding_lines AS b
     INNER JOIN main_models.stg_games AS g USING (game_id)
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4
 ),
 
 event_agg AS (
     SELECT
         game_id,
+        team_id,
         player_id,
         fielding_position,
-        MIN(team_id) AS team_id,
         SUM(putouts)::DOUBLE AS putouts,
         SUM(assists)::DOUBLE AS assists,
         SUM(errors)::DOUBLE AS errors
     FROM main_models.event_player_fielding_stats
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4
+),
+
+personnel_presence AS (
+    SELECT DISTINCT
+        e.game_id,
+        ps.team_id,
+        ps.player_id,
+        ps.fielding_position
+    FROM main_models.personnel_fielding_states AS ps
+    INNER JOIN main_models.event_states_full AS e USING (event_key)
+    WHERE ps.player_id IS NOT NULL
+        AND ps.fielding_position IS NOT NULL
 ),
 
 wide AS (
     SELECT
-        COALESCE(b.game_id, e.game_id) AS game_id,
-        COALESCE(b.team_id, e.team_id) AS team_id,
-        COALESCE(b.player_id, e.player_id) AS player_id,
-        COALESCE(b.fielding_position, e.fielding_position) AS fielding_position,
+        COALESCE(b.game_id, e.game_id, p.game_id) AS game_id,
+        COALESCE(b.team_id, e.team_id, p.team_id) AS team_id,
+        COALESCE(b.player_id, e.player_id, p.player_id) AS player_id,
+        COALESCE(b.fielding_position, e.fielding_position, p.fielding_position) AS fielding_position,
         b.putouts AS box_putouts,
         e.putouts AS event_putouts,
         b.assists AS box_assists,
         e.assists AS event_assists,
         b.errors AS box_errors,
-        e.errors AS event_errors
+        e.errors AS event_errors,
+        (b.game_id IS NOT NULL) AS box_present,
+        (e.game_id IS NOT NULL) AS event_present,
+        (p.game_id IS NOT NULL) AS personnel_present
     FROM box_agg AS b
-    FULL OUTER JOIN event_agg AS e USING (game_id, player_id, fielding_position)
+    FULL OUTER JOIN event_agg AS e USING (game_id, team_id, player_id, fielding_position)
+    FULL OUTER JOIN personnel_presence AS p USING (game_id, team_id, player_id, fielding_position)
 ),
 
 fielding_long AS (
@@ -293,7 +434,13 @@ fielding_long AS (
         fielding_position,
         'putouts' AS stat_name,
         box_putouts AS box_value,
-        event_putouts AS event_value
+        CASE
+            WHEN event_present THEN COALESCE(event_putouts, 0)
+            WHEN personnel_present THEN 0
+            ELSE NULL
+        END AS event_value,
+        box_present,
+        event_present OR personnel_present AS event_evidence_present
     FROM wide
     UNION ALL BY NAME
     SELECT
@@ -303,7 +450,13 @@ fielding_long AS (
         fielding_position,
         'assists' AS stat_name,
         box_assists AS box_value,
-        event_assists AS event_value
+        CASE
+            WHEN event_present THEN COALESCE(event_assists, 0)
+            WHEN personnel_present THEN 0
+            ELSE NULL
+        END AS event_value,
+        box_present,
+        event_present OR personnel_present AS event_evidence_present
     FROM wide
     UNION ALL BY NAME
     SELECT
@@ -313,7 +466,13 @@ fielding_long AS (
         fielding_position,
         'errors' AS stat_name,
         box_errors AS box_value,
-        event_errors AS event_value
+        CASE
+            WHEN event_present THEN COALESCE(event_errors, 0)
+            WHEN personnel_present THEN 0
+            ELSE NULL
+        END AS event_value,
+        box_present,
+        event_present OR personnel_present AS event_evidence_present
     FROM wide
 )
 
@@ -325,18 +484,28 @@ SELECT
     stat_name,
     'player_position_game' AS aggregate_grain,
     CASE
-        WHEN box_value IS NULL THEN 'missing'
+        WHEN NOT box_present THEN 'missing'
+        WHEN NOT event_evidence_present THEN 'present_clean'
         WHEN box_value - event_value < 0 THEN 'negative_residual'
         WHEN box_value = event_value THEN 'present_clean'
         ELSE 'contradicted'
     END AS aggregate_status,
     box_value::DOUBLE AS aggregate_value,
     event_value::DOUBLE AS event_value,
-    (box_value - event_value)::DOUBLE AS residual_value,
+    CASE
+        WHEN box_value IS NOT NULL AND event_value IS NOT NULL
+            THEN (box_value - event_value)::DOUBLE
+        ELSE NULL
+    END AS residual_value,
     1 AS authority_rank,
     'none' AS data_error_risk
 FROM fielding_long;
 ```
+
+Notes on the join shape:
+
+- The `box_agg` / `event_agg` join key includes `team_id` so that doubleheader split-squad rosters, mid-game team changes, and historical pre-1900 oddities cannot mis-credit a player to the wrong side.
+- The personnel union ensures players who were on the field with zero plays surface as `event_value = 0` instead of `event_value IS NULL`. That distinguishes "no box at all" (`box_present = false`) from "fielder present with no plays" (`event_evidence_present = true, event_value = 0`).
 
 ### `official_credit_authority`
 
@@ -363,7 +532,8 @@ Decision policy:
 | Field | Meaning |
 | --- | --- |
 | `event_key`, `fielding_side`, `fielding_position`, `player_id` | Event-position eligibility key. |
-| `eligibility_status` | `direct_event`, `lineup_derived`, `box_derived`, `synthetic`, `missing`, `duplicate_position`, `ambiguous_substitution`. |
+| `reliability_class` | FK to `seed_reliability_class` (`direct`, `derived`, `inferred`, `synthetic`, `ambiguous`). |
+| `eligibility_status` | Ledger-specific extension: `direct_event`, `lineup_derived`, `box_derived`, `synthetic`, `missing`, `duplicate_position`, `ambiguous_substitution`. Maps cleanly to `reliability_class` (e.g., `direct_event` -> `direct`; `lineup_derived`, `box_derived` -> `derived`; `synthetic` -> `synthetic`; `duplicate_position`, `ambiguous_substitution` -> `ambiguous`; `missing` -> `inferred` when an event lacks a direct personnel row). |
 | `hard_zero_allowed` | True when the model can assign zero probability to players outside this state. |
 | `personnel_confidence` | Numeric or enum confidence. |
 | `issue_reason` | Ambiguity class. |
@@ -385,7 +555,8 @@ Invariant: fielding allocation can use personnel as a hard constraint only when 
 | `source_id` | Raw/source ID. |
 | `canonical_id` | Project ID. |
 | `valid_from`, `valid_to` | Episode bounds when identity can change over time. |
-| `link_status` | `direct`, `crosswalk`, `alias`, `inferred`, `conflict`, `unresolved`. |
+| `reliability_class` | FK to `seed_reliability_class`. |
+| `link_status` | Ledger-specific extension: `direct`, `crosswalk`, `alias`, `inferred`, `conflict`, `unresolved`. Maps to `reliability_class` (`direct` -> `direct`; `crosswalk`, `alias` -> `derived`; `inferred` -> `inferred`; `conflict`, `unresolved` -> `ambiguous`). |
 | `link_confidence` | Numeric or enum confidence. |
 | `conflict_reason` | Why the link is weak. |
 
@@ -398,7 +569,7 @@ Use this ledger before fitting random effects by player, team, park, scorer, or 
 | `game_id`, `context_dimension` | Context field key. |
 | `raw_value` | Source value as stored or serialized. |
 | `normalized_value` | Canonical value if deterministically derived. |
-| `observed_status` | `observed`, `derived`, `missing`, `not_applicable`, `contradicted`, `data_error_prone`. |
+| `observed_status` | FK to `seed_observed_status` (subset used here: `observed`, `derived`, `missing`, `not_applicable`, `contradicted`, `data_error_prone`). |
 | `source_family` | Source of the context value. |
 | `context_confidence` | Confidence enum or numeric weight. |
 
@@ -437,96 +608,216 @@ Validation checks:
 | `denominator_policy` | `full_game`, `observed_outs`, `official_result_only`, `exclude`, `synthetic_required`. |
 | `exposure_confidence` | Confidence enum or numeric weight. |
 
-This table is deterministic after source reconciliation. Bayesian modeling belongs in missing context values or sensitivity analysis, not in overriding official suspension, forfeit, or walk-off facts.
+This table is deterministic after source reconciliation. Missing context values should start with observed-status flags, missing indicators, deterministic fallbacks, and simple tabular imputation baselines. Bayesian context imputation is only justified for high-impact covariates that materially change park, advancement, or run-value estimates. It never overrides official suspension, forfeit, or walk-off facts.
 
-### `event_observation_ledger`
+### Event observation ledgers (three siblings)
 
-This is the central deterministic contract for fitted models.
+The central deterministic contract for fitted models is split across three sibling tables at `(event_key, dimension)` grain, each with a tight per-family `dimension` enum. A single combined ledger would be 100-200M rows over 18M events with sentinel-decoding branches that vary by dimension; the per-family split keeps each table's accepted-values surface small, lets per-dimension sentinel logic live next to the dimensions it applies to, and allows the three to be planned and restated independently.
+
+All three share the same column schema:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `event_key` | `UINTEGER` | Event key. |
-| `dimension` | `VARCHAR` | `trajectory`, `location_side`, `location_depth`, `batted_to_fielder`, `pitch_sequence`, `count`, `putout_credit`, `assist_credit`, etc. |
+| `dimension` | `VARCHAR` | Per-family dimension enum (see each ledger below). |
+| `observed_status` | `VARCHAR` | FK to `seed_observed_status`. |
+| `sentinel_type` | `VARCHAR` | `null`, `unknown`, `default`, `zero`, `empty_sequence`, `valid_value`, `not_applicable`. Sentinel semantics are per-dimension; see the taxonomy doc. |
 | `raw_value` | `VARCHAR` | Source value serialized as text. |
 | `deduced_value` | `VARCHAR` | Deterministic derived value when present. |
-| `sentinel_type` | `VARCHAR` | `null`, `unknown`, `default`, `zero`, `empty_sequence`, `valid_value`, `not_applicable`. |
-| `observed_status` | `VARCHAR` | `observed`, `deduced`, `unknown_code`, `source_family_block_missing`, `structural_absence`, `not_applicable`, `contradicted`, `data_error_prone`. |
-| `source_family` | `VARCHAR` | Joined source family. |
-| `data_error_risk` | `VARCHAR` | Joined data-error class. |
-| `deterministic_confidence` | `DOUBLE` | Confidence for deterministic derived measurements. |
-| `can_train_as_truth` | `BOOLEAN` | True only when source authority and data-error checks pass. |
-| `can_use_as_measurement` | `BOOLEAN` | True when value is noisy but useful evidence. |
+| `source_acquisition_status` | `VARCHAR` | Joined `source_availability_status` from `source_acquisition_ledger` for the relevant `(game_id, team_id, dimension)` triple. |
+| `data_error_risk` | `VARCHAR` | Joined `data_error_class` from `source_data_error_risk_ledger`. |
+| `model_input_eligible` | `BOOLEAN` | True when the row can enter a fitted model as truth or evidence (i.e., not `not_applicable`, not `data_error_prone`, and source authority is non-block-missing). |
 
-SQL sketch for batted-ball dimensions:
+Each ledger is `kind INCREMENTAL_BY_TIME_RANGE` partitioned by `season`. (No existing model in this repo uses `INCREMENTAL_BY_TIME_RANGE`; `season` as the time column is the user's pick and is encoded as an integer year, not a date — this is a known limitation worth confirming when the first ledger is implemented. The fallback is `kind FULL` with an explicit season filter.) Each body is constructed as `UNION ALL BY NAME` branches keyed by per-family dimension.
+
+#### `event_observation_geometry`
+
+Dimensions: `trajectory`, `location_side`, `location_depth`, `location_edge`, `general_location`, `ball_handler_position`, `pulled_opposite`.
+
+Note on `ball_handler_position`: this is the downstream mirror of the raw `stg_events.batted_to_fielder` column. The raw column name stays as-is; the ledger renames the dimension to make the semantics explicit — this is who fielded or completed the play (handler), not where the ball was hit (location). See the taxonomy doc's §Fielding-Geometry Coupling for why these must not be conflated, especially in shift-heavy eras.
 
 ```sql
 MODEL (
-  name main_models.event_observation_ledger,
-  kind FULL,
+  name main_models.event_observation_geometry,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column season,
+    partition_by_time_column false
+  ),
+  start @VAR('start_season', 1910),
+  end @VAR('end_season', 2025),
   grain (event_key, dimension),
   columns (
     event_key UINTEGER,
     dimension VARCHAR,
+    observed_status VARCHAR,
+    sentinel_type VARCHAR,
     raw_value VARCHAR,
     deduced_value VARCHAR,
-    sentinel_type VARCHAR,
-    observed_status VARCHAR,
-    source_family VARCHAR,
+    source_acquisition_status VARCHAR,
     data_error_risk VARCHAR,
-    deterministic_confidence DOUBLE,
-    can_train_as_truth BOOLEAN,
-    can_use_as_measurement BOOLEAN
+    model_input_eligible BOOLEAN
+  ),
+  audits (
+    unique_grain(columns := (event_key, dimension)),
+    accepted_values(column := dimension, is_in := (
+      'trajectory',
+      'location_side',
+      'location_depth',
+      'location_edge',
+      'general_location',
+      'ball_handler_position',
+      'pulled_opposite'
+    )),
+    relationships(column := observed_status, to_model := main_seeds.seed_observed_status, to_column := observed_status)
   )
 );
 
-WITH batted_ball AS (
+WITH events AS (
+    SELECT
+        e.event_key,
+        e.season,
+        e.game_id,
+        e.batting_team_id,
+        e.fielding_team_id
+    FROM main_models.event_states_full AS e
+    WHERE e.season BETWEEN @start_ds AND @end_ds
+),
+
+trajectory AS (
     SELECT
         c.event_key,
         'trajectory' AS dimension,
-        c.recorded_trajectory::VARCHAR AS raw_value,
-        c.trajectory::VARCHAR AS deduced_value,
+        CASE
+            WHEN c.recorded_trajectory IS NOT NULL AND c.recorded_trajectory != 'Unknown' THEN 'observed'
+            WHEN c.trajectory IS NOT NULL AND c.trajectory != 'Unknown' THEN 'derived'
+            ELSE 'unknown_code'
+        END AS observed_status,
         CASE
             WHEN c.recorded_trajectory IS NULL THEN 'null'
             WHEN c.recorded_trajectory = 'Unknown' THEN 'unknown'
             ELSE 'valid_value'
         END AS sentinel_type,
-        CASE
-            WHEN c.recorded_trajectory IS NOT NULL AND c.recorded_trajectory != 'Unknown' THEN 'observed'
-            WHEN c.trajectory IS NOT NULL AND c.trajectory != 'Unknown' THEN 'deduced'
-            ELSE 'unknown_code'
-        END AS observed_status,
-        CASE
-            WHEN c.is_trajectory_deduced THEN 0.85
-            WHEN c.recorded_trajectory != 'Unknown' THEN 1.0
-            ELSE 0.0
-        END AS deterministic_confidence
+        c.recorded_trajectory::VARCHAR AS raw_value,
+        c.trajectory::VARCHAR AS deduced_value
     FROM main_models.calc_batted_ball_type AS c
+    INNER JOIN events USING (event_key)
 )
 
 SELECT
-    b.event_key,
-    b.dimension,
-    b.raw_value,
-    b.deduced_value,
-    b.sentinel_type,
-    b.observed_status,
-    s.source_family,
+    g.event_key,
+    g.dimension,
+    g.observed_status,
+    g.sentinel_type,
+    g.raw_value,
+    g.deduced_value,
+    s.source_availability_status AS source_acquisition_status,
     COALESCE(a.data_error_class, 'none') AS data_error_risk,
-    b.deterministic_confidence,
-    b.observed_status = 'observed' AND COALESCE(a.training_action, 'allow') = 'allow' AS can_train_as_truth,
-    b.observed_status IN ('observed', 'deduced') AS can_use_as_measurement
-FROM batted_ball AS b
-INNER JOIN main_models.event_states_full AS e USING (event_key)
+    g.observed_status NOT IN ('not_applicable', 'data_error_prone')
+        AND s.source_availability_status != 'not_acquired' AS model_input_eligible
+FROM trajectory AS g
+INNER JOIN events AS e USING (event_key)
 INNER JOIN main_models.source_acquisition_ledger AS s
     ON e.game_id = s.game_id
     AND e.batting_team_id = s.team_id
     AND s.dimension = 'batted_ball'
 LEFT JOIN main_models.source_data_error_risk_ledger AS a
     ON e.game_id = a.game_id
-    AND a.field_name = b.dimension;
+    AND a.field_name = g.dimension;
 ```
 
-This sketch should be expanded with `UNION ALL BY NAME` branches for all event dimensions instead of using one wide table. The long shape makes it possible to add dimensions without altering all downstream models.
+This sketch shows one dimension; expand with `UNION ALL BY NAME` branches for the other geometry dimensions. Sentinel semantics (e.g., what `Unknown` vs `null` vs `default_code` means) are per-dimension and must match the per-field rules in the taxonomy doc.
+
+#### `event_observation_pitch`
+
+Dimensions: `count_balls`, `count_strikes`, `pitch_sequence`, `pitch_results`, `strike_types`, `pitch_count_total`. Same schema, same incremental kind. Sentinel rules diverge from geometry: `pitch_sequence` uses `empty_sequence` and `default_code` to distinguish "no pitch sequence recorded" from "sequence is structurally empty" from "default-coded entry"; `count_balls` / `count_strikes` use `default_code` for legacy 0/0 defaults that may be unobserved.
+
+```sql
+MODEL (
+  name main_models.event_observation_pitch,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column season,
+    partition_by_time_column false
+  ),
+  start @VAR('start_season', 1910),
+  end @VAR('end_season', 2025),
+  grain (event_key, dimension),
+  columns (
+    event_key UINTEGER,
+    dimension VARCHAR,
+    observed_status VARCHAR,
+    sentinel_type VARCHAR,
+    raw_value VARCHAR,
+    deduced_value VARCHAR,
+    source_acquisition_status VARCHAR,
+    data_error_risk VARCHAR,
+    model_input_eligible BOOLEAN
+  ),
+  audits (
+    unique_grain(columns := (event_key, dimension)),
+    accepted_values(column := dimension, is_in := (
+      'count_balls',
+      'count_strikes',
+      'pitch_sequence',
+      'pitch_results',
+      'strike_types',
+      'pitch_count_total'
+    )),
+    relationships(column := observed_status, to_model := main_seeds.seed_observed_status, to_column := observed_status)
+  )
+);
+
+-- Body: UNION ALL BY NAME over the six dimensions, joining
+-- source_acquisition_ledger on dimension='pitch_sequence' (or 'event' for the
+-- count dimensions) and source_data_error_risk_ledger on field_name.
+-- WHERE season BETWEEN @start_ds AND @end_ds applied in the driver CTE.
+```
+
+#### `event_observation_credit`
+
+Dimensions: `putout_credit`, `assist_credit`, `error_credit`, `double_play_credit`, `triple_play_credit`, `passed_ball_credit`. Same schema, same incremental kind. Sentinel rules: unknown fielder credit uses `unknown_code` and is the input to `fielding_credit_gaps`; `not_applicable` covers events where the credit type is structurally impossible (e.g., no error credit on a clean play).
+
+```sql
+MODEL (
+  name main_models.event_observation_credit,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column season,
+    partition_by_time_column false
+  ),
+  start @VAR('start_season', 1910),
+  end @VAR('end_season', 2025),
+  grain (event_key, dimension),
+  columns (
+    event_key UINTEGER,
+    dimension VARCHAR,
+    observed_status VARCHAR,
+    sentinel_type VARCHAR,
+    raw_value VARCHAR,
+    deduced_value VARCHAR,
+    source_acquisition_status VARCHAR,
+    data_error_risk VARCHAR,
+    model_input_eligible BOOLEAN
+  ),
+  audits (
+    unique_grain(columns := (event_key, dimension)),
+    accepted_values(column := dimension, is_in := (
+      'putout_credit',
+      'assist_credit',
+      'error_credit',
+      'double_play_credit',
+      'triple_play_credit',
+      'passed_ball_credit'
+    )),
+    relationships(column := observed_status, to_model := main_seeds.seed_observed_status, to_column := observed_status)
+  )
+);
+
+-- Body: UNION ALL BY NAME over the six dimensions, joining
+-- source_acquisition_ledger on (game_id, fielding_team_id, dimension='box_fielding')
+-- for credit attribution and source_data_error_risk_ledger on field_name.
+-- WHERE season BETWEEN @start_ds AND @end_ds applied in the driver CTE.
+```
+
+Cross-doc reference note: downstream consumers that previously referenced `event_observation_ledger` should be updated to read from the appropriate sibling (`event_observation_geometry` for batted-ball geometry, `event_observation_pitch` for pitch-level evidence, `event_observation_credit` for fielding-credit gaps). Cross-doc reference updates are handled by separate agents on the other docs.
 
 ### `event_observation_context`
 
@@ -548,9 +839,10 @@ Invariant: modeling datasets should select from `event_observation_context` rath
 | Field | Meaning |
 | --- | --- |
 | `event_key`, `fielding_team_id` | Event/team key. |
+| `fielding_evidence_status` | `complete_with_zero_unknowns`, `complete_with_known_unknowns`, `no_fielding_row`, `incomplete_event_flag`. Distinguishes "fielding row exists with zero unknown credit" from "no fielding row at all (walk, HBP, certain strikeouts)" and from explicit incomplete-event flagging. |
 | `gap_class` | `complete`, `unknown_putout`, `unknown_assist_risk`, `box_residual_positive`, `box_residual_negative`, `no_box_unknown`, `data_error_flagged`, `not_applicable`. |
-| `unknown_putouts` | Event unknown putouts from `calc_fielding_play_agg`. |
-| `known_putouts`, `known_assists`, `known_errors` | Event-known team values. |
+| `unknown_putouts` | Event unknown putouts from `calc_fielding_play_agg`. `NULL` means no fielding row exists; `0` means a fielding row exists with zero unknown credit. The two are not collapsed. |
+| `known_putouts`, `known_assists`, `known_errors` | Event-known team values. `NULL` when no fielding row exists. |
 | `has_clean_aggregate_total` | Whether a usable official aggregate total exists. |
 | `aggregate_residual_putouts`, `aggregate_residual_assists`, `aggregate_residual_errors` | Aggregate residuals when applicable. |
 | `personnel_hard_mask_available` | Whether personnel can constrain allocations. |
@@ -561,11 +853,17 @@ SQL sketch:
 ```sql
 MODEL (
   name main_models.fielding_credit_gaps,
-  kind FULL,
+  kind INCREMENTAL_BY_TIME_RANGE (
+    time_column season,
+    partition_by_time_column false
+  ),
+  start @VAR('start_season', 1910),
+  end @VAR('end_season', 2025),
   grain (event_key, fielding_team_id),
   columns (
     event_key UINTEGER,
     fielding_team_id TEAM_ID,
+    fielding_evidence_status VARCHAR,
     gap_class VARCHAR,
     unknown_putouts DOUBLE,
     known_putouts DOUBLE,
@@ -580,18 +878,56 @@ MODEL (
   )
 );
 
-WITH event_credit AS (
+WITH events AS (
     SELECT
         e.event_key,
+        e.season,
+        e.game_id,
         e.fielding_team_id,
-        SUM(f.unknown_putouts)::DOUBLE AS unknown_putouts,
-        SUM(f.putouts)::DOUBLE AS known_putouts,
-        SUM(f.assists)::DOUBLE AS known_assists,
-        SUM(f.errors)::DOUBLE AS known_errors
+        e.is_incomplete_event
     FROM main_models.event_states_full AS e
-    LEFT JOIN main_models.calc_fielding_play_agg AS f USING (event_key)
-    WHERE e.season BETWEEN 1910 AND 2025
+    WHERE e.season BETWEEN @start_ds AND @end_ds
+),
+
+fielding_agg AS (
+    SELECT
+        event_key,
+        SUM(unknown_putouts)::DOUBLE AS unknown_putouts,
+        BOOL_OR(unknown_putouts IS NOT NULL) AS fielding_row_present
+    FROM main_models.calc_fielding_play_agg
+    GROUP BY 1
+),
+
+player_stat_agg AS (
+    SELECT
+        event_key,
+        team_id,
+        SUM(putouts)::DOUBLE AS known_putouts,
+        SUM(assists)::DOUBLE AS known_assists,
+        SUM(errors)::DOUBLE AS known_errors,
+        BOOL_OR(putouts IS NOT NULL OR assists IS NOT NULL OR errors IS NOT NULL)
+            AS fielding_stat_row_present
+    FROM main_models.event_player_fielding_stats
     GROUP BY 1, 2
+),
+
+event_credit AS (
+    SELECT
+        ev.event_key,
+        ev.game_id,
+        ev.fielding_team_id,
+        ev.is_incomplete_event,
+        fa.unknown_putouts,
+        ps.known_putouts,
+        ps.known_assists,
+        ps.known_errors,
+        COALESCE(fa.fielding_row_present, false)
+            OR COALESCE(ps.fielding_stat_row_present, false) AS fielding_row_present
+    FROM events AS ev
+    LEFT JOIN fielding_agg AS fa USING (event_key)
+    LEFT JOIN player_stat_agg AS ps
+        ON ev.event_key = ps.event_key
+        AND ev.fielding_team_id = ps.team_id
 ),
 
 aggregate_totals AS (
@@ -618,8 +954,16 @@ SELECT
     ec.event_key,
     ec.fielding_team_id,
     CASE
-        WHEN ec.unknown_putouts > 0 AND COALESCE(a.has_clean_aggregate_total, false) THEN 'unknown_putout'
-        WHEN ec.unknown_putouts > 0 THEN 'no_box_unknown'
+        WHEN ec.is_incomplete_event THEN 'incomplete_event_flag'
+        WHEN NOT ec.fielding_row_present THEN 'no_fielding_row'
+        WHEN COALESCE(ec.unknown_putouts, 0) > 0 THEN 'complete_with_known_unknowns'
+        ELSE 'complete_with_zero_unknowns'
+    END AS fielding_evidence_status,
+    CASE
+        WHEN ec.is_incomplete_event THEN 'data_error_flagged'
+        WHEN NOT ec.fielding_row_present THEN 'not_applicable'
+        WHEN COALESCE(ec.unknown_putouts, 0) > 0 AND COALESCE(a.has_clean_aggregate_total, false) THEN 'unknown_putout'
+        WHEN COALESCE(ec.unknown_putouts, 0) > 0 THEN 'no_box_unknown'
         WHEN COALESCE(a.aggregate_residual_putouts, 0) > 0 THEN 'box_residual_positive'
         WHEN COALESCE(a.aggregate_residual_putouts, 0) < 0 THEN 'box_residual_negative'
         ELSE 'complete'
@@ -636,12 +980,17 @@ SELECT
     gap_class IN ('unknown_putout', 'no_box_unknown', 'box_residual_positive')
         AND COALESCE(p.personnel_hard_mask_available, false) AS eligible_for_allocation
 FROM event_credit AS ec
-INNER JOIN main_models.event_states_full AS e USING (event_key)
 LEFT JOIN aggregate_totals AS a
-    ON e.game_id = a.game_id
+    ON ec.game_id = a.game_id
     AND ec.fielding_team_id = a.team_id
 LEFT JOIN personnel AS p USING (event_key);
 ```
+
+Notes on the join shape:
+
+- The driver is `event_states_full` so events with NO fielding row at all (walks, HBP, certain strikeouts) are represented as rows rather than dropped — they receive `fielding_evidence_status = 'no_fielding_row'` and `unknown_putouts IS NULL`.
+- `unknown_putouts = 0` (fielding row exists, zero unknowns) and `unknown_putouts IS NULL` (no fielding row at all) are kept distinct downstream. `gap_class = 'complete'` is reserved for the former; `gap_class = 'not_applicable'` is used for the latter.
+- `is_incomplete_event` (or whatever the project surfaces as the event-level incompleteness flag) routes to `fielding_evidence_status = 'incomplete_event_flag'` so partially-recorded events don't masquerade as clean.
 
 ## Prep EDA To Run Before Modeling
 
@@ -653,7 +1002,7 @@ LEFT JOIN personnel AS p USING (event_key);
 | Personnel hard-mask coverage by season/source | `personnel_state_reliability` | Whether fielding allocation can assign hard zero masks. |
 | Context missingness by season/park/source | `game_context_observation_ledger` | Park-factor covariates and context imputation. |
 | Exposure classes by game type/source | `game_exposure_ledger` | Denominator policy for rates and run values. |
-| Observation statuses by dimension/scorer/result | `event_observation_ledger` | Candidate observation model interactions. |
+| Observation statuses by dimension/scorer/result | `event_observation_geometry`, `event_observation_pitch`, `event_observation_credit` | Candidate observation model interactions. |
 | Fielding gap classes by era/position/scorer | `fielding_credit_gaps` | First allocation target and holdout design. |
 
 Example EDA query:
@@ -663,13 +1012,23 @@ SELECT
     e.season,
     e.league,
     e.source_type,
+    o.ledger,
     o.dimension,
     o.observed_status,
     COUNT(*) AS events
-FROM main_models.event_observation_ledger AS o
+FROM (
+    SELECT 'geometry' AS ledger, event_key, dimension, observed_status
+    FROM main_models.event_observation_geometry
+    UNION ALL BY NAME
+    SELECT 'pitch' AS ledger, event_key, dimension, observed_status
+    FROM main_models.event_observation_pitch
+    UNION ALL BY NAME
+    SELECT 'credit' AS ledger, event_key, dimension, observed_status
+    FROM main_models.event_observation_credit
+) AS o
 INNER JOIN main_models.event_observation_context AS e USING (event_key)
-GROUP BY 1, 2, 3, 4, 5
-ORDER BY 1, 2, 3, 4, 5;
+GROUP BY 1, 2, 3, 4, 5, 6
+ORDER BY 1, 2, 3, 4, 5, 6;
 ```
 
 ## Audits
@@ -678,12 +1037,14 @@ Attach SQLMesh audits where possible and add custom audits where built-ins are i
 
 | Table | Audit |
 | --- | --- |
-| `source_acquisition_ledger` | Unique `game_id, team_id, dimension`; accepted statuses; no target `PlayByPlay` event dimension marked aggregate-only. |
+| `source_acquisition_ledger` | `unique_grain((game_id, team_id, dimension))`; accepted `target_population_status` and `source_block_status`; no target `PlayByPlay` event dimension marked aggregate-only; no `pitch_sequence` or `batted_ball` dimension marked `event_level` when game-level coverage flags are absent or false; `team_id IS NULL` exactly for game-wide dimensions. |
 | `source_data_error_risk_ledger` | Accepted `training_action`; `training_weight` between 0 and 1; no confirmed issue with `training_action = allow`. |
-| `official_aggregate_availability` | Unique key; residual equals aggregate total minus event value; no clean aggregate total with null aggregate value. |
-| `personnel_state_reliability` | At most one hard-mask player per event/side/position; accepted `eligibility_status`. |
-| `event_observation_ledger` | Unique `event_key, dimension`; accepted `observed_status`; deterministic confidence between 0 and 1. |
-| `fielding_credit_gaps` | Unknown putouts nonnegative; allocation-eligible rows require personnel hard masks. |
+| `official_aggregate_availability` | `unique_grain((game_id, team_id, player_id, fielding_position, stat_name))`; residual equals aggregate total minus event value when both present; no clean aggregate total with null aggregate value; `team_id` non-null. |
+| `personnel_state_reliability` | At most one hard-mask player per event/side/position; `eligibility_status` aligned with `seed_reliability_class` canonical values (`direct`, `derived`, `inferred`, `synthetic`, `ambiguous`) plus any documented ledger-specific extensions; FK via `relationships(column := reliability_class, to_model := main_seeds.seed_reliability_class, ...)`. |
+| `event_observation_geometry` | `unique_grain((event_key, dimension))`; `dimension` restricted to the geometry enum (`trajectory`, `location_side`, `location_depth`, `location_edge`, `general_location`, `ball_handler_position`, `pulled_opposite`); `observed_status` FK to `seed_observed_status`; `source_acquisition_status` non-null. |
+| `event_observation_pitch` | `unique_grain((event_key, dimension))`; `dimension` restricted to the pitch enum (`count_balls`, `count_strikes`, `pitch_sequence`, `pitch_results`, `strike_types`, `pitch_count_total`); `observed_status` FK to `seed_observed_status`. |
+| `event_observation_credit` | `unique_grain((event_key, dimension))`; `dimension` restricted to the credit enum (`putout_credit`, `assist_credit`, `error_credit`, `double_play_credit`, `triple_play_credit`, `passed_ball_credit`); `observed_status` FK to `seed_observed_status`. |
+| `fielding_credit_gaps` | `unique_grain((event_key, fielding_team_id))`; accepted `fielding_evidence_status`; unknown putouts nonnegative when present; `unknown_putouts IS NULL` iff `fielding_evidence_status = 'no_fielding_row'`; allocation-eligible rows require personnel hard masks. |
 
 ## Acceptance Criteria
 
@@ -693,6 +1054,6 @@ This prep phase is done when:
 - Existing completeness models can be reproduced from ledger rollups.
 - Source counts match the verified DB snapshot unless upstream sources changed and the docs are updated.
 - Sentinel meanings are field-specific and not collapsed into a generic null.
-- Artifact-risk outputs can be joined to every planned modeling dataset.
+- Data-error risk outputs can be joined to every planned modeling dataset.
 - Fielding allocation datasets can select `eligible_for_allocation` rows without ad hoc joins to issue tables.
 - No fitted model consumes raw event rows directly when a ledgered equivalent exists.

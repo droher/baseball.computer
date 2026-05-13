@@ -3,7 +3,7 @@ title: Data Coverage Implementation Plan, 1910-2025
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 <!-- Shape: index and system-level RFC for a multi-document implementation plan. The companion docs own detailed contracts, code sketches, and rollout gates. -->
@@ -96,6 +96,7 @@ The implementation uses SQLMesh for deterministic database transformations and o
 | Doc | Purpose |
 | --- | --- |
 | `README.md` | High-level implementation plan and directory index. |
+| `implementation-checklist.md` | Editable progress checklist for implementing the plan in dependency order. |
 | `data-coverage-taxonomy-1910-2025.md` | Taxonomy of source surfaces, missingness classes, fielding/geometry coupling, and imputation order. |
 | `statistical-modeling-coverage-design.md` | Statistical design and model-family critique. |
 | `01-prep-ledgers.md` | Deterministic SQLMesh tables for source availability, official aggregate totals, personnel/context/exposure reliability, and SQL sketches. |
@@ -158,10 +159,10 @@ Invariant: SQLMesh plans should never run full MCMC or train neural models. SQLM
 | Raw source | Direct source fields and source sentinels. | `stg_events.batted_trajectory` |
 | Deterministic derived | Rule-based transformations from source facts. | `calc_batted_ball_type.trajectory` |
 | Official aggregate | Box, gamelog, or Databank-style official counters at their source grain. | `stg_box_score_fielding_lines.putouts` |
-| Provenance ledger | Source, authority, observed status, known data-error risk, and reliability facts. | `event_observation_ledger` |
+| Provenance ledger | Source, authority, observed status, known data-error risk, and reliability facts. | `event_observation_geometry` / `event_observation_pitch` / `event_observation_credit` |
 | Statistical estimate | Probability, expected counter, posterior draw, or uncertainty summary. | `imputed_fielding_credit` |
 | Deep supplement | Calibrated proposal distribution or embedding used by statistical models. | `dl_geometry_proposals` |
-| Synthetic namespace | Generated rows for aggregate-only sources when explicitly accepted. | `synthetic_event_distribution` |
+| Synthetic namespace | Generated rows for aggregate-only sources when explicitly accepted. OUT of scope for this implementation cycle. BoxScore-only games stay at aggregate grain (`target_population_status='aggregate_only'`). Future project. | `synthetic_event_distribution` |
 
 Invariant: a posterior expected putout, a box-score putout, a deterministic deduced putout, and a sampled synthetic putout are different values. Do not store them in one column without `source`, `method`, `observed_status`, `model_version`, and uncertainty metadata.
 
@@ -172,11 +173,12 @@ Invariant: a posterior expected putout, a box-score putout, a deterministic dedu
 | Source availability and data-error flags | `source_acquisition_ledger`, `source_data_error_risk_ledger` | All later modules use these as masks, strata, and training weights. |
 | Official aggregate totals and authority | `official_aggregate_availability`, `official_credit_authority` | Fielding allocation and aggregate reconciliation require field-level totals at the right grain. |
 | Identity, personnel, context, exposure | `entity_link_reliability`, `personnel_state_reliability`, `game_context_observation_ledger`, `game_exposure_ledger` | Fielding, park, advancement, and run-value models need reliable constraints and denominators. |
-| Observation ledger | `event_observation_ledger`, `event_observation_context` | Every statistical model consumes these contracts. |
+| Observation ledger | `event_observation_geometry` / `event_observation_pitch` / `event_observation_credit`, `event_observation_context` | Every statistical model consumes these contracts. |
 | Gap classification | `fielding_credit_gaps`, batted-ball and pitch gap views | Converts generic missingness into model-specific target populations. |
-| EDA and modeling datasets | `stat_model_dataset_*`, `stat_model_eda_*`, split registry | Determines interaction terms, weak identification, and leakage-safe evaluation. |
+| EDA and modeling datasets | `model_input_*`, EDA reports, `split_registry` | Determines interaction terms, weak identification, and leakage-safe evaluation. |
 | Deep supplements | `dl_proposal_*`, `dl_embedding_*`, calibration reports | Supplies cross-fitted probabilities and embeddings to Bayesian models. |
 | Hierarchical models | `imputed_fielding_credit`, `imputed_batted_ball_geometry`, `park_factor_posterior`, `run_value_posterior` | Produces uncertainty-aware model outputs. |
+| Shift propensity (Model K) | `imputed_shift_propensity` | Latent alignment-regime covariate for geometry, advancement/responsibility, and optionally run values. Fit on event coverage 2015+ and pitch coverage 2009+ where direct shift evidence exists. |
 | Publication | expected-counter views, compatibility views, validation reports | Makes official, deterministic, and estimated metrics explicit to consumers. |
 
 ## Implementation DAG
@@ -212,6 +214,7 @@ flowchart LR
     B5["run values"]
     B6["advancement/responsibility"]
     B7["pitch summaries"]
+    K["shift propensity (Model K)"]
   end
 
   subgraph Publish["Phase 5: ingestion and publication"]
@@ -240,9 +243,14 @@ flowchart LR
   B3 --> B4
   B3 --> B6
   B4 --> B5
+  F2 --> K
+  K --> B3
+  K --> B6
+  K --> B5
   B5 --> O1
   B6 --> O1
   B7 --> O1
+  K --> O1
   O1 --> O2
   O2 --> O3
   O4 --> O3
@@ -274,6 +282,7 @@ bc/python_models/statistical/
     run_values.py
     advancement.py
     pitch_summary.py
+    shift_propensity.py
   deep/
     proposals.py
     embeddings.py
@@ -293,7 +302,9 @@ bc/models/intermediate/coverage/
   entity_link_reliability.sql
   game_context_observation_ledger.sql
   game_exposure_ledger.sql
-  event_observation_ledger.sql
+  event_observation_geometry.sql
+  event_observation_pitch.sql
+  event_observation_credit.sql
   fielding_credit_gaps.sql
 
 bc/models/intermediate/statistical_datasets/
@@ -313,14 +324,17 @@ bc/models/intermediate/statistical_outputs/
   run_value_posterior.py
   advancement_posterior.py
   pitch_summary_posterior.py
+  imputed_shift_propensity.py
   statistical_model_runs.py
 ```
+
+The `.py` files in `bc/models/intermediate/statistical_outputs/` are thin SQLMesh `@model` decorators that read published Parquet manifests and ingest them. The fitting code (PyMC priors, sampling, posterior export) lives in `bc/python_models/statistical/models/` and is invoked offline via the CLI in `bc/python_models/statistical/cli.py`.
 
 The exact directory names can change, but the separation should not: deterministic SQL, frozen modeling datasets, offline fitting code, and SQL model-output ingestion are different concerns.
 
 ## Dependency Policy
 
-Add a separate optional dependency group for Bayesian and statistical model-output work:
+Decision: add a separate optional `stats` dependency group for Bayesian and statistical model-output work. PyMC and ArviZ are the first backend.
 
 ```toml
 [dependency-groups]
@@ -334,7 +348,7 @@ stats = [
 ]
 ```
 
-Keep neural-model training in the existing `ml` group unless a shared dependency forces a split. The `stats` group should not become a default requirement for ordinary SQLMesh builds until model-output ingestion depends on a small runtime-only subset.
+Keep neural-model training in the existing `ml` group unless a shared dependency forces a split. The `stats` group should not become a default requirement for ordinary SQLMesh builds until model-output ingestion depends on a small runtime-only subset. `stats` repeats the `scikit-learn` constraint so calibration utilities can run without importing Keras, Torch, or MLflow from the full `ml` group.
 
 ## Acceptance Definition
 
@@ -346,11 +360,20 @@ The implementation is complete only when each published probabilistic table has:
 - Versioned model outputs with query hashes, schema hashes, category maps, seeds, package versions, sampler diagnostics, and validation status.
 - SQLMesh audits proving unique grain, non-null keys, probability normalization, expected-counter conservation, and valid source/method enums.
 - A rollback path to official-only or deterministic-only outputs.
+- Each Bayes model is fit twice (`gamma_dl_zero` and `gamma_dl_shrunk` ablation flavors). Publication tier selection is per-model based on posterior-change magnitude. Both artifacts are stored; the published tier is named in the manifest.
+
+Canonical versioning identifiers are defined in doc 05 (Glossary section): `artifact_id` is the immutable per-fit handle, `model_version` is semver, `run_id` is per-fit-attempt.
+
+## Decisions Resolved 2026-05-13
+
+1. Canonical naming. Datasets are `model_input_*`; the event observation ledger is split into three siblings `event_observation_geometry`, `event_observation_pitch`, and `event_observation_credit`; published probabilistic outputs use the `imputed_*` prefix.
+2. First Bayesian prototypes live directly in `bc/python_models/statistical/models/observation.py` and sibling modules. Notebooks are reserved for plots and EDA narrative only, not for fitting code.
+3. Public exposure. Posterior intervals are published on park-factor and run-value outputs. Other estimated outputs publish counters plus `method` and `*_confidence` fields, with draw tables retained for downstream nonlinear summaries.
+4. No-box official-credit estimates are always included; their reliability is exposed through a `fielding_credit_confidence` field rather than a hard threshold that suppresses rows.
+5. Synthetic event distributions for aggregate-only games are out of scope for this cycle. BoxScore-only games stay at aggregate grain.
 
 ## Open Decisions
 
-1. Choose canonical model naming and SQL directory placement before adding files.
-2. Decide whether first Bayesian prototypes live in notebooks/scripts or immediately in `bc/python_models/statistical`.
-3. Decide whether public metrics should expose posterior intervals or only estimated counters plus method/confidence fields.
-4. Decide the minimum confidence threshold for no-box official-credit estimates.
-5. Decide whether synthetic event distributions for aggregate-only games are in scope for this implementation cycle or a later project.
+1. Scorer pooling specifics within `entity_link_reliability` and the observation models: how scorer identity rolls up to scorer-team, scorer-park, and inputter/translator levels, and how unknown-scorer rows pool.
+2. Park-episode boundary handling for renovations, dimensional changes, and surface changes where the available metadata disagrees across sources; specifically the rules for opening a new `park_episode_id` versus continuing the prior episode.
+3. Withholding policy for `imputed_shift_propensity` outside event 2015+ / pitch 2009+. Whether to publish prior-only draws with a `weak_identification` flag or withhold rows entirely.

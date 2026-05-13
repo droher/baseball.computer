@@ -1,9 +1,9 @@
 ---
 title: Data Coverage Taxonomy, 1910-2025
 type: architecture
-status: active
+status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 <!-- Shape: report/reference note rather than the stock architecture template. The request is an ontology of missing data and imputation order, so the doc keeps the required frontmatter and decision-first opener but uses taxonomy, dependency, and playbook sections. -->
@@ -22,7 +22,7 @@ Implementation details now live in `README.md` and the companion docs in this di
 
 This report covers the database shape implied by the general models, data-quality/completeness models, and `bc/models/analyses` for seasons 1910-2025. It follows the project goal of treating this span as the target event-coverage range, but it does not assume every game inside the span has event rows.
 
-The local `bc.db` snapshot verified on 2026-05-12 contains `205845` `PlayByPlay` games, `1953` `BoxScore` games, and `4` `GameLog` games in 1910-2025. `event_states_full` contains `18137758` events across the `205845` `PlayByPlay` games only. The local LSF metadata still says event-level play-by-play is complete from 1912 and sparse before 1912; the current database has full `PlayByPlay` source coverage for all 1910 and 1911 team-seasons. Treat the 1910-1911 discrepancy as a metadata drift item, not as evidence that the event spine is absent.
+The local `bc.db` snapshot verified on 2026-05-12 contains `205845` `PlayByPlay` games, `1953` `BoxScore` games, and `4` `GameLog` games in 1910-2025. `event_states_full` contains `18137758` events across the `205845` `PlayByPlay` games only. LSF metadata in `docs/llm/supplement.yaml` and `docs/llm/lsf_1_spec.md` now reports event-level play-by-play as complete from 1910 with sparse 1871-1909 coverage, matching the database; the 1910-1911 drift item is resolved.
 
 This report does not provide completeness rates or rank seasons, teams, scorers, or players by coverage. It classifies missingness types and gives a dependency order for daisy-chained imputation.
 
@@ -330,7 +330,7 @@ The current models already imply this split. `player_position_game_fielding_stat
 | Problem | Where it appears | Consequence | Handling |
 | --- | --- | --- | --- |
 | Unknown putout implies unknown assist chain | `calc_fielding_play_agg.unknown_putouts`, `incomplete_events` | The database may know an out happened but not the putout fielder or whether assists occurred. | Allocate putout and assist expectation separately; do not infer `assists = 0` from no explicit assist. |
-| Box/event disagreement | `surplus_box_putouts`, `surplus_box_assists`, `surplus_box_errors`, `box_event_fielding_discrepancies` | Event credit may be incomplete while box totals are complete, or one source may contain a scorer/parser artifact. | Use event only when no unknown putouts affected the fielder-game; otherwise use box for official counters and keep event evidence for geometry. |
+| Box/event disagreement | `surplus_box_putouts`, `surplus_box_assists`, `surplus_box_errors`, `box_event_fielding_discrepancies` | Event credit may be incomplete while box totals are complete, or one source may contain a scorer/parser data error. | Use event only when no unknown putouts affected the fielder-game; otherwise use box for official counters and keep event evidence for geometry. |
 | No-box unknown plays | `unknown_play_no_box` | There is no official aggregate total for player allocation. | Use constrained empirical priors with lower confidence; never promote to official stat without a source flag. |
 | Assists recorded like putouts or conventional plays miscoded | `assists_as_putouts_finder`, `putout_innings_gaps` | Apparent fielding credit can be internally coherent but semantically wrong. | Classify these as source-pattern issues before allocation; avoid training priors on flagged games unless explicitly weighted down. |
 | Shift-era fielder/location mismatch | `ground_ball_blame`, `fielder_location_shares` | `batted_to_fielder = 6` no longer means "ball hit to normal shortstop zone." | Treat fielder position as handler, not geometry or responsibility, in shift-heavy eras. Condition priors on era and batter hand. |
@@ -579,6 +579,10 @@ Track these as first-class diagnostics:
 
 The clean long-term shape is a set of parallel observation and imputation tables rather than rewriting existing facts. The implementation should make the distinction between raw source evidence, official-credit estimates, geometry estimates, and responsibility estimates impossible to miss.
 
+Event observation lives in three sibling tables (`event_observation_geometry`, `event_observation_pitch`, `event_observation_credit`) rather than a single ledger. The three siblings share an identical schema; only the dimension enum differs per family. Splitting them keeps geometry, pitch, and credit observation independently auditable and avoids forcing one wide enum to cover heterogeneous evidence patterns.
+
+Synthetic event distribution for `BoxScore`-only and `GameLog`-only games is out of scope for this implementation cycle. `BoxScore`-only games stay at aggregate grain with `target_population_status='aggregate_only'` and a `usable_as_aggregate_constraint` boolean. A synthetic namespace is a future project.
+
 | Table family | Grain | Purpose |
 | --- | --- | --- |
 | `source_acquisition_ledger` | `game_id, team_id, dimension` | Source availability, target-population status, structural absence, source-family block absence, and usable target flag. |
@@ -586,7 +590,9 @@ The clean long-term shape is a set of parallel observation and imputation tables
 | `personnel_reliability_ledger` | `event_key, side, fielding_position` or `game_id, player_id` | Direct, derived, missing, ambiguous, or synthetic eligibility evidence for hard fielding masks. |
 | `context_observation_ledger` | `game_id, context_field` | Park, weather, handedness, scorer, inputter, translator, rules, and schedule fields with observed status and source authority. |
 | `exposure_ledger` | game/team-game/half-inning | Innings, outs, suspended/forfeit/truncated/walk-off status, and denominator policy. |
-| `event_observation_ledger` | `event_key, dimension` | Canonical record of what was recorded, deduced, aggregate-only, unknown, defaulted, or estimated. This should preserve raw sentinel semantics instead of flattening null, `Unknown`, `Default`, and `0`. |
+| `event_observation_geometry` | `event_key, dimension` | Canonical record for geometry dimensions (trajectory, location side/depth/edge). Same schema as its sibling tables; the dimension enum is restricted to geometry. |
+| `event_observation_pitch` | `event_key, dimension` | Canonical record for pitch dimensions (count, pitch sequence, pitch result, strike type). |
+| `event_observation_credit` | `event_key, dimension` | Canonical record for fielding-credit dimensions (putout, assist, error, handler). |
 | `fielding_credit_gaps` | `event_key, fielding_team_id` | Classifies unknown putouts, unknown-assist risk, box residuals, no-box gaps, event/box disagreement, and known source-pattern issues. |
 | `imputed_fielding_credit` | `event_key, player_id, fielding_position, credit_type` | Expected official putouts, assists, errors, double plays, and related credits. This table answers stat-line questions, not range-responsibility questions. |
 | `ball_handler_probabilities` | `event_key, player_id, fielding_position` | Probability that a player/position actually handled the batted ball or completed the play. This can feed geometry even when official putout credit goes elsewhere. |
@@ -601,7 +607,7 @@ Each imputation table should expose additive expected values where possible. For
 The table build order should mirror the dependency order:
 
 1. Build `source_acquisition_ledger`, `source_data_error_risk_ledger`, `personnel_reliability_ledger`, `context_observation_ledger`, and `exposure_ledger`.
-2. Build `event_observation_ledger` from the existing completeness models, raw event fields, sentinel semantics, and provenance ledgers.
+2. Build the three sibling `event_observation_*` tables (`geometry`, `pitch`, `credit`) from the existing completeness models, raw event fields, sentinel semantics, and provenance ledgers.
 3. Build `fielding_credit_gaps` from `calc_fielding_play_agg`, `event_player_fielding_stats`, `player_position_game_fielding_stats`, `unknown_plays`, `unknown_play_no_box`, and the fielding discrepancy analyses.
 4. Build `imputed_fielding_credit` using event evidence, box-score residual constraints, and no-box priors.
 5. Build `ball_handler_probabilities` separately from official credit.
@@ -610,21 +616,24 @@ The table build order should mirror the dependency order:
 8. Build `fielder_responsibility_probabilities` only after geometry and shift-regime handling are explicit.
 9. Feed aggregate metrics from expected counters and weights; reserve event-level sampled classes for analyses that truly need one row-level class.
 
+## Resolved (2026-05-13 Review)
+
+- **Official-credit estimates in the public stat line.** Yes, always included with a `fielding_credit_confidence` column so consumers can filter or weight.
+- **No-box unknown fielding confidence cap.** Same answer: always included with `fielding_credit_confidence`; the column carries the cap rather than withholding the row.
+- **`batted_to_fielder` rename.** The raw `stg_events.batted_to_fielder` column stays. Downstream consumers (`event_observation_geometry`, fielder responsibility, geometry models) use the semantically-correct `ball_handler_position` name. This forces consumers to think "handler, not location" — the design intent in shift-heavy eras.
+- **Detailed contact label publication.** Publish scorer-adjusted broad classes plus the detailed-label posterior distribution as a separate column, not one normalized fly/line/pop label.
+- **LSF 1910-1911 metadata.** Fixed upstream in `docs/llm/supplement.yaml` and `docs/llm/lsf_1_spec.md`; LSF now reports event-level play-by-play as complete from 1910 with sparse 1871-1909 coverage.
+
 ## Open Questions
 
-- Should official-credit estimates ever flow into the published player fielding stat line, or should they live only in an estimated-stat namespace?
-- Should range/responsibility estimates represent actual alignment when it can be inferred, normal defensive alignment for the era, or both?
-- How should shift regimes be split? At minimum, pre-shift, shift-growth, full shift-era, and post-2023 restriction seasons should not share one fielder-to-location prior.
-- What sample-size and fallback rules should govern scorer effects, especially when scorer, inputter, translator, and likely affiliated team are entangled?
-- How should no-box unknown fielding confidence be capped for player-level metrics? The lack of a usable official aggregate total limits its use in official-style outputs.
-- Should `batted_to_fielder` be renamed or mirrored in downstream outputs as handler evidence, not location evidence, to avoid misuse in shifted seasons?
-- Should detailed contact type be published as scorer-adjusted broad classes plus a detailed-label distribution instead of as one normalized fly/line/pop label?
-- Should the project metadata be updated from "complete from 1912" to the requested 1910 scope, or should 1910-1911 stay explicitly flagged until the LSF and source reality agree?
+- **Range/responsibility alignment basis.** Should range/responsibility estimates represent actual alignment when it can be inferred, normal defensive alignment for the era, or both? Model K (shift propensity) answers most of this: the shift posterior is the primary alignment basis, with an era-normal fallback prior. Pre-2009 alignment basis remains open because Model K's training window starts at pitch-level 2009.
+- **Shift regime splits.** At minimum, pre-shift, shift-growth, full shift-era, and post-2023 restriction seasons should not share one fielder-to-location prior. Model K partially resolves this for 2009+ (event-level 2015+); specifics around pre-2009 alignment splits remain open.
+- **Scorer/inputter/translator entanglement.** What sample-size and fallback rules should govern scorer effects when scorer, inputter, translator, and likely affiliated team are entangled? Open.
 
 ## Next Work
 
 1. Promote source acquisition, data-error risk, personnel reliability, context observation, and exposure ledgers before any field imputation.
-2. Promote an event observation ledger for fielding credit, handler evidence, batted-ball trajectory, batted-ball location, contact label, scorer, inputter, translator, source type, sentinel semantics, and provenance status.
+2. Promote the three sibling event observation tables (`event_observation_geometry`, `event_observation_pitch`, `event_observation_credit`) for fielding credit, handler evidence, batted-ball trajectory, batted-ball location, contact label, scorer, inputter, translator, source type, sentinel semantics, and provenance status.
 3. Promote a fielding gap table that splits unknown putouts, unknown-assist risk, box residuals, no-box unknowns, and source-pattern issues before any allocation happens.
 4. Implement expected-value `imputed_fielding_credit` with hard conservation constraints against event outs and box residuals where available.
 5. Implement `ball_handler_probabilities` so batted-ball inference does not have to misuse official putout credit.

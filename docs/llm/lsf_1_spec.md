@@ -334,7 +334,7 @@ COVERAGE|{coverage_summary}
 Example:
 
 ```text
-COVERAGE|Event-level play-by-play 1912+ (sparse 1871-1911); season/career stats 1871+; biographical data 1871+.
+COVERAGE|Event-level play-by-play 1910+ (sparse 1871-1909); season/career stats 1871+; biographical data 1871+.
 ```
 
 A document SHOULD contain at most one `COVERAGE` record. Use `-` when not applicable.
@@ -1026,7 +1026,7 @@ A retrieved packet SHOULD include all dependencies necessary to interpret a metr
 <DB_CONTEXT version="LSF-1" dialect="duckdb">
 DOMAIN|domain.baseball|Major-league play-by-play, season, and career analytics.
 TZ|America/New_York
-COVERAGE|Event-level play-by-play 1912+ (sparse 1871-1911); season/career stats 1871+; biographical data 1871+.
+COVERAGE|Event-level play-by-play 1910+ (sparse 1871-1909); season/career stats 1871+; biographical data 1871+.
 
 TABLES
 TABLE|table.offense_seasons|main_models.player_offense_season_stats|one row per (player_id, team_id, season, game_type)|Player offense, one row per player-team-season-game_type. Backed by the BSL semantic table that joins league info from seed_franchises and filters to regular-season game types by default.|batters;hitters

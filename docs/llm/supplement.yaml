@@ -5,7 +5,7 @@ domain:
 tz: America/New_York
 
 coverage: >-
-  Event-level play-by-play complete from 1912; sparse 1871-1911.
+  Event-level play-by-play complete from 1910; sparse 1871-1909.
   Season/career stats from 1871. Lahman-supplemented batters_faced for
   1872/1874. Earned runs absent 1903-1909, BFP partial 1901-1907 even
   with the supplement. Negro Leagues data integrated where available.
@@ -69,7 +69,7 @@ rules:
     text: Season-grain BSL tables filter to regular-season game types by default. Pass game_type explicitly when postseason data is wanted.
   - severity: warn
     scope: global
-    text: Event-level data is sparse before 1912. Restrict event-grain queries to season >= 1912 unless the question specifically targets the early era.
+    text: Event-level data is sparse before 1910. Restrict event-grain queries to season >= 1910 unless the question specifically targets the early era.
 
 verified_queries:
   - id: vq.trout_2018_obp

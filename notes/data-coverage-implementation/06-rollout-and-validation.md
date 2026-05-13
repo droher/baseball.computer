@@ -3,38 +3,32 @@ title: Data Coverage Rollout And Validation
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Data Coverage Rollout And Validation
 
 ## TL;DR
 
-Roll out the 1910-2025 coverage implementation in gated phases: deterministic ledgers, EDA and modeling datasets, fielding-credit allocation, observation and geometry models, deep supplements, park factors, run values, advancement/responsibility, pitch summaries, and publication. Each phase must be additive, auditable, reversible, and blocked from publication until provenance, calibration, conservation, and grouped holdout checks pass.
+Roll out the 1910-2025 coverage implementation in six gated phases that mirror the README DAG: deterministic prep, datasets+EDA+splits, deep-learning supplements, hierarchical Bayesian models (observation, fielding, geometry, park, run values, advancement, responsibility, pitch summary, shift propensity), SQLMesh ingestion + publication, then validation/audits/rollback. Each phase must be additive, auditable, reversible, and blocked from publication until provenance, calibration, conservation, and grouped holdout checks pass.
 
 The first production release should publish no probabilistic values. It should publish ledgers, gap classifications, dataset metadata, EDA summaries, and validation gaps. This makes the assumptions visible before any imputed counter reaches a metric.
 
 ## Rollout DAG
 
+This rollout's phase numbering matches the README's canonical DAG. Phase 0 is a baseline-capture preamble; phases 1-6 mirror the README's five-phase implementation DAG plus a final validation/rollback phase.
+
 ```mermaid
 flowchart TD
-  P0["Phase 0: branch and baseline checks"] --> P1["Phase 1: deterministic ledgers"]
-  P1 --> P2["Phase 2: EDA and modeling datasets"]
-  P2 --> P3["Phase 3: fielding credit allocation"]
-  P2 --> P4["Phase 4: scorer/source observation"]
-  P3 --> P5["Phase 5: handler and geometry"]
-  P4 --> P5
-  P5 --> P6["Phase 6: deep supplement integration"]
-  P6 --> P7["Phase 7: park factors"]
-  P7 --> P8["Phase 8: run values"]
-  P5 --> P9["Phase 9: advancement and responsibility"]
-  P4 --> P10["Phase 10: pitch summaries"]
-  P8 --> P11["Phase 11: publication and compatibility views"]
-  P9 --> P11
-  P10 --> P11
+  P0["Phase 0: branch and baseline checks"] --> P1["Phase 1: deterministic prep (ledgers, observation, gaps)"]
+  P1 --> P2["Phase 2: datasets + EDA + split registry"]
+  P2 --> P3["Phase 3: deep-learning supplements (proposals, embeddings, calibration)"]
+  P3 --> P4["Phase 4: hierarchical Bayesian models"]
+  P4 --> P5["Phase 5: SQLMesh ingestion + publication"]
+  P5 --> P6["Phase 6: validation, audits, rollback"]
 ```
 
-The phases can overlap only after their dependency gates pass. For example, basic run-scoring park factors can start before full geometry models, but batted-ball park factors require observation-adjusted geometry inputs.
+Phase 4 is itself a layered model family. Within Phase 4 the sub-order is: observation models first; then fielding allocation; then geometry; then park factors; then run values; then advancement; then responsibility; then pitch summary; then Model K (shift propensity), which is fit on event-level 2015+ and pitch-level 2009+ and feeds geometry, responsibility (primary alignment basis), and run values. The phases can overlap only after their dependency gates pass.
 
 ## Phase 0: Baseline Checks
 
@@ -62,14 +56,14 @@ SELECT
     source_type,
     COUNT(*) AS games
 FROM main_models.game_start_info
-WHERE season BETWEEN 1910 AND 2025
+WHERE season BETWEEN @VAR('start_season', 1910) AND @VAR('end_season', 2025)
 GROUP BY 1
 ORDER BY 1;
 ```
 
-## Phase 1: Deterministic Ledgers
+## Phase 1: Deterministic Prep
 
-Purpose: build the prep layer from `01-prep-ledgers.md`.
+Purpose: build the prep layer from `01-prep-ledgers.md`. Ledgers, the three sibling event observation tables, and gap classification.
 
 SQLMesh targets:
 
@@ -81,9 +75,13 @@ SQLMesh targets:
 - `main_models.entity_link_reliability`
 - `main_models.game_context_observation_ledger`
 - `main_models.game_exposure_ledger`
-- `main_models.event_observation_ledger`
+- `main_models.event_observation_geometry`
+- `main_models.event_observation_pitch`
+- `main_models.event_observation_credit`
 - `main_models.event_observation_context`
 - `main_models.fielding_credit_gaps`
+
+The three `event_observation_*` siblings share the same schema with narrower dimension enums per family (geometry: trajectory/location/edge/depth/side; pitch: count/sequence/result/strike-type; credit: putout/assist/error/handler).
 
 Acceptance gates:
 
@@ -95,10 +93,11 @@ Acceptance gates:
 | Aggregate-total clarity | Primary `BoxScore` source status is distinct from usable aggregate totals in `PlayByPlay` games. |
 | Personnel hard masks | Hard eligibility masks exist only for high-confidence personnel states. |
 | Exposure policy | Suspended, forfeited, shortened, walk-off, and unknown completion statuses have denominator rules. |
+| Observation sibling parity | The three `event_observation_*` tables share schema and remain joinable on `event_key`. |
 
 Rollback:
 
-- These tables are additive. Exclude them from downstream models if a ledger audit fails.
+- These tables are additive. Rollback path is `just promote-prod main_models.<previous_compatibility_view>` to restate the legacy view in prod, plus a `sqlmesh janitor` step to clean per-branch env snapshots for the bad ledger. Per-branch envs reference the bad ledger fingerprint and must be invalidated separately (via `just plan` on each affected branch).
 
 ## Phase 2: EDA And Modeling Datasets
 
@@ -134,116 +133,17 @@ Acceptance gates:
 
 Rollback:
 
-- Rebuild modeling datasets from ledgers and keep prior dataset snapshots immutable.
+- Rebuild modeling datasets from ledgers and keep prior dataset snapshots immutable. Rollback path is `just promote-prod main_models.<previous_compatibility_view>` plus `sqlmesh janitor` for affected per-branch env snapshots.
 
-## Phase 3: Fielding Credit Allocation
+## Phase 3: Deep-Learning Supplements
 
-Purpose: replace `unknown_fielding_play_shares` as the long-term estimated official-credit layer.
-
-First scope:
-
-- Unknown putouts and hidden assist risk in event-level games.
-- Clean box-score residual constraints.
-- No-box unknowns tagged low-confidence.
-- Battery and baserunning-related credits modeled separately or withheld.
-
-Outputs:
-
-- `imputed_fielding_credit`
-- `fielding_credit_expected_counters`
-- `fielding_credit_validation`
-
-Acceptance gates:
-
-| Gate | Requirement |
-| --- | --- |
-| Conservation | Expected event putouts reconcile to event outs and unknown putouts. |
-| Aggregate reconciliation | Expected player-game credits reconcile to clean box-score residuals where official aggregate constraints are used. |
-| Personnel | No credit assigned outside reliable personnel states. |
-| Backtest | Held-out complete events beat legacy allocation or match it with better calibration and uncertainty. |
-| No-box confidence | No-box estimates are tagged lower confidence and separated from estimates constrained by official aggregate totals. |
-
-Rollback:
-
-- Keep `unknown_fielding_play_shares` as the legacy compatibility source.
-- Publish new outputs only in an estimated namespace until validation clears.
-
-## Phase 4: Scorer And Source Observation
-
-Purpose: estimate observation propensities and label-bias surfaces for batted-ball and pitch dimensions.
-
-First scope:
-
-- `trajectory` observedness.
-- `location_side` and `location_depth` observedness.
-- broad ground/air contact observedness.
-
-Later scope:
-
-- detailed fly/line/pop label confusion.
-- pitch sequence and strike-type observedness.
-
-Outputs:
-
-- `scorer_observation_propensities`
-- `observation_model_draws`
-- `observation_weighted_metric_inputs`
-- `scorer_label_confusion_summaries`
-
-Acceptance gates:
-
-| Gate | Requirement |
-| --- | --- |
-| Calibration | Propensities calibrate by era, scorer, source, hit/out, result, and team affiliation. |
-| Holdout | Scorer and source-family holdouts do not collapse. |
-| Sensitivity | MNAR sensitivity intervals exist for hit location and detailed contact labels. |
-| Metric baseline | Existing coverage-weighted metrics can be reproduced as a baseline. |
-
-Rollback:
-
-- Continue publishing raw and existing coverage-weighted metrics.
-
-## Phase 5: Handler And Geometry
-
-Purpose: estimate handler and batted-ball geometry probabilities without treating fielder position as universal location.
-
-First scope:
-
-- handler probability by player/position.
-- broad trajectory and side/depth geometry.
-- recorded and deduced layers preserved.
-- alignment regimes included.
-
-Outputs:
-
-- `ball_handler_probabilities`
-- `imputed_batted_ball_geometry`
-- `normalized_contact_probabilities`
-- `geometry_expected_counters`
-
-Acceptance gates:
-
-| Gate | Requirement |
-| --- | --- |
-| Layer separation | Recorded, deduced, normalized, and estimated geometry remain separate. |
-| Regime validation | Train/test within alignment regimes passes before cross-regime transfer. |
-| Hit/out validation | Location holdouts pass separately for hits and outs. |
-| Scorer validation | Scorer/source holdouts pass or produce weak flags. |
-| Fielding separation | Official credit, handler, and responsibility are not collapsed. |
-
-Rollback:
-
-- Keep `calc_batted_ball_type` as the default geometry source.
-
-## Phase 6: Deep Supplement Integration
-
-Purpose: add calibrated deep proposals and embeddings as inputs to hierarchical models.
+Purpose: add calibrated deep proposals and embeddings as inputs to hierarchical models. Trained on the frozen Phase 2 datasets; outputs are out-of-fold predictions and embedding tables.
 
 First scope:
 
 - Geometry proposal probabilities.
 - Handler proposal probabilities.
-- Batter/pitcher/park/scorer embeddings for diagnostics.
+- Batter/pitcher/park/scorer embeddings for diagnostics and Phase 4 priors.
 
 Acceptance gates:
 
@@ -257,117 +157,68 @@ Acceptance gates:
 
 Rollback:
 
-- Bayesian models run without deep covariates by setting deep coefficients to zero or omitting proposal columns.
+- Bayesian models run without deep covariates by setting deep coefficients to zero or omitting proposal columns. Per-model `gamma_dl_zero` ablation flavors stay published as fallbacks (see Phase 4).
 
-## Phase 7: Park Factors
+## Phase 4: Hierarchical Bayesian Models
 
-Purpose: replace fixed pseudo-count park factors with hierarchical posterior park effects.
+Purpose: fit the model families from `03-hierarchical-models.md` in the strict dependency order. Each family is a separate model with its own dataset, prior, and acceptance gates, but they share the Phase 4 publication gate below.
 
-First scope:
+Model families, in order:
 
-- Basic scoring and event-outcome factors.
-- Sparse-league shrinkage.
-- Compatibility view with existing factor columns.
+- **Model A — Scorer/source observation.** Observation propensities and label-bias surfaces. Outputs feed every downstream model as weights and masks.
+- **Model B — Fielding allocation.** Replaces `unknown_fielding_play_shares`. Putouts, assists, errors, no-box and box-residual constraints. Uses Model A weights.
+- **Model C — Handler.** Ball-handler probability by player/position; feeds geometry.
+- **Model D — Geometry.** Trajectory and side/depth/edge with recorded, deduced, normalized, and estimated layers preserved. Consumes Model A, B, C and Model K (shift posterior).
+- **Model E — Park factors.** Hierarchical posterior park effects, replacing fixed pseudo-counts. Consumes Model D for batted-ball factors.
+- **Model F — Run values.** Run expectancy and event/play run values, replacing hard sample-size thresholds in `linear_weights`. Consumes Model E and Model K.
+- **Model G — Advancement.** Runner advancement after geometry and handler uncertainty are stable.
+- **Model H — Pitch summary.** Pitch coverage and pitch summary distributions (count, sequence observedness, summary counts) after source-family block absence is classified.
+- **Model I — Responsibility.** Fielding responsibility / range distribution. Consumes Model D and Model K (alignment basis).
+- **Model K — Shift propensity.** Fit on event-level 2015+ and pitch-level 2009+. Feeds geometry, responsibility (primary alignment basis), run values.
 
-Later scope:
+Outputs (the union across families; see `03-hierarchical-models.md` for per-model schemas):
 
-- Observation-adjusted batted-ball park factors.
-- Multivariate correlated park effect vectors.
+- `scorer_observation_propensities`
+- `observation_model_draws`
+- `observation_weighted_metric_inputs`
+- `scorer_label_confusion_summaries`
+- `observation_model_diagnostics`
+- `imputed_fielding_credit`
+- `fielding_credit_expected_counters`
+- `fielding_credit_validation`
+- `ball_handler_probabilities`
+- `imputed_batted_ball_geometry`
+- `normalized_contact_probabilities`
+- `geometry_expected_counters`
+- posterior `park_factors`
+- posterior run-value tables
+- runner/fielder advancement posteriors
+- pitch-summary posteriors
+- responsibility posteriors
+- shift-propensity posteriors (Model K)
 
-Acceptance gates:
+### Schema Sketches For Outputs Without A Home In `03-hierarchical-models.md`
 
-| Gate | Requirement |
-| --- | --- |
-| Connectivity | Park-season connectedness report supports estimation or flags weak slices. |
-| Posterior predictive | Rates calibrate by park, season, league, handedness, team, and outcome. |
-| Legacy comparison | Stable high-sample MLB periods agree directionally with current factors. |
-| Sparse behavior | Sparse leagues shrink through hierarchy instead of fixed pseudo-counts. |
-| Observation sensitivity | Batted-ball factors include sensitivity to observation-model draws. |
+These three outputs are referenced as Phase 4 deliverables but do not have a schema in `03-hierarchical-models.md`. Sketch them here so consumers can plan against them:
 
-Rollback:
+- `observation_weighted_metric_inputs` — `(metric_grain, observation_propensity_weight, source_method, confidence)`. Used by aggregate metrics for inverse-probability weighting.
+- `scorer_label_confusion_summaries` — `(scorer_id, era_bucket, true_class, observed_class, confusion_prob_mean, confusion_prob_lower, confusion_prob_upper)`. Long format; one row per (scorer, era, true, observed) combination.
+- `observation_model_diagnostics` — `(slice_key, calibration_metric, coverage_pct, n_events, n_holdout)`. Per-slice posterior-predictive diagnostics.
 
-- Existing `park_factors` remains the compatibility view until posterior factors are approved.
+### Acceptance Gates (per-family)
 
-## Phase 8: Run Values
+Each model carries its own conservation, calibration, and holdout gates from `03-hierarchical-models.md`. The union of those gates is summarized in the Validation Matrix below.
 
-Purpose: replace hard sample-size thresholds in run expectancy and linear weights with hierarchical value models.
+### Cross-Family Acceptance Gate: gamma_dl Ablation
 
-First scope:
+Each Bayes model is fit twice (`gamma_dl_zero` and `gamma_dl_shrunk`). Publication tier is selected per-model based on posterior-change magnitude — if including DL shifts publication-tier random-effect posteriors by more than 0.25 SD on most cells, the `gamma_dl_zero` flavor is published; otherwise the shrunk flavor. Both artifacts are stored; the published tier is named in the manifest.
 
-- run expectancy by base/out state, season, and league.
-- generated run values for event/play categories.
+Rollback (Phase 4 as a whole):
 
-Later scope:
+- Keep `unknown_fielding_play_shares`, `calc_batted_ball_type`, existing `park_factors`, `linear_weights`, `runner_advance_expectancy`, `fielder_advance_expectancy`, and `ground_ball_blame` as legacy compatibility surfaces until each posterior family clears validation.
+- Rollback path is `just promote-prod main_models.<previous_compatibility_view>` to restate the legacy view in prod, plus a `sqlmesh janitor` step to clean per-branch env snapshots for the bad model. Per-branch envs reference the bad model fingerprint and must be invalidated separately (via `just plan` on each affected branch).
 
-- win expectancy after game-end and exposure policy validation.
-
-Acceptance gates:
-
-| Gate | Requirement |
-| --- | --- |
-| State conservation | Start/end state transitions pass audits. |
-| Posterior predictive | Runs per inning and state values calibrate by era, league, and park. |
-| Sparse states | Rare states expose intervals and shrink to plausible neighbors. |
-| Metric compatibility | Downstream metrics recompute from counters or expected counters. |
-
-Rollback:
-
-- Keep current `linear_weights` as the legacy baseline.
-
-## Phase 9: Advancement And Responsibility
-
-Purpose: estimate runner advancement and fielding responsibility only after geometry and handler uncertainty are stable.
-
-First scope:
-
-- context-only advancement model.
-- responsibility readiness report.
-
-Later scope:
-
-- runner and fielder effects.
-- range-style responsibility probabilities.
-
-Acceptance gates:
-
-| Gate | Requirement |
-| --- | --- |
-| Geometry propagation | Geometry uncertainty is passed as draws or probability vectors. |
-| Post-treatment guard | First model avoids conditioning on labels that encode advancement success. |
-| Opportunity checks | Fielder effects improve calibration without absorbing opportunity bias. |
-| Responsibility separation | Responsibility outputs do not alter official credits. |
-
-Rollback:
-
-- Keep `runner_advance_expectancy`, `fielder_advance_expectancy`, and `ground_ball_blame` as exploratory views.
-
-## Phase 10: Pitch Summaries
-
-Purpose: model pitch coverage and pitch summary distributions after source-family block absence is classified.
-
-First scope:
-
-- count observedness.
-- sequence observedness.
-- pitch summary counts.
-
-Later scope:
-
-- ordered pitch sequence generation for analyses that require order.
-
-Acceptance gates:
-
-| Gate | Requirement |
-| --- | --- |
-| Source-family block separation | Game/source-level absence is not treated as event-level missingness. |
-| Constraint preservation | Summary outputs preserve count, result, and pitch-event constraints. |
-| Era validation | Modern pitch patterns are not transported to early eras without strong weak-identification flags. |
-
-Rollback:
-
-- Keep pitch sequence outputs as observed-only.
-
-## Phase 11: Publication And Compatibility Views
+## Phase 5: SQLMesh Ingestion And Publication
 
 Purpose: publish estimated outputs safely and preserve existing consumer expectations.
 
@@ -400,6 +251,26 @@ Compatibility views:
 - Add estimated counterparts under explicit names.
 - Do not silently change official metric semantics.
 
+## Phase 6: Validation, Audits, And Rollback
+
+Purpose: run the post-publication validation and audit pass against the rollout. This phase produces validation reports, not new model artifacts.
+
+Tasks:
+
+- Run the full validation matrix below against each Phase 4 model family at the published tier (`gamma_dl_zero` or `gamma_dl_shrunk`, per manifest).
+- Run conservation, calibration, holdout, and sensitivity diagnostics against frozen Phase 2 datasets.
+- Compare estimated namespace counters against legacy compatibility views and explain any directional drift.
+- Confirm rollback paths still work: `just promote-prod main_models.<previous_compatibility_view>` plus `sqlmesh janitor` for each affected per-branch env, then `just plan` on each branch that referenced the bad fingerprint.
+
+Acceptance gates:
+
+| Gate | Requirement |
+| --- | --- |
+| Validation matrix | Every model family in the matrix below clears its row. |
+| Drift explanation | Direction of change versus legacy is documented per family. |
+| Rollback rehearsal | At least one per-branch env is rolled back end-to-end as a dry run. |
+| Manifest completeness | Every published artifact lists model name, version, tier, `gamma_dl` flavor, and dataset snapshot. |
+
 ## Validation Matrix
 
 | Model family | Conservation | Calibration | Holdout | Sensitivity | Publication blocker |
@@ -411,17 +282,31 @@ Compatibility views:
 | Park factors | exposure denominators | posterior predictive rates | park-season holdouts | roster/team/source controls | weak connectivity unflagged. |
 | Run values | state transitions | runs by state | season/league holdouts | priors, park/context | sparse states overconfident. |
 | Advancement | base/out consistency | category reliability | runner/fielder/context holdouts | geometry uncertainty | player effects absorb opportunity bias. |
+| Responsibility | event-level normalization | range distribution reliability | alignment-regime and scorer holdouts | shift-regime, geometry uncertainty | range estimates overwrite official credit or transport across alignment regimes. |
 | Pitch summaries | count/result constraints | sequence summary reliability | source/era holdouts | modern-to-historical transport | source-family block absence misclassified. |
+| Shift propensity (Model K) | per-event/per-pitch normalization | era-conditional reliability | era/team/park holdouts | pre-2009 alignment uncertainty | pre-2009 alignment basis treated as observed rather than prior. |
 
 ## SQLMesh Gates
 
+> **DEV_ONLY trap.** This project runs with `virtual_environment_mode=DEV_ONLY`
+> plus `always_recreate_environment=True`. A bare `sqlmesh plan` without an env
+> argument will silently advance state without rebuilding the unsuffixed
+> `main_models.*` prod tables. Use `just plan` for per-branch dev iteration
+> and `just promote-prod` for promoting a code change to prod. See
+> `.claude/rules/sqlmesh.md`.
+
 Before any new SQLMesh model family is promoted:
 
-1. Run `sqlmesh plan` in a dev environment for the selected models.
+1. Iterate on the current branch with `just plan` (per-branch env auto-derived
+   from the git branch slug; preview with `just which-env`). For a single
+   model, use `just plan-model main_models.<model>`.
 2. Run audits for the selected models and direct downstream consumers.
 3. Compare row counts against baseline and dataset metadata.
 4. Run `git diff --check`.
 5. Confirm artifact manifests referenced by ingestion models exist.
+6. Promote to prod with `just promote-prod main_models.<model> [more...]`,
+   which runs `sqlmesh plan --restate-model <each>` and cascades to
+   downstream consumers. For a clean wipe, use `just rebuild-prod`.
 
 Promotion should be model-scoped. Avoid restating unrelated downstream model families until the estimated namespace is stable.
 

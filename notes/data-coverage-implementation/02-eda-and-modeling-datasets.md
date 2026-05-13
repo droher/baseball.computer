@@ -3,7 +3,7 @@ title: Data Coverage EDA And Modeling Datasets
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Data Coverage EDA And Modeling Datasets
@@ -23,6 +23,8 @@ The central implementation rule is simple: fitted models read only versioned dat
 - Produce lightweight EDA reports that can block a model from fitting when assumptions fail.
 
 Invariant: a modeling dataset without source-availability columns, `observed_status`, reliability columns, official aggregate constraint state, and split metadata is a scratchpad, not a production input.
+
+Invariant: season bounds in SQL sketches are placeholders for SQLMesh vars. Production models should use `@VAR('start_season', 1910)` and `@VAR('end_season', 2025)`, not hardcoded literals.
 
 ## Dataset Lifecycle
 
@@ -62,42 +64,58 @@ Every modeling dataset should include these column families even if a model uses
 | Official aggregate constraints | `official_aggregate_status`, `aggregate_grain`, `residual_value`, `authority_rank`. |
 | Context | `scorer`, `inputter`, `translator`, `affiliated_team`, `base_state_start`, `outs_start`, `inning_start`, `frame_start`, `score_margin`, `leverage_index`. |
 | Baseball actors | `batter_id`, `pitcher_id`, `runner_*_id`, `fielder_id`, `fielding_position`, `batter_hand`, `pitcher_hand`. |
-| Split metadata | `split_family`, `fold_id`, `holdout_regime`, `source_snapshot_id`, `query_hash`, `dataset_version`. |
+| Deep proposal linkage | `dl_artifact_id` (nullable VARCHAR). |
+| Split metadata | `primary_fold`, `stress_holdouts`, `source_snapshot_id`, `query_hash`, `dataset_version`, `ablation_status`. |
+
+`dl_artifact_id` is a universal column even when NULL. Datasets that do not consume DL proposals leave it NULL. Datasets that do (observation, geometry, advancement) populate it during the dataset-prep step from the calibrated DL proposal manifest, and cross-fitted proposal columns join in by `dl_artifact_id` plus the dataset's key columns.
 
 Optional but preferred:
 
-- `dl_proposal_*` columns for calibrated out-of-fold deep probabilities.
+- `dl_proposal_*` columns for calibrated out-of-fold deep probabilities (joined via `dl_artifact_id`).
 - `dl_embedding_*` vector references when embeddings are used.
 - `alignment_regime` for fielder-to-location and responsibility models.
 - `park_episode_id` when park identity is not stable enough for a bare `park_id`.
 
 ## Split Policy
 
-Random event splits are useful only for smoke tests. Production validation needs grouped splits that match the failure mode.
+Random event splits are useful only for smoke tests. Production validation uses one primary grouped split for fit/select, plus a collection of stress-test holdouts evaluated post-fit via posterior predictive.
 
-| Split | Unit | Required for |
-| --- | --- | --- |
-| `game_hash` | `game_id` | Default leakage firewall for event models. |
-| `season_block` | season or era block | Cross-era transport and sparse-era validation. |
-| `scorer_holdout` | scorer/inputter/translator | Scorer/source observation models. |
-| `park_holdout` | park-season or park episode | Park factors and geometry transfer. |
-| `source_family_holdout` | source family or file family | Source-family block missingness. |
-| `alignment_regime_holdout` | pre-shift, shift-growth, full shift, post-2023 | Handler, geometry, and responsibility. |
-| `aggregate_total_holdout` | game/team/player-position aggregate total | Fielding credit allocation. |
-| `player_group_holdout` | player career or player-season | Player embeddings, player effects, and synthetic personnel. |
+### Primary split
 
-SQL sketch for split assignment:
+Every modeling dataset assigns one `primary_fold` value per row using `HASH(game_id) % 100`: 70 TRAIN / 15 VALIDATE / 15 TEST. This is the only split the fitter conditions on; all hyperparameter selection and stopping criteria read from VALIDATE, and TEST is reserved for end-of-pipeline reporting.
 
 ```sql
 CASE
-    WHEN HASH(game_id)::HUGEINT % 100 BETWEEN 0 AND 79 THEN 'TRAIN'
-    WHEN HASH(game_id)::HUGEINT % 100 BETWEEN 80 AND 89 THEN 'VALIDATE'
+    WHEN HASH(game_id)::HUGEINT % 100 BETWEEN 0 AND 69 THEN 'TRAIN'
+    WHEN HASH(game_id)::HUGEINT % 100 BETWEEN 70 AND 84 THEN 'VALIDATE'
     ELSE 'TEST'
-END AS split_family,
-HASH(game_id)::HUGEINT % 10 AS fold_id
+END AS primary_fold
 ```
 
-For scorer and park holdouts, the split registry should store explicit held-out IDs so future reruns evaluate the same slices.
+### Stress-test holdouts
+
+Stress dimensions are NOT intersected with the primary split. Each is recorded as a boolean flag on every row, and generalization is measured after the primary fit by sampling the posterior predictive on rows where that dimension's entity was held out entirely from the fit. Because hierarchical Bayes partial-pools across scorer/park/regime random effects, generalization to unseen entities can be measured on held-out IDs without refitting. Sequential refits (one per stress dimension) are reserved for the publication-tier observation and fielding-credit models, run only after the primary fit stabilizes.
+
+Each model's validation report includes a per-stress-test calibration plot and coverage table.
+
+| Stress dimension | Unit | `stress_holdouts` flag |
+| --- | --- | --- |
+| Scorer | scorer/inputter/translator id | `IS_HELDOUT_SCORER` |
+| Park | park-season or park episode | `IS_HELDOUT_PARK` |
+| Alignment regime | pre-shift, shift-growth, full shift, post-2023 | `IS_HELDOUT_ALIGNMENT_REGIME` |
+| Source acquisition block | source family/file family block | `IS_HELDOUT_SOURCE_ACQUISITION_BLOCK` |
+| Season block | era block | `IS_HELDOUT_SEASON_BLOCK` |
+| Aggregate total | game/team/player-position aggregate | `IS_HELDOUT_AGGREGATE_TOTAL` |
+| Player group | player career or player-season | `IS_HELDOUT_PLAYER_GROUP` |
+
+The split registry stores the explicit held-out IDs for each stress dimension so future reruns evaluate the same slices, and each row carries a `stress_holdouts` struct with one bool per flag above. A row may be flagged on multiple dimensions; the posterior-predictive evaluator filters by one dimension at a time.
+
+### Contract additions
+
+The split-registry contract requires per-row:
+
+- `primary_fold` VARCHAR in `{TRAIN, VALIDATE, TEST}`.
+- `stress_holdouts` STRUCT with one BOOLEAN field per stress dimension (`IS_HELDOUT_SCORER`, `IS_HELDOUT_PARK`, `IS_HELDOUT_ALIGNMENT_REGIME`, `IS_HELDOUT_SOURCE_ACQUISITION_BLOCK`, `IS_HELDOUT_SEASON_BLOCK`, `IS_HELDOUT_AGGREGATE_TOTAL`, `IS_HELDOUT_PLAYER_GROUP`).
 
 ## EDA Report Schema
 
@@ -136,6 +154,8 @@ Required report fields:
 
 Purpose: decide whether a dimension is missing at the cell, event, game, source-family block, era block, or not applicable level.
 
+The profile breaks down by `sentinel_type` rather than a single collapsed `observed_status`. Downstream models need to distinguish `null`, `unknown`, `default`, `zero`, `empty_sequence`, `valid_value`, and `not_applicable`: a `default` code (e.g., a parser-emitted fallback) is informative in a different way from a structural `zero`, which is different again from a `null` cell or a `not_applicable` dimension. Aggregating across sentinel types loses that signal.
+
 Query sketch:
 
 ```sql
@@ -144,18 +164,30 @@ SELECT
     league,
     source_family,
     dimension,
-    observed_status,
+    sentinel_type,
     COUNT(*) AS rows,
     SUM(CASE WHEN data_error_risk != 'none' THEN 1 ELSE 0 END) AS data_error_rows
 FROM main_models.model_input_observation_batted_ball
 GROUP BY 1, 2, 3, 4, 5;
 ```
 
+`sentinel_type` values:
+
+| Value | Meaning |
+| --- | --- |
+| `valid_value` | Sourced observation present. |
+| `null` | Cell is missing, no sentinel emitted. |
+| `unknown` | Source emitted an explicit unknown marker. |
+| `default` | Parser or upstream system filled a default code. |
+| `zero` | Structural zero (e.g., no pitches, no advancement). |
+| `empty_sequence` | Sequence-valued dimension is present but empty. |
+| `not_applicable` | Dimension does not apply to this row (e.g., trajectory on a walk). |
+
 Block a model when:
 
 - Source-family block missingness is being treated as event-level missingness.
 - The observed sample for the target is dominated by one era, scorer, source family, park, or team.
-- `Unknown`, `Default`, null, and not-applicable are collapsed into one value.
+- `unknown`, `default`, `null`, `zero`, and `not_applicable` are collapsed into one value.
 
 ### Interaction Discovery
 
@@ -236,7 +268,7 @@ INNER JOIN main_models.event_states_full AS other
     AND this.season = other.season
     AND this.league = other.league
     AND this.park_id != other.park_id
-WHERE this.season BETWEEN 1910 AND 2025
+WHERE this.season BETWEEN @VAR('start_season', 1910) AND @VAR('end_season', 2025)
     AND this.game_type = 'RegularSeason'
     AND other.game_type = 'RegularSeason'
 GROUP BY 1, 2, 3, 4;
@@ -291,6 +323,25 @@ Checks:
 - Probability that a target is undefined rather than missing.
 
 For categorical models, any category with no training observations in a validation regime needs an explicit unseen-category policy or a hierarchy that pools to broader classes.
+
+### MNAR Pattern-Mixture Sensitivity
+
+Purpose: bound how much downstream conclusions depend on the MAR assumption when the missingness mechanism on the unobserved subset is plausibly not random.
+
+The sensitivity scan uses a fixed delta grid `{-2, -1, -0.5, 0, +0.5, +1, +2}` SD shifts in the latent-class probability for the unobserved subset. This grid is canonical across all models and stress tests so that sensitivity reports are comparable run-to-run. Each model's validation report tabulates which downstream conclusions flip at which delta level, and the publication tier records the minimum-magnitude delta at which each headline result loses sign or significance.
+
+`delta = 0` recovers the MAR fit; the extremes act as tipping-point probes rather than calibrated likelihoods.
+
+## Per-Model Ablation Indexing
+
+Each Bayes model's primary fit dataset has two ablation flavors, distinguished by an `ablation_status` column in the manifest rather than by separate dataset files:
+
+| `ablation_status` | Meaning |
+| --- | --- |
+| `gamma_dl_zero` | Fit ignores the DL proposal mean (sets the coefficient to zero), used to bound how much of the posterior is carried by the DL signal. |
+| `gamma_dl_shrunk` | Fit applies the production shrinkage prior to the DL coefficient, used as the headline run. |
+
+The dataset itself is shared across both flavors. The model fit consumes the same Parquet snapshot twice with different priors, and the manifest records `ablation_status` per fit so posterior artifacts stay distinguishable downstream. Datasets without DL proposals omit the column from per-fit manifests entirely.
 
 ## Dataset Specifications
 
@@ -352,10 +403,20 @@ MODEL (
     hit_or_out VARCHAR,
     leverage_bucket VARCHAR,
     alignment_regime VARCHAR,
+    sentinel_type VARCHAR,
     data_error_risk VARCHAR,
     training_weight DOUBLE,
-    split_family VARCHAR,
-    fold_id UTINYINT,
+    dl_artifact_id VARCHAR,
+    primary_fold VARCHAR,
+    stress_holdouts STRUCT(
+        IS_HELDOUT_SCORER BOOLEAN,
+        IS_HELDOUT_PARK BOOLEAN,
+        IS_HELDOUT_ALIGNMENT_REGIME BOOLEAN,
+        IS_HELDOUT_SOURCE_ACQUISITION_BLOCK BOOLEAN,
+        IS_HELDOUT_SEASON_BLOCK BOOLEAN,
+        IS_HELDOUT_AGGREGATE_TOTAL BOOLEAN,
+        IS_HELDOUT_PLAYER_GROUP BOOLEAN
+    ),
     source_snapshot_id VARCHAR
   )
 );
@@ -385,18 +446,32 @@ SELECT
     c.hit_or_out,
     c.leverage_bucket,
     c.alignment_regime,
+    o.sentinel_type,
     o.data_error_risk,
     CASE WHEN o.data_error_risk = 'none' THEN 1.0 ELSE 0.0 END AS training_weight,
+    p.dl_artifact_id,
     CASE
-        WHEN HASH(c.game_id)::HUGEINT % 100 BETWEEN 0 AND 79 THEN 'TRAIN'
-        WHEN HASH(c.game_id)::HUGEINT % 100 BETWEEN 80 AND 89 THEN 'VALIDATE'
+        WHEN HASH(c.game_id)::HUGEINT % 100 BETWEEN 0 AND 69 THEN 'TRAIN'
+        WHEN HASH(c.game_id)::HUGEINT % 100 BETWEEN 70 AND 84 THEN 'VALIDATE'
         ELSE 'TEST'
-    END AS split_family,
-    (HASH(c.game_id)::HUGEINT % 10)::UTINYINT AS fold_id,
+    END AS primary_fold,
+    STRUCT_PACK(
+        IS_HELDOUT_SCORER := s.is_heldout_scorer,
+        IS_HELDOUT_PARK := s.is_heldout_park,
+        IS_HELDOUT_ALIGNMENT_REGIME := s.is_heldout_alignment_regime,
+        IS_HELDOUT_SOURCE_ACQUISITION_BLOCK := s.is_heldout_source_acquisition_block,
+        IS_HELDOUT_SEASON_BLOCK := s.is_heldout_season_block,
+        IS_HELDOUT_AGGREGATE_TOTAL := s.is_heldout_aggregate_total,
+        IS_HELDOUT_PLAYER_GROUP := s.is_heldout_player_group
+    ) AS stress_holdouts,
     @VAR('source_snapshot_id', 'dev') AS source_snapshot_id
-FROM main_models.event_observation_ledger AS o
+FROM main_models.event_observation_geometry AS o
 INNER JOIN main_models.event_observation_context AS c USING (event_key)
-WHERE o.dimension IN ('trajectory', 'location_side', 'location_depth', 'location_edge', 'batted_to_fielder')
+LEFT JOIN main_models.dl_proposal_manifest AS p
+    ON p.event_key = o.event_key AND p.dimension = o.dimension
+LEFT JOIN main_models.stress_holdout_registry AS s
+    ON s.event_key = c.event_key
+WHERE o.dimension IN ('trajectory', 'location_side', 'location_depth', 'location_edge', 'ball_handler_position')
     AND c.target_population_status = 'event_level';
 ```
 
@@ -538,15 +613,38 @@ class DatasetExport:
     output_path: Path
     metadata_path: Path
     source_snapshot_id: str
+    categorical_columns: tuple[str, ...] = ()
 
 
 def query_hash(sql: str) -> str:
     return hashlib.sha256(sql.encode("utf-8")).hexdigest()
 
 
+def quote_identifier(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def build_category_maps(con: duckdb.DuckDBPyConnection, spec: DatasetExport) -> dict[str, dict[str, int]]:
+    source_sql = spec.sql.rstrip().rstrip(";")
+    maps: dict[str, dict[str, int]] = {}
+    for column in spec.categorical_columns:
+        quoted = quote_identifier(column)
+        values = con.sql(
+            f"""
+            SELECT DISTINCT {quoted}::VARCHAR AS value
+            FROM ({source_sql}) AS dataset
+            WHERE {quoted} IS NOT NULL
+            ORDER BY 1
+            """
+        ).fetchall()
+        maps[column] = {value: idx for idx, (value,) in enumerate(values)}
+    return maps
+
+
 def export_dataset(con: duckdb.DuckDBPyConnection, spec: DatasetExport) -> dict[str, object]:
     log.info("exporting dataset", extra={"dataset_name": spec.dataset_name, "output_path": str(spec.output_path)})
     relation = con.sql(spec.sql)
+    category_maps = build_category_maps(con, spec)
     relation.write_parquet(str(spec.output_path))
     metadata = {
         "dataset_name": spec.dataset_name,
@@ -554,6 +652,7 @@ def export_dataset(con: duckdb.DuckDBPyConnection, spec: DatasetExport) -> dict[
         "source_snapshot_id": spec.source_snapshot_id,
         "output_path": str(spec.output_path),
         "schema": [(field.name, str(field.type)) for field in pq.read_schema(spec.output_path)],
+        "category_maps": category_maps,
     }
     spec.metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
     return metadata

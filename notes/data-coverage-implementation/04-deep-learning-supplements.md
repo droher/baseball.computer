@@ -3,7 +3,7 @@ title: Deep Learning Supplements For Imputation
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Deep Learning Supplements For Imputation
@@ -80,15 +80,25 @@ For each target:
 
 Invariant: Bayesian training rows must receive out-of-fold deep proposals. In-sample deep probabilities are allowed only for posterior predictive diagnostics, never as training covariates.
 
+## Ablation Contract
+
+Each downstream Bayesian model that consumes a DL proposal is fit twice:
+
+- once with `gamma_dl = 0` (the DL covariate is omitted from the linear predictor entirely).
+- once with `gamma_dl ~ Normal(0, 0.5)` (the shrinkage prior described in the hierarchical model inputs section).
+
+Both posteriors are written under the same `model_name` with distinct `artifact_id`s and a manifest field `ablation_status in {gamma_dl_zero, gamma_dl_shrunk}` (schema lives in `05-runtime-artifacts-and-library.md`). Per-model publication tier is chosen by comparing posterior change magnitude on target slices: if including the DL covariate shifts publication-tier random-effect posteriors by more than 0.25 SD on most scorer/park/era cells, the `gamma_dl_zero` flavor is published (interpreted as DL absorbing scorer/source signal — leakage risk) and the proposal is recorded as diagnostic-only for that model; otherwise the `gamma_dl_shrunk` flavor is published (DL adds incremental lift without contaminating the hierarchy). Threshold and direction must match 03-hierarchical-models.md and 06-rollout-and-validation.md.
+
+Implication for this doc: DL proposal artifacts must be **loadable without affecting the Bayes prior structure**. The proposal is consumed conditionally by the Bayes layer — the deep training and export code never assumes the proposal will be used downstream. Proposal artifacts are written independent of any per-Bayes-model decision; the ablation is a property of how the Bayes model is configured at fit time, not of the DL artifact.
+
 ## Output Tables
 
 ### `dl_proposal_probabilities`
 
 | Field | Meaning |
 | --- | --- |
-| `artifact_id` | Deep model artifact ID. |
+| `artifact_id` | Deep model artifact ID (UUID per fit; see `05-runtime-artifacts-and-library.md` versioning glossary). |
 | `target_name` | `geometry_side`, `trajectory_broad`, `handler_position`, `advancement_category`, etc. |
-| `grain_key` | Serialized event/player key or explicit key columns in model-specific views. |
 | `event_key` | Event key when applicable. |
 | `player_id` | Player key when applicable. |
 | `fielding_position` | Position key when applicable. |
@@ -207,7 +217,7 @@ Guardrail: do not train on post-treatment result labels that encode the advancem
 Inputs:
 
 - event outcomes from high-coverage modeling datasets
-- regular-season filters and source/artifact masks
+- regular-season filters and source/data-error masks
 - batter, pitcher, park, team, scorer, era IDs
 
 Outputs:
@@ -221,6 +231,14 @@ Bayesian use:
 - prior mean features for player/park random effects only after sensitivity checks.
 
 Guardrail: run an adversarial diagnostic that predicts source family or scorer from embeddings. Embeddings that strongly encode source-specific collection patterns should be diagnostic-only.
+
+Concrete thresholds on the source-probe AUC, evaluated on a held-out source family (see `source_probe_auc` sketch below):
+
+- `auc >= 0.75`: the DL embedding (or proposal that consumes it) is treated as **diagnostic-only** for that source family. It may not be used as a Bayes covariate downstream — the `gamma_dl_shrunk` ablation is unavailable and only the `gamma_dl_zero` artifact is publishable.
+- `auc < 0.65`: full publication-tier eligibility. The embedding is allowed as a Bayes covariate subject to the ablation contract above.
+- `0.65 <= auc < 0.75`: gray zone. Artifact is flagged for manual review in the validation report; the publication decision is recorded in the manifest with an explicit reviewer note.
+
+Thresholds are per source family, not global — an embedding may be publication-eligible on Retrosheet event sources while being diagnostic-only on early-century box sources.
 
 ## Model Sketch
 
@@ -280,7 +298,67 @@ Candidate calibrators:
 - Temperature scaling for multiclass probabilities.
 - Isotonic regression for binary or one-vs-rest outputs when enough data exists.
 - Dirichlet calibration for multiclass outputs after validation.
-- Hierarchical calibration curves by era/source/scorer for sparse slices.
+- Per-slice Platt scaling by era/source/scorer for sparse slices where global calibration leaves residual bias.
+
+### Per-Slice Platt Calibrators
+
+Per-slice calibration is implemented as a fit-per-`slice_key` Platt-scaling sweep with the resulting coefficients stored in a single Parquet keyed on `slice_key`. `slice_key` is a composite string (e.g. `era=deadball|source=retrosheet|scorer=NULL`) defined by the calibration plan for each target. Sparse slices fall back to a parent slice (e.g. `era=*|source=retrosheet|scorer=NULL`) recorded in the same Parquet so the resolver always has a row to read.
+
+```python
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+import polars as pl
+from sklearn.linear_model import LogisticRegression
+
+
+@dataclass(frozen=True)
+class PlattCoefficients:
+    slice_key: str
+    target_name: str
+    class_name: str
+    coef: float
+    intercept: float
+    n: int
+    fallback_slice_key: str | None
+
+
+def fit_platt_per_slice(
+    df: pl.DataFrame,
+    target_name: str,
+    class_name: str,
+    min_rows_per_slice: int,
+) -> list[PlattCoefficients]:
+    rows: list[PlattCoefficients] = []
+    for slice_key, group in df.group_by("slice_key"):
+        if group.height < min_rows_per_slice:
+            continue
+        logit = np.log(group["raw_probability"].to_numpy().clip(1e-6, 1 - 1e-6))
+        logit = logit - np.log(1 - np.exp(logit).clip(1e-6, 1 - 1e-6))
+        observed = group["observed"].to_numpy().astype(int)
+        clf = LogisticRegression(C=1e6, solver="lbfgs", max_iter=500)
+        clf.fit(logit.reshape(-1, 1), observed)
+        rows.append(
+            PlattCoefficients(
+                slice_key=str(slice_key[0]),
+                target_name=target_name,
+                class_name=class_name,
+                coef=float(clf.coef_[0, 0]),
+                intercept=float(clf.intercept_[0]),
+                n=int(group.height),
+                fallback_slice_key=None,
+            )
+        )
+    return rows
+
+
+def write_calibrator_parquet(coefficients: list[PlattCoefficients], path: str) -> None:
+    pl.DataFrame([c.__dict__ for c in coefficients]).write_parquet(path)
+```
+
+The Parquet (`calibrators.parquet`) lives next to `probabilities.parquet` in the deep artifact exports directory. Bayesian ingestion joins it by `slice_key` and applies `sigmoid(coef * logit + intercept)` to the raw probability column, falling back to `fallback_slice_key` when the row's `slice_key` is absent.
 
 Code sketch:
 
@@ -290,6 +368,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.optimize import minimize
+from scipy.special import logsumexp, softmax
 from sklearn.isotonic import IsotonicRegression
 
 
@@ -304,6 +384,28 @@ def fit_binary_isotonic(probability: np.ndarray, observed: np.ndarray, target_na
     model = IsotonicRegression(out_of_bounds="clip")
     model.fit(probability, observed)
     return BinaryCalibrator(target_name=target_name, class_name=class_name, model=model)
+
+
+@dataclass(frozen=True)
+class TemperatureCalibrator:
+    target_name: str
+    classes: tuple[str, ...]
+    temperature: float
+
+
+def fit_temperature_scaling(logits: np.ndarray, observed_class_idx: np.ndarray, target_name: str, classes: tuple[str, ...]) -> TemperatureCalibrator:
+    def objective(log_temperature: np.ndarray) -> float:
+        temperature = float(np.exp(log_temperature[0]))
+        scaled = logits / temperature
+        log_probs = scaled - logsumexp(scaled, axis=1, keepdims=True)
+        return float(-np.mean(log_probs[np.arange(observed_class_idx.shape[0]), observed_class_idx]))
+
+    result = minimize(objective, x0=np.array([0.0]), method="BFGS")
+    return TemperatureCalibrator(target_name=target_name, classes=classes, temperature=float(np.exp(result.x[0])))
+
+
+def calibrate_multiclass(logits: np.ndarray, calibrator: TemperatureCalibrator) -> np.ndarray:
+    return softmax(logits / calibrator.temperature, axis=1)
 ```
 
 Calibration reports should block downstream use if reliability curves fail in key slices even when global metrics look strong.

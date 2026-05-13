@@ -3,7 +3,7 @@ title: Statistical Runtime Artifacts And Library
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Statistical Runtime Artifacts And Library
@@ -13,6 +13,25 @@ last-verified: 2026-05-12
 Create a shared `bc/python_models/statistical` library before implementing individual models. The library owns modeling dataset export, artifact manifests, typed schemas, split registries, logging, calibration utilities, PyMC helpers, diagnostics, validation reports, and SQLMesh artifact ingestion. Individual models should be thin modules that plug into this shared runtime.
 
 Without this shared layer, each model will invent different paths, metadata, logging, split rules, and validation formats. That makes posterior model outputs impossible to audit and dangerous to publish.
+
+## Versioning Glossary
+
+The statistical layer uses several version-like identifiers. They are not interchangeable. Code, manifests, and SQL ingestion must use them with the meanings below.
+
+| Identifier | Type | Meaning |
+| --- | --- | --- |
+| `artifact_id` | UUID v4 | Immutable per-fit handle. Generated once when a fit succeeds. Canonical handle for joining model outputs across tables — every probability row, embedding row, posterior summary row, and manifest record carries the `artifact_id` of the fit that produced it. |
+| `model_version` | semver string (`"1.0"`, `"1.1"`, `"2.0"`) | Bumps on any change to the model's API: input schema, output schema, prior structure, ablation contract, or other reader-visible contract. Patch bumps are not used; the smallest reader-visible change is a minor bump. |
+| `run_id` | string | Per-fit-attempt label. May equal `artifact_id` if the fit succeeded on the first attempt and no retries were needed. When a fit is retried (e.g. sampler restart, divergence retry), each attempt has its own `run_id`; the final successful attempt's `run_id` is the one that becomes the `artifact_id`. Failed attempts have `run_id`s but no `artifact_id`. |
+| `query_hash` | SHA-256 hex | Hash of the rendered SQLMesh-generated dataset query (the text the exporter actually sends to DuckDB). Identifies dataset version. Two datasets with the same `query_hash` and the same source snapshot are byte-identical. |
+| `schema_hash` | SHA-256 hex | Hash of the column schema — sorted `(column_name, dtype)` tuples serialized canonically. Detects breaking schema changes independent of `query_hash` (e.g. a `SELECT *` query whose underlying table grew a column). |
+
+Usage rules:
+
+- Downstream joins use `artifact_id`. Never join on `run_id`.
+- Reader-visible contracts (SQL ingestion, validation reports, published manifests) reference `model_version` for compatibility checks and `artifact_id` for the specific fit.
+- `run_id` is internal to the fitting layer; it appears in fit logs and (optionally) in the manifest's metadata block, but not in SQL-consumable exports.
+- `query_hash` and `schema_hash` are dataset-level identifiers. They are recorded on dataset manifests and propagated to fit manifests so a fit can be traced to the exact dataset bytes it consumed.
 
 ## Runtime Boundary
 
@@ -111,7 +130,7 @@ Package responsibilities:
 
 ## Dependency Group
 
-Add a new `stats` dependency group when implementation begins:
+Decision: add a new `stats` dependency group for the first Bayesian implementation. PyMC and ArviZ are the default backend unless smoke runs, diagnostics, or performance gates fail.
 
 ```toml
 [dependency-groups]
@@ -127,18 +146,29 @@ stats = [
 
 Keep `stats` separate from the existing `ml` group unless dependency resolution forces a more specific split. SQLMesh ingestion models should not require importing PyMC.
 
+The `stats` group intentionally repeats the `scikit-learn` constraint instead of including the full `ml` group. Calibration utilities need `scikit-learn`, but Bayesian runs should not pull in Keras, Torch, or MLflow unless a command is explicitly training deep proposals.
+
 ## CLI Shape
 
-Use one CLI entrypoint for repeatable operations:
+The package lives at `bc/python_models/statistical/`; the importable module path is `bc.python_models.statistical`. Expose a console-script entry point in `pyproject.toml` so recipes invoke a short binary name instead of a long dotted module path:
+
+```toml
+[project.scripts]
+bc-stats = "bc.python_models.statistical.cli:main"
+```
+
+`just` recipes and ad-hoc commands use `bc-stats`:
 
 ```text
-uv run --group stats python -m python_models.statistical.cli prepare-dataset --dataset model_input_fielding_credit --artifact-id <id>
-uv run --group stats python -m python_models.statistical.cli run-eda --dataset-artifact <id>
-uv run --group ml python -m python_models.statistical.cli fit-deep --target geometry_side --dataset-artifact <id>
-uv run --group stats python -m python_models.statistical.cli fit-bayes --model fielding_credit --dataset-artifact <id>
-uv run --group stats python -m python_models.statistical.cli export-sql --model fielding_credit --run-id <id>
-uv run --group stats python -m python_models.statistical.cli validate --run-id <id>
+uv run --group stats bc-stats prepare-dataset --dataset model_input_fielding_credit --artifact-id <id>
+uv run --group stats bc-stats run-eda --dataset-artifact <id>
+uv run --group ml bc-stats fit-deep --target geometry_side --dataset-artifact <id>
+uv run --group stats bc-stats fit-bayes --model fielding_credit --dataset-artifact <id>
+uv run --group stats bc-stats export-sql --model fielding_credit --artifact-id <id>
+uv run --group stats bc-stats validate --artifact-id <id>
 ```
+
+The equivalent dotted-path form (`uv run --group stats python -m bc.python_models.statistical.cli ...`) is supported as a fallback for environments where the entry point is not installed (e.g. running directly from a source checkout without `uv sync`). Documentation and `just` recipes prefer `bc-stats`.
 
 Subcommands:
 
@@ -150,7 +180,7 @@ Subcommands:
 | `fit-bayes` | Prior predictive, posterior, posterior predictive, diagnostics. |
 | `export-sql` | SQL-consumable probability, expected-counter, and summary Parquet files. |
 | `validate` | Conservation, calibration, grouped holdout, and publication status report. |
-| `publish-manifest` | Marks a run as the artifact ID SQLMesh may ingest. |
+| `publish-manifest` | Writes the `artifact_id` SQLMesh may ingest for a given `model_name`. |
 
 ## Artifact Layout
 
@@ -170,7 +200,7 @@ artifacts/statistical/
         calibration_report.parquet
       manifest.json
   bayes/
-    <model_name>/<run_id>/
+    <model_name>/<artifact_id>/
       inference/
         prior_predictive.nc
         posterior.nc
@@ -191,6 +221,17 @@ artifacts/statistical/
 
 `published/<model_name>.json` should contain the approved artifact ID for SQLMesh ingestion. This avoids editing SQL every time a new statistical run is approved.
 
+### Branch-Scoped Published Roots
+
+Branch envs resolve `published/<model_name>.json` via the `BC_STATS_PUBLISHED_ROOT` environment variable so two branches racing to publish the same model do not stomp on each other.
+
+- `just` recipes for branch envs set `BC_STATS_PUBLISHED_ROOT=artifacts/statistical/published-${BC_DEV_ENV_SLUG}/`.
+- `just promote-prod` and other prod recipes set `BC_STATS_PUBLISHED_ROOT=artifacts/statistical/published/`.
+- The ingestion `@model` resolves `${BC_STATS_PUBLISHED_ROOT}/<model_name>.json` first and falls back to the global `artifacts/statistical/published/<model_name>.json` if the branch-scoped manifest is absent. This lets a branch reuse prod manifests for models it has not refit while overriding only the manifests it has refit locally.
+- Manifest writes always target `${BC_STATS_PUBLISHED_ROOT}` — the writer never touches the global directory unless the recipe is a prod recipe.
+
+The fallback is one-way: branch-scoped manifests can override prod, but prod ingestion never reads from a branch-scoped directory.
+
 ## Manifest Schema
 
 Use Pydantic v2 for manifests.
@@ -207,6 +248,7 @@ from pydantic import BaseModel, Field
 
 ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export"]
 ValidationStatus = Literal["passed", "failed", "exploratory"]
+AblationStatus = Literal["gamma_dl_zero", "gamma_dl_shrunk", "not_applicable"]
 
 
 class ArtifactManifest(BaseModel):
@@ -217,12 +259,14 @@ class ArtifactManifest(BaseModel):
     created_at: datetime
     source_snapshot_id: str
     query_hash: str | None = None
+    schema_hash: str | None = None
     dataset_artifact_id: str | None = None
     input_artifact_ids: tuple[str, ...] = ()
     output_paths: dict[str, Path]
     package_versions: dict[str, str]
     random_seed: int | None = None
     validation_status: ValidationStatus = "exploratory"
+    ablation_status: AblationStatus = "not_applicable"
     blocking_findings: tuple[str, ...] = ()
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
 ```
@@ -231,9 +275,17 @@ Manifest invariants:
 
 - Artifact IDs are immutable.
 - New runs create new artifact directories.
-- Published manifests point to immutable run IDs.
+- Published manifests point to immutable `artifact_id`s.
 - Validation status is never inferred from file existence.
 - SQLMesh ingestion reads only artifacts with explicit published manifests unless the environment variable allows exploratory artifacts in dev.
+
+`ablation_status` semantics (paired with the ablation contract in `04-deep-learning-supplements.md`):
+
+- `not_applicable` — model does not consume any DL proposal. Default for deep artifacts, dataset artifacts, sql_export artifacts, and Bayes models that have no DL covariate.
+- `gamma_dl_zero` — Bayes fit with the DL covariate omitted (`gamma_dl = 0`).
+- `gamma_dl_shrunk` — Bayes fit with the DL covariate included under a `Normal(0, 0.5)` shrinkage prior.
+
+Bayes models that consume a DL proposal emit two artifacts per fit cycle — one with `ablation_status='gamma_dl_zero'`, one with `ablation_status='gamma_dl_shrunk'`. Only one is referenced by the published manifest; the per-model selection criterion lives in the model's validation report and the choice is recorded in the published manifest's `metadata` block.
 
 ## Logging
 
@@ -391,7 +443,7 @@ The production helper should run diagnostics before returning a publishable stat
 
 | Field | Meaning |
 | --- | --- |
-| `run_id` | Bayesian run ID. |
+| `artifact_id` | Bayesian fit artifact ID (canonical handle; see Versioning Glossary). |
 | `model_name` | Model name. |
 | `diagnostic_name` | `r_hat`, `ess_bulk`, `ess_tail`, `divergences`, `bfmi`, `loo`, etc. |
 | `variable` | Parameter or generated quantity. |
@@ -418,7 +470,7 @@ Validation families:
 | Conservation | Expected putouts by event, player-game residual reconciliation, count/result constraints, base/out transitions. |
 | Calibration | Reliability curves, ECE, Brier/log loss by slice. |
 | Holdout | Era, scorer, source, park, alignment, aggregate-total. |
-| Sensitivity | Priors, MNAR shifts, artifact downweighting, deep proposal inclusion/exclusion. |
+| Sensitivity | Priors, MNAR shifts, data-error downweighting, deep proposal inclusion/exclusion. |
 | Publication | Required metadata, source/method enums, uncertainty columns. |
 
 Code sketch:
@@ -456,51 +508,96 @@ def probability_normalization_check(df: pl.DataFrame, key_cols: list[str], prob_
 
 Use Python SQLMesh models for artifact ingestion when paths and manifests need runtime logic. Keep these models small:
 
-- read published manifest.
-- return empty typed table in dev when artifact is missing and the model is explicitly optional.
-- read Parquet exports.
+- resolve the branch-scoped published manifest path via `BC_STATS_PUBLISHED_ROOT`, falling back to the global `published/` directory.
+- return an **empty typed DataFrame** (correct columns and dtypes) with a warning log when the manifest is missing, instead of raising.
+- read Parquet exports for the published `artifact_id`.
 - avoid importing PyMC, Keras, or training code.
+
+Rationale for the empty-table-on-missing-manifest behavior: branch envs are spun up before every model has been refit locally, so the ingestion `@model` must succeed against an empty published-root directory. A separate prod-only health-check audit flags any non-empty model-output table whose model is in the publication tier — that audit is what catches accidentally-empty prod manifests, not the ingestion model itself. Missing manifests are a normal branch-env state; missing prod manifests for a publication-tier model are a separate, audited failure.
 
 Sketch:
 
 ```python
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
 
 import pandas as pd
 from sqlmesh import ExecutionContext, model
 
-from python_models.statistical.config import STATISTICAL_PUBLISHED_ROOT
-from python_models.statistical.manifests import ArtifactManifest
+from bc.python_models.statistical.manifests import ArtifactManifest
 
 
-def published_export_path(model_name: str, export_name: str) -> Path:
-    manifest_path = STATISTICAL_PUBLISHED_ROOT / f"{model_name}.json"
-    if not manifest_path.exists():
-        raise FileNotFoundError(manifest_path)
-    manifest = ArtifactManifest.model_validate_json(manifest_path.read_text())
-    return manifest.output_paths[export_name]
+log = logging.getLogger(__name__)
+
+
+GLOBAL_PUBLISHED_ROOT = Path("artifacts/statistical/published")
+
+
+def resolve_published_roots() -> tuple[Path, Path]:
+    branch_root = Path(os.environ.get("BC_STATS_PUBLISHED_ROOT", str(GLOBAL_PUBLISHED_ROOT)))
+    return branch_root, GLOBAL_PUBLISHED_ROOT
+
+
+def find_manifest(model_name: str) -> Path | None:
+    branch_root, global_root = resolve_published_roots()
+    branch_path = branch_root / f"{model_name}.json"
+    if branch_path.exists():
+        return branch_path
+    global_path = global_root / f"{model_name}.json"
+    if global_path.exists():
+        return global_path
+    return None
+
+
+FIELDING_CREDIT_COLUMNS: dict[str, str] = {
+    "event_key": "UINTEGER",
+    "player_id": "VARCHAR",
+    "fielding_position": "UTINYINT",
+    "credit_type": "VARCHAR",
+    "expected_credit": "DOUBLE",
+    "model_version": "VARCHAR",
+    "artifact_id": "VARCHAR",
+}
+
+FIELDING_CREDIT_PANDAS_DTYPES: dict[str, str] = {
+    "event_key": "uint32",
+    "player_id": "string",
+    "fielding_position": "UInt8",
+    "credit_type": "string",
+    "expected_credit": "float64",
+    "model_version": "string",
+    "artifact_id": "string",
+}
+
+
+def empty_typed_frame(columns: dict[str, str], dtypes: dict[str, str]) -> pd.DataFrame:
+    return pd.DataFrame({name: pd.Series(dtype=dtypes[name]) for name in columns})
 
 
 @model(
     "main_models.imputed_fielding_credit",
     kind="FULL",
-    columns={
-        "event_key": "UINTEGER",
-        "player_id": "VARCHAR",
-        "fielding_position": "UTINYINT",
-        "credit_type": "VARCHAR",
-        "expected_credit": "DOUBLE",
-        "model_version": "VARCHAR",
-    },
+    columns=FIELDING_CREDIT_COLUMNS,
 )
 def execute(context: ExecutionContext, **kwargs) -> pd.DataFrame:
-    path = published_export_path("fielding_credit", "expected_counters")
+    manifest_path = find_manifest("fielding_credit")
+    if manifest_path is None:
+        log.warning(
+            "manifest missing for fielding_credit; emitting empty table",
+            extra={"model_name": "fielding_credit", "branch_root": os.environ.get("BC_STATS_PUBLISHED_ROOT")},
+        )
+        return empty_typed_frame(FIELDING_CREDIT_COLUMNS, FIELDING_CREDIT_PANDAS_DTYPES)
+    manifest = ArtifactManifest.model_validate_json(manifest_path.read_text())
+    path = manifest.output_paths["expected_counters"]
     return context.fetchdf(f"SELECT * FROM read_parquet('{path}')")
 ```
 
-In actual code, put `ArtifactManifest` in a lightweight module that ingestion can import without pulling in `stats` dependencies.
+In actual code, put `ArtifactManifest` in a lightweight module that ingestion can import without pulling in `stats` dependencies. The schema constants for each ingestion model (`*_COLUMNS`, `*_PANDAS_DTYPES`) live next to the `@model` so the column list and dtype list cannot drift apart.
+
+Missing-manifest is recoverable in branch envs that have not fit the model yet. Prod has a separate health-check audit that flags non-empty model-output tables for any model listed in the publication tier — that audit is the prod safety net, not the ingestion model itself.
 
 ## Orchestration DAG
 
@@ -519,6 +616,12 @@ flowchart LR
 ```
 
 Each step should be idempotent by artifact ID. Rerunning with the same artifact ID either verifies outputs or fails before overwriting. New inputs create new IDs.
+
+### First Bayesian Smoke-Run Target
+
+The first Bayesian model to be implemented end-to-end on this runtime is the **observation/scorer model** (`scorer_observation_propensities`). All subsequent Bayesian models depend on the observation-model patterns being correct: it exercises the dataset exporter, the split registry, the PyMC helpers, the calibration utilities, the manifest writer, the ablation contract (with no DL covariate initially — `ablation_status='not_applicable'` until a deep proposal exists for scorer/source behavior), the SQL ingestion `@model` skeleton, and the publication tier policy. Geometry, fielding credit, advancement, park factors, and run values land afterwards and reuse the patterns the observation model establishes.
+
+A model that lands before the observation model is out of order — its patterns will be re-derived once observation lands and the work will not compound.
 
 ## Testing
 

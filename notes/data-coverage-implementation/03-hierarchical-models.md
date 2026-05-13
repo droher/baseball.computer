@@ -3,7 +3,7 @@ title: Hierarchical Models For Data Coverage
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-12
+last-verified: 2026-05-13
 ---
 
 # Hierarchical Models For Data Coverage
@@ -35,19 +35,23 @@ Invariant: posterior means are not raw facts. Probability vectors, posterior dra
 
 ```mermaid
 flowchart TD
-  A["Observation propensities"] --> B["Fielding credit allocation"]
-  A --> C["Contact label model"]
-  B --> D["Ball-handler model"]
-  D --> E["Geometry model"]
-  C --> E
-  E --> F["Responsibility model"]
-  E --> G["Advancement model"]
-  E --> H["Batted-ball park factors"]
-  I["Basic scoring park factors"] --> J["Run values and context metrics"]
-  H --> J
-  G --> J
-  K["Pitch coverage and summary model"] --> J
+  A["Model A: Observation propensities"] --> B["Model B: Contact label confusion"]
+  A --> C["Model C: Fielding credit allocation"]
+  A --> D["Model D: Ball-handler model"]
+  D --> E["Model E: Latent geometry"]
+  B --> E
+  K["Model K: Shift propensity"] --> E
+  K --> I["Model I: Fielding responsibility"]
+  K --> G["Model G: Run values"]
+  E --> I
+  E --> H["Model H: Advancement"]
+  E --> F["Model F: Park factors"]
+  F --> G
+  H --> G
+  J["Model J: Pitch coverage and summary"] --> G
 ```
+
+Model D and Model C are siblings under Model A. Phase one does not feed Model D's posterior back into Model C; both consume Model A's outputs and direct handler evidence independently. A joint refit of (C, D) is a later option, gated on the standalone Model C and Model D both passing validation.
 
 Pass uncertainty forward in one of three ways:
 
@@ -58,6 +62,10 @@ Pass uncertainty forward in one of three ways:
 | Expected counter table | Additive metric inputs when SQL consumers need a compact stable table. |
 
 Use a cut-feedback boundary when a downstream metric should not update upstream measurement parameters. For example, park-factor outcomes should not update scorer label-confusion parameters if the purpose of the scorer model is measurement correction.
+
+### Deep-Proposal Ablation Policy
+
+Each Bayesian model in {A, B, C, E, F, G, H, I, J, K} is fit twice — once with `gamma_dl = 0` (DL covariates excluded) and once with `gamma_dl ~ Normal(0, 0.5)` shrinkage prior. Publication tier selection is per-model based on posterior change magnitude: if including DL shifts the publication-tier random-effect posteriors by more than 0.25 SD on most scorer/park/era cells, the `gamma_dl = 0` flavor is published; otherwise the shrunk flavor is published. Both fits are stored as separate artifacts; ablation diagnostics are part of each model's validation report. The manifest's `ablation_status` column (see `05-runtime-artifacts-and-library.md`) records which flavor is the published tier and which is the shadow.
 
 ## Model A: Scorer And Source Observation
 
@@ -91,7 +99,7 @@ R_{i,d} \sim \operatorname{Bernoulli}(p_{i,d})
 + \gamma^{dl}_{d} \operatorname{logit}(\tilde p^{dl}_{i,d})
 ```
 
-`tilde p^{dl}` is optional and must be out-of-fold calibrated before use.
+`\tilde p^{dl}` is optional and must be out-of-fold calibrated before use. The symbol `\tilde p^{dl}` is used globally across all models for DL proposal probabilities; older drafts used `\tilde \pi^{dl}` in some places and have been normalized.
 
 ### Pooling
 
@@ -156,6 +164,21 @@ where `Omega` is a scorer/decade confusion matrix.
 
 Broad `GroundBall` versus `AirBall` is the first publishable target. Detailed fly/line/pop labels are scorer-adjusted label distributions, not claims about measured launch angle.
 
+### Publication Shape
+
+Broad classes (`GroundBall` vs `AirBall`) are publication-tier with point estimates and posterior credible intervals. Detailed labels (FB, LD, PU) are published as a posterior probability distribution per event — **never** collapsed to argmax. The detailed-label artifact `event_contact_detailed_posterior` has columns:
+
+| Column | Description |
+| --- | --- |
+| `event_key` | Event identifier. |
+| `class` | Detailed contact class (FB, LD, PU, ...). |
+| `prob_mean` | Posterior mean probability for this class. |
+| `prob_lower` | Lower bound of posterior credible interval. |
+| `prob_upper` | Upper bound of posterior credible interval. |
+| `prob_draws` | Long-form draws (`draw_id`, probability) for downstream propagation. |
+
+An argmax convenience column may be emitted for inspection but is never the canonical representation for any downstream consumer.
+
 ### Constraints
 
 - Recorded labels are direct measurements of scorer/source vocabulary.
@@ -164,7 +187,8 @@ Broad `GroundBall` versus `AirBall` is the first publishable target. Detailed fl
 
 ### Outputs
 
-- `normalized_contact_probabilities(event_key, contact_class)`.
+- `normalized_contact_probabilities(event_key, contact_class)` — broad classes, with point estimate + credible interval.
+- `event_contact_detailed_posterior(event_key, class, prob_mean, prob_lower, prob_upper, prob_draws)` — detailed labels as a full posterior distribution.
 - `contact_confusion_summaries(scorer, decade, source_family, recorded_label, latent_class)`.
 - `contact_expected_counters` for aggregate metrics.
 
@@ -182,30 +206,109 @@ where `Y` is official credit such as putout, assist, error, double play, or rela
 
 ### Likelihood
 
-For unknown putout or assist counts `U_{e,c}`:
+Putouts and assists use different likelihoods because the missing count is known for putouts but not for assists.
+
+For putouts, `U_{e,PO}` is the known event-level unknown-putout count:
 
 ```latex
-Y_{e,1:K,c} \sim \operatorname{Multinomial}(U_{e,c}, \pi_{e,1:K,c})
+Y_{e,1:K,PO} \sim \operatorname{Multinomial}(U_{e,PO}, \pi_{e,1:K,PO})
+```
+
+For assists, first estimate the missing assist count, then allocate that count. The assist-count likelihood is a **state-conditioned discrete distribution**: each event-class × base/out-state combination has its own categorical distribution over plausible assist counts, fit as a Dirichlet-multinomial across event classes with hierarchical pooling toward a global mean.
+
+```latex
+N_{e,A} \sim \operatorname{Categorical}(\theta_{event\_class_e, base\_out_e})
 ```
 
 ```latex
-\operatorname{softmax}(\eta_{e,k,c}) =
-\pi_{e,k,c}
+\theta_{event\_class, base\_out} \sim \operatorname{Dirichlet}(\alpha_{event\_class})
 ```
 
 ```latex
-\eta_{e,k,c} =
-\alpha_{c,pos_k}
-+ \beta^{result}_{c,pos_k,r_e}
-+ \beta^{state}_{c,pos_k,b_e,o_e}
-+ \beta^{contact}_{c,pos_k,z_e}
-+ \beta^{handler}_{c} H_{e,k}
-+ a^{teamseason}_{c,pos_k,t_e}
-+ a^{scorer}_{c,pos_k,s_e}
-+ \gamma^{dl}_{c} \log(\tilde \pi^{dl}_{e,k,c})
+\alpha_{event\_class} \sim \operatorname{HalfCauchy}(\alpha_{global}, \tau)
 ```
 
-`H_{e,k}` is handler evidence or a handler probability from the handler model. `tilde pi^{dl}` is an optional calibrated deep proposal.
+The simplex `theta_{event_class, base_out}` ranges over `0..M_{event_class}`, where `M_{event_class}` is the per-event-class upper bound on plausible assists:
+
+| Event class | `M_{event_class}` | Rationale |
+| --- | --- | --- |
+| Normal force-out | 1 | Single throw, single relay-free assist. |
+| Normal infield assist with throw | 2 | Common 6-4-3 / 4-6-3 style; allows for cutoff. |
+| Bunt double play | 3 | Charge-throw-relay-cover sequences observed in the corpus. |
+| Rundown | 4 | Multi-handler chains capped at four documented assists. |
+
+Allocation across players follows once the count is drawn:
+
+```latex
+Y_{e,1:K,A} \mid N_{e,A} \sim \operatorname{Multinomial}(N_{e,A}, \pi_{e,1:K,A})
+```
+
+```latex
+\operatorname{softmax}(\eta^A_{e,k}) = \pi_{e,k,A}
+```
+
+### Credit-Type Submodels
+
+Each credit type `c ∈ {putout, assist, error, double_play}` has its own predictor `η_c`, with shared random effects on player/position/era and credit-specific structure. The math here aligns with the prose constraint that credit types are separate submodels:
+
+Putout submodel:
+
+```latex
+\eta^{PO}_{e,k} =
+\alpha_{PO,pos_k}
++ \beta^{result}_{PO,pos_k,r_e}
++ \beta^{state}_{PO,pos_k,b_e,o_e}
++ \beta^{contact}_{PO,pos_k,z_e}
++ \beta^{direct\_handler}_{PO} D_{e,k}
++ a^{teamseason}_{PO,pos_k,t_e}
++ a^{scorer}_{PO,pos_k,s_e}
++ a^{player\_era}_{PO,k,era_e}
++ \gamma^{dl}_{PO} \log(\tilde p^{dl}_{e,k,PO})
+```
+
+Assist submodel: same structural form as putouts but with assist-specific intercepts and coefficients, conditioned on the drawn `N_{e,A}`.
+
+```latex
+\eta^{A}_{e,k} =
+\alpha_{A,pos_k}
++ \beta^{result}_{A,pos_k,r_e}
++ \beta^{state}_{A,pos_k,b_e,o_e}
++ \beta^{contact}_{A,pos_k,z_e}
++ \beta^{direct\_handler}_{A} D_{e,k}
++ a^{teamseason}_{A,pos_k,t_e}
++ a^{scorer}_{A,pos_k,s_e}
++ a^{player\_era}_{A,k,era_e}
++ \gamma^{dl}_{A} \log(\tilde p^{dl}_{e,k,A})
+```
+
+Error submodel: errors are scorer-discretion outcomes; the predictor weights scorer / scorer-team / park / era heavily and downweights state structure relative to putouts.
+
+```latex
+\eta^{E}_{e,k} =
+\alpha_{E,pos_k}
++ \beta^{result}_{E,pos_k,r_e}
++ a^{scorer}_{E,pos_k,s_e}
++ a^{scorer\_team}_{E,pos_k,st_e}
++ a^{park}_{E,pos_k,p_e}
++ a^{era}_{E,pos_k,era_e}
++ a^{player\_era}_{E,k,era_e}
++ \gamma^{dl}_{E} \log(\tilde p^{dl}_{e,k,E})
+```
+
+Double-play submodel: DPs are state-locked (they can only occur from specific base/out states) and are conditioned on the post-event state being consistent with two outs recorded on the play.
+
+```latex
+\eta^{DP}_{e,k} =
+\alpha_{DP,pos_k}
++ \beta^{state}_{DP,pos_k,b_e,o_e}
+\cdot \mathbb{1}[\text{state admits DP}]
++ \beta^{contact}_{DP,pos_k,z_e}
++ a^{teamseason}_{DP,pos_k,t_e}
++ a^{player\_era}_{DP,k,era_e}
++ \gamma^{dl}_{DP} \log(\tilde p^{dl}_{e,k,DP})
+```
+
+`D_{e,k}` is direct handler evidence available before the handler model, such as explicit fielding-play evidence, `batted_to_fielder`, or deterministic handler clues. Phase-one fielding credit allocation must not consume posterior `ball_handler_probabilities`; those are later geometry inputs or optional refit inputs after the first allocation model validates. `\tilde p^{dl}` is an optional calibrated deep proposal.
 
 ### Aggregate Constraint Likelihood
 
@@ -226,14 +329,15 @@ Use a tighter `sigma_aggregate` only for clean official aggregate totals. Issue-
 - Probability mass only goes to personnel-eligible players.
 - Expected event putouts reconcile to event outs and unknown putout counts.
 - Expected player-game credits reconcile to clean box-score residuals where official aggregate constraints are used.
-- Putouts and assists are modeled separately.
+- Putouts and assists are modeled separately; assists require a missing-count model before player allocation.
 - Battery plays, steals, pickoffs, bunts, strikeouts, passed balls, and unusual plays use separate strata or submodels.
 
 ### First Implementation
 
-1. Train a known-credit multinomial model on complete events with hard personnel masks.
-2. Condition event probabilities on box residual constraints with deterministic constrained optimization or posterior importance weighting.
-3. Add direct aggregate constraint likelihood after the first version validates.
+1. Train a known-putout multinomial model on complete events with hard personnel masks.
+2. Train an assist-count model and an assist-allocation model on complete events.
+3. Condition event probabilities on box residual constraints with deterministic constrained optimization or posterior importance weighting.
+4. Add direct aggregate constraint likelihood after the first version validates.
 
 ### Outputs
 
@@ -253,6 +357,8 @@ Use a tighter `sigma_aggregate` only for clean official aggregate totals. Issue-
 
 where `H` is the player or fielding position that handled or completed the play. This is not official credit and not defensive responsibility.
 
+Invariant: Model D and Model C are siblings under Model A. Neither feeds the other in phase one. Both consume Model A's observation propensities and direct handler evidence independently. The handler posterior feeds Model E (geometry) and later optional refits; the credit posterior feeds aggregate metrics. A joint (C, D) refit is gated on both passing standalone validation.
+
 ### Likelihood
 
 ```latex
@@ -268,8 +374,10 @@ H_i \sim \operatorname{Categorical}(\pi_i)
 + a^{seasonleague}_{t_i,l_i,pos_k}
 + a^{scorer}_{s_i,pos_k}
 + \gamma^{credit} \hat Y_{i,k}
-+ \gamma^{dl} \log(\tilde \pi^{dl}_{i,k})
++ \gamma^{dl} \log(\tilde p^{dl}_{i,k})
 ```
+
+`\gamma^{credit}` couples handler posterior to credit evidence as a covariate read-only — it does not refit Model C. In phase one, set `\gamma^{credit} = 0` (no read-across from credit allocation) and treat `\hat Y_{i,k}` as a diagnostic-only feature.
 
 ### Outputs
 
@@ -331,8 +439,11 @@ Deduced_{i,d} \mid G_{i,d}, rule_i \sim
 + \beta^{state}_{d,g,b_i,o_i}
 + \beta^{handler}_{d,g} P(H_i)
 + \beta^{alignment}_{d,g,A_i}
-+ \gamma^{dl}_{d,g} \log(\tilde \pi^{dl}_{i,g,d})
++ \beta^{shift}_{d,g} P(\text{shift}_i)
++ \gamma^{dl}_{d,g} \log(\tilde p^{dl}_{i,g,d})
 ```
+
+`P(shift_i)` is the posterior shift probability from Model K. Where Model K's posterior is sparse or unreliable (pre-2009, or post-2009 cells with wide credible intervals), this term falls back to the era-normal alignment prior already captured in `β^{alignment}`.
 
 ### Outputs
 
@@ -379,8 +490,27 @@ y_{i,o} \sim \operatorname{Bernoulli}(\operatorname{logit}^{-1}(\mu_{i,o}))
 + \beta^{state}_{o,state_i}
 + \beta^{team}_{o,team_i}
 + \theta_{park_i,t_i,l_i,o}
++ u^{umpire}_{o,ump_i}
++ \beta^{weather}_{o} W_i
++ \beta^{surface}_{o,surf_i,era_i}
++ \beta^{day\_night}_{o,dn_i}
++ h^{home\_adv}_{o,park_i,t_i}
 + \gamma^{obs}_{o} \hat R_{i,o}
 ```
+
+### Park F Covariates
+
+Model F's linear predictor extends beyond park × season × league to include the following observable covariates. Each has a backoff policy keyed by `context_observation_ledger`:
+
+| Covariate | Type | Symbol | Backoff when `not_applicable` | Backoff when `missing` |
+| --- | --- | --- | --- | --- |
+| `umpire` | Per-umpire random effect (partial pooling toward league-season mean). | `u^{umpire}_{o,ump_i}` | Drop term (rare). | League-season prior. |
+| `weather` | Continuous: temperature (°F), wind speed × direction (decomposed into out-to-CF and cross components). `W_i` is the vector. | `\beta^{weather}_{o} W_i` | Drop term (indoor / dome). | Impute to park-season mean weather. |
+| `surface` | Categorical: turf/grass × era. | `\beta^{surface}_{o,surf_i,era_i}` | Drop term. | League-season prior for surface mix. |
+| `day_night` | Fixed effect, observable post-1935. Pre-1935 events get `not_applicable` and `day_night = NA`. | `\beta^{day\_night}_{o,dn_i}` | **Drop term** (pre-1935: no night baseball). | League-season day/night base rate. |
+| `home_advantage` | Per-park per-season random effect (or pooled to global fixed effect when park-season support is thin). | `h^{home\_adv}_{o,park_i,t_i}` | Not applicable in neutral-site games — drop term. | Global home-advantage fixed effect. |
+
+The backoff is implemented as a per-event mask: when `context_observation_ledger` marks a field `not_applicable`, the corresponding term is omitted from `μ_{i,o}` for that event — it is **not** imputed to a base rate, because the absence is structural, not stochastic. When the ledger marks a field `missing`, the term enters with an imputed value (league-season prior or imputation-model posterior, depending on availability) plus an extra variance inflation to reflect imputation uncertainty.
 
 For runs:
 
@@ -399,9 +529,22 @@ r_g \sim \operatorname{NegativeBinomial}(\lambda_g, \phi)
 
 ### Dynamic Park Prior
 
+The AR(1) persistence parameter uses a mildly informative prior favoring persistence:
+
+```latex
+\rho_o \sim \operatorname{Beta}(2, 1)
+```
+
+This prior puts more mass near 1 than near 0, consistent with the expectation that park effects are sticky year to year absent a structural change.
+
+```latex
+\theta_{p,t_0,l,o} \sim \operatorname{Normal}(0, \sigma_{park\_initial,o})
+```
+
 ```latex
 \theta_{p,t,l,o} \sim \operatorname{Normal}
 (\rho_o \theta_{p,t-1,l,o}, \sigma_{park,o})
+\quad \text{for } t > t_0 \text{ and } t \text{ within the same } park\_episode\_id
 ```
 
 Park episodes can add another level:
@@ -411,6 +554,26 @@ Park episodes can add another level:
 \theta^{identity}_{park\_episode(p,t),o}
 + \theta^{season}_{p,t,l,o}
 ```
+
+### Episode Boundary Policy
+
+`park_episode_id` segments a park's history into chains of comparable physical configurations. At episode boundaries the AR(1) chain **resets**:
+
+```latex
+\theta_{p, t_{episode\_start}, l, o} \sim
+\operatorname{Normal}(0, \sigma_{episode\_init,o})
+```
+
+rather than the in-chain transition `Normal(rho * theta_{p,t-1}, sigma)`. Triggers for a new `park_episode_id`:
+
+- Major renovation (e.g., outfield wall moved, seating altered enough to change carry/foul territory).
+- Surface change (turf ↔ grass).
+- Roof installation or removal.
+- Documented dimension change beyond a calibration threshold.
+
+`park_episode_id` is derived elsewhere (the park-history dimension; see `01-prep-ledgers.md`) and joined into Model F's predictor. When a renovation creates a new episode at the same site, the new-episode initial draw shrinks toward a weakly regularized park-identity effect rather than the league-average park effect.
+
+`t_0` is the first season for a `park_episode_id` in a league. New park episodes do not borrow from a non-existent previous season; they shrink toward the league-average park effect or, when a renovation creates a new episode at the same site, toward a weakly regularized park-identity effect.
 
 ### Deep Inputs
 
@@ -437,33 +600,111 @@ Regularize embedding coefficients strongly. If embeddings predict source/scorer 
 V_{state,t,l} = E[runs\_to\_end \mid state, season=t, league=l]
 ```
 
-Play values are generated quantities:
+Play values are generated quantities, but **published linear weights are context-neutral in the strict sense**: averaged over the *modeled* transition distribution `P_LW(end | start)`, not over realized transitions in the sample. This is the key change from a marginal-LW computation: marginal LW conflates the run-value of a play type with the empirical end-state distribution observed for that play type in a particular season-league sample. A context-neutral LW separates them.
 
-```latex
-\Delta_i = runs\_on\_play_i + V_{end(i),t_i,l_i} - V_{start(i),t_i,l_i}
-```
+### Run-Expectancy Likelihood
 
-### Likelihood
+The fitted run-expectancy likelihood can include park and era-regime effects as nuisance adjustments, but the published standard linear weights are context-neutral generated quantities.
 
 ```latex
 runs\_to\_end_i \sim \operatorname{NegativeBinomial}
-(\lambda_{state_i,t_i,l_i}, \phi)
+(\lambda_i, \phi)
 ```
 
 ```latex
-\log(\lambda_{state,t,l}) =
-\alpha_{state}
-+ a^{seasonleague}_{state,t,l}
-+ a^{park}_{state,park}
+\log(\lambda_i) =
+\alpha_{state_i}
++ a^{seasonleague}_{state_i,t_i,l_i}
++ a^{park}_{state_i,park_i}
++ a^{era\_regime}_{state_i, regime_i}
 ```
 
-Start with run expectancy, then add win expectancy after inning, score, home/away, walk-off, suspended, and game-length policies validate.
+The `era_regime` covariate partitions baseball history into rule-driven scoring regimes:
+
+| Regime | Span |
+| --- | --- |
+| `pre_DH` | Pre-1973 (both leagues). |
+| `DH_AL_only` | 1973–2021 AL only (NL stays pre-DH for this regime split). |
+| `full_DH` | 2022+ both leagues. |
+| `ghost_runner` | 2020+ extra innings (regular season). |
+| `extra_inning_ghost_plus_expanded_DH` | Overlap of ghost-runner + full-DH regimes from 2022 onward. |
+
+Regimes are not mutually exclusive in all seasons; the `era_regime` covariate is encoded as a vector of regime indicators, not a single categorical.
+
+### Markov Transition Submodel
+
+Add a submodel for end-state given start-state:
+
+```latex
+P(end\_state_i = e \mid start\_state_i = s, season_i=t, league_i=l, regime_i) =
+\operatorname{softmax}(\zeta_{s,e,t,l,regime})
+```
+
+```latex
+\zeta_{s,e,t,l,regime} =
+\alpha^{trans}_{s,e}
++ a^{trans,seasonleague}_{s,e,t,l}
++ a^{trans,regime}_{s,e,regime}
+```
+
+The end-state space is the 24 base-out states plus a half-inning-ending state, for 25 outcomes. The transition probabilities pool partially across season-league via `a^{trans,seasonleague}`.
+
+Define the league-marginal transition probability as the season-league-averaged transition across all event types in the sample:
+
+```latex
+P_{LW}(e \mid s, t, l) = \sum_{regime} w_{regime,t,l} \cdot P(e \mid s, t, l, regime)
+```
+
+where `w_{regime,t,l}` are the regime weights for that season-league.
+
+### Context-Neutral Play Value
+
+The generated quantity for a play value is:
+
+```latex
+\Delta_i =
+E[runs\_on\_play_i \mid start\_state_i, end\_state_i]
++ E_{end\_state \sim P_{LW}(\cdot \mid start\_state_i)}[V_{end\_state, t_i, l_i}]
+- V_{start\_state_i, t_i, l_i}
+```
+
+Crucially, the middle term integrates `V_{end}` against the **modeled marginal transition distribution** `P_LW`, not against the realized end-state of event `i`. This separates run value from realized context.
+
+A marginal-LW alternative (`E[V_{end(i)}] - V_{start(i)}` using the realized end state) is computed as a diagnostic for comparison but is **not** the published linear weight.
+
+Start with run expectancy and the transition submodel, then add win expectancy after inning, score, home/away, walk-off, suspended, and game-length policies validate.
+
+Context-neutral generated quantity:
+
+```latex
+V^{neutral}_{state,t,l} =
+E[runs\_to\_end \mid state,t,l,a^{park}=0]
+```
+
+Optional context-specific generated quantity:
+
+```latex
+V^{context}_{state,t,l,park} =
+E[runs\_to\_end \mid state,t,l,park]
+```
+
+`linear_weight_posterior` should use `V^{neutral}` integrated against `P_LW` unless a downstream analysis explicitly requests park-specific or sample-marginal run values.
+
+### Validation
+
+- Posterior predictive checks on per-season run scoring at the league level.
+- Holdout park-seasons to confirm park effects are identified.
+- **Markov consistency check**: for every start state `s`, verify that `Σ_e P(end_state = e | start_state = s, t, l, regime) = 1` within sampler tolerance. This is a hard invariant on the transition submodel.
+- Compare context-neutral LW against marginal LW; the gap should track regime composition changes.
+- Era-regime ablation: refit with `a^{era_regime} = 0` and confirm that DH / ghost-runner regimes show non-trivial posterior shifts in the regime-on flavor.
 
 ### Outputs
 
 - `run_expectancy_posterior(state, season, league, draw_id, value)`.
-- `linear_weight_posterior(play_type, season, league, draw_id, value)`.
-- `linear_weight_summary` with intervals and sparse-state flags.
+- `context_run_expectancy_posterior(state, season, league, park_id, draw_id, value)` when park-specific values are approved.
+- `state_transition_posterior(start_state, end_state, season, league, regime, draw_id, prob)` — the Markov transition submodel.
+- `linear_weight_posterior(play_type, season, league, draw_id, value)` — context-neutral LW integrated against `P_LW`.
+- `linear_weight_summary` with intervals, sparse-state flags, and a marginal-vs-neutral gap column.
 
 ## Model H: Advancement
 
@@ -515,13 +756,30 @@ This is an analytical opportunity model, not an official-credit model.
 ### Model Shape
 
 - Use geometry posterior draws.
-- Use alignment-regime priors.
+- Use alignment-regime priors **gated on Model K's shift-propensity posterior**.
 - Separate infield, outfield, pitcher/catcher, bunt, deflection, and unusual-play mechanisms.
 - Use high-coverage location slices for validation, not as universal truth.
 
+### Alignment Basis And Gating Policy
+
+The primary alignment input is the posterior from Model K (shift propensity) when Model K is sufficiently identified for the cell. Concretely, for each event:
+
+1. Look up the Model K posterior `P(shift | player, batter_hand, defending_team, count, outs, base_state, season)`.
+2. If the posterior 95% credible interval width is **below a threshold** (default 0.25 on the probability scale; tunable per validation), use the Model K posterior mean as the alignment-shift input.
+3. Otherwise, fall back to the **era-normal alignment prior** for the relevant batter-hand × era cell. Eras prior to 2009 always use the era-normal prior because Model K has no observation support.
+
+Both columns are published so downstream consumers can choose:
+
+| Column | Source |
+| --- | --- |
+| `alignment_actual_post` | Model K posterior, when above identification threshold. |
+| `alignment_normal_prior` | Era-normal prior, always populated. |
+
+The gating threshold is a hyperparameter of Model I's data-prep step, recorded in the model manifest.
+
 ### Outputs
 
-- `fielder_responsibility_probabilities(event_key, player_id, fielding_position)`.
+- `fielder_responsibility_probabilities(event_key, player_id, fielding_position, alignment_actual_post, alignment_normal_prior)`.
 - `responsibility_expected_counters` for range-style metrics.
 
 Invariant: responsibility probabilities never rewrite official putouts, assists, errors, or double plays.
@@ -548,7 +806,80 @@ summary_i \sim p(summary \mid plate\_appearance\_result_i, count_i, era_i, batte
 
 Full sequence generation is a later model because it must preserve count, plate appearance result, pickoffs, pitchouts, wild pitches, passed balls, stolen-base attempts, and baserunning coupling.
 
+## Model K: Shift Propensity
+
+### Estimand
+
+```latex
+\Pr(\text{shift}_i = 1 \mid player_i, batter\_hand_i, defending\_team_i, count_i, outs_i, base\_state_i, season_i)
+```
+
+`shift_i` is a binary indicator: did the defense employ a shift on event `i`?
+
+### Grain
+
+- **2015+**: event-level (full-coverage shift annotations).
+- **2009–2014**: pitch-level (pitch-by-pitch shift data exists for this window but is incomplete at the event level).
+- **Pre-2009**: not applicable. Pre-2009 events are tagged `not_applicable` in the shift ledger; Model K never produces a posterior for these rows.
+
+### Likelihood
+
+```latex
+\text{shift}_i \sim \operatorname{Bernoulli}(p_i)
+```
+
+```latex
+\operatorname{logit}(p_i) =
+\alpha
++ \beta^{hand}_{bh_i}
++ \beta^{count}_{balls_i, strikes_i}
++ \beta^{outs}_{o_i}
++ \beta^{base\_state}_{b_i}
++ \beta^{regime}_{regime_i}
++ a^{player(hand)}_{batter_i, bh_i}
++ a^{teamseason}_{team_i, t_i}
++ a^{seasonleague}_{t_i, l_i}
++ \gamma^{dl} \log(\tilde p^{dl}_{shift,i})
+```
+
+Fixed effects: `batter_hand`, `count` (full interaction of balls × strikes), `outs`, `base_state`, and an era-regime fixed effect over `{2009-2014 partial, 2015-2022 full-shift, 2023+ post-restriction}`.
+
+Random effects:
+
+- `a^{player(hand)}`: player, hierarchically pooled **within batter_hand** (the meaningful slice — LHB and RHB shift rates are structurally different).
+- `a^{teamseason}`: defending-team-season effect.
+- `a^{seasonleague}`: season-league effect.
+
+### Priors
+
+- Fixed effects: `Normal(0, 1)` (weakly informative on the logit scale).
+- Group standard deviations: `HalfNormal(0.5)` on all hierarchical variance components.
+- Deep-proposal coefficient `gamma^{dl}`: per the ablation policy.
+
+### Outputs
+
+| Table | Grain | Contents |
+| --- | --- | --- |
+| `shift_propensity_posterior` | `event_key` | `shift_prob_mean`, `shift_prob_lower`, `shift_prob_upper`, `shift_prob_draws` (long-form: `draw_id × event_key × prob`). |
+| `shift_propensity_diagnostics` | run/slice | Calibration plots by era, posterior predictive shift rates by team-season. |
+
+### Consumers
+
+- **Model E (geometry)**: enters as `β^{shift} P(shift_i)` in the linear predictor; gated on Model K's posterior identification.
+- **Model I (responsibility)**: primary alignment basis, with era-normal alignment prior as fallback for older / sparse cells (see Model I's gating policy).
+- **Model G (run values)**: optional covariate for state-transition heterogeneity; not in the first fit, but documented for the future regime-conditional fit.
+
+### Validation
+
+- Holdout 10% of player-seasons; calibration plots by era.
+- Confirm pre-2009 events are correctly tagged `not_applicable` and that Model K never emits a posterior row for them.
+- Posterior predictive shift rates per team-season should match observed shift rates within sampler tolerance.
+- Sanity check: post-2023 (shift restrictions in effect) should show a sharp regime-level drop relative to 2022.
+- Player-season holdout calibration by handedness.
+
 ## PyMC Builder Pattern
+
+Decision: the first Bayesian implementation uses PyMC and ArviZ through the optional `stats` dependency group. Alternative backends can be evaluated later only if PyMC fails the smoke-run, diagnostics, or performance gates.
 
 Model code should be small, named by estimand, and built from prepared arrays:
 
@@ -613,9 +944,10 @@ This skeleton is not the final formula. It shows required mechanics: named dimen
 | Fielding credit | Trained multinomial probabilities plus constrained allocation. | Joint event plus aggregate residual likelihood. |
 | Geometry | Categorical model with deterministic measurement reliability. | Joint handler/contact/geometry measurement model. |
 | Park factors | Outcome-specific hierarchical GLM. | Multivariate correlated park-season effects. |
-| Run values | Hierarchical run expectancy. | Run and win expectancy with posterior draw propagation. |
+| Run values | Hierarchical run expectancy plus Markov transition submodel. | Joint run/win expectancy with posterior draw propagation and regime-conditional transition. |
 | Advancement | Context-only categorical model. | Geometry-draw-aware runner/fielder effects. |
 | Pitch summary | Coverage and summary counts. | Ordered sequence generation. |
+| Shift propensity | Event-level Bernoulli with player(hand) / team-season / season-league random effects. | Pitch-level joint with pitch-coverage and within-PA shift-change dynamics. |
 
 Use aggregated likelihoods for group counts when event-level predictors are not essential. Use event-level likelihoods only where the estimand needs event context.
 
@@ -630,7 +962,7 @@ Every model must pass:
 - Grouped holdouts matching the missingness mechanism.
 - Calibration curves for probability outputs.
 - Conservation audits for official aggregate constraints.
-- Sensitivity to priors, MNAR assumptions, deep-proposal inputs, and artifact downweighting.
+- Sensitivity to priors, MNAR assumptions, deep-proposal inputs, and data-error downweighting.
 
 Block SQL ingestion when diagnostics fail. Failed models can still write exploratory artifacts, but those artifacts should not be joined into production metric models.
 
