@@ -169,12 +169,12 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Source Availability
 
-- [ ] Implement `main_models.source_acquisition_ledger`.
-- [ ] Include `game_id`, `team_id`, `dimension`, `source_family`, `source_type`, `target_population_status`, `source_availability_status`, `usable_for_event_imputation`, `usable_as_aggregate_constraint`, and `authority_rank`.
-- [ ] Classify event-level, aggregate-only, gamelog-only, structural absence, and out-of-scope rows.
-- [ ] Split source availability by dimension: event, box batting, box pitching, box fielding, line score, pitch sequence, batted ball, gamelog, schedule.
-- [ ] Reconcile against `season_team_coverage`, `game_start_info`, `stg_schedule`, `stg_gamelog`, and `stg_games`.
-- [ ] Verify 1910 and 1911 are not excluded by stale "complete from 1912" metadata.
+- [x] Implement `main_models.source_acquisition_ledger`.
+- [x] Include `game_id`, `team_id`, `dimension`, `source_family`, `source_type`, `target_population_status`, `source_availability_status`, `usable_for_event_imputation`, `usable_as_aggregate_constraint`, and `authority_rank`.
+- [x] Classify event-level, aggregate-only, gamelog-only, structural absence, and out-of-scope rows.
+- [x] Split source availability by dimension: event, box batting, box pitching, box fielding, line score, pitch sequence, batted ball, gamelog, schedule.
+- [x] Reconcile against `season_team_coverage`, `game_start_info`, `stg_schedule`, `stg_gamelog`, and `stg_games`.
+- [x] Verify 1910 and 1911 are not excluded by stale "complete from 1912" metadata.
 
 ### Source Data-Error Risk
 
@@ -849,7 +849,7 @@ Update this table as implementation proceeds.
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
 | 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | runtime scaffolding sub-gate complete on `data-coverage-phase-0-1-scaffolding`; ledgers unstarted |  | Implement `source_acquisition_ledger` |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `source_acquisition_ledger` on branch `data-coverage-source-acquisition-ledger`; remaining ledgers unstarted |  | Implement `source_data_error_risk_ledger` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
@@ -873,6 +873,10 @@ Record decisions here when they become concrete.
 | 2026-05-13 | Baseline JSON lives at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json`; recipe: `just baseline-data-coverage`. | Co-locates baseline with other statistical artifacts; deterministic filename lets later validation reports cite a stable ID. | Re-run after any prod rebuild to refresh the baseline. |
 | 2026-05-13 | Ledger SQL (`source_acquisition_ledger` and siblings) stays out of this PR. | Each ledger is its own design surface; keeping runtime scaffolding separate unblocks parallel ledger work without coupling. | Open follow-up PR(s) per ledger family. |
 | 2026-05-13 | Boolean flag semantics in `seed_observed_status` and `seed_reliability_class` chosen during seed-write. | Doc 01 enumerated tokens but not flag truth tables; chose `is_observed = true` only for `observed`, `is_training_eligible = true` for `observed` + `derived`, `is_hard_mask_eligible = true` for `direct` + `derived`. | Confirm during first ledger review; adjust if a ledger needs different gating. |
+| 2026-05-13 | Added `start_season = 1910` and `end_season = 2025` SQLMesh vars to `bc/config.py`. | Every Phase 1 ledger and downstream modeling dataset will filter on the 1910-2025 target span; centralizing in `config.py` lets `--vars` override at plan time without per-model defaults drifting. | All later coverage ledgers reference `@start_season` / `@end_season`. |
+| 2026-05-13 | Reconciled `source_acquisition_ledger` column names against the real `game_data_completeness` view; doc 01 sketch updated in the same PR. | Doc-only names `has_pitch_sequence`/`has_pitch_count_data`/`has_offense_batted_ball`/`has_defense_batted_ball` never existed in the DB. Real columns: `has_pitches`, `has_count`, plus `has_trajectory OR has_location OR has_batted_to_fielder` for batted-ball signal. | None — zero downstream consumers referenced the doc-only names. |
+| 2026-05-13 | New SQLMesh model directory `bc/models/intermediate/coverage/`. | Phase 1 will land 8+ data-coverage ledgers; co-locating them keeps the SQLMesh tree navigable. | Each subsequent ledger PR lands its `.sql` file alongside `source_acquisition_ledger.sql`. |
+| 2026-05-13 | Dropped `relationships` FK audit on `source_acquisition_ledger.team_id`. | Game-wide dimensions (`event`, `pitch_sequence`, `batted_ball`, `gamelog`) carry `team_id IS NULL` by design, which would fail any standard FK audit. The `not_null` audit deliberately omits `team_id`. | Revisit when the side-dependent / game-wide split is closed by a separate table or a `team_id` value. |
 
 ## Blocker Log To Fill During Implementation
 

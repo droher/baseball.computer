@@ -126,6 +126,8 @@ config = Config(
             "biodata": "https://data.baseball.computer/biodata",
         },
         "force_reload": False,
+        "start_season": 1910,
+        "end_season": 2025,
     },
     ignore_patterns=[
         "models/**/*.yml",
