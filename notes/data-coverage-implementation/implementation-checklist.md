@@ -206,10 +206,10 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 - [x] Audit duplicate fielding positions by event/side. New custom audit `at_most_one_hard_mask_per_position` (`bc/audits/at_most_one_hard_mask_per_position.sql`) groups by (event_key, fielding_side, fielding_position) restricted to hard-mask-eligible rows and flags any group with COUNT > 1.
 - [ ] Audit missing fielding positions by season/source. _Partial: the `missing` class is wired in the ledger but is unreachable under v1 upstreams; an explicit season/source breakdown will accompany the box-only enrichment PR._
 - [ ] Mark Ohtani-rule, DH, multi-position, courtesy runner, deduped roster, and substitution ambiguity classes.
-- [ ] Implement `main_models.entity_link_reliability`.
-- [ ] Cover players, teams, parks, leagues, scorers, inputters, translators, and umpires where available.
-- [ ] Add park episode reliability for renovations, aliases, dimensions, surfaces, and multi-park seasons.
-- [ ] Prevent weak entity links from silently becoming random-effect levels.
+- [x] Implement `main_models.entity_link_reliability`. v1: FULL kind, grain (entity_type, source_system, source_id). 82,582 rows materialized in dev env `data_coverage_entity_link_reliability`. Distribution: player 68,298 (26,961 direct stg_bio + 41,240 crosswalk + 97 unresolved baseballdatabank/bbref), umpire 1,676 (direct), team 292 (direct), park 656 (direct; 67 carry conflict_reason='has_aka_alias'), league 20 (direct), scorer 10,526 / inputter 624 / translator 490 (all unresolved/ambiguous, no_master_record). Audits pass: not_null, unique_grain, accepted_values × 4 (entity_type, link_status, reliability_class, link_confidence), relationships(reliability_class → seed_reliability_class).
+- [x] Cover players, teams, parks, leagues, scorers, inputters, translators, and umpires where available. All eight covered. Translator kept in ledger for completeness even though [[data-coverage-review-decisions]] excludes translator from publication-tier random effects.
+- [ ] Add park episode reliability for renovations, aliases, dimensions, surfaces, and multi-park seasons. _Partial: park-aka entries surface as conflict_reason='has_aka_alias' but renovations / surfaces / dimensions remain on the v1 backlog; needs an upstream park-episode model._
+- [x] Prevent weak entity links from silently becoming random-effect levels. Consumers filter on `reliability_class IN ('direct', 'derived')` and source-system allow-lists; unresolved rows carry `link_confidence='low'` and explicit `conflict_reason`.
 
 ### Context And Exposure Reliability
 
@@ -849,7 +849,7 @@ Update this table as implementation proceeds.
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
 | 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `personnel_state_reliability` on branch `data-coverage-personnel-state-reliability`; ledgers #1-#4 done (#3 also bundles AAP into the risk ledger; #4 emits `direct_event` only under current upstreams), remaining ledgers unstarted |  | Implement `entity_link_reliability` |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `entity_link_reliability` on branch `data-coverage-entity-link-reliability`; ledgers #1-#5 done (#3 also bundles AAP into the risk ledger; #4 emits `direct_event` only; #5 covers all 8 entity types but parks have aka-only annotation, not full renovation episodes), remaining ledgers unstarted |  | Implement `game_context_observation_ledger` + `game_exposure_ledger` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
