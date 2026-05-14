@@ -18,11 +18,32 @@ _log = logging.getLogger(__name__)
 
 @contextmanager
 def open_bc_db(
-    db_path: str | Path | None = None, *, read_only: bool = True
+    db_path: str | Path | None = None,
+    *,
+    read_only: bool = True,
+    attach_as: str | None = "bc",
 ) -> Generator[duckdb.DuckDBPyConnection, None, None]:
+    """Open the baseball.computer DuckDB.
+
+    Per-branch env views (``main_models__<slug>.*``) and modeling
+    dataset views fully-qualify joins against the ``bc`` catalog, so by
+    default we ATTACH the database as ``bc`` from an in-memory
+    connection. Pass ``attach_as=None`` to skip the indirection when a
+    bare connection is enough.
+    """
     path = Path(db_path) if db_path is not None else resolve_db_path()
-    con = duckdb.connect(str(path), read_only=read_only)
+    if attach_as is None:
+        con = duckdb.connect(str(path), read_only=read_only)
+        try:
+            yield con
+        finally:
+            con.close()
+        return
+    con = duckdb.connect(":memory:")
     try:
+        suffix = " (READ_ONLY)" if read_only else ""
+        con.execute(f"ATTACH '{path}' AS {attach_as}{suffix}")
+        con.execute(f"USE {attach_as}")
         yield con
     finally:
         con.close()

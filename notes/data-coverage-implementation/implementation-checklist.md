@@ -10,8 +10,8 @@ last-verified: 2026-05-14
 
 ## Where We Are (2026-05-14)
 
-- **Done:** Phase 0 + Phase 1 (runtime scaffolding sub-gate, all 13 doc-01 ledgers, audits + reconciliation + rollup-parity tooling, exit gate ticked) + Phase 2 §"Modeling Dataset SQL" (all 7 `model_input_*` VIEWs + `dl_proposal_manifest`/`stress_holdout_registry` zero-row stubs in commit `c25172a`; `event_observation_context` gained `result_family`/`alignment_regime`/`leverage_bucket` with audits) + Phase 2 §"Split Registry" (real `stress_holdout_registry` materializing 18.14M event_keys × 7 BOOLEAN flags; ~37% of events held out in at least one stress dim).
-- **Next PR:** Phase 2 §"Dataset Exporter" — the `prepare-dataset` CLI that snapshots `main_models.model_input_*` VIEWs to Parquet with metadata (query hash, source snapshot ID, schema, row count, category maps, split policy). After exporter lands, EDA runner becomes feasible. Cut branch off `data_coverage`, squash-merge back. **Do NOT merge into `main`** until the whole initiative graduates.
+- **Done:** Phase 0 + Phase 1 (runtime scaffolding sub-gate, all 13 doc-01 ledgers, audits + reconciliation + rollup-parity tooling, exit gate ticked) + Phase 2 §"Modeling Dataset SQL" (all 7 `model_input_*` VIEWs + `dl_proposal_manifest`/`stress_holdout_registry` zero-row stubs in commit `c25172a`; `event_observation_context` gained `result_family`/`alignment_regime`/`leverage_bucket` with audits) + Phase 2 §"Split Registry" (real `stress_holdout_registry` materializing 18.14M event_keys × 7 BOOLEAN flags; ~37% of events held out in at least one stress dim) + Phase 2 §"Dataset Exporter" (`prepare-dataset` CLI snapshotting per-branch `main_models__<slug>.model_input_*` views to Parquet + metadata + manifest; smoke-tested on `model_input_observation_batted_ball` → 84.27M rows / 860 MB).
+- **Next PR:** Phase 2 §"EDA Runner" — the `run-eda` CLI that consumes a dataset manifest and writes missingness-by-slice / target-distribution / connectivity / collinearity tables plus a markdown summary. Branch off `data_coverage`; squash-merge back. **Do NOT merge into `main`** until the whole initiative graduates.
 - **Read before opening the next PR:** `02-eda-and-modeling-datasets.md` (§Dataset Lifecycle, §Universal Dataset Columns, §EDA Report Schema); this file's Phase 2 §"Dataset Exporter"; `bc/.claude/rules/sqlmesh.md`; `scripts/CLAUDE.md`.
 - **Settled decisions (do not re-litigate):** see the Decision Log below, plus the `data-coverage-review-decisions` + `data-coverage-shift-model` auto-memory entries.
 - **Phase-1 enrichment backlog (none block Phase 2):** see §"Deferred — Phase 1 Backlog" below.
@@ -294,13 +294,13 @@ Purpose: freeze model inputs and discover identification problems before fitting
 
 ### Dataset Exporter
 
-- [ ] Implement `prepare-dataset` CLI command.
-- [ ] Export Parquet snapshots from SQLMesh-built dataset models.
-- [ ] Store query hash, source snapshot ID, schema, row count, category maps, and split metadata.
-- [ ] Compute stable category maps before model code reads the dataset.
-- [ ] Validate that category maps are split-stable and include explicit unseen-category policy where needed.
-- [ ] Ensure rerunning an existing dataset output ID verifies or fails before overwrite.
-- [ ] Write dataset metadata atomically.
+- [x] Implement `prepare-dataset` CLI command. `bc/python_models/statistical/cli.py::_run_prepare_dataset` dispatches to `datasets.prepare_dataset`; `just prepare-dataset DATASET ARTIFACT_ID` wires it to the per-branch ledger schema.
+- [x] Export Parquet snapshots from SQLMesh-built dataset models. `_copy_to_parquet_atomic` runs DuckDB `COPY (SELECT * FROM <schema>.<dataset>) TO <tmp>.parquet (FORMAT PARQUET, COMPRESSION ZSTD)` then renames into place.
+- [x] Store query hash, source snapshot ID, schema, row count, category maps, and split metadata. Recorded in `dataset_metadata.json` (DatasetMetadata) + `manifest.json` (ArtifactManifest kind=dataset) under `artifacts/statistical/datasets/<name>/<artifact_id>/`.
+- [x] Compute stable category maps before model code reads the dataset. Per-dataset categorical column list lives in `dataset_registry.py`; maps built via `SELECT DISTINCT col::VARCHAR ... ORDER BY 1` so sorted-token-to-dense-int codes are stable across runs.
+- [x] Validate that category maps are split-stable and include explicit unseen-category policy where needed. Stable: maps are derived from the full dataset before any split, so all primary_fold values see the same code space. Unseen policy lives in `datasets.encode_with_map` (`error` / `null` / `add`); consumers choose per call.
+- [x] Ensure rerunning an existing dataset output ID verifies or fails before overwrite. `_verify_rerun` loads the on-disk `dataset_metadata.json` and compares `query_hash` + `source_snapshot_id`; matches return the existing manifest, mismatches raise `ValueError`.
+- [x] Write dataset metadata atomically. Both `dataset_metadata.json` and `manifest.json` go through tempfile-rename (`_write_metadata_atomic`, `manifests.write_manifest`); the Parquet uses `_copy_to_parquet_atomic`. Pytest coverage in `bc/tests/statistical/test_prepare_dataset.py`.
 
 ### Split Registry
 

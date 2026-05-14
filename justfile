@@ -106,6 +106,11 @@ baseline-data-coverage *ARGS:
 compare-baseline *ARGS:
     {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/compare_baseline.py "$@"
 
+# Prepare a modeling-dataset Parquet snapshot from the per-branch ledger schema.
+# Usage: just prepare-dataset model_input_observation_batted_ball <artifact-id> [extra args]
+prepare-dataset DATASET ARTIFACT_ID *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli prepare-dataset --dataset {{ DATASET }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
 # Rollup parity check: existing completeness model vs ledger reproduction.
 # All 7 current models carry an accept-gap disposition (see
 # notes/data-coverage-implementation/rollup-parity-dispositions.md): the
