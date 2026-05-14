@@ -3,16 +3,16 @@ title: Data Coverage Implementation Checklist
 type: runbook
 status: active
 audience: humans-and-agents
-last-verified: 2026-05-13
+last-verified: 2026-05-14
 ---
 
 # Data Coverage Implementation Checklist
 
-## Where We Are (2026-05-13)
+## Where We Are (2026-05-14)
 
-- **Done:** Phase 0 + Phase 1 (runtime scaffolding sub-gate, all 13 doc-01 ledgers, audits + reconciliation + rollup-parity tooling, exit gate ticked). Squash-merged into `data_coverage`.
-- **Next PR:** `main_models.model_input_observation_batted_ball` per Phase 2 §"Modeling Dataset SQL" below (line 283). Cut branch off `data_coverage`, squash-merge back to `data_coverage`. **Do NOT merge into `main`** until the whole initiative graduates.
-- **Read before opening the next PR:** `02-eda-and-modeling-datasets.md`; this file's Phase 2 checklist; `notes/data-coverage-implementation/rollup-parity-dispositions.md` (records why all 7 existing completeness models accept their ledger gap rather than rewrite); `bc/.claude/rules/sqlmesh.md`.
+- **Done:** Phase 0 + Phase 1 (runtime scaffolding sub-gate, all 13 doc-01 ledgers, audits + reconciliation + rollup-parity tooling, exit gate ticked) + Phase 2 §"Modeling Dataset SQL" (all 7 `model_input_*` VIEWs + `dl_proposal_manifest`/`stress_holdout_registry` zero-row stubs in commit `c25172a`; `event_observation_context` gained `result_family`/`alignment_regime`/`leverage_bucket` with audits) + Phase 2 §"Split Registry" (real `stress_holdout_registry` materializing 18.14M event_keys × 7 BOOLEAN flags; ~37% of events held out in at least one stress dim).
+- **Next PR:** Phase 2 §"Dataset Exporter" — the `prepare-dataset` CLI that snapshots `main_models.model_input_*` VIEWs to Parquet with metadata (query hash, source snapshot ID, schema, row count, category maps, split policy). After exporter lands, EDA runner becomes feasible. Cut branch off `data_coverage`, squash-merge back. **Do NOT merge into `main`** until the whole initiative graduates.
+- **Read before opening the next PR:** `02-eda-and-modeling-datasets.md` (§Dataset Lifecycle, §Universal Dataset Columns, §EDA Report Schema); this file's Phase 2 §"Dataset Exporter"; `bc/.claude/rules/sqlmesh.md`; `scripts/CLAUDE.md`.
 - **Settled decisions (do not re-litigate):** see the Decision Log below, plus the `data-coverage-review-decisions` + `data-coverage-shift-model` auto-memory entries.
 - **Phase-1 enrichment backlog (none block Phase 2):** see §"Deferred — Phase 1 Backlog" below.
 
@@ -282,15 +282,15 @@ Purpose: freeze model inputs and discover identification problems before fitting
 
 ### Modeling Dataset SQL
 
-- [ ] Implement `main_models.model_input_observation_batted_ball`.
-- [ ] Implement `main_models.model_input_fielding_credit`.
-- [ ] Implement `main_models.model_input_geometry`.
-- [ ] Implement `main_models.model_input_park_factors`.
-- [ ] Implement `main_models.model_input_run_values`.
-- [ ] Implement `main_models.model_input_advancement`.
-- [ ] Implement `main_models.model_input_pitch_summary`.
-- [ ] Ensure each dataset includes entity keys, source availability, observation status, reliability inputs, official aggregate constraints where applicable, context, actors, and split metadata.
-- [ ] Ensure each dataset can be rebuilt from deterministic ledgers and not ad hoc raw joins.
+- [x] Implement `main_models.model_input_observation_batted_ball`. (commit `c25172a`, VIEW kind)
+- [x] Implement `main_models.model_input_fielding_credit`. (commit `c25172a`, VIEW kind)
+- [x] Implement `main_models.model_input_geometry`. (commit `c25172a`, VIEW kind)
+- [x] Implement `main_models.model_input_park_factors`. (commit `c25172a`, VIEW kind)
+- [x] Implement `main_models.model_input_run_values`. (commit `c25172a`, VIEW kind)
+- [x] Implement `main_models.model_input_advancement`. (commit `c25172a`, VIEW kind)
+- [x] Implement `main_models.model_input_pitch_summary`. (commit `c25172a`, VIEW kind)
+- [x] Ensure each dataset includes entity keys, source availability, observation status, reliability inputs, official aggregate constraints where applicable, context, actors, and split metadata. Every dataset INNER JOINs `event_observation_context` (entity keys, source availability, context, actors) and pulls observation/reliability columns from the relevant `event_observation_*` ledger. Split metadata: `primary_fold` (inline HASH(game_id)%100), `holdout_flags` STRUCT (LEFT JOIN `stress_holdout_registry` — currently NULL until §"Split Registry" lands), `source_snapshot_id` from `@VAR`.
+- [x] Ensure each dataset can be rebuilt from deterministic ledgers and not ad hoc raw joins. Every `model_input_*` SELECT is sourced from `event_observation_*` / `*_ledger` / `*_authority` / `event_observation_context` — no raw `stg_*` / `calc_*` joins.
 
 ### Dataset Exporter
 
@@ -304,16 +304,16 @@ Purpose: freeze model inputs and discover identification problems before fitting
 
 ### Split Registry
 
-- [ ] Define default `game_hash` split.
-- [ ] Define season or era block holdouts.
-- [ ] Define scorer/inputter/translator holdouts.
-- [ ] Define source family and file-family holdouts.
-- [ ] Define park-season or park-episode holdouts.
-- [ ] Define alignment-regime holdouts.
-- [ ] Define aggregate-total holdouts for fielding.
-- [ ] Define player-group holdouts for embeddings and player effects.
-- [ ] Store split assignments in the dataset and in a split registry output.
-- [ ] Add validation that no game/source/scorer/park leakage exists for the intended holdout.
+- [x] Define default `game_hash` split. Inline in each `model_input_*` VIEW as `HASH(game_id) % 100 → [0,69]=TRAIN / [70,84]=VALIDATE / [85,99]=TEST` (commit `c25172a`).
+- [x] Define season or era block holdouts. `is_heldout_season_block = season IN (2024, 2025)`; 2.61% of registry rows.
+- [x] Define scorer/inputter/translator holdouts. `is_heldout_scorer = scorer IS NOT NULL AND HASH(scorer) % 10 = 0`; ~10% of distinct scorers. Inputter/translator deferred — they correlate strongly with scorer and the scorer holdout is the primary lever; revisit if EDA shows independent inputter/translator effects.
+- [x] Define source family and file-family holdouts. `is_heldout_source_acquisition_block = source_type IS NOT NULL AND HASH(source_type || decade) % 20 = 0` (decade = (season/10)*10); 6.48% of registry rows. File-family unit deferred until acquisition ledger exposes file_family.
+- [x] Define park-season or park-episode holdouts. `is_heldout_park = park_id IS NOT NULL AND HASH(park_id || season) % 10 = 0`; 9.82% of registry rows. Park-episode unit deferred until `entity_link_reliability` gains park-episode enrichment.
+- [x] Define alignment-regime holdouts. `is_heldout_alignment_regime = alignment_regime = 'post_restriction'` (newest of four regimes); 3.84% of registry rows.
+- [x] Define aggregate-total holdouts for fielding. `is_heldout_aggregate_total = HASH(game_id || fielding_team_id) % 20 = 0`; 4.95% of registry rows. Player-position aggregate unit deferred until fielding-credit aggregate target lands.
+- [x] Define player-group holdouts for embeddings and player effects. `is_heldout_player_group = (batter_id … % 20 = 0) OR (pitcher_id … % 20 = 0)`; 9.25% of registry rows.
+- [x] Store split assignments in the dataset and in a split registry output. `main_models.stress_holdout_registry` materializes one row per event_key with all 7 BOOLEAN flags; every `model_input_*` VIEW packs them into `holdout_flags STRUCT` via LEFT JOIN.
+- [ ] Add validation that no game/source/scorer/park leakage exists for the intended holdout. Per-flag leakage validation (e.g., "no game_id appears in both training fold AND scorer-holdout") deferred to a follow-up validation script that runs against the materialized registry.
 
 ### EDA Runner
 
