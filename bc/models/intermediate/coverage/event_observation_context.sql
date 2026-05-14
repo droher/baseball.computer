@@ -1,7 +1,7 @@
 MODEL (
   name main_models.event_observation_context,
   kind FULL,
-  description 'Phase 2 modeling-dataset feeder. Wide event-grain (one row per event_key) table denormalizing shared covariates so every modeling dataset INNER JOINs this rather than re-deriving the same joins. source_type/source_family/target_population_status pull from source_acquisition_ledger filtered to dimension=event, team_id IS NULL. park_episode_status is NULL in v1 pending park-renovation enrichment of entity_link_reliability. scorer/inputter/translator come direct from stg_games. affiliated_team rolls game_scorekeeping up to one row per game_id via MAX(game_share), then projects scorer_more_common_team_id. score_margin is event_states_full.batting_team_margin_start. leverage_index is win_leverage_index from leverage_index (joined on win_expectancy_start_key). hit_or_out is BOOLEAN: TRUE = batted-ball hit, FALSE = batted-ball out, NULL = non-batted-ball (walk/HBP/K/no-PA). Derived from event_offense_stats (baserunner=Batter): balls_batted=1 AND hits=1 -> TRUE; balls_batted=1 AND hits=0 -> FALSE; else NULL. personnel_confidence rolls personnel_state_reliability per event_key: low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 collapses to high/medium because the v1 upstream emits only direct + inferred. context_confidence rolls game_context_observation_ledger per game_id across its 23 atomic dimensions: low if any observed_status=missing; medium if any IN (derived, unknown_code); else high. exposure_status is game_exposure_ledger.completion_status joined on (game_id, batting_team_id).',
+  description 'Shared modeling-dataset feeder. Wide event-grain (one row per event_key) table denormalizing covariates so every model_input_* dataset INNER JOINs this rather than re-deriving the same joins. source_type/source_family/target_population_status pull from source_acquisition_ledger filtered to dimension=event, team_id IS NULL. park_episode_status is NULL in v1 pending park-renovation enrichment of entity_link_reliability. scorer/inputter/translator come direct from stg_games. affiliated_team rolls game_scorekeeping up to one row per game_id via MAX(game_share), then projects scorer_more_common_team_id. score_margin is event_states_full.batting_team_margin_start. leverage_index is win_leverage_index from leverage_index (joined on win_expectancy_start_key). hit_or_out is BOOLEAN: TRUE = batted-ball hit, FALSE = batted-ball out, NULL = non-batted-ball (walk/HBP/K/no-PA). Derived from event_offense_stats (baserunner=Batter): balls_batted=1 AND hits=1 -> TRUE; balls_batted=1 AND hits=0 -> FALSE; else NULL. personnel_confidence rolls personnel_state_reliability per event_key: low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 collapses to high/medium because the v1 upstream emits only direct + inferred. context_confidence rolls game_context_observation_ledger per game_id across its 23 atomic dimensions: low if any observed_status=missing; medium if any IN (derived, unknown_code); else high. exposure_status is game_exposure_ledger.completion_status joined on (game_id, batting_team_id).',
   grain (event_key),
   columns (
     event_key UINTEGER,
@@ -34,7 +34,10 @@ MODEL (
     fielding_team_id TEAM_ID,
     personnel_confidence VARCHAR,
     context_confidence VARCHAR,
-    exposure_status VARCHAR
+    exposure_status VARCHAR,
+    result_family VARCHAR,
+    alignment_regime VARCHAR,
+    leverage_bucket VARCHAR
   ),
   column_descriptions (
     event_key = @doc('event_key'),
@@ -67,7 +70,10 @@ MODEL (
     fielding_team_id = 'Fielding team for the event (event_states_full.fielding_team_id).',
     personnel_confidence = 'Rollup of personnel_state_reliability per event_key. low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 reachable: high (full direct coverage) or medium (any missing slot).',
     context_confidence = 'Rollup of game_context_observation_ledger per game_id across 23 atomic context dimensions. low if any observed_status=missing; medium if any IN (derived, unknown_code); else high.',
-    exposure_status = 'game_exposure_ledger.completion_status joined on (game_id, batting_team_id). complete, walk_off, shortened, suspended, forfeit, unknown.'
+    exposure_status = 'game_exposure_ledger.completion_status joined on (game_id, batting_team_id). complete, walk_off, shortened, suspended, forfeit, unknown.',
+    result_family = 'Coarse PA result family. hit / out_in_play / strikeout / walk / hbp / sacrifice / reached_on_error / fielders_choice / interference. NULL for no-play and baserunning-only events.',
+    alignment_regime = 'Categorical season-era fallback for the shift-propensity model. pre_shift_era <=2009, shift_growth_era 2010-2014, full_shift_era 2015-2022, post_restriction >=2023.',
+    leverage_bucket = 'Leverage bucket from win_leverage_index. low <0.8, medium 0.8-<2.0, high >=2.0. NULL when leverage_index is NULL.'
   ),
   audits (
     not_null(columns := (event_key, game_id, season, game_type, batting_team_id, fielding_team_id, inning_start, frame_start, outs_start, base_state_start, exposure_status, source_family, source_type, target_population_status)),
@@ -76,7 +82,15 @@ MODEL (
     accepted_values(column := target_population_status, is_in := ('event_level', 'aggregate_only', 'gamelog_only', 'structural_absence', 'out_of_scope', 'coverage_within_source_sparse')),
     accepted_values(column := exposure_status, is_in := ('complete', 'walk_off', 'shortened', 'suspended', 'forfeit', 'unknown')),
     accepted_values(column := personnel_confidence, is_in := ('high', 'medium', 'low')),
-    accepted_values(column := context_confidence, is_in := ('high', 'medium', 'low'))
+    accepted_values(column := context_confidence, is_in := ('high', 'medium', 'low')),
+    accepted_values(column := result_family, is_in := (
+      'hit', 'out_in_play', 'strikeout', 'walk', 'hbp',
+      'sacrifice', 'reached_on_error', 'fielders_choice', 'interference'
+    )),
+    accepted_values(column := alignment_regime, is_in := (
+      'pre_shift_era', 'shift_growth_era', 'full_shift_era', 'post_restriction'
+    )),
+    accepted_values(column := leverage_bucket, is_in := ('low', 'medium', 'high'))
   )
 );
 
@@ -103,6 +117,13 @@ WITH evt AS (
         win_expectancy_start_key
     FROM main_models.event_states_full
     WHERE season BETWEEN @start_season AND @end_season
+),
+
+evp AS (
+    SELECT
+        event_key,
+        plate_appearance_result
+    FROM main_models.stg_events
 ),
 
 gms AS (
@@ -215,7 +236,32 @@ SELECT
     evt.fielding_team_id,
     prs.personnel_confidence,
     gco.context_confidence,
-    gex.completion_status AS exposure_status
+    gex.completion_status AS exposure_status,
+    CASE
+        WHEN evp.plate_appearance_result IN ('Single', 'Double', 'GroundRuleDouble', 'Triple', 'HomeRun', 'InsideTheParkHomeRun')
+            THEN 'hit'
+        WHEN evp.plate_appearance_result = 'InPlayOut' THEN 'out_in_play'
+        WHEN evp.plate_appearance_result = 'StrikeOut' THEN 'strikeout'
+        WHEN evp.plate_appearance_result IN ('Walk', 'IntentionalWalk') THEN 'walk'
+        WHEN evp.plate_appearance_result = 'HitByPitch' THEN 'hbp'
+        WHEN evp.plate_appearance_result IN ('SacrificeFly', 'SacrificeHit') THEN 'sacrifice'
+        WHEN evp.plate_appearance_result = 'ReachedOnError' THEN 'reached_on_error'
+        WHEN evp.plate_appearance_result = 'FieldersChoice' THEN 'fielders_choice'
+        WHEN evp.plate_appearance_result = 'Interference' THEN 'interference'
+        ELSE NULL
+    END AS result_family,
+    CASE
+        WHEN evt.season <= 2009 THEN 'pre_shift_era'
+        WHEN evt.season BETWEEN 2010 AND 2014 THEN 'shift_growth_era'
+        WHEN evt.season BETWEEN 2015 AND 2022 THEN 'full_shift_era'
+        WHEN evt.season >= 2023 THEN 'post_restriction'
+    END AS alignment_regime,
+    CASE
+        WHEN lev.win_leverage_index IS NULL THEN NULL
+        WHEN lev.win_leverage_index < 0.8 THEN 'low'
+        WHEN lev.win_leverage_index < 2.0 THEN 'medium'
+        ELSE 'high'
+    END AS leverage_bucket
 FROM evt
 LEFT JOIN gms USING (game_id)
 LEFT JOIN src USING (game_id)
@@ -225,3 +271,4 @@ LEFT JOIN ofs USING (event_key)
 LEFT JOIN prs USING (event_key)
 LEFT JOIN gco USING (game_id)
 LEFT JOIN gex ON gex.game_id = evt.game_id AND gex.team_id = evt.batting_team_id
+LEFT JOIN evp USING (event_key)

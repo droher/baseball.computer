@@ -1,0 +1,165 @@
+MODEL (
+  name main_models.model_input_run_values,
+  kind VIEW,
+  description 'Modeling dataset for the run-value Markov chain. One row per event_level event carrying run_expectancy_start_key, run_expectancy_end_key, win_expectancy_start_key, win_expectancy_end_key from event_states_full and runs_to_end_of_inning derived via a window sum partitioned by (game_id, inning_start, frame_start, batting_team_id). win_flag is NULL — gated on a game-end reliability check. denominator_policy = include iff exposure_status IN (complete, walk_off) else exclude. Filtered to target_population_status = event_level.',
+  grain (event_key),
+  columns (
+    event_key UINTEGER,
+    run_expectancy_start_key VARCHAR,
+    run_expectancy_end_key VARCHAR,
+    win_expectancy_start_key VARCHAR,
+    win_expectancy_end_key VARCHAR,
+    runs_on_play UTINYINT,
+    runs_to_end_of_inning USMALLINT,
+    win_flag BOOLEAN,
+    denominator_policy VARCHAR,
+    game_id VARCHAR,
+    season SMALLINT,
+    league VARCHAR,
+    game_type GAME_TYPE,
+    source_type VARCHAR,
+    source_family VARCHAR,
+    target_population_status VARCHAR,
+    park_id PARK_ID,
+    park_episode_status VARCHAR,
+    scorer VARCHAR,
+    inputter VARCHAR,
+    translator VARCHAR,
+    affiliated_team TEAM_ID,
+    inning_start UTINYINT,
+    frame_start FRAME,
+    base_state_start UTINYINT,
+    outs_start UTINYINT,
+    score_margin TINYINT,
+    leverage_index DOUBLE,
+    leverage_bucket VARCHAR,
+    hit_or_out BOOLEAN,
+    batter_id VARCHAR,
+    pitcher_id VARCHAR,
+    batter_hand HAND,
+    pitcher_hand HAND,
+    batting_team_id TEAM_ID,
+    fielding_team_id TEAM_ID,
+    personnel_confidence VARCHAR,
+    context_confidence VARCHAR,
+    exposure_status VARCHAR,
+    result_family VARCHAR,
+    alignment_regime VARCHAR,
+    dl_artifact_id VARCHAR,
+    dl_p_class VARCHAR,
+    dl_logit_class DOUBLE,
+    holdout_flags STRUCT(
+      is_heldout_scorer BOOLEAN,
+      is_heldout_park BOOLEAN,
+      is_heldout_alignment_regime BOOLEAN,
+      is_heldout_source_acquisition_block BOOLEAN,
+      is_heldout_season_block BOOLEAN,
+      is_heldout_aggregate_total BOOLEAN,
+      is_heldout_player_group BOOLEAN
+    ),
+    primary_fold VARCHAR,
+    training_weight DOUBLE,
+    source_snapshot_id VARCHAR
+  ),
+  column_descriptions (
+    event_key = @doc('event_key'),
+    run_expectancy_start_key = 'event_states_full.run_expectancy_start_key. State key indexing the start-of-play run-expectancy lookup.',
+    run_expectancy_end_key = 'event_states_full.run_expectancy_end_key. State key indexing the end-of-play run-expectancy lookup.',
+    win_expectancy_start_key = 'event_states_full.win_expectancy_start_key.',
+    win_expectancy_end_key = 'event_states_full.win_expectancy_end_key.',
+    runs_on_play = @doc('runs_on_play'),
+    runs_to_end_of_inning = 'Window SUM(runs_on_play) over (game_id, inning_start, frame_start, batting_team_id) ORDER BY event_key ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING. Includes runs_on_play for the current event.',
+    win_flag = 'NULL — gated on a game-end reliability check.',
+    denominator_policy = 'include iff exposure_status IN (complete, walk_off) else exclude. Marks rows that should count in the run-value denominator vs being excluded due to truncated exposure.',
+    primary_fold = 'Default game-hash split. HASH(game_id) mod 100 -> [0,69]=TRAIN, [70,84]=VALIDATE, [85,99]=TEST.',
+    training_weight = '1.0 universally (no per-row data_error_risk on this driver).',
+    source_snapshot_id = 'Stamp from the source_snapshot_id var.',
+    holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
+    dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land.',
+    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
+    dl_logit_class = 'dl_proposal_manifest.dl_logit_class, NULL until DL supplements land.'
+  ),
+  audits (
+    not_null(columns := (event_key, game_id, season, primary_fold, source_snapshot_id, denominator_policy)),
+    unique_grain(columns := (event_key)),
+    accepted_values(column := denominator_policy, is_in := ('include', 'exclude')),
+    accepted_values(column := primary_fold, is_in := ('TRAIN', 'VALIDATE', 'TEST')),
+    accepted_values(column := alignment_regime, is_in := (
+      'pre_shift_era', 'shift_growth_era', 'full_shift_era', 'post_restriction'
+    )),
+    accepted_values(column := leverage_bucket, is_in := ('low', 'medium', 'high')),
+    relationships(column := event_key, to_model := main_models.event_observation_context, to_column := event_key)
+  )
+);
+
+SELECT
+    c.event_key,
+    es.run_expectancy_start_key,
+    es.run_expectancy_end_key,
+    es.win_expectancy_start_key,
+    es.win_expectancy_end_key,
+    c.runs_on_play,
+    SUM(c.runs_on_play) OVER (
+        PARTITION BY c.game_id, c.inning_start, c.frame_start, c.batting_team_id
+        ORDER BY c.event_key
+        ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
+    )::USMALLINT AS runs_to_end_of_inning,
+    NULL::BOOLEAN AS win_flag,
+    CASE WHEN c.exposure_status IN ('complete', 'walk_off') THEN 'include' ELSE 'exclude' END AS denominator_policy,
+    c.game_id,
+    c.season,
+    c.league,
+    c.game_type,
+    c.source_type,
+    c.source_family,
+    c.target_population_status,
+    c.park_id,
+    c.park_episode_status,
+    c.scorer,
+    c.inputter,
+    c.translator,
+    c.affiliated_team,
+    c.inning_start,
+    c.frame_start,
+    c.base_state_start,
+    c.outs_start,
+    c.score_margin,
+    c.leverage_index,
+    c.leverage_bucket,
+    c.hit_or_out,
+    c.batter_id,
+    c.pitcher_id,
+    c.batter_hand,
+    c.pitcher_hand,
+    c.batting_team_id,
+    c.fielding_team_id,
+    c.personnel_confidence,
+    c.context_confidence,
+    c.exposure_status,
+    c.result_family,
+    c.alignment_regime,
+    p.dl_artifact_id,
+    p.dl_p_class,
+    p.dl_logit_class,
+    STRUCT_PACK(
+        is_heldout_scorer := s.is_heldout_scorer,
+        is_heldout_park := s.is_heldout_park,
+        is_heldout_alignment_regime := s.is_heldout_alignment_regime,
+        is_heldout_source_acquisition_block := s.is_heldout_source_acquisition_block,
+        is_heldout_season_block := s.is_heldout_season_block,
+        is_heldout_aggregate_total := s.is_heldout_aggregate_total,
+        is_heldout_player_group := s.is_heldout_player_group
+    ) AS holdout_flags,
+    CASE
+        WHEN (HASH(c.game_id)::HUGEINT % 100) < 70 THEN 'TRAIN'
+        WHEN (HASH(c.game_id)::HUGEINT % 100) < 85 THEN 'VALIDATE'
+        ELSE 'TEST'
+    END AS primary_fold,
+    1.0 AS training_weight,
+    @VAR('source_snapshot_id', 'dev') AS source_snapshot_id
+FROM main_models.event_observation_context AS c
+INNER JOIN main_models.event_states_full AS es USING (event_key)
+LEFT JOIN main_models.dl_proposal_manifest AS p
+    ON p.event_key = c.event_key AND p.dimension = 'run_values'
+LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)
+WHERE c.target_population_status = 'event_level'
