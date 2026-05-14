@@ -200,11 +200,11 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Personnel And Entity Reliability
 
-- [ ] Implement `main_models.personnel_state_reliability`.
-- [ ] Classify direct event evidence, box-derived evidence, deduped evidence, synthetic evidence, missing evidence, ambiguous evidence, and not-applicable states.
-- [ ] Add hard-zero eligibility only for high-confidence personnel states.
-- [ ] Audit duplicate fielding positions by event/side.
-- [ ] Audit missing fielding positions by season/source.
+- [x] Implement `main_models.personnel_state_reliability`. v1: FULL kind, grain (event_key, fielding_side, fielding_position, player_id). 146.9M rows materialized in dev env `data_coverage_personnel_state_reliability` (audits pass: not_null, unique_grain, accepted_values × 2, relationships, at_most_one_hard_mask_per_position). All seven `eligibility_status` values remain in `accepted_values`; only `direct_event` is reachable under current upstreams (PBP events always carry a `personnel_fielding_states` row). The remaining classes await follow-up enrichment (see below).
+- [ ] Classify direct event evidence, box-derived evidence, deduped evidence, synthetic evidence, missing evidence, ambiguous evidence, and not-applicable states. _Partial: only `direct_event` emitted in v1. `lineup_derived` / `box_derived` / `synthetic` / `duplicate_position` / `ambiguous_substitution` require upstream signal that does not yet exist (e.g., per-game source classification, box-only event synthesis); follow-up PR after `entity_link_reliability`._
+- [x] Add hard-zero eligibility only for high-confidence personnel states. `hard_zero_allowed = TRUE` is restricted to `eligibility_status = 'direct_event'` (which maps to `reliability_class = 'direct'`) per `seed_reliability_class.is_hard_mask_eligible`.
+- [x] Audit duplicate fielding positions by event/side. New custom audit `at_most_one_hard_mask_per_position` (`bc/audits/at_most_one_hard_mask_per_position.sql`) groups by (event_key, fielding_side, fielding_position) restricted to hard-mask-eligible rows and flags any group with COUNT > 1.
+- [ ] Audit missing fielding positions by season/source. _Partial: the `missing` class is wired in the ledger but is unreachable under v1 upstreams; an explicit season/source breakdown will accompany the box-only enrichment PR._
 - [ ] Mark Ohtani-rule, DH, multi-position, courtesy runner, deduped roster, and substitution ambiguity classes.
 - [ ] Implement `main_models.entity_link_reliability`.
 - [ ] Cover players, teams, parks, leagues, scorers, inputters, translators, and umpires where available.
@@ -849,7 +849,7 @@ Update this table as implementation proceeds.
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
 | 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `official_aggregate_availability` on branch `data-coverage-official-aggregate-availability`; ledgers #1-#3 done (#3 also bundles AAP into the risk ledger), remaining ledgers unstarted |  | Implement `personnel_state_reliability` |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `personnel_state_reliability` on branch `data-coverage-personnel-state-reliability`; ledgers #1-#4 done (#3 also bundles AAP into the risk ledger; #4 emits `direct_event` only under current upstreams), remaining ledgers unstarted |  | Implement `entity_link_reliability` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
