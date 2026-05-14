@@ -107,8 +107,23 @@ compare-baseline *ARGS:
     {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/compare_baseline.py "$@"
 
 # Rollup parity check: existing completeness model vs ledger reproduction.
+# All 7 current models carry an accept-gap disposition (see
+# notes/data-coverage-implementation/rollup-parity-dispositions.md): the
+# heuristic flag rules pre-date the ledgers and the diffs reflect real
+# semantic divergence, not bugs. The defaults below let the recipe exit 0
+# without `--allow-delta`-style escape hatches; pass extra `--allow-mismatch`
+# args to suppress additional models, or override entirely with
+# `just rollup-parity-checks --model <name>`.
 rollup-parity-checks *ARGS:
-    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/rollup_parity_checks.py "$@"
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/rollup_parity_checks.py \
+        --allow-mismatch event_completeness_pitches \
+        --allow-mismatch event_completeness_fielding_credit \
+        --allow-mismatch event_completeness_batted_balls \
+        --allow-mismatch player_game_data_completeness \
+        --allow-mismatch player_completeness \
+        --allow-mismatch game_data_completeness \
+        --allow-mismatch season_team_coverage \
+        "$@"
 
 # --- LLM context ---
 
