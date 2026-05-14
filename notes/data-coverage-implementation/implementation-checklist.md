@@ -245,9 +245,23 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 - [x] Add not-null audits for required keys and dimensions. Every Phase-1 ledger carries `not_null` audits for required keys (verified across all 13 ledgers).
 - [x] Add residual arithmetic audits for official aggregate availability. Custom audit `residual_value_matches_status` wired on `official_aggregate_availability` enforces residual sign per status (NULL-tolerant per memory — `present_clean` rows with NULL `event_value` from box-only games allowed).
 - [x] Add deterministic-confidence range audits. Custom audit `sentinel_status_consistent` wired on `event_observation_geometry` / `event_observation_pitch` / `event_observation_credit` enforces `sentinel_type ↔ observed_status` mapping (allows the documented `derived` override for geometry deduction paths).
-- [ ] Add hard-mask personnel audits.
+- [ ] Add hard-mask personnel audits. _Substantively covered by `at_most_one_hard_mask_per_position()` on `personnel_state_reliability` and `eligible_for_allocation_requires_hard_mask()` on `fielding_credit_gaps`. No additional invariant surfaced through Phase-1 audit work. Close on next pass if no new invariant emerges._
 - [x] Add source-count reconciliation queries. `scripts/baseline_data_coverage.py` now emits 13 ledger row-count scalars + 10 grouped distributions. `scripts/compare_baseline.py` diffs two snapshots (or the latest vs the live DB) and exits 1 on any nonzero delta.
 - [x] Add rollup checks showing existing completeness models can be reproduced from ledgers. `scripts/rollup_parity_checks.py` runs EXCEPT-both-directions between each existing completeness model (`event_completeness_pitches`, `event_completeness_fielding_credit`, `event_completeness_batted_balls`, `player_game_data_completeness`, `player_completeness`, `game_data_completeness`, `season_team_coverage`) and its ledger reproduction. Initial run surfaces nonzero diffs on every model (expected per the plan — these are real semantic gaps between the existing flag heuristics and the ledger source-of-truth, to be decided on per-model in follow-up enrichment PRs).
+
+### Phase 1 Enrichment Follow-Ups
+
+None of these block Phase 2. Each is its own PR off `data_coverage`. Listed here for visibility; some are also tracked in-place above as `[ ]` items under their ledger section — the duplication is intentional so this section is a single-pane index.
+
+- [ ] `official_aggregate_availability` batting / pitching / line-score / earned-runs / decisions expansion. _Tracked above at line 195. Distinct PR — adds ~4-5x rows + per-stat risk fan-out._
+- [ ] `official_credit_authority` lights up `estimated_no_aggregate_constraint`. Needs a no-box-unknown rollup from `fielding_credit_gaps.gap_class` to (game_id, team_id) so oaa can flag aggregate_status=missing with event_value IS NULL in fielding scope.
+- [ ] `source_data_error_risk_ledger` composite-`field_name` → per-credit-dimension mapping. Today `field_name` carries composite labels (`fielding_putouts`, `fielding_putouts_assists`, `fielding_putouts_assists_errors`); the sibling-ledger `data_error_risk` join is a no-op until these expand to `putout_credit` / `assist_credit` / `error_credit` per-dim rows.
+- [ ] `personnel_state_reliability` enrichment: light up `lineup_derived` / `box_derived` / `synthetic` / `missing` / `duplicate_position` / `ambiguous_substitution`. _Tracked above at lines 204 + 207 + 208. Needs new upstream signals (per-game source classification, box-only event synthesis, ambiguity-preserving personnel state model)._
+- [ ] `entity_link_reliability` park-episode enrichment: renovations, surface changes, dimension changes, multi-park seasons, plus stg_bio-absent player_id traffic. _Tracked above at line 211. Needs upstream park-episode model._
+- [ ] `game_context_observation_ledger` enrichment: per-roster bio coverage on `batter_hand` / `pitcher_hand` (today stamped from team-wide bio availability) + 7-inning `scheduled_innings` variants (2020-2021 doubleheaders, pre-1957 AA twin bills).
+- [ ] `event_observation_pitch` v2: emit `default_code` for `count_balls` / `count_strikes`. Needs an upstream "was this 0-0 recorded or defaulted" signal that does not yet exist on `stg_event_pitch_sequences`.
+- [ ] `fielding_credit_gaps` lights up `incomplete_event_flag` / `data_error_flagged`. Needs an `is_incomplete_event` (or equivalent structural-incompleteness flag) on `event_states_full`; today inlined as FALSE.
+- [ ] Reserve Bayesian context imputation for high-impact covariates. _Tracked above at line 219. This is the imputation **model**, not the ledger — its eligibility/coverage truth lives in `game_context_observation_ledger`._
 
 ### Phase 1 Exit Gate
 
