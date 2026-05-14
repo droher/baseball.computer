@@ -1,7 +1,7 @@
 MODEL (
   name main_models.source_data_error_risk_ledger,
   kind FULL,
-  description 'Per (source_table, game, team, player, field, issue_source) ledger of known data-error risk on source rows. Confirmed arithmetic violations (box_score_data_issues), audit-exempt artifacts (team_game_data_issues), box-vs-event contradictions (box_event_fielding_discrepancies), suspected source/parser issues for missing box rows (unknown_play_no_box), and suspected assists-miscoded-as-putouts scorer/parser pattern (assists_as_putouts_finder). Sibling to source_acquisition_ledger: that ledger says whether a source exists, this one says whether — when it exists — it is trustworthy. Every downstream Phase 1 event-observation ledger joins to both ledgers to compute model_input_eligible. data_error_key is a stable MD5 hex digest over the natural-key columns and is the unique grain.',
+  description 'Per (source_table, game, team, player, field, issue_source) ledger of known data-error risk on source rows. Confirmed arithmetic violations (box_score_data_issues), audit-exempt artifacts (team_game_data_issues), box-vs-event contradictions (box_event_fielding_discrepancies), suspected source/parser issues for missing box rows (unknown_play_no_box), and suspected assists-miscoded-as-putouts scorer/parser pattern (assists_as_putouts_finder). Sibling to source_acquisition_ledger: that ledger says whether a source exists, this one says whether — when it exists — it is trustworthy. Every downstream Phase 1 event-observation ledger joins to both ledgers to compute model_input_eligible. data_error_key is a stable MD5 hex digest over the natural-key columns and is the unique grain. Composite field_name labels (fielding_putouts, fielding_putouts_assists, fielding_putouts_assists_errors) are emitted alongside per-credit-dimension rows (putout_credit, assist_credit, error_credit) so consumers that join on composite labels (official_aggregate_availability) and consumers that join on credit-dimension literals (event_observation_credit) both light up.',
   grain (data_error_key),
   columns (
     data_error_key VARCHAR,
@@ -21,7 +21,7 @@ MODEL (
     game_id = @doc('game_id'),
     team_id = @doc('team_id'),
     player_id = @doc('player_id'),
-    field_name = 'Affected field or composite stat. For multi-stat rollups (e.g. fielding putouts/assists/errors) a composite name is used so downstream sums by (game, player, field_name) do not double-count weight.',
+    field_name = 'Affected field or per-credit-dimension label. Composite labels (fielding_putouts, fielding_putouts_assists, fielding_putouts_assists_errors) are emitted for consumers that operate on stat rollups (e.g. official_aggregate_availability). Per-credit-dimension labels (putout_credit, assist_credit, error_credit) are emitted in addition for consumers that key off event_observation_credit.dimension. Each composite source row therefore expands into 1 composite row + N per-dimension rows; data_error_key includes field_name so the per-dimension rows do not collide.',
     data_error_class = 'Risk class: confirmed_issue, suspected_source_issue, suspected_parser_issue, contradiction, audit_exception.',
     training_action = 'How training pipelines should treat the row: allow, downweight, exclude, constraint_only, diagnostic_only. confirmed_issue rows can never use allow (enforced by custom audit).',
     training_weight = 'Multiplicative weight in [0, 1] applied to the affected row/field during model fitting.',
@@ -117,6 +117,60 @@ assists_as_putouts AS (
     FROM main_models.assists_as_putouts_finder AS aap
 ),
 
+fielding_discrepancies_per_dim AS (
+    SELECT
+        fd.source_table,
+        fd.game_id,
+        fd.team_id,
+        fd.player_id,
+        v.field_name_expanded AS field_name,
+        fd.data_error_class,
+        fd.training_action,
+        fd.training_weight,
+        fd.issue_source
+    FROM fielding_discrepancies AS fd
+    CROSS JOIN (VALUES
+        ('putout_credit'),
+        ('assist_credit'),
+        ('error_credit')
+    ) AS v(field_name_expanded)
+),
+
+unknown_play_per_dim AS (
+    SELECT
+        up.source_table,
+        up.game_id,
+        up.team_id,
+        up.player_id,
+        v.field_name_expanded AS field_name,
+        up.data_error_class,
+        up.training_action,
+        up.training_weight,
+        up.issue_source
+    FROM unknown_play AS up
+    CROSS JOIN (VALUES
+        ('putout_credit')
+    ) AS v(field_name_expanded)
+),
+
+assists_as_putouts_per_dim AS (
+    SELECT
+        aap.source_table,
+        aap.game_id,
+        aap.team_id,
+        aap.player_id,
+        v.field_name_expanded AS field_name,
+        aap.data_error_class,
+        aap.training_action,
+        aap.training_weight,
+        aap.issue_source
+    FROM assists_as_putouts AS aap
+    CROSS JOIN (VALUES
+        ('putout_credit'),
+        ('assist_credit')
+    ) AS v(field_name_expanded)
+),
+
 unioned AS (
     SELECT * FROM box_score_issues
     UNION ALL BY NAME
@@ -127,6 +181,12 @@ unioned AS (
     SELECT * FROM unknown_play
     UNION ALL BY NAME
     SELECT * FROM assists_as_putouts
+    UNION ALL BY NAME
+    SELECT * FROM fielding_discrepancies_per_dim
+    UNION ALL BY NAME
+    SELECT * FROM unknown_play_per_dim
+    UNION ALL BY NAME
+    SELECT * FROM assists_as_putouts_per_dim
 )
 
 SELECT

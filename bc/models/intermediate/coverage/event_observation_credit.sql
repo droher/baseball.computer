@@ -1,7 +1,7 @@
 MODEL (
   name main_models.event_observation_credit,
   kind FULL,
-  description 'Per (event_key, dimension) observation ledger for fielding-credit covariates. Driven by main_models.event_states_full (every event in 1910-2025). Atomic dimensions: putout_credit, assist_credit, error_credit, double_play_credit, triple_play_credit, passed_ball_credit. Putout/assist/error rows aggregate main_models.calc_fielding_play_agg, splitting known (fielding_position != 0) from unknown (fielding_position = 0) credit-bearer rows; unknown_code fires when any unknown-fielder credit row is present for that dimension. double_play / triple_play join main_models.event_double_plays (event-grain); passed_ball aggregates main_models.stg_event_baserunners filtered to baserunning_play_type = PassedBall. source_acquisition_status joins source_acquisition_ledger on (game_id, fielding_team_id, dimension=box_fielding) — credit data are side-dependent and live in the box_fielding row. data_error_risk joins on (game_id, field_name=dimension); the current source_data_error_risk_ledger field_names (fielding_putouts, fielding_putouts_assists, fielding_putouts_assists_errors) are composites that do not literally match the credit dimension keys, so this is a no-op in v1 — kept for a follow-up enrichment PR that maps composite field_names to per-credit dimensions.',
+  description 'Per (event_key, dimension) observation ledger for fielding-credit covariates. Driven by main_models.event_states_full (every event in 1910-2025). Atomic dimensions: putout_credit, assist_credit, error_credit, double_play_credit, triple_play_credit, passed_ball_credit. Putout/assist/error rows aggregate main_models.calc_fielding_play_agg, splitting known (fielding_position != 0) from unknown (fielding_position = 0) credit-bearer rows; unknown_code fires when any unknown-fielder credit row is present for that dimension. double_play / triple_play join main_models.event_double_plays (event-grain); passed_ball aggregates main_models.stg_event_baserunners filtered to baserunning_play_type = PassedBall. source_acquisition_status joins source_acquisition_ledger on (game_id, fielding_team_id, dimension=box_fielding) — credit data are side-dependent and live in the box_fielding row. data_error_risk joins on (game_id, field_name=dimension) and matches the per-credit-dimension rows emitted by source_data_error_risk_ledger (putout_credit, assist_credit, error_credit) in addition to the composite labels.',
   grain (event_key, dimension),
   columns (
     event_key UINTEGER,
@@ -22,7 +22,7 @@ MODEL (
     raw_value = 'Source value serialized as text. Credit dims: total credit count (known + unknown). DP/TP dims: boolean cast to text. passed_ball: boolean cast to text.',
     deduced_value = 'Always NULL in v1.',
     source_acquisition_status = 'source_acquisition_ledger.source_availability_status for (game_id, fielding_team_id, dimension=box_fielding).',
-    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. No-op in v1.',
+    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. Matches per-credit-dimension rows emitted by the risk ledger (putout_credit/assist_credit/error_credit) — non-credit dimensions remain none in v1.',
     model_input_eligible = 'TRUE when observed_status NOT IN (not_applicable, data_error_prone) AND source_acquisition_status != not_acquired.'
   ),
   audits (
