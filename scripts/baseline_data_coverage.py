@@ -29,6 +29,44 @@ from python_models.statistical.manifests import new_artifact_id
 
 _log = logging.getLogger("baseline_data_coverage")
 
+ENV_LEDGER_SCHEMA: str = "BC_LEDGER_SCHEMA"
+DEFAULT_LEDGER_SCHEMA: str = "main_models"
+
+LEDGER_TABLES: frozenset[str] = frozenset(
+    {
+        "source_acquisition_ledger",
+        "source_data_error_risk_ledger",
+        "official_aggregate_availability",
+        "personnel_state_reliability",
+        "entity_link_reliability",
+        "game_context_observation_ledger",
+        "game_exposure_ledger",
+        "event_observation_geometry",
+        "event_observation_pitch",
+        "event_observation_credit",
+        "event_observation_context",
+        "fielding_credit_gaps",
+        "official_credit_authority",
+    }
+)
+
+
+def _ledger_schema() -> str:
+    return os.environ.get(ENV_LEDGER_SCHEMA, DEFAULT_LEDGER_SCHEMA)
+
+
+def _retarget_ledger_queries(queries: dict[str, str]) -> dict[str, str]:
+    schema = _ledger_schema()
+    if schema == DEFAULT_LEDGER_SCHEMA:
+        return queries
+    rewritten: dict[str, str] = {}
+    for label, sql in queries.items():
+        out = sql
+        for table in LEDGER_TABLES:
+            out = out.replace(f"main_models.{table}", f"{schema}.{table}")
+        rewritten[label] = out
+    return rewritten
+
 
 SCALAR_QUERIES: dict[str, str] = {
     "event_states_full_event_count": "SELECT COUNT(*) FROM main_models.event_states_full",
@@ -71,6 +109,45 @@ SCALAR_QUERIES: dict[str, str] = {
     "season_team_coverage_row_count": "SELECT COUNT(*) FROM main_models.season_team_coverage",
     "season_team_coverage_min_season": "SELECT MIN(season) FROM main_models.season_team_coverage",
     "season_team_coverage_max_season": "SELECT MAX(season) FROM main_models.season_team_coverage",
+    "source_acquisition_ledger_row_count": (
+        "SELECT COUNT(*) FROM main_models.source_acquisition_ledger"
+    ),
+    "source_data_error_risk_ledger_row_count": (
+        "SELECT COUNT(*) FROM main_models.source_data_error_risk_ledger"
+    ),
+    "official_aggregate_availability_row_count": (
+        "SELECT COUNT(*) FROM main_models.official_aggregate_availability"
+    ),
+    "personnel_state_reliability_row_count": (
+        "SELECT COUNT(*) FROM main_models.personnel_state_reliability"
+    ),
+    "entity_link_reliability_row_count": (
+        "SELECT COUNT(*) FROM main_models.entity_link_reliability"
+    ),
+    "game_context_observation_ledger_row_count": (
+        "SELECT COUNT(*) FROM main_models.game_context_observation_ledger"
+    ),
+    "game_exposure_ledger_row_count": (
+        "SELECT COUNT(*) FROM main_models.game_exposure_ledger"
+    ),
+    "event_observation_geometry_row_count": (
+        "SELECT COUNT(*) FROM main_models.event_observation_geometry"
+    ),
+    "event_observation_pitch_row_count": (
+        "SELECT COUNT(*) FROM main_models.event_observation_pitch"
+    ),
+    "event_observation_credit_row_count": (
+        "SELECT COUNT(*) FROM main_models.event_observation_credit"
+    ),
+    "event_observation_context_row_count": (
+        "SELECT COUNT(*) FROM main_models.event_observation_context"
+    ),
+    "fielding_credit_gaps_row_count": (
+        "SELECT COUNT(*) FROM main_models.fielding_credit_gaps"
+    ),
+    "official_credit_authority_row_count": (
+        "SELECT COUNT(*) FROM main_models.official_credit_authority"
+    ),
 }
 
 GROUPED_QUERIES: dict[str, str] = {
@@ -88,6 +165,56 @@ GROUPED_QUERIES: dict[str, str] = {
         "SELECT season, COUNT(*) AS row_count "
         "FROM main_models.linear_weights "
         "GROUP BY 1 ORDER BY season"
+    ),
+    "oaa_aggregate_status_dist": (
+        "SELECT aggregate_status, COUNT(*) AS row_count "
+        "FROM main_models.official_aggregate_availability "
+        "GROUP BY 1 ORDER BY aggregate_status"
+    ),
+    "oca_authority_source_dist": (
+        "SELECT authority_source, COUNT(*) AS row_count "
+        "FROM main_models.official_credit_authority "
+        "GROUP BY 1 ORDER BY authority_source"
+    ),
+    "fcg_gap_class_dist": (
+        "SELECT gap_class, COUNT(*) AS row_count "
+        "FROM main_models.fielding_credit_gaps "
+        "GROUP BY 1 ORDER BY gap_class"
+    ),
+    "psr_eligibility_status_dist": (
+        "SELECT eligibility_status, COUNT(*) AS row_count "
+        "FROM main_models.personnel_state_reliability "
+        "GROUP BY 1 ORDER BY eligibility_status"
+    ),
+    "elr_link_status_dist": (
+        "SELECT entity_type, link_status, COUNT(*) AS row_count "
+        "FROM main_models.entity_link_reliability "
+        "GROUP BY 1, 2 ORDER BY entity_type, link_status"
+    ),
+    "geometry_observed_status_by_dim": (
+        "SELECT dimension, observed_status, COUNT(*) AS row_count "
+        "FROM main_models.event_observation_geometry "
+        "GROUP BY 1, 2 ORDER BY dimension, observed_status"
+    ),
+    "pitch_observed_status_by_dim": (
+        "SELECT dimension, observed_status, COUNT(*) AS row_count "
+        "FROM main_models.event_observation_pitch "
+        "GROUP BY 1, 2 ORDER BY dimension, observed_status"
+    ),
+    "credit_observed_status_by_dim": (
+        "SELECT dimension, observed_status, COUNT(*) AS row_count "
+        "FROM main_models.event_observation_credit "
+        "GROUP BY 1, 2 ORDER BY dimension, observed_status"
+    ),
+    "context_observed_status_by_dim": (
+        "SELECT context_dimension, observed_status, COUNT(*) AS row_count "
+        "FROM main_models.game_context_observation_ledger "
+        "GROUP BY 1, 2 ORDER BY context_dimension, observed_status"
+    ),
+    "exposure_completion_status_dist": (
+        "SELECT completion_status, COUNT(*) AS row_count "
+        "FROM main_models.game_exposure_ledger "
+        "GROUP BY 1 ORDER BY completion_status"
     ),
 }
 
@@ -150,7 +277,9 @@ def _table_exists(con: duckdb.DuckDBPyConnection, schema: str, name: str) -> boo
     return bool(row and row[0])
 
 
-def _safe_run(label: str, con: duckdb.DuckDBPyConnection, query: str, *, scalar: bool) -> dict[str, Any]:
+def _safe_run(
+    label: str, con: duckdb.DuckDBPyConnection, query: str, *, scalar: bool
+) -> dict[str, Any]:
     try:
         result = _scalar(con, query) if scalar else _rows(con, query)
         return {"query": query, "result": result, "error": None}
@@ -159,13 +288,26 @@ def _safe_run(label: str, con: duckdb.DuckDBPyConnection, query: str, *, scalar:
         return {"query": query, "result": None, "error": str(exc)}
 
 
+def _connect_as_bc(db_path: Path) -> duckdb.DuckDBPyConnection:
+    """Open ``db_path`` so per-branch env views referencing the ``bc`` catalog resolve."""
+    con = duckdb.connect(":memory:")
+    con.execute(f"ATTACH '{db_path}' AS bc (READ_ONLY)")
+    con.execute("USE bc")
+    return con
+
+
 def collect_baseline(db_path: Path) -> dict[str, Any]:
     out: dict[str, Any] = {"scalar_queries": {}, "grouped_queries": {}}
-    with duckdb.connect(str(db_path), read_only=True) as con:
-        for label, q in SCALAR_QUERIES.items():
+    scalar = _retarget_ledger_queries(SCALAR_QUERIES)
+    grouped = _retarget_ledger_queries(GROUPED_QUERIES)
+    con = _connect_as_bc(db_path)
+    try:
+        for label, q in scalar.items():
             out["scalar_queries"][label] = _safe_run(label, con, q, scalar=True)
-        for label, q in GROUPED_QUERIES.items():
+        for label, q in grouped.items():
             out["grouped_queries"][label] = _safe_run(label, con, q, scalar=False)
+    finally:
+        con.close()
     return out
 
 
@@ -207,7 +349,9 @@ def main(argv: list[str] | None = None) -> int:
         default=str(BASELINE_ROOT),
         help="Output directory (default: artifacts/statistical/baseline).",
     )
-    _ = parser.add_argument("--log-level", default="INFO", help="stdlib logging level name.")
+    _ = parser.add_argument(
+        "--log-level", default="INFO", help="stdlib logging level name."
+    )
     args = parser.parse_args(argv)
     configure_logging(getattr(logging, args.log_level.upper(), logging.INFO))
     path = build_report(output_dir=Path(args.output_dir))

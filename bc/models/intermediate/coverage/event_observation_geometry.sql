@@ -39,7 +39,8 @@ MODEL (
       column := observed_status,
       to_model := main_seeds.seed_observed_status,
       to_column := observed_status
-    )
+    ),
+    sentinel_status_consistent()
   )
 );
 

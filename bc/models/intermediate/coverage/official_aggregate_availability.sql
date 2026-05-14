@@ -38,7 +38,8 @@ MODEL (
     accepted_values(column := aggregate_grain, is_in := ('player_position_game')),
     accepted_values(column := aggregate_status, is_in := ('present_clean', 'present_issue_flagged', 'missing', 'not_applicable', 'negative_residual', 'contradicted')),
     accepted_values(column := data_error_risk, is_in := ('none', 'allow', 'diagnostic_only', 'downweight', 'constraint_only', 'exclude')),
-    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    residual_value_matches_status()
   )
 );
 

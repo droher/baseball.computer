@@ -100,7 +100,15 @@ diff MODEL SRC TGT:
 
 # Phase 0 baseline: read-only DuckDB snapshot under artifacts/statistical/baseline/.
 baseline-data-coverage *ARGS:
-    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/baseline_data_coverage.py "$@"
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/baseline_data_coverage.py "$@"
+
+# Diff two data-coverage baseline JSONs (or the latest against the live DB).
+compare-baseline *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/compare_baseline.py "$@"
+
+# Rollup parity check: existing completeness model vs ledger reproduction.
+rollup-parity-checks *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/rollup_parity_checks.py "$@"
 
 # --- LLM context ---
 

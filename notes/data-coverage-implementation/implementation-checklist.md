@@ -240,14 +240,14 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Audits And Validation
 
-- [ ] Add uniqueness audits for every ledger grain.
-- [ ] Add accepted-value audits for status columns.
-- [ ] Add not-null audits for required keys and dimensions.
-- [ ] Add residual arithmetic audits for official aggregate availability.
-- [ ] Add deterministic-confidence range audits.
+- [x] Add uniqueness audits for every ledger grain. Every Phase-1 ledger carries a `unique_grain` audit (verified across all 13 ledgers in audit inventory).
+- [x] Add accepted-value audits for status columns. Every Phase-1 ledger carries `accepted_values` audits for its enum columns (verified across all 13 ledgers).
+- [x] Add not-null audits for required keys and dimensions. Every Phase-1 ledger carries `not_null` audits for required keys (verified across all 13 ledgers).
+- [x] Add residual arithmetic audits for official aggregate availability. Custom audit `residual_value_matches_status` wired on `official_aggregate_availability` enforces residual sign per status (NULL-tolerant per memory — `present_clean` rows with NULL `event_value` from box-only games allowed).
+- [x] Add deterministic-confidence range audits. Custom audit `sentinel_status_consistent` wired on `event_observation_geometry` / `event_observation_pitch` / `event_observation_credit` enforces `sentinel_type ↔ observed_status` mapping (allows the documented `derived` override for geometry deduction paths).
 - [ ] Add hard-mask personnel audits.
-- [ ] Add source-count reconciliation queries.
-- [ ] Add rollup checks showing existing completeness models can be reproduced from ledgers.
+- [x] Add source-count reconciliation queries. `scripts/baseline_data_coverage.py` now emits 13 ledger row-count scalars + 10 grouped distributions. `scripts/compare_baseline.py` diffs two snapshots (or the latest vs the live DB) and exits 1 on any nonzero delta.
+- [x] Add rollup checks showing existing completeness models can be reproduced from ledgers. `scripts/rollup_parity_checks.py` runs EXCEPT-both-directions between each existing completeness model (`event_completeness_pitches`, `event_completeness_fielding_credit`, `event_completeness_batted_balls`, `player_game_data_completeness`, `player_completeness`, `game_data_completeness`, `season_team_coverage`) and its ledger reproduction. Initial run surfaces nonzero diffs on every model (expected per the plan — these are real semantic gaps between the existing flag heuristics and the ledger source-of-truth, to be decided on per-model in follow-up enrichment PRs).
 
 ### Phase 1 Exit Gate
 
