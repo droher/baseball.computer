@@ -213,14 +213,14 @@ Purpose: create the shared runtime machinery and materialize every deterministic
 
 ### Context And Exposure Reliability
 
-- [ ] Implement `main_models.game_context_observation_ledger`.
-- [ ] Cover park, weather, temperature, wind, start time, attendance, DH/rule flags, extra-inning runner rule, game type, scorer, inputter, translator, umpires, batter hand, and pitcher hand where applicable.
-- [ ] Start missing context handling with observed-status flags, missing indicators, deterministic fallbacks, and simple tabular baselines.
-- [ ] Reserve Bayesian context imputation for high-impact covariates that materially affect park, advancement, or run-value estimates.
-- [ ] Implement `main_models.game_exposure_ledger`.
-- [ ] Include scheduled innings, actual batting/fielding outs, completion status, denominator policy, and exposure confidence.
-- [ ] Cover complete, walk-off, shortened, suspended, forfeit, and unknown completion statuses.
-- [ ] Verify exposure policy does not override official suspension, forfeit, or walk-off facts.
+- [x] Implement `main_models.game_context_observation_ledger`. v1: FULL kind, grain (game_id, context_dimension). 4,779,354 rows = 207,798 games × 23 atomic dimensions. doc-01 composite dims (`weather`, `wind`, `umpires`) split into per-slot/per-sub-field atoms (sky, field_condition, precipitation, wind_direction, wind_speed, umpire_home/first/second/third/left/right). observed_status distribution: observed 2.60M, unknown_code 0.57M (sky/field_condition/precipitation/wind_direction/time_of_day stored sentinel `Unknown` instead of NULL), not_applicable 0.63M (umpire_third pre-1933, umpire_left/right outside postseason 6-man eras, extra_inning_runner_rule pre-2020 or non-RegularSeason), derived 0.42M (batter_hand/pitcher_hand bio-availability stamps), missing 0.57M (genuinely null in source). All 7 audits green: not_null, unique_grain, accepted_values × 4 (context_dimension, observed_status, source_family, context_confidence), relationships(observed_status → seed_observed_status).
+- [x] Cover park, weather, temperature, wind, start time, attendance, DH/rule flags, extra-inning runner rule, game type, scorer, inputter, translator, umpires, batter hand, and pitcher hand where applicable. All 15 doc-01 dimensions covered, with weather/wind/umpires split into atoms for clean per-sub-field missingness aggregation.
+- [x] Start missing context handling with observed-status flags, missing indicators, deterministic fallbacks, and simple tabular baselines. observed_status carries the structural answer; context_confidence (high/medium/low) downweights `missing` and `unknown_code` rows for downstream imputation models.
+- [ ] Reserve Bayesian context imputation for high-impact covariates that materially affect park, advancement, or run-value estimates. _Imputation models themselves are future work; this ledger provides the eligibility/coverage truth they will fit against._
+- [x] Implement `main_models.game_exposure_ledger`. v1: FULL kind, grain (game_id, team_id). 415,604 rows = 207,802 games × 2 sides. completion_status distribution: complete 374,810 (90.2%), walk_off 35,048 (8.4%), shortened 5,292, suspended 406, forfeit 48. denominator_policy: full_game 409,858, observed_outs 5,698, official_result_only 48. exposure_confidence: high 409,858, medium 5,698, low 48. 8 rows have NULL actual_outs_* (gamelog-only games with no team_game_pitching_stats entry). All 6 audits green: not_null, unique_grain, accepted_values × 3 (completion_status, denominator_policy, exposure_confidence), relationships(game_id → game_results).
+- [x] Include scheduled innings, actual batting/fielding outs, completion status, denominator policy, and exposure confidence. scheduled_innings hardcoded to 9 in v1; 7-inning variants (2020-2021 doubleheaders, pre-1957 AA twin bills) are reserved for follow-up.
+- [x] Cover complete, walk-off, shortened, suspended, forfeit, and unknown completion statuses. All 6 statuses in `accepted_values`. `unknown` reserved for games with no duration_outs AND no forfeit/suspension/shortened flag (none observed in v1; gamelog-only games classify as `complete` with `medium` confidence).
+- [x] Verify exposure policy does not override official suspension, forfeit, or walk-off facts. denominator_policy CASE respects the official-fact ordering (forfeit → official_result_only; suspended/shortened → observed_outs; complete/walk_off → full_game).
 
 ### Event Observation And Gap Ledgers
 
@@ -849,7 +849,7 @@ Update this table as implementation proceeds.
 | Phase | Status | Current output ID or branch | Blocking issue | Next action |
 | --- | --- | --- | --- | --- |
 | 0. Setup + baseline | `[x]` | branch `data-coverage-phase-0-1-scaffolding`; baseline at `artifacts/statistical/baseline/baseline_${ISO_DATE}_${GIT_SHA_SHORT}.json` | LSF 1910-1911 flip deferred to separate PR | Open Phase 1 ledger PR (source acquisition first) |
-| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `entity_link_reliability` on branch `data-coverage-entity-link-reliability`; ledgers #1-#5 done (#3 also bundles AAP into the risk ledger; #4 emits `direct_event` only; #5 covers all 8 entity types but parks have aka-only annotation, not full renovation episodes), remaining ledgers unstarted |  | Implement `game_context_observation_ledger` + `game_exposure_ledger` |
+| 1. Deterministic prep (runtime, ledgers, observation, gaps) | `[~]` | `game_context_observation_ledger` + `game_exposure_ledger` on branch `data-coverage-game-context-and-exposure`; ledgers #1-#7 done (#3 also bundles AAP into the risk ledger; #4 emits `direct_event` only; #5 covers all 8 entity types but parks have aka-only annotation; #6 splits doc-01 composite dims into atoms, 23 dimensions × 207,798 games; #7 walk-off rate 8.4%, gamelog-only games classify as complete-medium), remaining ledgers unstarted |  | Implement event observation sibling ledgers (geometry/pitch/credit) or `official_credit_authority` |
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
