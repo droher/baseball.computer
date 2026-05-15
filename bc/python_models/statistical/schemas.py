@@ -126,3 +126,15 @@ class PublishedPointer(BaseModel):
     published_at: datetime
     manifest_path: Path
     notes: str | None = None
+
+
+class ValidationReport(BaseModel):
+    artifact_id: str
+    kind: ArtifactKind
+    name: str
+    status: ValidationStatus
+    findings: tuple[ValidationFinding, ...] = ()
+    diagnostics: tuple[Diagnostic, ...] = ()
+    metrics: dict[str, float | int] = Field(default_factory=dict)
+    metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    generated_at: datetime

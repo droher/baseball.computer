@@ -222,6 +222,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run conservation/calibration/holdout/sensitivity checks on an artifact.",
     )
     _add_artifact_id_arg(validate)
+    _ = validate.add_argument(
+        "--output-path",
+        default=None,
+        help=(
+            "Override where validation_report.json is written (defaults to "
+            "<artifact_dir>/validation/validation_report.json)."
+        ),
+    )
 
     publish = subparsers.add_parser(
         "publish-manifest",
@@ -425,6 +433,64 @@ def _run_fit_deep(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_validate(args: argparse.Namespace) -> int:
+    import os
+    import tempfile
+
+    from python_models.statistical.validate import (
+        _find_manifest,  # type: ignore[reportPrivateUsage]
+        validate_artifact,
+    )
+
+    artifact_id = str(args.artifact_id)
+    candidate_roots = _build_candidate_roots()
+    report = validate_artifact(artifact_id, candidate_roots=candidate_roots)
+    artifact_dir = _find_manifest(artifact_id, candidate_roots).parent
+    output_path = (
+        Path(args.output_path)
+        if args.output_path
+        else artifact_dir / "validation" / "validation_report.json"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = report.model_dump_json(indent=2)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(output_path.parent), prefix=".validation.", suffix=".json"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            _ = fh.write(payload)
+        os.replace(tmp_name, output_path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+    blocking = sum(1 for f in report.findings if f.severity == "block")
+    _log.info(
+        "validate artifact_id=%s kind=%s status=%s findings=%d blocking=%d output=%s",
+        report.artifact_id,
+        report.kind,
+        report.status,
+        len(report.findings),
+        blocking,
+        output_path,
+    )
+    return 1 if report.status == "failed" else 0
+
+
+def _build_candidate_roots() -> tuple[Path, ...]:
+    from python_models.statistical.config import (
+        BAYES_ROOT,
+        DATASETS_ROOT,
+        DEEP_ROOT,
+        EDA_ROOT,
+    )
+
+    return (DEEP_ROOT, BAYES_ROOT, DATASETS_ROOT, EDA_ROOT)
+
+
 def _run_publish_manifest(args: argparse.Namespace) -> int:
     from datetime import datetime, timezone
 
@@ -491,6 +557,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return _run_fit_deep(args)
         case "publish-manifest":
             return _run_publish_manifest(args)
+        case "validate":
+            return _run_validate(args)
         case other:
             raise NotImplementedError(
                 f"command {other!r} is a scaffolding stub; real implementation lands per the data-coverage checklist."
