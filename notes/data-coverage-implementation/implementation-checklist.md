@@ -343,8 +343,19 @@ Purpose: freeze model inputs and discover identification problems before fitting
 
 - [ ] Each planned model has a named dataset model or a deliberate deferral note.
 - [ ] Each dataset has exported snapshot metadata with query hash, schema, row count, category maps, source snapshot ID, and split policy.
-- [ ] EDA reports exist for the first model family targeted for fitting.
-- [ ] Split registry has passed leakage checks. _Tooling landed (`check_split_leakage` / `bc-stats check-split-leakage` / `just check-split-leakage` / EDA blocking finding `split_leakage_detected`); needs a real `model_input_*` snapshot run on `bc_dev.db` before this item can flip._
+- [x] EDA reports exist for the first model family targeted for fitting. The
+  observation/scorer model targets `model_input_observation_batted_ball`
+  (doc-03 §"Observation models"); a frozen Parquet snapshot + EDA report
+  has been generated against `bc_dev.db`. Summary captured in
+  `notes/data-coverage-implementation/phase2-exit-eda-batted-ball.md`;
+  raw artifacts under `artifacts/statistical/{datasets,eda}/...` are
+  gitignored.
+- [x] Split registry has passed leakage checks. Tooling
+  (`check_split_leakage`, `bc-stats check-split-leakage`, `just check-split-leakage`,
+  EDA blocking finding `split_leakage_detected`) plus a real
+  `model_input_observation_batted_ball` snapshot on `bc_dev.db`:
+  `split_leakage_report.parquet` is empty across all 84.27M rows × 7
+  keying units. See `phase2-exit-eda-batted-ball.md` for the artifact.
 - [x] Weak-identification flags are available to model configs and publication gates. `bc.python_models.statistical.model_config.ModelConfig` declares `addressed_weak_identifications` (tuple of `WeakIdentificationPolicy(effect, slice, treatment, rationale)` with treatments `partial_pool|fixed_prior|drop|merge_levels|mark_weakly_identified|accept_unidentified`) and `expected_blocking_findings`. `publication.evaluate_publication_gate(config, eda_report)` cross-checks dataset name/version, requires every EDA `WeakIdentificationFlag` to match a policy (exact slice wins over `*` wildcard), and refuses unexpected blocking findings. Surfaced as `bc-stats check-publication-gate` / `just check-publication-gate MODEL_CONFIG EDA_REPORT`. The actual Phase 4 Bayesian fits consume this scaffolding when they land.
 
 ## Phase 3: Deep-Learning Supplements
