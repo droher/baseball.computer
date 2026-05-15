@@ -6,7 +6,7 @@ import python_models.ml  # noqa: F401  # set KERAS_BACKEND before keras import
 
 import keras
 
-from python_models.ml.features import BASERUNNING_CAT
+from python_models.ml.features import BASERUNNING_CAT, LEGACY_ML_LAYOUT
 from python_models.ml.model_factory import build_model as _build_model
 
 
@@ -19,6 +19,7 @@ def build_model(
 ) -> keras.Model:
     return _build_model(
         target_spec=BASERUNNING_CAT,
+        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=vocab_sizes,
         numeric_means=numeric_means,
         numeric_variances=numeric_variances,

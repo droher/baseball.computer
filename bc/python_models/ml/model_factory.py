@@ -16,9 +16,7 @@ import keras
 from keras import layers
 
 from python_models.ml.features import (
-    HIGH_CARD_CATEGORICAL,
-    LOW_CARD_CATEGORICAL,
-    NUMERIC,
+    FeatureLayout,
     TargetSpec,
 )
 
@@ -69,6 +67,7 @@ def _make_outputs_layer(
 def build_model(
     *,
     target_spec: TargetSpec,
+    layout: FeatureLayout,
     vocab_sizes: dict[str, int],
     numeric_means: dict[str, float],
     numeric_variances: dict[str, float],
@@ -81,7 +80,7 @@ def build_model(
     inputs: dict[str, keras.KerasTensor] = {}
     branches: list[keras.KerasTensor] = []
 
-    for col in HIGH_CARD_CATEGORICAL:
+    for col in layout.high_card_columns:
         size = vocab_sizes[col]
         inp = keras.Input(shape=(1,), dtype="int64", name=col)
         emb = layers.Embedding(
@@ -92,7 +91,7 @@ def build_model(
         branches.append(layers.Flatten(name=f"flatten_{col}")(emb))
         inputs[col] = inp
 
-    for col in LOW_CARD_CATEGORICAL:
+    for col in layout.low_card_columns:
         size = vocab_sizes[col]
         inp = keras.Input(shape=(1,), dtype="int64", name=col)
         one_hot = layers.CategoryEncoding(
@@ -103,7 +102,7 @@ def build_model(
         branches.append(layers.Flatten(name=f"flatten_{col}")(one_hot))
         inputs[col] = inp
 
-    for col in NUMERIC:
+    for col in layout.numeric_columns:
         inp = keras.Input(shape=(1,), dtype="float32", name=col)
         norm = layers.Normalization(
             mean=numeric_means[col],

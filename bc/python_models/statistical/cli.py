@@ -165,6 +165,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _ = fit_deep.add_argument("--target", required=True, help="Deep target name.")
     _add_dataset_artifact_arg(fit_deep)
+    _add_artifact_id_arg(fit_deep)
+    _ = fit_deep.add_argument(
+        "--source-snapshot-id",
+        default=None,
+        help=(
+            "Override the source_snapshot_id stamped onto the deep manifest. "
+            "Defaults to the dataset artifact's source_snapshot_id."
+        ),
+    )
+    _ = fit_deep.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="Override training epochs per fit (default: deep.training.DEFAULT_EPOCHS).",
+    )
+    _ = fit_deep.add_argument(
+        "--keras-batch-size",
+        type=int,
+        default=None,
+        help="Override Keras batch size (default: deep.training.DEFAULT_KERAS_BATCH_SIZE).",
+    )
+    _ = fit_deep.add_argument(
+        "--dataset-output-root",
+        default=None,
+        help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
+    )
+    _ = fit_deep.add_argument(
+        "--output-root",
+        default=None,
+        help="Override the deep artifact root (defaults to artifacts/statistical/deep).",
+    )
 
     fit_bayes = subparsers.add_parser(
         "fit-bayes",
@@ -335,6 +366,117 @@ def _run_run_eda(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_fit_deep(args: argparse.Namespace) -> int:
+    from python_models.statistical.config import DATASETS_ROOT, DEEP_ROOT
+    from python_models.statistical.deep.feature_layout import coverage_layout_for
+    from python_models.statistical.deep.registry import get_target
+    from python_models.statistical.deep.training import (
+        DEFAULT_EPOCHS,
+        DEFAULT_KERAS_BATCH_SIZE,
+        run_target,
+    )
+    from python_models.statistical.manifests import read_manifest
+
+    spec = get_target(args.target)
+    dataset_root = (
+        Path(args.dataset_output_root) if args.dataset_output_root else DATASETS_ROOT
+    )
+    dataset_dir = dataset_root / spec.dataset_name / args.dataset_artifact
+    parquet_path = dataset_dir / "dataset.parquet"
+    manifest_path = dataset_dir / "manifest.json"
+    if not parquet_path.exists():
+        raise FileNotFoundError(
+            f"dataset Parquet missing at {parquet_path}; run prepare-dataset first."
+        )
+    if args.source_snapshot_id is not None:
+        source_snapshot_id = str(args.source_snapshot_id)
+    elif manifest_path.exists():
+        source_snapshot_id = read_manifest(manifest_path).source_snapshot_id
+    else:
+        raise FileNotFoundError(
+            f"dataset manifest missing at {manifest_path}; pass --source-snapshot-id to override."
+        )
+
+    output_root = Path(args.output_root) if args.output_root else DEEP_ROOT
+    layout = coverage_layout_for(spec.dataset_name)
+    result = run_target(
+        spec,
+        dataset_parquet=parquet_path,
+        artifact_id=args.artifact_id,
+        layout=layout,
+        source_snapshot_id=source_snapshot_id,
+        dataset_artifact_id=args.dataset_artifact,
+        artifact_root=output_root,
+        epochs=int(args.epochs) if args.epochs is not None else DEFAULT_EPOCHS,
+        keras_batch_size=(
+            int(args.keras_batch_size)
+            if args.keras_batch_size is not None
+            else DEFAULT_KERAS_BATCH_SIZE
+        ),
+    )
+    _log.info(
+        "fit-deep completed target=%s artifact_id=%s train=%d validate=%d test=%d",
+        spec.name,
+        args.artifact_id,
+        result.train_rows,
+        result.validate_rows,
+        result.test_rows,
+    )
+    return 0
+
+
+def _run_publish_manifest(args: argparse.Namespace) -> int:
+    from datetime import datetime, timezone
+
+    from python_models.statistical.config import (
+        BAYES_ROOT,
+        DATASETS_ROOT,
+        DEEP_ROOT,
+        EDA_ROOT,
+    )
+    from python_models.statistical.manifests import (
+        read_manifest,
+        write_published_pointer,
+    )
+    from python_models.statistical.schemas import PublishedPointer
+
+    artifact_id = str(args.artifact_id)
+    model_name = str(args.model)
+
+    candidate_roots: list[Path] = [DEEP_ROOT, BAYES_ROOT, DATASETS_ROOT, EDA_ROOT]
+    found: Path | None = None
+    for root in candidate_roots:
+        for candidate in root.rglob(f"{artifact_id}/manifest.json"):
+            found = candidate
+            break
+        if found is not None:
+            break
+    if found is None:
+        raise FileNotFoundError(
+            f"no manifest.json for artifact_id={artifact_id!r} under {[str(r) for r in candidate_roots]}"
+        )
+
+    manifest = read_manifest(found)
+    if manifest.artifact_id != artifact_id:
+        raise ValueError(
+            f"manifest.json at {found} reports artifact_id={manifest.artifact_id!r}, expected {artifact_id!r}"
+        )
+    pointer = PublishedPointer(
+        model_name=model_name,
+        artifact_id=artifact_id,
+        published_at=datetime.now(tz=timezone.utc),
+        manifest_path=found,
+    )
+    target = write_published_pointer(pointer)
+    _log.info(
+        "publish-manifest wrote pointer model=%s artifact_id=%s path=%s",
+        model_name,
+        artifact_id,
+        target,
+    )
+    return 0
+
+
 def _dispatch(args: argparse.Namespace) -> int:
     match args.command:
         case "prepare-dataset":
@@ -345,6 +487,10 @@ def _dispatch(args: argparse.Namespace) -> int:
             return _run_check_split_leakage(args)
         case "check-publication-gate":
             return _run_check_publication_gate(args)
+        case "fit-deep":
+            return _run_fit_deep(args)
+        case "publish-manifest":
+            return _run_publish_manifest(args)
         case other:
             raise NotImplementedError(
                 f"command {other!r} is a scaffolding stub; real implementation lands per the data-coverage checklist."

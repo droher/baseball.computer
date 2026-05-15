@@ -52,6 +52,33 @@ ALL_FEATURE_COLUMNS: tuple[str, ...] = (
 
 OOV_TOKEN = "<oov>"
 
+
+class FeatureLayout(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    high_card_columns: tuple[str, ...]
+    low_card_columns: tuple[str, ...]
+    numeric_columns: tuple[str, ...]
+    grain_column: str
+    split_column: str
+
+    @property
+    def all_feature_columns(self) -> tuple[str, ...]:
+        return (*self.high_card_columns, *self.low_card_columns, *self.numeric_columns)
+
+    @property
+    def categorical_columns(self) -> tuple[str, ...]:
+        return (*self.high_card_columns, *self.low_card_columns)
+
+
+LEGACY_ML_LAYOUT = FeatureLayout(
+    high_card_columns=HIGH_CARD_CATEGORICAL,
+    low_card_columns=LOW_CARD_CATEGORICAL,
+    numeric_columns=NUMERIC,
+    grain_column=GRAIN_COLUMN,
+    split_column=SPLIT_COLUMN,
+)
+
 TargetKind = Literal["multiclass", "binary", "regression"]
 
 
