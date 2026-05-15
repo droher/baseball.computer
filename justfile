@@ -111,6 +111,11 @@ compare-baseline *ARGS:
 prepare-dataset DATASET ARTIFACT_ID *ARGS:
     {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli prepare-dataset --dataset {{ DATASET }} --artifact-id {{ ARTIFACT_ID }} "$@"
 
+# Run EDA against an existing dataset Parquet snapshot.
+# Usage: just run-eda model_input_observation_batted_ball <dataset-artifact-id> <eda-artifact-id> [extra args]
+run-eda DATASET DATASET_ARTIFACT_ID ARTIFACT_ID *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli run-eda --dataset {{ DATASET }} --dataset-artifact {{ DATASET_ARTIFACT_ID }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
 # Rollup parity check: existing completeness model vs ledger reproduction.
 # All 7 current models carry an accept-gap disposition (see
 # notes/data-coverage-implementation/rollup-parity-dispositions.md): the

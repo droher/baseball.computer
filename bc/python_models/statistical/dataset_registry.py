@@ -37,6 +37,8 @@ class DatasetSpec(BaseModel):
             "to derive ``observed_truth_count``."
         ),
     )
+    slice_columns: tuple[str, ...] = ("season", "league", "source_family")
+    target_columns: tuple[str, ...] = ()
 
     def qualified_table(self, schema: str = _SQLMESH_SCHEMA) -> str:
         return f"{schema}.{self.sqlmesh_table}"
@@ -81,6 +83,19 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
             ("dimension", "observed_status", "sentinel_type", "data_error_risk"),
             _COMMON_CATEGORICAL,
         ),
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+            "sentinel_type",
+            "dimension",
+        ),
+        target_columns=(
+            "is_observed",
+            "observed_status",
+            "raw_value",
+            "deduced_value",
+        ),
     ),
     "model_input_geometry": DatasetSpec(
         name="model_input_geometry",
@@ -97,6 +112,14 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
             ),
             _COMMON_CATEGORICAL,
         ),
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+            "sentinel_type",
+            "geometry_dimension",
+        ),
+        target_columns=("class", "is_observed_class"),
     ),
     "model_input_fielding_credit": DatasetSpec(
         name="model_input_fielding_credit",
@@ -113,6 +136,19 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
             _COMMON_CATEGORICAL,
         ),
         observed_truth_predicate="eligible_for_allocation",
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+            "credit_type",
+            "fielding_evidence_status",
+        ),
+        target_columns=(
+            "known_credit",
+            "unknown_credit_need",
+            "aggregate_residual",
+            "eligible_for_allocation",
+        ),
     ),
     "model_input_advancement": DatasetSpec(
         name="model_input_advancement",
@@ -128,6 +164,17 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
                 "ball_handler_position_class",
             ),
             _COMMON_CATEGORICAL,
+        ),
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+            "baserunner",
+        ),
+        target_columns=(
+            "trajectory_class",
+            "location_depth_class",
+            "ball_handler_position_class",
         ),
     ),
     "model_input_pitch_summary": DatasetSpec(
@@ -147,6 +194,19 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
             _COMMON_CATEGORICAL,
         ),
         observed_truth_predicate="has_count",
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+        ),
+        target_columns=(
+            "count_balls_raw",
+            "count_strikes_raw",
+            "pitch_sequence_raw",
+            "pitch_results_raw",
+            "has_count",
+            "has_pitch_sequence",
+        ),
     ),
     "model_input_park_factors": DatasetSpec(
         name="model_input_park_factors",
@@ -157,6 +217,28 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
             ("home_away",),
             _COMMON_CATEGORICAL,
         ),
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+            "park_id",
+            "home_away",
+        ),
+        target_columns=(
+            "plate_appearances",
+            "at_bats",
+            "hits",
+            "singles",
+            "doubles",
+            "triples",
+            "home_runs",
+            "walks",
+            "intentional_walks",
+            "hit_by_pitches",
+            "strikeouts",
+            "balls_in_play",
+            "runs",
+        ),
     ),
     "model_input_run_values": DatasetSpec(
         name="model_input_run_values",
@@ -166,6 +248,20 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
         categorical_columns=_merge(
             ("denominator_policy",),
             _COMMON_CATEGORICAL,
+        ),
+        slice_columns=(
+            "season",
+            "league",
+            "source_family",
+            "denominator_policy",
+        ),
+        target_columns=(
+            "runs_to_end_of_inning",
+            "win_flag",
+            "run_expectancy_start_key",
+            "run_expectancy_end_key",
+            "win_expectancy_start_key",
+            "win_expectancy_end_key",
         ),
     ),
 }

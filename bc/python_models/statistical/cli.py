@@ -18,6 +18,7 @@ from pathlib import Path
 from python_models.statistical.dataset_registry import all_dataset_names, get_spec
 from python_models.statistical.datasets import prepare_dataset
 from python_models.statistical.duckdb_io import open_bc_db
+from python_models.statistical.eda import run_eda
 from python_models.statistical.logging import configure as configure_logging
 
 _log = logging.getLogger(__name__)
@@ -89,11 +90,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
     )
 
-    run_eda = subparsers.add_parser(
+    run_eda_parser = subparsers.add_parser(
         "run-eda",
         help="Generate EDA tables, weak-identification flags, markdown summary.",
     )
-    _add_dataset_artifact_arg(run_eda)
+    _ = run_eda_parser.add_argument(
+        "--dataset",
+        required=True,
+        choices=all_dataset_names(),
+        help="Modeling dataset name (one of the registered model_input_* views).",
+    )
+    _add_dataset_artifact_arg(run_eda_parser)
+    _add_artifact_id_arg(run_eda_parser)
+    _ = run_eda_parser.add_argument(
+        "--dataset-output-root",
+        default=None,
+        help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
+    )
+    _ = run_eda_parser.add_argument(
+        "--output-root",
+        default=None,
+        help="Override the EDA artifact root (defaults to artifacts/statistical/eda).",
+    )
 
     fit_deep = subparsers.add_parser(
         "fit-deep",
@@ -166,10 +184,33 @@ def _run_prepare_dataset(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_run_eda(args: argparse.Namespace) -> int:
+    spec = get_spec(args.dataset)
+    output_root = Path(args.output_root) if args.output_root else None
+    dataset_artifact_root = (
+        Path(args.dataset_output_root) if args.dataset_output_root else None
+    )
+    manifest = run_eda(
+        spec,
+        dataset_artifact_id=args.dataset_artifact,
+        artifact_id=args.artifact_id,
+        output_root=output_root,
+        dataset_artifact_root=dataset_artifact_root,
+    )
+    _log.info(
+        "run-eda completed artifact_id=%s blocking_findings=%d",
+        manifest.artifact_id,
+        len(manifest.blocking_findings),
+    )
+    return 0
+
+
 def _dispatch(args: argparse.Namespace) -> int:
     match args.command:
         case "prepare-dataset":
             return _run_prepare_dataset(args)
+        case "run-eda":
+            return _run_run_eda(args)
         case other:
             raise NotImplementedError(
                 f"command {other!r} is a scaffolding stub; real implementation lands per the data-coverage checklist."

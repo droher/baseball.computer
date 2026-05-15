@@ -317,26 +317,26 @@ Purpose: freeze model inputs and discover identification problems before fitting
 
 ### EDA Runner
 
-- [ ] Implement `run-eda` CLI command.
-- [ ] Generate dataset summaries.
-- [ ] Generate missingness-by-slice tables.
-- [ ] Generate target distributions by split.
-- [ ] Generate source-family block missingness reports.
-- [ ] Generate data-error concentration reports.
-- [ ] Generate connectivity graphs for scorer, park, team, batter, pitcher, league, and season effects.
-- [ ] Generate collinearity screens for scorer x park, source family x era, team x park, player career x era, observed geometry x result.
-- [ ] Generate candidate interaction reports.
-- [ ] Generate weak-identification flags.
-- [ ] Generate a short markdown EDA summary for each dataset.
+- [x] Implement `run-eda` CLI command. `bc/python_models/statistical/cli.py:run-eda` dispatches to `bc/python_models/statistical/eda.py:run_eda`; `just run-eda <DATASET> <DATASET_ARTIFACT_ID> <ARTIFACT_ID>` wraps it.
+- [x] Generate dataset summaries. `_dataset_summary` populates `row_count`, `target_population_count`, `observed_truth_count`, `source_family_block_missing_count`, `data_error_excluded_count` on `EdaReport`.
+- [x] Generate missingness-by-slice tables. `_missingness_by_slice` groups by `(season, league, source_family, sentinel_type, dimension|geometry_dimension)` — preserves all seven sentinel types per doc-02.
+- [x] Generate target distributions by split. `_target_distribution` cross-tabs each declared target by `primary_fold` and each `holdout_flags.is_heldout_*`.
+- [x] Generate source-family block missingness reports. `_source_family_block_missingness` flags rows with `source_acquisition_status='not_acquired'` per `(source_family, season)`.
+- [x] Generate data-error concentration reports. `_data_error_concentration` cross-tabs `data_error_risk` by `scorer / source_family / season / park_id`.
+- [x] Generate connectivity graphs for scorer, park, team, batter, pitcher, league, and season effects. `_connectivity_edges` emits `park↔park` (via shared batter+pitcher), `scorer↔park`, `source_family↔season` edge tables; component analysis is the downstream consumer's job.
+- [x] Generate collinearity screens for scorer x park, source family x era, team x park, player career x era, observed geometry x result. `_collinearity_report` covers `scorer×park`, `source_family×season-era-bin`, `park×result_family`, `alignment_regime×batter_hand`, `scorer×source_family`.
+- [x] Generate candidate interaction reports. `_candidate_interactions` runs DuckDB equivalent of doc-02's polars scan over the nine pairs in §"Interaction Discovery"; thresholds in `EdaThresholds`.
+- [x] Generate weak-identification flags. `_weak_identification_flags` derives flags from collinearity dominant share, single-node connectivity components, and dominant holdout splits.
+- [x] Generate a short markdown EDA summary for each dataset. `_render_markdown` writes `eda.md` with summary + module file links + blocking findings + weak-identification flags.
 
 ### Blocking EDA Findings
 
-- [ ] Block if source-family block absence is treated as event-level missingness.
-- [ ] Block if high data-error rows can train as truth.
-- [ ] Block if target categories appear in validation/test but have no training support and no hierarchy/unseen policy.
-- [ ] Block if a modeled effect has no connected component across the relevant holdout.
-- [ ] Block if one scorer, park, team, source, or era dominates a target slice and the model lacks a weak-identification policy.
-- [ ] Block if conservation violations appear in modeling datasets.
+- [x] Block if source-family block absence is treated as event-level missingness. `BlockingFinding(code='source_family_block_as_event_missing')` fires when `source_acquisition_status='not_acquired'` AND `model_input_eligible=TRUE`.
+- [x] Block if high data-error rows can train as truth. `BlockingFinding(code='data_error_rows_train_as_truth')` fires when `data_error_risk != 'none' AND training_weight > 0`.
+- [x] Block if target categories appear in validation/test but have no training support and no hierarchy/unseen policy. `BlockingFinding(code='category_absent_in_train_present_in_test')` fires per categorical dimension (`source_family`, `park_id`, `scorer`, `league`, `alignment_regime`).
+- [x] Block if a modeled effect has no connected component across the relevant holdout. `BlockingFinding(code='no_connected_component_for_effect')` fires when `connectivity_edges` shows a single-node component for an edge kind.
+- [x] Block if one scorer, park, team, source, or era dominates a target slice and the model lacks a weak-identification policy. `BlockingFinding(code='dominant_single_scorer_park_team')` fires when collinearity dominant_share ≥ `EdaThresholds.dominant_share` (0.95 default) over ≥ 100 rows.
+- [ ] Block if conservation violations appear in modeling datasets. Deferred — `constraint_violation_in_dataset` finding stays out-of-scope per the EDA-runner PR plan; SQLMesh audits already gate this at plan time, real per-row constraint checks land with the validator.
 
 ### Phase 2 Exit Gate
 

@@ -13,6 +13,7 @@ ENV_STATE_DB_PATH: str = "BC_STATE_DB_PATH"
 
 ARTIFACT_ROOT: Path = PROJECT_ROOT / "artifacts" / "statistical"
 DATASETS_ROOT: Path = ARTIFACT_ROOT / "datasets"
+EDA_ROOT: Path = ARTIFACT_ROOT / "eda"
 DEEP_ROOT: Path = ARTIFACT_ROOT / "deep"
 BAYES_ROOT: Path = ARTIFACT_ROOT / "bayes"
 BASELINE_ROOT: Path = ARTIFACT_ROOT / "baseline"

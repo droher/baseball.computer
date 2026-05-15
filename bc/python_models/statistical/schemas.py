@@ -8,10 +8,20 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export"]
+ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda"]
 ValidationStatus = Literal["passed", "failed", "exploratory"]
 AblationStatus = Literal["gamma_dl_zero", "gamma_dl_shrunk", "not_applicable"]
 DiagnosticStatus = Literal["passed", "warn", "failed"]
+FindingSeverity = Literal["block", "warn", "info"]
+BlockingCode = Literal[
+    "source_family_block_as_event_missing",
+    "dominant_single_scorer_park_team",
+    "no_connected_component_for_effect",
+    "data_error_rows_train_as_truth",
+    "split_leakage_detected",
+    "category_absent_in_train_present_in_test",
+    "constraint_violation_in_dataset",
+]
 
 
 class ArtifactManifest(BaseModel):
@@ -75,9 +85,39 @@ class Diagnostic(BaseModel):
 
 
 class ValidationFinding(BaseModel):
-    severity: Literal["block", "warn", "info"]
+    severity: FindingSeverity
     code: str
     message: str
+
+
+class BlockingFinding(BaseModel):
+    code: BlockingCode
+    severity: FindingSeverity
+    message: str
+    evidence_path: Path | None = None
+
+
+class WeakIdentificationFlag(BaseModel):
+    effect: str
+    slice: str
+    share: float
+    reason: str
+
+
+class EdaReport(BaseModel):
+    dataset_name: str
+    dataset_version: str
+    dataset_artifact_id: str
+    source_snapshot_id: str
+    row_count: int
+    target_population_count: int
+    observed_truth_count: int
+    source_family_block_missing_count: int
+    data_error_excluded_count: int
+    module_paths: dict[str, Path]
+    blocking_findings: tuple[BlockingFinding, ...] = ()
+    weak_identification_flags: tuple[WeakIdentificationFlag, ...] = ()
+    recommended_formula_terms: tuple[str, ...] = ()
 
 
 class PublishedPointer(BaseModel):
