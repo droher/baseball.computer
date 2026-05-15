@@ -8,5 +8,10 @@ PR5 (fielding_credit), PR6 (embeddings) add their own modules.
 
 from __future__ import annotations
 
+from python_models.statistical.deep.targets import (
+    fielding_credit as _fielding_credit,  # noqa: F401
+)
 from python_models.statistical.deep.targets import geometry as _geometry  # noqa: F401
-from python_models.statistical.deep.targets import pitch_summary as _pitch_summary  # noqa: F401
+from python_models.statistical.deep.targets import (
+    pitch_summary as _pitch_summary,  # noqa: F401
+)
