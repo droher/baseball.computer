@@ -19,6 +19,15 @@ class DeepTargetSpec(BaseModel):
     target_column: str
     weight_column: str
     kind: DeepTargetKind
+    proposal_dimension: str = Field(
+        description=(
+            "Row-level value stamped into the dl_*_proposal_manifest "
+            "'dimension' column. Matches the JOIN predicate in the "
+            "corresponding model_input_* view (e.g. 'trajectory', "
+            "'pitch_summary', 'park_factors'). Also used to derive "
+            "published_manifest_name()."
+        ),
+    )
     class_universe_source: ClassUniverseSource = "train_distinct"
     configured_class_labels: tuple[str, ...] = ()
     calibration_method: CalibrationMethod = "temperature"
@@ -32,11 +41,11 @@ class DeepTargetSpec(BaseModel):
     filter_predicate: str | None = Field(
         default=None,
         description=(
-            "Optional Polars-expression-compatible SQL predicate applied "
-            "to the dataset frame before fitting. Used by per-dimension "
-            "Geometry specs to filter geometry_dimension == 'trajectory' etc."
+            "Optional SQL predicate (DuckDB-compatible) applied to the "
+            "dataset frame before fitting. Used by per-dimension Geometry "
+            "specs to filter geometry_dimension == 'trajectory' etc."
         ),
     )
 
     def published_manifest_name(self) -> str:
-        return f"dl_proposal_{self.name}"
+        return f"dl_proposal_{self.proposal_dimension}"

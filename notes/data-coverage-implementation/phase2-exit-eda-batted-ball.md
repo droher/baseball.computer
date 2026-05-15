@@ -15,7 +15,12 @@ this file is the tracked record of what they contained.
 
 ## Run inputs
 
-- **Dataset**: `model_input_observation_batted_ball` (dataset_version `0.1.0`)
+- **Dataset**: `model_input_observation_batted_ball` (dataset_version `0.1.0` at the
+  time of this run; Phase-3 PR3 bumps the registry to `0.2.0` once the
+  DL proposal manifest schema migration lands. Re-run `prepare-dataset` +
+  `run-eda` against the new schema before declaring this artifact current
+  again — the `dataset_metadata.json::query_hash` will not match after the
+  view schema change.)
 - **Source DB**: `bc_dev.db` at `BC_LEDGER_SCHEMA=main_models__split_registry`
 - **Source snapshot id**: `dev` (literal stamped by the SQLMesh var on this dev env)
 - **Dataset artifact id**: `phase2-exit-batted-ball`

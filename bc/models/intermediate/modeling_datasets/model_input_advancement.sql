@@ -50,8 +50,7 @@ MODEL (
     result_family VARCHAR,
     alignment_regime VARCHAR,
     dl_artifact_id VARCHAR,
-    dl_p_class VARCHAR,
-    dl_logit_class DOUBLE,
+    dl_p_class DOUBLE[],
     holdout_flags STRUCT(
       is_heldout_scorer BOOLEAN,
       is_heldout_park BOOLEAN,
@@ -83,8 +82,7 @@ MODEL (
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
     dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land.',
-    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
-    dl_logit_class = 'dl_proposal_manifest.dl_logit_class, NULL until DL supplements land.'
+    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.'
   ),
   audits (
     not_null(columns := (event_key, baserunner, base_start, game_id, season, primary_fold, source_snapshot_id)),
@@ -178,7 +176,6 @@ SELECT
     c.alignment_regime,
     p.dl_artifact_id,
     p.dl_p_class,
-    p.dl_logit_class,
     STRUCT_PACK(
         is_heldout_scorer := s.is_heldout_scorer,
         is_heldout_park := s.is_heldout_park,
@@ -200,7 +197,8 @@ INNER JOIN main_models.event_observation_context AS c USING (event_key)
 LEFT JOIN trj USING (event_key)
 LEFT JOIN dep USING (event_key)
 LEFT JOIN bhp USING (event_key)
-LEFT JOIN main_models.dl_proposal_manifest AS p
-    ON p.event_key = br.event_key AND p.dimension = 'advancement'
+LEFT JOIN main_models.dl_advancement_proposal_manifest AS p
+    ON p.event_key = br.event_key
+    AND p.baserunner = br.baserunner
 LEFT JOIN main_models.stress_holdout_registry AS s ON s.event_key = br.event_key
 WHERE c.target_population_status = 'event_level'

@@ -49,8 +49,7 @@ MODEL (
     result_family VARCHAR,
     alignment_regime VARCHAR,
     dl_artifact_id VARCHAR,
-    dl_p_class VARCHAR,
-    dl_logit_class DOUBLE,
+    dl_p_class DOUBLE[],
     holdout_flags STRUCT(
       is_heldout_scorer BOOLEAN,
       is_heldout_park BOOLEAN,
@@ -81,8 +80,7 @@ MODEL (
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
     dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land. Manifest joined on (event_key, dimension = credit_type) for forward-compat.',
-    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
-    dl_logit_class = 'dl_proposal_manifest.dl_logit_class, NULL until DL supplements land.'
+    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.'
   ),
   audits (
     not_null(columns := (event_key, player_id, fielding_position, credit_type, game_id, season, batting_team_id, fielding_team_id, primary_fold, source_snapshot_id)),
@@ -192,7 +190,6 @@ SELECT
     c.alignment_regime,
     p.dl_artifact_id,
     p.dl_p_class,
-    p.dl_logit_class,
     STRUCT_PACK(
         is_heldout_scorer := s.is_heldout_scorer,
         is_heldout_park := s.is_heldout_park,
@@ -218,7 +215,10 @@ LEFT JOIN known AS k
 LEFT JOIN main_models.fielding_credit_gaps AS g
     ON g.event_key = o.event_key
     AND g.fielding_team_id = o.fielding_team_id
-LEFT JOIN main_models.dl_proposal_manifest AS p
-    ON p.event_key = o.event_key AND p.dimension = o.credit_type
+LEFT JOIN main_models.dl_credit_proposal_manifest AS p
+    ON p.event_key = o.event_key
+    AND p.player_id = o.player_id
+    AND p.fielding_position = o.fielding_position
+    AND p.credit_type = o.credit_type
 LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)
 WHERE c.target_population_status = 'event_level'

@@ -73,6 +73,7 @@ def _spec() -> DeepTargetSpec:
         target_column="target_class",
         weight_column="weight",
         kind="multiclass",
+        proposal_dimension="synthetic",
         fold_count=3,
     )
 
