@@ -23,6 +23,9 @@ from python_models.statistical.leakage import (
     check_split_leakage,
     summarize_violations,
 )
+from python_models.statistical.model_config import ModelConfig
+from python_models.statistical.publication import evaluate_publication_gate
+from python_models.statistical.schemas import EdaReport
 from python_models.statistical.logging import configure as configure_logging
 
 _log = logging.getLogger(__name__)
@@ -113,6 +116,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--dataset-output-root",
         default=None,
         help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
+    )
+
+    gate_parser = subparsers.add_parser(
+        "check-publication-gate",
+        help=(
+            "Compare an EDA report against a ModelConfig JSON and report "
+            "whether the model is clear to publish."
+        ),
+    )
+    _ = gate_parser.add_argument(
+        "--model-config",
+        required=True,
+        help="Path to a ModelConfig JSON file.",
+    )
+    _ = gate_parser.add_argument(
+        "--eda-report",
+        required=True,
+        help="Path to an EDA report.json file emitted by run-eda.",
     )
 
     run_eda_parser = subparsers.add_parser(
@@ -248,6 +269,51 @@ def _run_check_split_leakage(args: argparse.Namespace) -> int:
     return 1
 
 
+def _run_check_publication_gate(args: argparse.Namespace) -> int:
+    config_path = Path(args.model_config)
+    report_path = Path(args.eda_report)
+    if not config_path.exists():
+        raise FileNotFoundError(f"ModelConfig JSON not found at {config_path}")
+    if not report_path.exists():
+        raise FileNotFoundError(f"EDA report.json not found at {report_path}")
+
+    config = ModelConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
+    report = EdaReport.model_validate_json(report_path.read_text(encoding="utf-8"))
+    result = evaluate_publication_gate(config=config, eda_report=report)
+
+    if result.warnings:
+        for w in result.warnings:
+            _log.info(
+                "publication_gate_warning code=%s severity=%s effect=%s slice=%s message=%s",
+                w.code,
+                w.severity,
+                w.effect,
+                w.slice,
+                w.message,
+            )
+    if result.blocking_violations:
+        for v in result.blocking_violations:
+            _log.error(
+                "publication_gate_block code=%s effect=%s slice=%s message=%s",
+                v.code,
+                v.effect,
+                v.slice,
+                v.message,
+            )
+        _log.error(
+            "publication_gate FAILED model=%s blocking=%d",
+            config.model_name,
+            len(result.blocking_violations),
+        )
+        return 1
+    _log.info(
+        "publication_gate PASSED model=%s warnings=%d",
+        config.model_name,
+        len(result.warnings),
+    )
+    return 0
+
+
 def _run_run_eda(args: argparse.Namespace) -> int:
     spec = get_spec(args.dataset)
     output_root = Path(args.output_root) if args.output_root else None
@@ -277,6 +343,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return _run_run_eda(args)
         case "check-split-leakage":
             return _run_check_split_leakage(args)
+        case "check-publication-gate":
+            return _run_check_publication_gate(args)
         case other:
             raise NotImplementedError(
                 f"command {other!r} is a scaffolding stub; real implementation lands per the data-coverage checklist."

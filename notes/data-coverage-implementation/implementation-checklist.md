@@ -345,7 +345,7 @@ Purpose: freeze model inputs and discover identification problems before fitting
 - [ ] Each dataset has exported snapshot metadata with query hash, schema, row count, category maps, source snapshot ID, and split policy.
 - [ ] EDA reports exist for the first model family targeted for fitting.
 - [ ] Split registry has passed leakage checks. _Tooling landed (`check_split_leakage` / `bc-stats check-split-leakage` / `just check-split-leakage` / EDA blocking finding `split_leakage_detected`); needs a real `model_input_*` snapshot run on `bc_dev.db` before this item can flip._
-- [ ] Weak-identification flags are available to model configs and publication gates.
+- [x] Weak-identification flags are available to model configs and publication gates. `bc.python_models.statistical.model_config.ModelConfig` declares `addressed_weak_identifications` (tuple of `WeakIdentificationPolicy(effect, slice, treatment, rationale)` with treatments `partial_pool|fixed_prior|drop|merge_levels|mark_weakly_identified|accept_unidentified`) and `expected_blocking_findings`. `publication.evaluate_publication_gate(config, eda_report)` cross-checks dataset name/version, requires every EDA `WeakIdentificationFlag` to match a policy (exact slice wins over `*` wildcard), and refuses unexpected blocking findings. Surfaced as `bc-stats check-publication-gate` / `just check-publication-gate MODEL_CONFIG EDA_REPORT`. The actual Phase 4 Bayesian fits consume this scaffolding when they land.
 
 ## Phase 3: Deep-Learning Supplements
 

@@ -121,6 +121,11 @@ run-eda DATASET DATASET_ARTIFACT_ID ARTIFACT_ID *ARGS:
 check-split-leakage DATASET DATASET_ARTIFACT_ID *ARGS:
     {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli check-split-leakage --dataset {{ DATASET }} --dataset-artifact {{ DATASET_ARTIFACT_ID }} "$@"
 
+# Compare an EDA report against a ModelConfig JSON. Exits non-zero on any blocking violation.
+# Usage: just check-publication-gate <model-config-json> <eda-report-json>
+check-publication-gate MODEL_CONFIG EDA_REPORT *ARGS:
+    {{ _dev_env }} PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli check-publication-gate --model-config {{ MODEL_CONFIG }} --eda-report {{ EDA_REPORT }} "$@"
+
 # Rollup parity check: existing completeness model vs ledger reproduction.
 # All 7 current models carry an accept-gap disposition (see
 # notes/data-coverage-implementation/rollup-parity-dispositions.md): the
