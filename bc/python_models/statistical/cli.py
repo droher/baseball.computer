@@ -376,6 +376,7 @@ def _run_run_eda(args: argparse.Namespace) -> int:
 
 def _run_fit_deep(args: argparse.Namespace) -> int:
     from python_models.statistical.config import DATASETS_ROOT, DEEP_ROOT
+    from python_models.statistical.deep import targets as _targets  # noqa: F401
     from python_models.statistical.deep.feature_layout import coverage_layout_for
     from python_models.statistical.deep.registry import get_target
     from python_models.statistical.deep.training import (

@@ -62,12 +62,12 @@ envs:
 # Plan + apply ENV (default: current-branch slug). Writes to bc_dev.db.
 plan env=_branch_slug:
     @test -n "{{ env }}" || { echo "ERROR: empty env (detached HEAD?). Pass an env name explicitly." >&2; exit 1; }
-    cd bc && {{ _dev_env }} uv run --group build sqlmesh plan {{ env }} --auto-apply --no-prompts
+    cd bc && {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ env }}/" uv run --group build sqlmesh plan {{ env }} --auto-apply --no-prompts
 
 # Plan + apply only MODEL into ENV. Writes to bc_dev.db.
 plan-model MODEL env=_branch_slug:
     @test -n "{{ env }}" || { echo "ERROR: empty env (detached HEAD?). Pass an env name explicitly." >&2; exit 1; }
-    cd bc && {{ _dev_env }} uv run --group build sqlmesh plan {{ env }} --select-model {{ MODEL }} --auto-apply --no-prompts
+    cd bc && {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ env }}/" uv run --group build sqlmesh plan {{ env }} --select-model {{ MODEL }} --auto-apply --no-prompts
 
 # Run audits against the dev DB.
 audit *ARGS:
