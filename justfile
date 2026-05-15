@@ -116,6 +116,11 @@ prepare-dataset DATASET ARTIFACT_ID *ARGS:
 run-eda DATASET DATASET_ARTIFACT_ID ARTIFACT_ID *ARGS:
     {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli run-eda --dataset {{ DATASET }} --dataset-artifact {{ DATASET_ARTIFACT_ID }} --artifact-id {{ ARTIFACT_ID }} "$@"
 
+# Standalone leakage check on a dataset Parquet snapshot. Exits non-zero on any violation.
+# Usage: just check-split-leakage model_input_observation_batted_ball <dataset-artifact-id> [extra args]
+check-split-leakage DATASET DATASET_ARTIFACT_ID *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli check-split-leakage --dataset {{ DATASET }} --dataset-artifact {{ DATASET_ARTIFACT_ID }} "$@"
+
 # Rollup parity check: existing completeness model vs ledger reproduction.
 # All 7 current models carry an accept-gap disposition (see
 # notes/data-coverage-implementation/rollup-parity-dispositions.md): the

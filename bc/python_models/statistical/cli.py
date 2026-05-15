@@ -19,6 +19,10 @@ from python_models.statistical.dataset_registry import all_dataset_names, get_sp
 from python_models.statistical.datasets import prepare_dataset
 from python_models.statistical.duckdb_io import open_bc_db
 from python_models.statistical.eda import run_eda
+from python_models.statistical.leakage import (
+    check_split_leakage,
+    summarize_violations,
+)
 from python_models.statistical.logging import configure as configure_logging
 
 _log = logging.getLogger(__name__)
@@ -86,6 +90,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _ = prepare.add_argument(
         "--output-root",
+        default=None,
+        help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
+    )
+
+    check_leakage = subparsers.add_parser(
+        "check-split-leakage",
+        help=(
+            "Run split-registry leakage checks against a frozen dataset "
+            "Parquet snapshot. Exits non-zero if any unit maps to multiple "
+            "fold/holdout values."
+        ),
+    )
+    _ = check_leakage.add_argument(
+        "--dataset",
+        required=True,
+        choices=all_dataset_names(),
+        help="Modeling dataset name (one of the registered model_input_* views).",
+    )
+    _add_dataset_artifact_arg(check_leakage)
+    _ = check_leakage.add_argument(
+        "--dataset-output-root",
         default=None,
         help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
     )
@@ -184,6 +209,45 @@ def _run_prepare_dataset(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_check_split_leakage(args: argparse.Namespace) -> int:
+    from python_models.statistical.config import DATASETS_ROOT
+
+    spec = get_spec(args.dataset)
+    root = Path(args.dataset_output_root) if args.dataset_output_root else DATASETS_ROOT
+    parquet_path = root / spec.name / args.dataset_artifact / "dataset.parquet"
+    if not parquet_path.exists():
+        raise FileNotFoundError(
+            f"dataset Parquet missing at {parquet_path}; run prepare-dataset first."
+        )
+    violations = check_split_leakage(parquet_path)
+    if not violations:
+        _log.info(
+            "check-split-leakage clean dataset=%s artifact=%s",
+            spec.name,
+            args.dataset_artifact,
+        )
+        return 0
+    summary = summarize_violations(violations)
+    sample_size = min(len(violations), 10)
+    _log.error(
+        "check-split-leakage failed dataset=%s artifact=%s total=%d by_kind=%s",
+        spec.name,
+        args.dataset_artifact,
+        len(violations),
+        summary,
+    )
+    for v in violations[:sample_size]:
+        _log.error(
+            "leakage unit_kind=%s unit_id=%s distinct=%d values=%s rows=%d",
+            v.unit_kind,
+            v.unit_id,
+            v.distinct_value_count,
+            ",".join(v.distinct_values),
+            v.row_count,
+        )
+    return 1
+
+
 def _run_run_eda(args: argparse.Namespace) -> int:
     spec = get_spec(args.dataset)
     output_root = Path(args.output_root) if args.output_root else None
@@ -211,6 +275,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return _run_prepare_dataset(args)
         case "run-eda":
             return _run_run_eda(args)
+        case "check-split-leakage":
+            return _run_check_split_leakage(args)
         case other:
             raise NotImplementedError(
                 f"command {other!r} is a scaffolding stub; real implementation lands per the data-coverage checklist."

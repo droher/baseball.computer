@@ -329,6 +329,7 @@ def test_run_eda_writes_full_artifact(tmp_path: Path) -> None:
         "collinearity_report.parquet",
         "candidate_interactions.parquet",
         "weak_identification_flags.parquet",
+        "split_leakage_report.parquet",
     )
     for fname in expected_module_files:
         assert (artifact_dir / fname).exists(), fname
@@ -353,6 +354,7 @@ def test_run_eda_writes_full_artifact(tmp_path: Path) -> None:
         "collinearity_report",
         "candidate_interactions",
         "weak_identification_flags",
+        "split_leakage_report",
     }
 
 
@@ -553,6 +555,67 @@ def test_run_eda_manifest_is_artifact_manifest(tmp_path: Path) -> None:
     assert persisted.dataset_artifact_id == "ds-am"
     assert "report" in persisted.output_paths
     assert "markdown" in persisted.output_paths
+
+
+def test_run_eda_fires_split_leakage_detected(tmp_path: Path) -> None:
+    spec = _spec()
+    datasets_root = tmp_path / "datasets"
+    dataset_dir = datasets_root / spec.name / "ds-leak"
+    parquet_path = dataset_dir / "dataset.parquet"
+    _seed_parquet(
+        parquet_path,
+        rows=600,
+        inject_data_error_truth=False,
+        inject_dominant_scorer=False,
+        inject_test_only_category=False,
+    )
+    base = pl.read_parquet(parquet_path)
+    base_row = {col: base[col][0] for col in base.columns if col != "holdout_flags"}
+    leak_rows = pl.DataFrame(
+        [
+            {
+                **base_row,
+                "event_key": 9_999_001,
+                "scorer": "scorer_split",
+                "holdout_flags": {
+                    "is_heldout_scorer": True,
+                    "is_heldout_park": False,
+                    "is_heldout_alignment_regime": False,
+                    "is_heldout_source_acquisition_block": False,
+                    "is_heldout_season_block": False,
+                    "is_heldout_aggregate_total": False,
+                    "is_heldout_player_group": False,
+                },
+            },
+            {
+                **base_row,
+                "event_key": 9_999_002,
+                "scorer": "scorer_split",
+                "holdout_flags": {
+                    "is_heldout_scorer": False,
+                    "is_heldout_park": False,
+                    "is_heldout_alignment_regime": False,
+                    "is_heldout_source_acquisition_block": False,
+                    "is_heldout_season_block": False,
+                    "is_heldout_aggregate_total": False,
+                    "is_heldout_player_group": False,
+                },
+            },
+        ],
+        schema=base.schema,
+    )
+    combined = pl.concat([base, leak_rows], how="vertical_relaxed")
+    combined.write_parquet(parquet_path)
+
+    manifest = run_eda(
+        spec,
+        dataset_artifact_id="ds-leak",
+        artifact_id="eda-leak",
+        output_root=tmp_path / "eda",
+        dataset_artifact_root=datasets_root,
+        artifact_versions={"duckdb": "test"},
+    )
+    assert "split_leakage_detected" in manifest.blocking_findings
 
 
 def test_run_eda_module_parquet_schemas_are_consistent(tmp_path: Path) -> None:

@@ -22,6 +22,11 @@ from pydantic import BaseModel
 
 from python_models.statistical.config import DATASETS_ROOT, EDA_ROOT
 from python_models.statistical.dataset_registry import DatasetSpec
+from python_models.statistical.leakage import (
+    check_split_leakage,
+    summarize_violations,
+    violations_to_dataframe,
+)
 from python_models.statistical.manifests import (
     package_versions as snapshot_package_versions,
     query_hash,
@@ -49,6 +54,7 @@ _MODULE_FILES: dict[str, str] = {
     "collinearity_report": "collinearity_report.parquet",
     "candidate_interactions": "candidate_interactions.parquet",
     "weak_identification_flags": "weak_identification_flags.parquet",
+    "split_leakage_report": "split_leakage_report.parquet",
 }
 
 _HOLDOUT_FLAG_NAMES: tuple[str, ...] = (
@@ -985,6 +991,11 @@ def run_eda(
         module_sql["weak_identification_flags"] = "derived_in_python"
         write_parquet_atomic(weak_df, output_paths["weak_identification_flags"])
 
+        leakage_violations = check_split_leakage(parquet_path, con=con)
+        leakage_df = violations_to_dataframe(leakage_violations)
+        module_sql["split_leakage_report"] = "derived_in_python"
+        write_parquet_atomic(leakage_df, output_paths["split_leakage_report"])
+
         blocking = _derive_blocking_findings(
             snapshot=snapshot,
             summary=summary,
@@ -996,6 +1007,24 @@ def run_eda(
             thresholds=thresholds,
             output_paths=output_paths,
         )
+
+        if leakage_violations:
+            leakage_summary = summarize_violations(leakage_violations)
+            parts = ", ".join(
+                f"{kind}={count}" for kind, count in sorted(leakage_summary.items())
+            )
+            blocking.append(
+                BlockingFinding(
+                    code="split_leakage_detected",
+                    severity="block",
+                    message=(
+                        f"split-registry leakage detected across "
+                        f"{len(leakage_violations)} unit(s): {parts}. "
+                        "See split_leakage_report.parquet for offending unit_ids."
+                    ),
+                    evidence_path=output_paths["split_leakage_report"],
+                )
+            )
 
         composite_hash = _composite_query_hash(module_sql)
 

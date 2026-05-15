@@ -337,13 +337,14 @@ Purpose: freeze model inputs and discover identification problems before fitting
 - [x] Block if a modeled effect has no connected component across the relevant holdout. `BlockingFinding(code='no_connected_component_for_effect')` fires when `connectivity_edges` shows a single-node component for an edge kind.
 - [x] Block if one scorer, park, team, source, or era dominates a target slice and the model lacks a weak-identification policy. `BlockingFinding(code='dominant_single_scorer_park_team')` fires when collinearity dominant_share ≥ `EdaThresholds.dominant_share` (0.95 default) over ≥ 100 rows.
 - [ ] Block if conservation violations appear in modeling datasets. Deferred — `constraint_violation_in_dataset` finding stays out-of-scope per the EDA-runner PR plan; SQLMesh audits already gate this at plan time, real per-row constraint checks land with the validator.
+- [x] Block if a unit crosses the primary fold or a stress-holdout flag. `BlockingFinding(code='split_leakage_detected')` fires when `check_split_leakage` finds any (game_id → primary_fold) or (scorer/park-season/etc. → holdout flag) mapping that isn't single-valued. `bc/python_models/statistical/leakage.py` runs one DuckDB `GROUP BY` per unit; results land in `split_leakage_report.parquet`. Also available standalone via `bc-stats check-split-leakage` / `just check-split-leakage`.
 
 ### Phase 2 Exit Gate
 
 - [ ] Each planned model has a named dataset model or a deliberate deferral note.
 - [ ] Each dataset has exported snapshot metadata with query hash, schema, row count, category maps, source snapshot ID, and split policy.
 - [ ] EDA reports exist for the first model family targeted for fitting.
-- [ ] Split registry has passed leakage checks.
+- [ ] Split registry has passed leakage checks. _Tooling landed (`check_split_leakage` / `bc-stats check-split-leakage` / `just check-split-leakage` / EDA blocking finding `split_leakage_detected`); needs a real `model_input_*` snapshot run on `bc_dev.db` before this item can flip._
 - [ ] Weak-identification flags are available to model configs and publication gates.
 
 ## Phase 3: Deep-Learning Supplements
