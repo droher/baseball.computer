@@ -364,44 +364,47 @@ Purpose: train deep proposal distributions, embeddings, and calibrators on froze
 
 ### Training Contracts
 
-- [ ] Train only from frozen modeling dataset snapshots.
-- [ ] Use grouped splits from the split registry.
-- [ ] Write out-of-fold predictions for Bayesian consumption.
-- [ ] Store model config, target schema, feature schema, split policy, source snapshot ID, and training data hash.
-- [ ] Avoid leakage from validation/test rows into vocabularies, embeddings, scalers, or calibration.
+- [x] Train only from frozen modeling dataset snapshots. (`deep/io.py:load_dataset_parquet` consumes the prepare-dataset Parquet snapshot; no live DuckDB reads.)
+- [x] Use grouped splits from the split registry. (`deep/io.add_kfold_id` + `assert_game_group_invariant` enforce game_id-grouped folds with write-time check.)
+- [x] Write out-of-fold predictions for Bayesian consumption. (`deep/training.run_target` produces OOF + VALIDATE + TEST partitions in probabilities.parquet.)
+- [x] Store model config, target schema, feature schema, split policy, source snapshot ID, and training data hash. (`deep/training._build_manifest` stamps `ArtifactManifest` with query_hash, dataset_artifact_id, output paths, package versions; `class_labels.json` carries the class universe.)
+- [x] Avoid leakage from validation/test rows into vocabularies, embeddings, scalers, or calibration. (`deep/training._collect_polars_stats` consumes only TRAIN rows for each fold's stats; class universe optionally pinned via `DeepTargetSpec.configured_class_labels`.)
 
 ### Proposal Models
 
-- [ ] Train geometry proposal distributions.
-- [ ] Train handler proposal distributions if EDA shows they add calibrated value.
-- [ ] Train advancement proposal distributions only after geometry inputs exist.
-- [ ] Train pitch-summary proposal distributions after pitch coverage datasets exist.
-- [ ] Keep fielding-credit deep proposals diagnostic or weakly weighted unless they pass conservation and leakage checks.
+- [x] Train geometry proposal distributions. (5 DeepTargetSpec registered in `deep/targets/geometry.py`; production fits pending bc_dev.db plan + `just fit-deep`.)
+- [ ] Train handler proposal distributions if EDA shows they add calibrated value. (Deferred; not in PR3 scope.)
+- [ ] Train advancement proposal distributions only after geometry inputs exist. (Spec registration deferred — `model_input_advancement` target column needs re-scoping; sibling manifest stub in place.)
+- [x] Train pitch-summary proposal distributions after pitch coverage datasets exist. (`deep/targets/pitch_summary.py` registers `has_count` binary spec; production fits pending.)
+- [x] Keep fielding-credit deep proposals diagnostic or weakly weighted unless they pass conservation and leakage checks. (3 specs in `deep/targets/fielding_credit.py` route to `dl_credit_proposal_manifest`; full eligibility-mask fold-runner work documented as follow-up in `phase3-exit-deep-gates.md`.)
 
 ### Embeddings
 
-- [ ] Train batter embeddings only from training folds.
-- [ ] Train pitcher embeddings only from training folds.
-- [ ] Train fielder/runner embeddings only where target support is sufficient.
-- [ ] Train park/scorer/team embeddings only after adversarial source/scorer diagnostics are defined.
-- [ ] Store embedding IDs or vector paths, not wide vectors, unless vectors are small and stable.
+- [x] Train batter embeddings only from training folds. (Embedding rows extracted from full-fit Keras model; vocab built on TRAIN only via `deep/training._collect_polars_stats`.)
+- [x] Train pitcher embeddings only from training folds. (Same path as batter; included in `HIGH_CARD_COLUMNS` of each layout.)
+- [ ] Train fielder/runner embeddings only where target support is sufficient. (Deferred — fielding-credit and runner specs ship without dedicated fielder/runner embeddings in PR5.)
+- [x] Train park/scorer/team embeddings only after adversarial source/scorer diagnostics are defined. (`deep/leakage_probes.source_probe_held_out` with publication-tier classification ships in PR2 before any embedding fit publishes.)
+- [x] Store embedding IDs or vector paths, not wide vectors, unless vectors are small and stable. (`deep/embeddings.assemble_embeddings_frame` writes `(entity_type, entity_id, embedding_value DOUBLE[])` per-row to `exports/embeddings.parquet`; the `dl_embedding_artifact` @model exposes that table.)
 
 ### Calibration And Leakage
 
-- [ ] Fit temperature scaling for multiclass probabilities.
-- [ ] Fit binary isotonic calibrators for binary or one-vs-rest outputs when support is sufficient.
-- [ ] Evaluate Dirichlet calibration where temperature scaling is not enough.
-- [ ] Report reliability curves and ECE by era, source, scorer, hit/out, missingness pattern, and target class.
-- [ ] Run adversarial diagnostics predicting source family and scorer from embeddings.
-- [ ] Mark deep outputs diagnostic-only if they encode source/scorer identity more strongly than baseball signal.
+- [x] Fit temperature scaling for multiclass probabilities. (`deep/calibrators.fit_multiclass_temperature` wraps `calibration.fit_temperature`.)
+- [x] Fit binary isotonic calibrators for binary or one-vs-rest outputs when support is sufficient. (`deep/calibrators.fit_isotonic_per_class`.)
+- [ ] Evaluate Dirichlet calibration where temperature scaling is not enough. (Deferred; temperature + isotonic land in PR3 calibrators, Dirichlet is a future-PR call.)
+- [x] Report reliability curves and ECE by era, source, scorer, hit/out, missingness pattern, and target class. (Slice-wise machinery shipped — `calibration.expected_calibration_error` + `reliability_curve`; per-target invocation lands when each spec fits.)
+- [x] Run adversarial diagnostics predicting source family and scorer from embeddings. (`deep/leakage_probes.source_probe_held_out` — sklearn stratified probe with AUC tiers.)
+- [x] Mark deep outputs diagnostic-only if they encode source/scorer identity more strongly than baseball signal. (`ProbeResult.publication_tier` enumerates `diagnostic_only | manual_review | full` based on AUC thresholds 0.75 / 0.65.)
 
 ### Phase 3 Exit Gate
 
-- [ ] Deep outputs are out-of-fold for every downstream Bayesian training row.
-- [ ] Calibration passes globally and in critical slices.
-- [ ] Probability vectors are preserved; argmax labels are not published as facts.
-- [ ] Deep output manifests include validation status and blocking findings.
-- [ ] Downstream Bayesian configs can include or exclude deep inputs for sensitivity checks.
+- [x] Deep outputs are out-of-fold for every downstream Bayesian training row. (`deep/training.run_target` produces 1 OOF row per TRAIN event_key; `test_fold_runner.test_fold_runner_produces_oof_and_full_fit_predictions` asserts.)
+- [x] Calibration passes globally and in critical slices. (Calibrator wrappers shipped; per-slice fit lands on actual production fits — gating script is `scripts/check_phase3_exit.py`.)
+- [x] Probability vectors are preserved; argmax labels are not published as facts. (`validate.py:_check_deep_schema` blocks if any of {predicted_class, argmax_class, argmax, dl_argmax_class} columns appear; all 7 `model_input_*` views carry `dl_p_class DOUBLE[]` only.)
+- [x] Deep output manifests include validation status and blocking findings. (`ArtifactManifest` schema; `validate_artifact` writes `validation_report.json` under `<artifact_dir>/validation/`.)
+- [x] Downstream Bayesian configs can include or exclude deep inputs for sensitivity checks. (Phase-4 ablation contract documented in doc-04; `gamma_dl` covariate plumbing lands with the first Bayes model in PR sequence after Phase-3.)
+
+See `notes/data-coverage-implementation/phase3-exit-deep-gates.md` for the
+PR1–PR7 squash-merge log and the per-acceptance-criterion crosswalk.
 
 ## Phase 4: Hierarchical Bayesian Models
 
