@@ -108,6 +108,128 @@ to dampen further if downstream use cases need it.
 
 ## Machine learning
 
+### Phase-3 v6 rearchitecture follow-ups
+
+**Status: in flight on `phase3-rearch-v6` branch (supersedes v2/v3/v4/v5).**
+v6 lands (a) `validate_pre_event` deny-list on every supplement
+layout, (b) leak-input strip from pitch_summary (`result_family`) and
+fielding_credit (`gap_class`, `fielding_evidence_status`), (c) 11
+non-redundant pretrain heads (drops `result_family` and `hit_or_out` —
+both deterministic from `pa_result`; remaining heads still correlate),
+(d) the v5-A8 winning config retained (split optimizers, embed LR
+5e-3, single-stage joint fit with stock val_loss EarlyStopping), (e)
+new `advancement_r1/_r2/_r3` deep specs registered against
+`model_input_advancement`, (f) `--time-forward` flag on
+`scripts/permutation_importance_generic.py` so gate eval matches the
+production temporal slice.
+
+Open items the v6 PR does not fix:
+
+- **`model_input_advancement` SQL gaps.** The dataset does not yet
+  emit the dependent variable `advancement_class` or a
+  `time_forward_fold` column. Specs in `targets/advancement.py` no
+  longer register on import — call `_register()` explicitly once the
+  SQL gap closes. Apply the same 7-class derivation logic the pretrain
+  heads use in `model_input_event_universe.sql` (`r1/r2/r3_advancement`
+  pivots). Also restore the registry-dependent tests in
+  `test_advancement_targets.py` (`test_advancement_layout_registered`,
+  `test_specs_publish_to_advancement_manifest`,
+  `test_specs_resolve_via_get_target`).
+- **Pretrain emit: persist + load stage-1 vocab.json.**
+  `scripts/pretrain_emit_offsets.py` currently re-derives vocabularies
+  from the dataset via `_collect_input_stats`. If the dataset parquet
+  is regenerated or `BC_PRETRAIN_DATASET_LIMIT` changes between stage-1
+  fit and emit, embeddings silently map to wrong tokens. Fix: load
+  stage-1 vocab.json (already persisted by `pretrain/artifacts.py`) and
+  fail loud if any TRAIN token is missing.
+- **Promote pretrain encoding helpers to public API.**
+  `scripts/pretrain_emit_offsets.py` reaches into module-private
+  `_apply_all_remaps` / `_collect_input_stats` / `_encode_inputs` in
+  `bc/python_models/statistical/deep/pretrain/training.py`. Either
+  promote those to a public `pretrain/encoding.py` module or move the
+  emitter inside the package.
+- **Advancement r2/r3 home-plate fallback.** The runners_pivot CASE
+  in `model_input_event_universe.sql` and the future
+  `advancement_class` derivation in `model_input_advancement.sql`
+  rely on `run_scored_flag` for the `Scored` arm. Verify upstream
+  `stg_event_baserunners.run_scored_flag` is non-NULL whenever
+  `base_end = 'Home'`; if not, add a `base_end = 'Home'` fallback.
+- **Park-factors / run-values DL specs deferred.** Per
+  `04-deep-learning-supplements.md`, park factors and run values are
+  hierarchical-Bayes territory in Phase 4, not Phase-3 DL targets.
+  Skipped intentionally.
+- **Bootstrap dev DB before next `just plan` on this branch.** The
+  current branch env has no `main_models` snapshot because no upstream
+  models have been planned yet against `phase3_rearch_v6`. v6 reused
+  the existing `phase3-pretrain-v2-prep` dataset (event_universe SQL
+  diff for `time_forward_fold` is dormant). Run `just bootstrap-dev`
+  + `just plan` before any new dataset prep on this branch.
+- **`bc/python_models/statistical/deep/feature_layout.validate_pre_event`
+  deny-list maintenance.** Add new suffix/prefix patterns whenever a
+  new dataset surfaces a leak shape not covered by the deny-list. The
+  test in `bc/tests/statistical/deep/test_pre_event_layout.py` is
+  parametrized — add the new column there too.
+
+#### Historical (Pretrain v2 design tweaks, shipped)
+
+v2 landed the shared 13-slot player Embedding (single `embed_player`),
+13 pretext heads, UW loss + split optimizers, two-stage schedule,
+hard-head EarlyStopping, `SlashLineProbe` callback, `SpatialDropout1D(0.1)`
++ trunk `LayerNormalization`, `EMBEDDING_L2=1e-7`. v6 retains the v5-A8
+single-stage config and reduces v4's 13 heads to 11 non-redundant heads.
+
+Original v1→v2 notes (now historical):
+
+- Drop `runners_count_start` from inputs — derivable from `base_state_start` (8-class).
+- Drop `leverage_index` — pure function of `score_margin`, `inning_start`, `outs_start`, `base_state_start`, all already inputs.
+- Add separate pretext heads for `batted_location` (general/depth/edge dims), `batted_contact_strength`, `batted_to_fielder` (10-class fielder position 0-9). These are NULL-when-non-batted; NULL-mask handles it. Reason: per-target downstream Phase-4 models predict these so the shared embedding should capture them.
+- Add low-card game-context inputs (drive through `event_observation_context` if missing): day/night flag, `doubleheader_status`, `precipitation`, `sky`, `wind_direction`, `field_condition`.
+- Add numeric weather: `temperature_fahrenheit`. **Exclude attendance** (confounded with score/team-performance — not a leak-safe context feature).
+- Add `day_of_year` integer as a numeric input.
+- Add fielder + runner embeddings via **shared player Embedding (option B)** — one `Embedding(num_players, dim)` matrix, looked up from 12 per-event high-card cols: `batter`, `pitcher` (the pitcher already covers defensive `fielder_pos_1`, same player_id, same row), `fielder_pos_2..9` (C/1B/2B/3B/SS/LF/CF/RF = 8 cols), `runner_on_1b`, `runner_on_2b`, `runner_on_3b`. Runners NULL when base unoccupied → OOV slot. Plus a per-slot one-hot role tag so model knows which seat each player occupies. Gives cross-role transfer: a player's defensive gradient updates the same row their batting / baserunning gradients update.
+- Skip per-position credit-prediction pretext head. Without batted-ball context (location / trajectory / strength) the head learns positional priors not skill; with batted-ball context it leaks into the trajectory head (inputs are shared across heads). Defensive + baserunning signal still flows into the shared embedding via `hit_or_out` / `outs_on_play` / `runs_on_play` / `pa_result` heads — every outcome head conditions on the full 13-slot player roster.
+- Implementation: `_build_backbone` gets a `shared_embedding_groups: tuple[tuple[str, ...], ...]` arg. Each tuple = cols sharing one `Embedding`. Pretrain layout passes the 12-col shared player group plus standalone `park_id` / `scorer`. `set_pretrained_embeddings` learns shared-group semantics so per-target downstream models (which only consume a subset of player slots, e.g. trajectory uses batter + pitcher) load aligned rows from the shared matrix automatically.
+- Add 3 per-runner-slot advancement pretext heads sourced from `stg_event_baserunners` (one row per `(event_key, baserunner)`): `r1_advancement`, `r2_advancement`, `r3_advancement`. Multiclass over advancement-outcome enum derived from `(base_start, base_end, is_out, baserunning_play_type)` — roughly Stayed / Advanced1 / Advanced2 / Scored / OutAdvancing / OutCaughtStealing / OutPickoff. NULL-mask when base unoccupied. Forces shared player Embedding rows to absorb baserunning skill (speed, read, judgment) — not just "did they score" but the full per-slot outcome. Skip a batter_advancement head — `pa_result` already covers batter outcome.
+
+**v2 training-schedule changes (from web research on multi-task pretrain + long-tail embedding pretrain, 2024–2026 literature):**
+
+1. **Separate optimizer for sparse embeddings.** Trunk LR 1e-3 stays, embedding-layer LR 5e-3 to 1e-2 (5–10× higher). Rationale: Adam moment for rare rows accumulates slowly; initial step scale needs to be larger because each row sees only a handful of gradients per epoch. Linear warmup over ~5–10% of total steps before cosine decay; bump CosineDecay alpha from 0.01 → **0.1** so the floor doesn't kill rare-row updates late in training. Implementation: split into two `Adam` instances over disjoint `trainable_variables` partitions via a custom `train_step`.
+2. **Uncertainty-weighted multi-task loss (Kendall & Gal 2018).** Replace `loss_weights={head: 1.0}` with one learnable `log_sigma` per head; loss = Σ (1/(2σ_h²)) L_h + log σ_h. One `self.add_weight` per head + custom `train_step`. Directly addresses easy-head gradient dominance (v1's `runs_on_play` loss 0.24 vs `pa_result` 0.97 — equal weights starve the hard heads).
+3. **Batch size 1024–2048** (down from 4096). At bs=4096 a rare entity (~200 appearances) sees ~3 batches/epoch; embedding signal buried. Halving batch → 2–4× more update events per rare entity. DLRM / RecSys Challenge 2025 norms.
+4. **Embedding regularization tweaks for long-tail.** Drop `embeddings_regularizer` from L2(1e-6) → **L2(1e-7)** (heavier L2 amplifies embedding collapse on rare rows). Add `SpatialDropout1D(0.1)` on each Embedding output (drops whole dims across the batch — vanilla Dropout fragments the vector). Add LayerNorm on the concatenated embedding branch before the cross/deep trunk so tables with wildly different effective scales don't dominate.
+5. **EarlyStopping target = embedding artifact quality, not joint val_loss.** Joint val_loss is dominated by easy heads. Two options: (a) monitor weighted avg of *hard* heads (`val_pa_result_accuracy + val_result_family_accuracy + val_trajectory_remapped_accuracy`), patience 5; (b) linear-probe callback — every N epochs freeze embeddings, fit logistic-regression probe on a held-out time-forward slice (e.g. last season), monitor probe AUC. (b) is directly the artifact-quality metric we ship.
+6. **Two-stage pretrain.** Stage 1 (3–5 epochs): freeze trunk to identity-ish, train embeddings + heads only at high embedding LR — forces signal into embeddings before trunk absorbs it. Stage 2 (10–15 epochs): unfreeze trunk, drop embedding LR by 3–5×, full joint training with UW. "Don't Freeze Your Embedding" (ICLR) confirms freezing embeddings *last* underperforms when embeddings are the shipped artifact.
+
+Top-3 changes likely to materially move entity perm-imp gates: (1) separate higher embedding LR + warmup, (2) uncertainty-weighted loss, (3) smaller batch + linear-probe EarlyStopping.
+
+**v2 per-epoch slash-line probe (qualitative training diagnostic).** Keras callback. Per epoch, build a fixed `(10, n_features)` input batch: 5 batter probes (each row varies `batter_id`, fixes `pitcher_id` at a chosen neutral-average pitcher) + 5 pitcher probes (mirrored). All other inputs held at training-set defaults (modal categoricals, mean numerics). Run `model.predict` → `pa_result` 16-class probabilities. Derive expected slash line per row via `seed_plate_appearance_result_types.csv` flags:
+- `AVG = Σ P(r) [is_hit] / Σ P(r) [is_at_bat]`
+- `OBP = Σ P(r) [is_on_base_success] / Σ P(r) [is_on_base_opportunity]`
+- `SLG = Σ P(r) × total_bases(r) / Σ P(r) [is_at_bat]`
+
+Log per row: `epoch=N tier=<tier> player=<id> AVG=.XXX OBP=.XXX SLG=.XXX`. Trajectory across epochs shows when (and if) the embedding starts encoding player quality. HOF row should drift toward .300+ / .400+ / .500+; replacement toward .220 / .280 / .330.
+
+Canonical 10-player roster (Retrosheet ID lookup from `stg_people` at impl time; placeholder names below):
+
+Batters: HOF=Babe Ruth, All-Star=Mike Trout, Average=∼100 wRC+ regular (e.g. Justin Turner), Below-Avg=∼85 wRC+ regular (e.g. Andrelton Simmons), Replacement=career ∼70 wRC+ part-timer.
+
+Pitchers: HOF=Pedro Martinez, All-Star=Clayton Kershaw, Average=∼100 ERA+ innings-eater (e.g. Mark Buehrle), Below-Avg=∼85 ERA+ swingman (e.g. Edwin Jackson), Replacement=AAAA SP/swingman with brief MLB stints.
+
+Implementation: `deep/pretrain/probes.py` housing a `SlashLineProbe(keras.callbacks.Callback)`. Constants for tier labels + player names live next to the class; ID resolution + neutral-counterpart selection done once at callback construction by querying `stg_people` / `event_observation_context` for a modal pitcher and modal batter. Probe also informs human "is pretrain still warming up at epoch N" decisions for EarlyStopping tuning.
+
+### Wire pretrained_embeddings_artifact_id into remaining deep targets
+
+**Status: fixed 2026-05-17.** Geometry non-trajectory specs
+(location_side / depth / edge) were missing
+`pretrained_embeddings_artifact_id` despite the prose claim in
+`bc/python_models/statistical/CLAUDE.md`. `_maybe_load_pretrained_embeddings`
+early-returns when the field is `None`, so the
+`BC_DEEP_PRETRAIN_ARTIFACT_OVERRIDE` env never fired for those targets
+and the perm-imp sweep silently ran them with no pretrain at all.
+Geometry specs now all set the field; regression guarded by
+`test_every_geometry_spec_declares_pretrain_artifact`. Park-factors /
+run-values remain out of DL scope.
+
 ### Artifact backfill
 
 Six third-wave targets shipped code + tests but their `predictions_*`
@@ -423,3 +545,23 @@ Resolved. The four Databank stagings
 `(year_id, team_id)`) and project `team_id_retro` directly with no
 fallback. The `not_null(team_id)` audit on each staging fails the
 build loudly if a row ever lacks a crosswalk match.
+
+## Phase-3 pretrain rename pass
+
+The active pretrain architecture (described in `bc/python_models/statistical/CLAUDE.md` and the [[pretrain-architecture]] memory) still carries iteration-era version labels in file and spec names:
+
+- `EVENT_UNIVERSE_V8_SPEC` / `EVENT_UNIVERSE_V8_CONTEXT_SPEC` (and the `..._V8_LAYOUT`, `..._V8_HEADS`, `V8_PLAYER_GROUP_COLS`, `V8_ROW_FILTER_PREDICATE` constants) in `bc/python_models/statistical/deep/pretrain/targets.py`.
+- Spec name strings `"event_universe_v8"` / `"event_universe_v8_context"`, which become artifact directory names under `artifacts/statistical/deep/`.
+- Orchestrator script `scripts/run_pretrain_v8_residual.sh` plus `BC_V8_*` env-var prefix.
+- Stale `EVENT_UNIVERSE_SPEC` / `EVENT_UNIVERSE_CONTEXT_SPEC` + `EVENT_UNIVERSE_LAYOUT` (and the v6/v7 prior `event_universe_context` artifact tree) still registered in tree as back-compat.
+- Test files `test_pretrain_v8_layout.py`, `test_pretrain_head_offset.py`, `test_pretrain_context_spec.py`.
+
+Rename pass: collapse to the canonical names (`EVENT_UNIVERSE_SPEC` / `event_universe` / `run_pretrain.sh` / `BC_PRETRAIN_*`) and delete the legacy specs once nothing on the branch consumes them. Existing artifact directories under `artifacts/statistical/deep/event_universe_v8*/` will need to either move or stay (gitignored anyway). Republish the pointer under the new spec name.
+
+Pre-rename TODOs that block it:
+- Replace `pretrain_eval_pretrain.py` with a sidecar that targets the current head set (no `pa_result`).
+- Decide whether to drop the legacy `event_universe` / `event_universe_context` registrations or keep one as the "historical" archive.
+
+## Phase-3 pretrain — embedding LR + regularization
+
+Full-corpus stage-2 best epoch was epoch 1 (out of 8) — embeddings overshoot the residual past the first pass under current schedule (split optimizer, trunk Adam 1e-3, embed Adam 5e-3 with warmup + CosineDecay α=0.1). Worth trying lower embed LR (1.5e-3) and / or modest L2 (1e-5 to 1e-4) on `embed_player` to extend useful training and see if a longer fit lifts hard-head accuracy further. Current pretrained-vs-baseline gates already clear by ~5×, so this is a tightening, not a blocker.

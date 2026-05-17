@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda"]
+ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda", "pretrain"]
 ValidationStatus = Literal["passed", "failed", "exploratory"]
 AblationStatus = Literal["gamma_dl_zero", "gamma_dl_shrunk", "not_applicable"]
 DiagnosticStatus = Literal["passed", "warn", "failed"]

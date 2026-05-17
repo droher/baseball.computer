@@ -69,12 +69,12 @@ MODEL (
     baserunner = 'Baserunner enum from stg_event_baserunners: Batter, First, Second, Third.',
     base_start = 'Numeric base the runner occupies at event start. Batter=0, First=1, Second=2, Third=3.',
     runner_id = 'stg_event_baserunners.runner_id.',
-    trajectory_class = 'COALESCE(raw, deduced) for event_observation_geometry where dimension = trajectory.',
-    trajectory_is_observed = 'observed_status IN (observed, derived) for trajectory.',
-    location_depth_class = 'COALESCE(raw, deduced) for event_observation_geometry where dimension = location_depth.',
-    location_depth_is_observed = 'observed_status IN (observed, derived) for location_depth.',
-    ball_handler_position_class = 'COALESCE(raw, deduced) for event_observation_geometry where dimension = ball_handler_position.',
-    ball_handler_position_is_observed = 'observed_status IN (observed, derived) for ball_handler_position.',
+    trajectory_class = 'raw_value for event_observation_geometry where dimension = trajectory. NULL when not recorded; heuristic deductions excluded.',
+    trajectory_is_observed = 'observed_status = observed for trajectory. Heuristic deductions do not count.',
+    location_depth_class = 'raw_value for event_observation_geometry where dimension = location_depth. NULL when not recorded; heuristic deductions excluded.',
+    location_depth_is_observed = 'observed_status = observed for location_depth. Heuristic deductions do not count.',
+    ball_handler_position_class = 'raw_value for event_observation_geometry where dimension = ball_handler_position. NULL when not recorded; heuristic deductions excluded.',
+    ball_handler_position_is_observed = 'observed_status = observed for ball_handler_position. Heuristic deductions do not count.',
     geometry_posterior_artifact_id = 'NULL — geometry-posterior artifact pointer reserved for downstream.',
     responsibility_artifact_id = 'NULL — fielder-responsibility artifact pointer reserved for downstream.',
     primary_fold = 'Default game-hash split. HASH(game_id) mod 100 -> [0,69]=TRAIN, [70,84]=VALIDATE, [85,99]=TEST.',
@@ -106,19 +106,19 @@ WITH br AS (
 ),
 
 trj AS (
-    SELECT event_key, raw_value, deduced_value, observed_status
+    SELECT event_key, raw_value, observed_status
     FROM main_models.event_observation_geometry
     WHERE dimension = 'trajectory'
 ),
 
 dep AS (
-    SELECT event_key, raw_value, deduced_value, observed_status
+    SELECT event_key, raw_value, observed_status
     FROM main_models.event_observation_geometry
     WHERE dimension = 'location_depth'
 ),
 
 bhp AS (
-    SELECT event_key, raw_value, deduced_value, observed_status
+    SELECT event_key, raw_value, observed_status
     FROM main_models.event_observation_geometry
     WHERE dimension = 'ball_handler_position'
 )
@@ -133,12 +133,12 @@ SELECT
         WHEN 'Third'  THEN 3
     END::UTINYINT AS base_start,
     br.runner_id,
-    COALESCE(trj.raw_value, trj.deduced_value) AS trajectory_class,
-    (trj.observed_status IN ('observed', 'derived')) AS trajectory_is_observed,
-    COALESCE(dep.raw_value, dep.deduced_value) AS location_depth_class,
-    (dep.observed_status IN ('observed', 'derived')) AS location_depth_is_observed,
-    COALESCE(bhp.raw_value, bhp.deduced_value) AS ball_handler_position_class,
-    (bhp.observed_status IN ('observed', 'derived')) AS ball_handler_position_is_observed,
+    trj.raw_value AS trajectory_class,
+    (trj.observed_status = 'observed') AS trajectory_is_observed,
+    dep.raw_value AS location_depth_class,
+    (dep.observed_status = 'observed') AS location_depth_is_observed,
+    bhp.raw_value AS ball_handler_position_class,
+    (bhp.observed_status = 'observed') AS ball_handler_position_is_observed,
     NULL::VARCHAR AS geometry_posterior_artifact_id,
     NULL::VARCHAR AS responsibility_artifact_id,
     c.game_id,

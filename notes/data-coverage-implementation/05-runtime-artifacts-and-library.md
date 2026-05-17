@@ -96,6 +96,13 @@ bc/python_models/statistical/
     calibrators.py
     embeddings.py
     proposals.py
+    pretrain/
+      __init__.py
+      spec.py
+      heads.py
+      artifacts.py
+      training.py
+      targets.py
   models/
     __init__.py
     advancement.py
@@ -181,6 +188,8 @@ Subcommands:
 | `export-sql` | SQL-consumable probability, expected-counter, and summary Parquet files. |
 | `validate` | Conservation, calibration, grouped holdout, and publication status report. |
 | `publish-manifest` | Writes the `artifact_id` SQLMesh may ingest for a given `model_name`. |
+| `fit-pretrain` | Multi-head pretext fit over `model_input_event_universe` producing a shared entity-embedding artifact (`kind="pretrain"`) under `artifacts/statistical/deep/<pretrain_name>/<artifact_id>/{exports/{embeddings.parquet, vocab.json}, manifest.json}`. |
+| `publish-pretrain` | Writes the canonical pretrain pointer at `<BC_STATS_PUBLISHED_ROOT>/pretrain/<name>.json`. Per-target `DeepTargetSpec.pretrained_embeddings_artifact_id` resolves through the pointer. |
 
 ## Artifact Layout
 
@@ -246,7 +255,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export"]
+ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda", "pretrain"]
 ValidationStatus = Literal["passed", "failed", "exploratory"]
 AblationStatus = Literal["gamma_dl_zero", "gamma_dl_shrunk", "not_applicable"]
 
@@ -286,6 +295,8 @@ Manifest invariants:
 - `gamma_dl_shrunk` — Bayes fit with the DL covariate included under a `Normal(0, 0.5)` shrinkage prior.
 
 Bayes models that consume a DL proposal emit two artifacts per fit cycle — one with `ablation_status='gamma_dl_zero'`, one with `ablation_status='gamma_dl_shrunk'`. Only one is referenced by the published manifest; the per-model selection criterion lives in the model's validation report and the choice is recorded in the published manifest's `metadata` block.
+
+`kind="pretrain"` covers shared-embedding pretrain artifacts (see `04-deep-learning-supplements.md` → "Entity Embedding Pretraining"). Pretrain manifests' `output_paths` carry `{artifact_dir, embeddings, vocab}` and their `metadata` carries head-shape JSON (`head_specs_json`, `vocab_sizes_json`, per-head best `val_metrics`). Per-target `DeepTargetSpec.pretrained_embeddings_artifact_id` is the optional foreign key that consumes a pretrain artifact at fit time.
 
 ## Logging
 

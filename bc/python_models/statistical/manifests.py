@@ -62,6 +62,25 @@ def find_published_manifest(model_name: str) -> Path | None:
     return None
 
 
+PRETRAIN_POINTER_SUBDIR: str = "pretrain"
+
+
+def find_published_pretrain(name: str) -> Path | None:
+    """Locate a published pretrain pointer JSON by name.
+
+    Mirrors ``find_published_manifest`` but resolves under the
+    ``pretrain/`` subdir of the published root.
+    """
+    branch_root, global_root = resolve_published_roots()
+    branch_path = branch_root / PRETRAIN_POINTER_SUBDIR / f"{name}.json"
+    if branch_path.exists():
+        return branch_path
+    global_path = global_root / PRETRAIN_POINTER_SUBDIR / f"{name}.json"
+    if global_path.exists():
+        return global_path
+    return None
+
+
 def write_published_pointer(pointer: PublishedPointer, *, root: Path | None = None) -> Path:
     branch_root, _ = resolve_published_roots()
     target_root = root if root is not None else branch_root

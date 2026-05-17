@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Literal
 
 import polars as pl
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 # High-cardinality identifier columns get learned embeddings.
 HIGH_CARD_CATEGORICAL: tuple[str, ...] = (
@@ -61,6 +61,34 @@ class FeatureLayout(BaseModel):
     numeric_columns: tuple[str, ...]
     grain_column: str
     split_column: str
+    embedding_groups: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_embedding_groups(self) -> "FeatureLayout":
+        seen_cols: set[str] = set()
+        seen_groups: set[str] = set()
+        high_card = set(self.high_card_columns)
+        for group_name, cols in self.embedding_groups:
+            if group_name in seen_groups:
+                raise ValueError(f"duplicate embedding group {group_name!r}")
+            seen_groups.add(group_name)
+            if not cols:
+                raise ValueError(f"embedding group {group_name!r} has no columns")
+            for col in cols:
+                if col not in high_card:
+                    raise ValueError(
+                        f"embedding group {group_name!r} references {col!r} not in high_card_columns"
+                    )
+                if col in seen_cols:
+                    raise ValueError(
+                        f"column {col!r} is a member of multiple embedding groups"
+                    )
+                seen_cols.add(col)
+            if group_name in high_card and group_name not in cols:
+                raise ValueError(
+                    f"embedding group name {group_name!r} collides with a high-card column"
+                )
+        return self
 
     @property
     def all_feature_columns(self) -> tuple[str, ...]:
@@ -69,6 +97,30 @@ class FeatureLayout(BaseModel):
     @property
     def categorical_columns(self) -> tuple[str, ...]:
         return (*self.high_card_columns, *self.low_card_columns)
+
+    def group_for_column(self, col: str) -> str | None:
+        for group_name, cols in self.embedding_groups:
+            if col in cols:
+                return group_name
+        return None
+
+    def grouped_columns(self) -> frozenset[str]:
+        return frozenset(col for _, cols in self.embedding_groups for col in cols)
+
+    def embedding_unit_for_column(self, col: str) -> str:
+        return self.group_for_column(col) or col
+
+    def embedding_unit_names(self) -> tuple[str, ...]:
+        grouped = self.grouped_columns()
+        units: list[str] = []
+        seen: set[str] = set()
+        for col in self.high_card_columns:
+            unit = self.group_for_column(col) or col
+            if col in grouped and unit in seen:
+                continue
+            seen.add(unit)
+            units.append(unit)
+        return tuple(units)
 
 
 LEGACY_ML_LAYOUT = FeatureLayout(

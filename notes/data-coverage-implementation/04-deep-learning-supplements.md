@@ -3,10 +3,45 @@ title: Deep Learning Supplements For Imputation
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-13
+last-verified: 2026-05-16
 ---
 
 # Deep Learning Supplements For Imputation
+
+## Phase-3 v6 rearchitecture (2026-05-16)
+
+This document predates the v6 rearchitecture and remains the
+canonical design intent. Three invariants now constrain every
+DL supplement registered under
+`bc/python_models/statistical/deep/targets/`:
+
+1. **Pre-event input layouts only.** The `FeatureLayout` for each
+   spec may contain only features observable at inference time. Post-
+   event / outcome-correlated columns are forbidden — see
+   [`bc/python_models/statistical/CLAUDE.md`](../../bc/python_models/statistical/CLAUDE.md#phase-3-v6-invariants)
+   and the deny-list in `feature_layout.validate_pre_event`. v5's
+   trajectory model included `fielder_chain` and shortcuts to it
+   (perm-imp Δ_CE +1.16); the model never learned entity priors, and
+   v5 acceptance gates missed. v6 strips the layouts and the trajectory
+   batter signal rebounds from +0.015 → +0.053.
+2. **Non-redundant pretrain pretext heads.** v6 pretrain ships 11
+   non-redundant heads (`EVENT_UNIVERSE_HEADS_V6`). Drops `result_family`
+   (deterministic 9-class grouping of `pa_result`) and `hit_or_out`
+   (binary derivable from `pa_result`) — both let the trunk reuse
+   `pa_result` statistics instead of forcing entity-embedding signal.
+   Remaining 11 still correlate (e.g. `runs/outs_on_play` with
+   `pa_result`; `batted_location_*` with `trajectory_remapped`;
+   `r1/r2/r3_advancement` with outs/runs) but each carries residual
+   variance the trunk has to learn. Not orthogonal — just
+   no-deterministic-derivation.
+3. **Time-forward gate eval.** Per-supplement acceptance gates
+   (perm-imp Δ_CE per entity, v6-pretrained vs no-pretrain baseline)
+   run on `time_forward_fold = 'VALIDATE'` (season = 2023). Training
+   still uses `primary_fold` (HASH(game_id)) to maximize data. Gates
+   table: [`phase3-acceptance-gates-v6.md`](phase3-acceptance-gates-v6.md).
+
+`park_factors` and `run_values` remain Phase-4 hierarchical-Bayes
+targets, not DL specs, per §"Where Deep Learning Helps" below.
 
 ## TL;DR
 
@@ -230,6 +265,8 @@ Bayesian use:
 - optional covariates for park or geometry models.
 - prior mean features for player/park random effects only after sensitivity checks.
 
+Initialization (PR8): per-target Embedding layers no longer learn entity priors from each target's row slice in isolation. They are warm-started from the shared `event_universe` pretrain artifact (see "Entity Embedding Pretraining" below) and fine-tuned on the per-target loss. The per-target source-probe AUC gate still applies post-fit.
+
 Guardrail: run an adversarial diagnostic that predicts source family or scorer from embeddings. Embeddings that strongly encode source-specific collection patterns should be diagnostic-only.
 
 Concrete thresholds on the source-probe AUC, evaluated on a held-out source family (see `source_probe_auc` sketch below):
@@ -288,6 +325,27 @@ def build_proposal_model(
 ```
 
 The production version should reuse the existing `TargetSpec` pattern or extend it into a coverage-specific `DeepTargetSpec` that includes provenance fields, target-population filters, split policy, calibration slices, and output table names.
+
+### Entity Embedding Pretraining
+
+Each per-target deep model owns its own Embedding layers for high-cardinality features (`batter_id`, `pitcher_id`, `park_id`, `scorer`, ...). Trained in isolation these embeddings only see the rows the target uses (e.g. trajectory only sees observed batted-ball events) and a permutation-importance probe on the v3 trajectory fit confirmed they contribute < 0.03 nats each — crowded out by `fielder_chain` (1.0 nat).
+
+PR8 pretrains those embeddings once over the full 18.1M-event universe (`main_models.model_input_event_universe`) against a multi-head pretext objective, then per-target deep models warm-start from the resulting artifact:
+
+- Dataset (v2): one row per event_key (no per-dimension fanout), driver = `event_observation_context` filtered to `target_population_status = 'event_level'`. Joins `event_states_full` (count + outs), `stg_events` (pa_result), `event_fielders_flat` (positions 2–9), a baserunner pivot over `stg_event_baserunners` (runner_on_1b/2b/3b_id + r1/r2/r3_advancement), `stg_games` (weather + time_of_day + day_of_year), and `event_observation_geometry` per-dimension for trajectory / general_location / location_depth / location_edge / ball_handler_position.
+- Shared `"player"` Embedding (v2): 13 player-slot inputs — batter + pitcher + 8 fielders + 3 runners — route through ONE `embed_player` layer whose vocab is the union of player_ids appearing in any slot in TRAIN. Declared on the layout via `FeatureLayout.embedding_groups=(("player", PLAYER_GROUP_COLS),)`. Park + scorer remain per-column.
+- Pretext heads (v2, 13 total): the original six (`pa_result`, `result_family`, `hit_or_out`, `outs_on_play_capped`, `runs_on_play_capped`, `trajectory_remapped`) + three baserunner-advancement (`r1/r2/r3_advancement`, 7-class `{Stayed, Advanced1, Advanced2, Scored, OutAdvancing, OutCaughtStealing, OutPickoff}`) + four batted-ball geometry (`batted_location_general`, `batted_location_depth`, `batted_location_edge`, `batted_to_fielder_class`). NULL targets are masked out of the per-head loss; the row still contributes to every other head.
+- Leak-safe inputs: `batter_hand` / `pitcher_hand` deliberately excluded so the embedding absorbs handedness as a stable trait. `runners_count_start` (collinear with `base_state_start`) and `leverage_index` (function of inning / outs / score_margin / base_state) dropped from v2.
+- Multi-task loss (v2): Kendall-Gal uncertainty weighting via `PretrainModel`. Per-head trainable `log_sigma`; total = `Σ 0.5 * exp(-log_sigma_h) * loss_h + 0.5 * log_sigma_h`. Avoids manual `loss_weights` tuning.
+- Split optimizers (v2): `trunk_optimizer` (Adam, base 1e-3) for cross / deep / layernorm / head Denses; `embed_optimizer` (Adam, base 5e-3 stage 1, 1.5e-3 stage 2) for `embed_*` + `log_sigma_*`. Both schedules linearly warm up over 5% of the stage's total steps then `CosineDecay(alpha=0.1)`.
+- Two-stage schedule (v2): stage 1 = freeze trunk (cross / deep / layernorm) for `stage1_epochs=4`, training only embeddings + heads + `log_sigma`; stage 2 = unfreeze for the remaining `epochs - stage1_epochs` (default 21) with a fresh schedule. Recompile across the boundary.
+- `HardHeadEarlyStopping` (v2): watches the mean of val accuracy for `pa_result`, `result_family`, `trajectory_remapped`, `batted_location_general`, `batted_to_fielder_class`. UW `val_loss` is dominated by easy heads like `hit_or_out`, which would otherwise stop training before embeddings absorb the hard-head signal. Patience 5, restore best weights.
+- `SlashLineProbe` (v2): env-gated diagnostic (`BC_PRETRAIN_SLASH_PROBE=1` + `BC_DB_PATH`). Logs implied AVG / OBP / SLG per epoch for a 10-row probe batch — 5 batter tiers (HOF / AllStar / Average / BelowAvg / Replacement) vs neutral pitcher and 5 mirrored pitcher tiers. AVG / OBP / SLG derived from the `pa_result` softmax via the seed-supplied flag vectors (`is_hit / is_at_bat / is_on_base_success / is_on_base_opportunity / total_bases`).
+- Split: same `HASH(game_id) % 100` formula and `TRAIN / VALIDATE / TEST` labels as every other `model_input_*` dataset. VALIDATE / TEST rows are held out at the pretrain step — no eval leakage into per-target evaluations.
+- Vocabulary reconciliation (v2): `vocab.json` is keyed by **embedding unit** (group name or ungrouped col name) — one ordered `entity_id` list per unit, with `<oov>` at index 0. At per-target load time, `set_pretrained_embeddings(..., embedding_groups=…)` resolves each high-card column to its unit, looks up `embed_<unit>`, and copies rows for matching `entity_id`s into the consumer's per-column matrix.
+- Default load mode: fine-tune. `DeepTargetSpec.pretrained_embeddings_artifact_id` triggers the load post-`build_model`; embeddings continue training at the normal LR. `DeepTargetSpec.freeze_pretrained_embeddings` is opt-in and recompiles the model so the freeze takes effect.
+- `build_pretrain_model` (in `python_models.ml.model_factory`) shares the trunk extractor `_build_backbone` with `build_model`. Backbone v2 adds `SpatialDropout1D(0.1)` after each Embedding lookup and a `LayerNormalization` at the trunk concat; `EMBEDDING_L2` lowered to 1e-7.
+- Artifact layout: `artifacts/statistical/deep/event_universe/<artifact_id>/{exports/{embeddings.parquet, vocab.json}, manifest.json}` with `manifest.kind = "pretrain"`. Published via `bc-stats publish-pretrain` to `<BC_STATS_PUBLISHED_ROOT>/pretrain/<name>.json`.
 
 ## Calibration
 

@@ -11,7 +11,10 @@ specs without touching the JOIN side.
 from __future__ import annotations
 
 from python_models.ml.features import FeatureLayout
-from python_models.statistical.deep.feature_layout import register_coverage_layout
+from python_models.statistical.deep.feature_layout import (
+    register_coverage_layout,
+    validate_pre_event,
+)
 from python_models.statistical.deep.registry import register_target
 from python_models.statistical.deep.target_spec import DeepTargetSpec
 
@@ -23,7 +26,7 @@ HIGH_CARD_COLUMNS: tuple[str, ...] = (
     "park_id",
 )
 
-LOW_CARD_COLUMNS: tuple[str, ...] = (
+PRE_EVENT_LOW_CARD: tuple[str, ...] = (
     "league",
     "game_type",
     "frame_start",
@@ -33,8 +36,9 @@ LOW_CARD_COLUMNS: tuple[str, ...] = (
     "leverage_bucket",
     "personnel_confidence",
     "context_confidence",
-    "result_family",
 )
+
+LOW_CARD_COLUMNS: tuple[str, ...] = PRE_EVENT_LOW_CARD
 
 NUMERIC_COLUMNS: tuple[str, ...] = (
     "season",
@@ -64,12 +68,14 @@ HAS_COUNT_SPEC: DeepTargetSpec = DeepTargetSpec(
     slice_columns=("season", "league", "source_family"),
     game_id_column="game_id",
     split_column="primary_fold",
+    pretrained_embeddings_artifact_id="event_universe",
 )
 
 PITCH_SUMMARY_SPECS: tuple[DeepTargetSpec, ...] = (HAS_COUNT_SPEC,)
 
 
 def _register() -> None:
+    validate_pre_event(PITCH_SUMMARY_LAYOUT)
     register_coverage_layout(DATASET_NAME, PITCH_SUMMARY_LAYOUT)
     for spec in PITCH_SUMMARY_SPECS:
         register_target(spec, sibling_manifest="dl_proposal_manifest")

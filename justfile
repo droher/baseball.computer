@@ -149,6 +149,24 @@ fit-deep TARGET DATASET_ARTIFACT ARTIFACT_ID *ARGS:
     shift 3
     {{ _dev_env }} KERAS_BACKEND=torch BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli fit-deep --target {{ TARGET }} --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} "$@"
 
+# Pretrain shared entity embeddings on a multi-head pretext dataset
+# (default target: event_universe). Writes artifacts/statistical/deep/<TARGET>/<ARTIFACT_ID>/
+# {exports/{embeddings.parquet,vocab.json},manifest.json}.
+# Usage: just fit-pretrain <dataset-artifact-id> <fit-artifact-id> [extra args, e.g. --pretrain-target event_universe]
+fit-pretrain DATASET_ARTIFACT ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    {{ _dev_env }} KERAS_BACKEND=torch BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli fit-pretrain --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Resolve a pretrain artifact_id to the canonical pointer at <root>/pretrain/<name>.json.
+# Usage: just publish-pretrain <artifact-id> [extra args]
+publish-pretrain ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 1
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli publish-pretrain --artifact-id {{ ARTIFACT_ID }} "$@"
+
 # Resolve an artifact_id to the canonical "latest" pointer for its model.
 # Usage: just publish-manifest <model> <artifact-id> [extra args]
 publish-manifest MODEL ARTIFACT_ID *ARGS:

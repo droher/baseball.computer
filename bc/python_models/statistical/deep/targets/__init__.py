@@ -2,14 +2,13 @@
 
 Importing the package registers every shipped target with
 ``python_models.statistical.deep.registry`` and ``feature_layout``
-side-effects. PR3 ships Geometry; PR4 (pitch_summary, advancement),
-PR5 (fielding_credit), PR6 (embeddings) add their own modules.
+side-effects.
 """
 
 from __future__ import annotations
 
 from python_models.statistical.deep.targets import (
-    fielding_credit as _fielding_credit,  # noqa: F401
+    advancement as _advancement,  # noqa: F401
 )
 from python_models.statistical.deep.targets import geometry as _geometry  # noqa: F401
 from python_models.statistical.deep.targets import (

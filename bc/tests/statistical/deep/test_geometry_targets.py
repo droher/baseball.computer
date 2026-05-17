@@ -21,9 +21,9 @@ from python_models.statistical.deep.targets.geometry import (
 )
 
 
-def test_five_dimensions_registered() -> None:
+def test_dimensions_match_registry() -> None:
     geometry_names = [n for n in all_target_names() if n.startswith("geometry_")]
-    assert len(geometry_names) == 5
+    assert len(geometry_names) == len(GEOMETRY_DIMENSIONS)
     assert set(geometry_names) == {f"geometry_{d}" for d in GEOMETRY_DIMENSIONS}
 
 
@@ -41,7 +41,11 @@ def test_filter_predicate_matches_dimension() -> None:
     for spec in GEOMETRY_SPECS:
         assert spec.filter_predicate is not None
         assert spec.proposal_dimension in spec.filter_predicate
-        assert "is_observed_class" in spec.filter_predicate
+        admits_observed = (
+            "is_observed_class" in spec.filter_predicate
+            or "observed_status" in spec.filter_predicate
+        )
+        assert admits_observed
 
 
 def test_target_column_and_kind_consistent() -> None:
@@ -78,3 +82,12 @@ def test_layout_columns_distinct() -> None:
         *layout.numeric_columns,
     )
     assert len(all_cols) == len(set(all_cols)), "feature columns must be distinct"
+
+
+def test_every_geometry_spec_declares_pretrain_artifact() -> None:
+    for spec in GEOMETRY_SPECS:
+        assert spec.pretrained_embeddings_artifact_id == "event_universe", (
+            f"{spec.name} missing pretrained_embeddings_artifact_id — "
+            "BC_DEEP_PRETRAIN_ARTIFACT_OVERRIDE env will never fire "
+            "(see _maybe_load_pretrained_embeddings early-return)"
+        )

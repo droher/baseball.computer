@@ -238,6 +238,70 @@ def build_parser() -> argparse.ArgumentParser:
     _ = publish.add_argument("--model", required=True, help="Model name to publish.")
     _add_artifact_id_arg(publish)
 
+    fit_pretrain = subparsers.add_parser(
+        "fit-pretrain",
+        help=(
+            "Pretrain shared entity embeddings on a multi-head pretext "
+            "dataset (default: event_universe)."
+        ),
+    )
+    _ = fit_pretrain.add_argument(
+        "--pretrain-target",
+        default="event_universe",
+        help="Pretrain target name (default: event_universe).",
+    )
+    _add_dataset_artifact_arg(fit_pretrain)
+    _add_artifact_id_arg(fit_pretrain)
+    _ = fit_pretrain.add_argument(
+        "--source-snapshot-id",
+        default=None,
+        help=(
+            "Override the source_snapshot_id stamped onto the pretrain manifest. "
+            "Defaults to the dataset artifact's source_snapshot_id."
+        ),
+    )
+    _ = fit_pretrain.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="Override training epochs (default: pretrain.training.DEFAULT_EPOCHS).",
+    )
+    _ = fit_pretrain.add_argument(
+        "--stage1-epochs",
+        type=int,
+        default=None,
+        help=(
+            "Stage-1 (freeze-trunk) epochs. Falls back to "
+            "BC_PRETRAIN_STAGE1_EPOCHS env, then DEFAULT_STAGE1_EPOCHS (0 = single-stage). "
+            "Stage-2 epochs = total --epochs minus this value."
+        ),
+    )
+    _ = fit_pretrain.add_argument(
+        "--keras-batch-size",
+        type=int,
+        default=None,
+        help="Override Keras batch size (default: pretrain.training.DEFAULT_KERAS_BATCH_SIZE).",
+    )
+    _ = fit_pretrain.add_argument(
+        "--dataset-output-root",
+        default=None,
+        help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
+    )
+    _ = fit_pretrain.add_argument(
+        "--output-root",
+        default=None,
+        help="Override the artifact root (defaults to artifacts/statistical/deep).",
+    )
+
+    publish_pretrain = subparsers.add_parser(
+        "publish-pretrain",
+        help=(
+            "Write a published-pointer JSON under <root>/pretrain/<name>.json "
+            "naming the approved pretrain artifact ID."
+        ),
+    )
+    _add_artifact_id_arg(publish_pretrain)
+
     return parser
 
 
@@ -544,6 +608,122 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_fit_pretrain(args: argparse.Namespace) -> int:
+    from python_models.statistical.config import DATASETS_ROOT, DEEP_ROOT
+    from python_models.statistical.deep.pretrain import run_pretrain
+    from python_models.statistical.deep.pretrain.targets import (
+        get_pretrain_layout,
+        get_pretrain_spec,
+    )
+    from python_models.statistical.deep.pretrain.training import (
+        DEFAULT_EPOCHS,
+        DEFAULT_KERAS_BATCH_SIZE,
+        DEFAULT_STAGE1_EPOCHS,
+    )
+    from python_models.statistical.manifests import read_manifest
+
+    spec = get_pretrain_spec(args.pretrain_target)
+    layout = get_pretrain_layout(args.pretrain_target)
+    dataset_root = (
+        Path(args.dataset_output_root) if args.dataset_output_root else DATASETS_ROOT
+    )
+    dataset_dir = dataset_root / spec.dataset_name / args.dataset_artifact
+    parquet_path = dataset_dir / "dataset.parquet"
+    manifest_path = dataset_dir / "manifest.json"
+    if not parquet_path.exists():
+        raise FileNotFoundError(
+            f"dataset Parquet missing at {parquet_path}; run prepare-dataset first."
+        )
+    if args.source_snapshot_id is not None:
+        source_snapshot_id = str(args.source_snapshot_id)
+    elif manifest_path.exists():
+        source_snapshot_id = read_manifest(manifest_path).source_snapshot_id
+    else:
+        raise FileNotFoundError(
+            f"dataset manifest missing at {manifest_path}; pass --source-snapshot-id to override."
+        )
+
+    output_root = Path(args.output_root) if args.output_root else DEEP_ROOT
+    if args.stage1_epochs is not None:
+        stage1_epochs = int(args.stage1_epochs)
+    else:
+        env_stage1 = os.environ.get("BC_PRETRAIN_STAGE1_EPOCHS")
+        stage1_epochs = int(env_stage1) if env_stage1 else DEFAULT_STAGE1_EPOCHS
+    result = run_pretrain(
+        spec,
+        dataset_parquet=parquet_path,
+        artifact_id=args.artifact_id,
+        layout=layout,
+        source_snapshot_id=source_snapshot_id,
+        dataset_artifact_id=args.dataset_artifact,
+        artifact_root=output_root,
+        epochs=int(args.epochs) if args.epochs is not None else DEFAULT_EPOCHS,
+        stage1_epochs=stage1_epochs,
+        keras_batch_size=(
+            int(args.keras_batch_size)
+            if args.keras_batch_size is not None
+            else DEFAULT_KERAS_BATCH_SIZE
+        ),
+    )
+    _log.info(
+        "fit-pretrain completed target=%s artifact_id=%s train=%d validate=%d test=%d",
+        spec.name,
+        args.artifact_id,
+        result.train_rows,
+        result.validate_rows,
+        result.test_rows,
+    )
+    return 0
+
+
+def _run_publish_pretrain(args: argparse.Namespace) -> int:
+    from datetime import datetime, timezone
+
+    from python_models.statistical.config import DEEP_ROOT, resolve_published_roots
+    from python_models.statistical.manifests import (
+        PRETRAIN_POINTER_SUBDIR,
+        read_manifest,
+        write_published_pointer,
+    )
+    from python_models.statistical.schemas import PublishedPointer
+
+    artifact_id = str(args.artifact_id)
+    found: Path | None = None
+    for candidate in DEEP_ROOT.rglob(f"{artifact_id}/manifest.json"):
+        found = candidate
+        break
+    if found is None:
+        raise FileNotFoundError(
+            f"no manifest.json for pretrain artifact_id={artifact_id!r} under {DEEP_ROOT}"
+        )
+    manifest = read_manifest(found)
+    if manifest.kind != "pretrain":
+        raise ValueError(
+            f"manifest at {found} has kind={manifest.kind!r}, expected 'pretrain'"
+        )
+    if manifest.artifact_id != artifact_id:
+        raise ValueError(
+            f"manifest at {found} reports artifact_id={manifest.artifact_id!r}, expected {artifact_id!r}"
+        )
+
+    branch_root, _ = resolve_published_roots()
+    pretrain_root = branch_root / PRETRAIN_POINTER_SUBDIR
+    pointer = PublishedPointer(
+        model_name=manifest.name,
+        artifact_id=artifact_id,
+        published_at=datetime.now(tz=timezone.utc),
+        manifest_path=found,
+    )
+    target = write_published_pointer(pointer, root=pretrain_root)
+    _log.info(
+        "publish-pretrain wrote pointer name=%s artifact_id=%s path=%s",
+        manifest.name,
+        artifact_id,
+        target,
+    )
+    return 0
+
+
 def _dispatch(args: argparse.Namespace) -> int:
     match args.command:
         case "prepare-dataset":
@@ -556,8 +736,12 @@ def _dispatch(args: argparse.Namespace) -> int:
             return _run_check_publication_gate(args)
         case "fit-deep":
             return _run_fit_deep(args)
+        case "fit-pretrain":
+            return _run_fit_pretrain(args)
         case "publish-manifest":
             return _run_publish_manifest(args)
+        case "publish-pretrain":
+            return _run_publish_pretrain(args)
         case "validate":
             return _run_validate(args)
         case other:

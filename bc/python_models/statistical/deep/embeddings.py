@@ -51,41 +51,41 @@ def assemble_embeddings_frame(
     embedding_matrices: dict[str, NDArray[np.float64]],
     vocabularies: dict[str, Vocabulary],
 ) -> pl.DataFrame:
-    """Stack per-column embeddings into one wide ``(entity_type, entity_id, embedding_value)`` frame.
+    """Stack per-(group-or-column) embeddings into one wide frame.
 
-    ``embedding_matrices`` maps a high-card column name to its
-    ``(vocab_size, embedding_dim)`` weight matrix. ``vocabularies``
-    maps the same column to its ``Vocabulary``. Both keys must cover
-    every column in ``layout.high_card_columns``.
+    ``embedding_matrices`` is keyed by **embedding unit**: group name for
+    grouped high-card cols, column name for ungrouped high-card cols.
+    ``vocabularies`` is keyed identically. Each unit emits exactly one
+    ``(entity_type=<unit>, entity_id, embedding_value)`` block.
     """
-    expected = set(layout.high_card_columns)
-    if set(embedding_matrices) != expected:
+    expected_units = set(layout.embedding_unit_names())
+    if set(embedding_matrices) != expected_units:
         raise KeyError(
-            f"embedding_matrices keys {sorted(embedding_matrices)} != layout.high_card_columns {sorted(expected)}"
+            f"embedding_matrices keys {sorted(embedding_matrices)} != expected units {sorted(expected_units)}"
         )
-    if set(vocabularies) != expected:
+    if set(vocabularies) != expected_units:
         raise KeyError(
-            f"vocabularies keys {sorted(vocabularies)} != layout.high_card_columns {sorted(expected)}"
+            f"vocabularies keys {sorted(vocabularies)} != expected units {sorted(expected_units)}"
         )
 
     frames: list[pl.DataFrame] = []
-    for col in layout.high_card_columns:
-        matrix = embedding_matrices[col]
+    for unit in layout.embedding_unit_names():
+        matrix = embedding_matrices[unit]
         if matrix.ndim != 2:
             raise ValueError(
-                f"embedding matrix for {col!r} must be 2-d; got shape {matrix.shape}"
+                f"embedding matrix for {unit!r} must be 2-d; got shape {matrix.shape}"
             )
-        entity_ids = vocabulary_entity_ids(vocabularies[col])
+        entity_ids = vocabulary_entity_ids(vocabularies[unit])
         if matrix.shape[0] != len(entity_ids):
             raise ValueError(
-                f"embedding matrix rows for {col!r}: got {matrix.shape[0]} but vocabulary expects {len(entity_ids)}"
+                f"embedding matrix rows for {unit!r}: got {matrix.shape[0]} but vocabulary expects {len(entity_ids)}"
             )
         rows = [list(row) for row in matrix.astype(np.float64).tolist()]
         frames.append(
             pl.DataFrame(
                 {
                     "entity_type": pl.Series(
-                        [col] * len(entity_ids), dtype=pl.Utf8
+                        [unit] * len(entity_ids), dtype=pl.Utf8
                     ),
                     "entity_id": pl.Series(entity_ids, dtype=pl.Utf8),
                     "embedding_value": pl.Series(

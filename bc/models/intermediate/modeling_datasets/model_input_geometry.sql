@@ -1,7 +1,7 @@
 MODEL (
   name main_models.model_input_geometry,
   kind VIEW,
-  description 'Modeling dataset for the batted-ball geometry posterior. Emits one row per (event_key, geometry_dimension) with class = COALESCE(raw_value, deduced_value) and is_observed_class = (observed_status IN observed, derived). Per-class fan-out (full class universe per dim) deferred until the DL class axis is defined. Driver = event_observation_geometry filtered to observed_status IN observed / derived / unknown_code / missing. Target-population filter: event_level.',
+  description 'Modeling dataset for the batted-ball geometry posterior. Emits one row per (event_key, geometry_dimension). Row population: event_observation_geometry filtered to observed_status IN (observed, derived, unknown_code, missing) — all four statuses kept so downstream eligibility logic can reason about coverage. DL training-label flag: is_observed_class = (observed_status = observed) — heuristic deductions (HR->Fly, OF putout->AirBall, infielder-assisted putout->GroundBall, fielder-position-derived location side/depth) are NOT treated as observed labels. class = raw_value (NULL for non-observed rows). calc_batted_ball_type and event_observation_geometry still surface the deductions for analyses / published aggregates. Target-population filter: event_level.',
   grain (event_key, geometry_dimension),
   columns (
     event_key UINTEGER,
@@ -48,6 +48,24 @@ MODEL (
     exposure_status VARCHAR,
     result_family VARCHAR,
     alignment_regime VARCHAR,
+    count_balls UTINYINT,
+    count_strikes UTINYINT,
+    pitches UTINYINT,
+    swings UTINYINT,
+    swings_with_contact UTINYINT,
+    strikes_called UTINYINT,
+    strikes_swinging UTINYINT,
+    strikes_foul UTINYINT,
+    strikes_in_play UTINYINT,
+    balls_called UTINYINT,
+    plate_appearance_result PLATE_APPEARANCE_RESULT,
+    batted_to_fielder UTINYINT,
+    outs_on_play UTINYINT,
+    outs_end UTINYINT,
+    base_state_end UTINYINT,
+    runners_count_start UTINYINT,
+    batting_team_margin_end TINYINT,
+    fielder_chain VARCHAR,
     dl_artifact_id VARCHAR,
     dl_p_class DOUBLE[],
     holdout_flags STRUCT(
@@ -66,8 +84,8 @@ MODEL (
   column_descriptions (
     event_key = @doc('event_key'),
     geometry_dimension = 'Atomic geometry dimension (trajectory, location_side, etc.). One row per (event_key, geometry_dimension).',
-    class = 'COALESCE(raw_value, deduced_value). NULL when observed_status is missing or unknown_code with no inference.',
-    is_observed_class = 'BOOLEAN. TRUE iff observed_status IN (observed, derived) — class was either directly recorded or deterministically inferred.',
+    class = 'raw_value. NULL when not recorded. Heuristic deductions (HR->Fly, OF putout->AirBall, etc.) intentionally excluded from this column so DL training labels reflect only what was actually observed.',
+    is_observed_class = 'BOOLEAN. TRUE iff observed_status = observed — class was directly recorded. Heuristically-derived rows are NOT considered observed for DL training-label purposes (only for analyses / aggregates which still read calc_batted_ball_type and event_observation_geometry directly).',
     observed_status = 'event_observation_geometry.observed_status (filtered to observed / derived / unknown_code / missing).',
     sentinel_type = 'event_observation_geometry.sentinel_type.',
     raw_value = 'event_observation_geometry.raw_value.',
@@ -79,6 +97,24 @@ MODEL (
     training_weight = '1.0 when data_error_risk = none else 0.0.',
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until DL supplements land.',
+    count_balls = 'event_states_full.count_balls.',
+    count_strikes = 'event_states_full.count_strikes.',
+    pitches = 'event_pitch_sequence_stats.pitches (NULL pre-pitch-data eras).',
+    swings = 'event_pitch_sequence_stats.swings (NULL pre-pitch-data eras).',
+    swings_with_contact = 'event_pitch_sequence_stats.swings_with_contact.',
+    strikes_called = 'event_pitch_sequence_stats.strikes_called.',
+    strikes_swinging = 'event_pitch_sequence_stats.strikes_swinging.',
+    strikes_foul = 'event_pitch_sequence_stats.strikes_foul.',
+    strikes_in_play = 'event_pitch_sequence_stats.strikes_in_play.',
+    balls_called = 'event_pitch_sequence_stats.balls_called.',
+    plate_appearance_result = 'calc_batted_ball_type.plate_appearance_result (Single/Double/Triple/HomeRun/...).',
+    batted_to_fielder = 'calc_batted_ball_type.batted_to_fielder (primary fielder position 0-9; NULL if none/HR).',
+    outs_on_play = 'event_states_full.outs_on_play.',
+    outs_end = 'event_states_full.outs_end.',
+    base_state_end = 'event_states_full.base_state_end.',
+    runners_count_start = 'event_states_full.runners_count_start.',
+    batting_team_margin_end = 'event_states_full.batting_team_margin_end.',
+    fielder_chain = 'Aggregated putout/assist chain (e.g. ''6-4-3'') from stg_event_fielding_plays. NULL when no fielding plays recorded.',
     dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land.',
     dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.'
   ),
@@ -102,8 +138,8 @@ MODEL (
 SELECT
     o.event_key,
     o.dimension AS geometry_dimension,
-    COALESCE(o.raw_value, o.deduced_value) AS class,
-    (o.observed_status IN ('observed', 'derived')) AS is_observed_class,
+    o.raw_value AS class,
+    (o.observed_status = 'observed') AS is_observed_class,
     o.observed_status,
     o.sentinel_type,
     o.raw_value,
@@ -144,6 +180,24 @@ SELECT
     c.exposure_status,
     c.result_family,
     c.alignment_regime,
+    e.count_balls,
+    e.count_strikes,
+    psq.pitches,
+    psq.swings,
+    psq.swings_with_contact,
+    psq.strikes_called,
+    psq.strikes_swinging,
+    psq.strikes_foul,
+    psq.strikes_in_play,
+    psq.balls_called,
+    bbt.plate_appearance_result,
+    bbt.batted_to_fielder,
+    e.outs_on_play,
+    e.outs_end,
+    e.base_state_end,
+    e.runners_count_start,
+    e.batting_team_margin_end,
+    fc.fielder_chain,
     p.dl_artifact_id,
     p.dl_p_class,
     STRUCT_PACK(
@@ -164,6 +218,15 @@ SELECT
     @VAR('source_snapshot_id', 'dev') AS source_snapshot_id
 FROM main_models.event_observation_geometry AS o
 INNER JOIN main_models.event_observation_context AS c USING (event_key)
+LEFT JOIN main_models.event_states_full AS e USING (event_key)
+LEFT JOIN main_models.event_pitch_sequence_stats AS psq USING (event_key)
+LEFT JOIN main_models.calc_batted_ball_type AS bbt USING (event_key)
+LEFT JOIN (
+    SELECT event_key,
+           STRING_AGG(fielding_position::VARCHAR, '-' ORDER BY sequence_id) AS fielder_chain
+    FROM main_models.stg_event_fielding_plays
+    GROUP BY event_key
+) AS fc USING (event_key)
 LEFT JOIN main_models.dl_proposal_manifest AS p
     ON p.event_key = o.event_key AND p.dimension = o.dimension
 LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)

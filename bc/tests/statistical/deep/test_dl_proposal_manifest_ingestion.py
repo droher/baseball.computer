@@ -146,22 +146,22 @@ def test_skips_target_with_no_published_pointer(
 
     manifest_path = _write_artifact(
         deep_root,
-        target_name="geometry_region",
-        artifact_id="aid-region-1",
+        target_name="geometry_location_edge",
+        artifact_id="aid-edge-1",
         event_keys=[100, 101],
         dl_p_class=[[0.5, 0.5], [0.2, 0.8]],
     )
     _ = _publish_pointer(
         published_root,
-        target="geometry_region",
-        artifact_id="aid-region-1",
+        target="geometry_location_edge",
+        artifact_id="aid-edge-1",
         manifest_path=manifest_path,
     )
 
     frames = list(aggregate_proposal_manifest_frames("dl_proposal_manifest"))
     assert len(frames) == 1
     df = frames[0]
-    assert df["dimension"].unique().to_list() == ["region"]
+    assert df["dimension"].unique().to_list() == ["location_edge"]
     assert df.height == 2
 
 

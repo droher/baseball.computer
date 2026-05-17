@@ -25,7 +25,7 @@ Every model must specify:
 - Likelihood and constraints.
 - Pooling structure and exchangeability assumptions.
 - Priors on interpretable baseball scales.
-- Deep-proposal inputs, if any.
+- Deep-proposal inputs, if any. Per-entity priors (batter / pitcher / park / scorer effects) consumed downstream from Phase-3 are sourced from the shared `event_universe` pretrain artifact rather than per-target re-trains, so the same entity embedding propagates across all consumers and the entity-level signal is borrowed across all 18M events instead of the per-target row subset alone.
 - Validation and sensitivity checks.
 - Artifact outputs and SQL consumers.
 
