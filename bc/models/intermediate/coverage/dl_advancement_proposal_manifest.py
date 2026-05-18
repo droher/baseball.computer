@@ -3,9 +3,12 @@
 Grain ``(event_key, baserunner)``. Consumed by
 ``main_models.model_input_advancement``'s LEFT JOIN.
 
-PR3 ships this as a zero-row fallback; PR4 (advancement proposals)
-replaces the body with the real iteration over published advancement
-artifacts.
+Zero-row stub. Advancement specs (`advancement_r1/_r2/_r3` in
+`deep/targets/advancement.py`) are defined but not registered on
+import because `model_input_advancement` lacks the
+`advancement_class` + `time_forward_fold` columns the fits need. The
+stub keeps the typed schema visible to downstream LEFT JOINs. See
+`notes/followups.md` for the SQL gap.
 """
 
 from __future__ import annotations
@@ -41,8 +44,8 @@ _AUDITS = [
     audits=_AUDITS,
     description=(
         "DL advancement-proposal manifest (grain: event_key x baserunner). "
-        "PR3 zero-row fallback; PR4 wires real per-baserunner published "
-        "artifacts."
+        "Zero-row stub; advancement specs are not yet registered because "
+        "model_input_advancement lacks advancement_class + time_forward_fold."
     ),
 )
 def execute(context: ExecutionContext, **kwargs: t.Any) -> pl.DataFrame:
@@ -50,7 +53,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> pl.DataFrame:
     import logging
 
     logging.getLogger(__name__).info(
-        "dl_advancement_proposal_manifest: PR3 zero-row fallback"
+        "dl_advancement_proposal_manifest: zero-row stub (SQL gap blocks registration)"
     )
     return pl.DataFrame(
         schema={

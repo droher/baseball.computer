@@ -3,7 +3,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 REPO="$(pwd)"
-LOGDIR="${REPO}/logs/permimp_v8"
+LOGDIR="${REPO}/logs/permimp"
 BRANCH_SLUG="$(git rev-parse --abbrev-ref HEAD | tr -c 'a-zA-Z0-9' '_')"
 PUB_ROOT="${REPO}/artifacts/statistical/published-${BRANCH_SLUG}/"
 GEOM_DATA="${REPO}/artifacts/statistical/datasets/model_input_geometry/phase3-tune-v4-prep/dataset.parquet"
@@ -50,10 +50,9 @@ for tgt in ${TARGETS}; do
     data="$(dataset_for "${tgt}")"
     run_arm "${tgt}" baseline "${data}" \
         BC_DEEP_DISABLE_PRETRAIN=1
-    run_arm "${tgt}" v8 "${data}" \
+    run_arm "${tgt}" pretrained "${data}" \
         BC_PRETRAIN_SKIP_DIM_MISMATCH=1 \
         BC_DEEP_FORCE_EMBED_DIM=128 \
-        BC_DEEP_PRETRAIN_ARTIFACT_OVERRIDE=event_universe_v8 \
         BC_STATS_PUBLISHED_ROOT="${PUB_ROOT}"
 done
 

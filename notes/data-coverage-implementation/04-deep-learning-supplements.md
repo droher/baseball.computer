@@ -3,45 +3,20 @@ title: Deep Learning Supplements For Imputation
 type: design-doc
 status: draft
 audience: humans-and-agents
-last-verified: 2026-05-16
+last-verified: 2026-05-17
 ---
 
 # Deep Learning Supplements For Imputation
 
-## Phase-3 v6 rearchitecture (2026-05-16)
+## Implementation invariants
 
-This document predates the v6 rearchitecture and remains the
-canonical design intent. Three invariants now constrain every
-DL supplement registered under
-`bc/python_models/statistical/deep/targets/`:
+Three invariants constrain every DL supplement registered under `bc/python_models/statistical/deep/targets/`:
 
-1. **Pre-event input layouts only.** The `FeatureLayout` for each
-   spec may contain only features observable at inference time. Post-
-   event / outcome-correlated columns are forbidden — see
-   [`bc/python_models/statistical/CLAUDE.md`](../../bc/python_models/statistical/CLAUDE.md#phase-3-v6-invariants)
-   and the deny-list in `feature_layout.validate_pre_event`. v5's
-   trajectory model included `fielder_chain` and shortcuts to it
-   (perm-imp Δ_CE +1.16); the model never learned entity priors, and
-   v5 acceptance gates missed. v6 strips the layouts and the trajectory
-   batter signal rebounds from +0.015 → +0.053.
-2. **Non-redundant pretrain pretext heads.** v6 pretrain ships 11
-   non-redundant heads (`EVENT_UNIVERSE_HEADS_V6`). Drops `result_family`
-   (deterministic 9-class grouping of `pa_result`) and `hit_or_out`
-   (binary derivable from `pa_result`) — both let the trunk reuse
-   `pa_result` statistics instead of forcing entity-embedding signal.
-   Remaining 11 still correlate (e.g. `runs/outs_on_play` with
-   `pa_result`; `batted_location_*` with `trajectory_remapped`;
-   `r1/r2/r3_advancement` with outs/runs) but each carries residual
-   variance the trunk has to learn. Not orthogonal — just
-   no-deterministic-derivation.
-3. **Time-forward gate eval.** Per-supplement acceptance gates
-   (perm-imp Δ_CE per entity, v6-pretrained vs no-pretrain baseline)
-   run on `time_forward_fold = 'VALIDATE'` (season = 2023). Training
-   still uses `primary_fold` (HASH(game_id)) to maximize data. Gates
-   table: [`phase3-acceptance-gates-v6.md`](phase3-acceptance-gates-v6.md).
+1. **Pre-event input layouts only.** The `FeatureLayout` for each spec contains only features observable at inference time. Post-event / outcome-correlated columns are forbidden. See [`bc/python_models/statistical/CLAUDE.md`](../../bc/python_models/statistical/CLAUDE.md#pretrain-invariants) and the deny-list in `feature_layout.validate_pre_event`. The earlier trajectory model included `fielder_chain` and shortcut to it (perm-imp Δ_CE +1.16); the model never learned entity priors and acceptance gates missed. Stripping the layout lifts the trajectory batter signal from +0.015 to +0.053.
+2. **Non-redundant pretrain pretext heads.** The active pretrain ships 5 imputation-target heads (`trajectory_remapped`, `batted_location_general/depth/edge`, `batted_to_fielder_class`). Fully-observed outcomes (`pa_result`, `outs_on_play_capped`, `runs_on_play_capped`, `r1/r2/r3_advancement`) are inputs, not heads. See [[pretrain-architecture]] for the residual-decomposition fit.
+3. **Time-forward gate eval.** Per-supplement acceptance gates (perm-imp Δ_CE per entity, pretrained vs no-pretrain baseline) run on `time_forward_fold = 'VALIDATE'` (season = 2023). Training still uses `primary_fold` (HASH(game_id)) to maximize data. Gates table: [`phase3-acceptance-gates-v6.md`](phase3-acceptance-gates-v6.md) (filename label is incidental).
 
-`park_factors` and `run_values` remain Phase-4 hierarchical-Bayes
-targets, not DL specs, per §"Where Deep Learning Helps" below.
+`park_factors` and `run_values` remain Phase-4 hierarchical-Bayes targets, not DL specs, per §"Where Deep Learning Helps" below. Fielding-credit DL allocation and pitch-summary DL imputation also moved to Phase 4+; the `batted_to_fielder_class` pretrain head stays as auxiliary signal for the location heads.
 
 ## TL;DR
 

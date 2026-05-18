@@ -372,11 +372,11 @@ Purpose: train deep proposal distributions, embeddings, and calibrators on froze
 
 ### Proposal Models
 
-- [x] Train geometry proposal distributions. (5 DeepTargetSpec registered in `deep/targets/geometry.py`; production fits pending bc_dev.db plan + `just fit-deep`.)
-- [ ] Train handler proposal distributions if EDA shows they add calibrated value. (Deferred; not in PR3 scope.)
-- [ ] Train advancement proposal distributions only after geometry inputs exist. (Spec registration deferred — `model_input_advancement` target column needs re-scoping; sibling manifest stub in place.)
-- [x] Train pitch-summary proposal distributions after pitch coverage datasets exist. (`deep/targets/pitch_summary.py` registers `has_count` binary spec; production fits pending.)
-- [x] Keep fielding-credit deep proposals diagnostic or weakly weighted unless they pass conservation and leakage checks. (3 specs in `deep/targets/fielding_credit.py` route to `dl_credit_proposal_manifest`; full eligibility-mask fold-runner work documented as follow-up in `phase3-exit-deep-gates.md`.)
+- [x] Train geometry proposal distributions. (4 `DeepTargetSpec`s registered in `deep/targets/geometry.py`: trajectory, location_side, location_depth, location_edge. `geometry_region` dropped — upstream `event_observation_geometry` never emitted the dim.)
+- [ ] Train handler proposal distributions if EDA shows they add calibrated value. (Deferred.)
+- [ ] Train advancement proposal distributions only after geometry inputs exist. (Spec registration deferred — `model_input_advancement` lacks `advancement_class` + `time_forward_fold`. Sibling manifest stub in place.)
+- [ ] Train pitch-summary proposal distributions. (Spec + layout in tree behind `BC_DEEP_REGISTER_PITCH_SUMMARY`. Dropped from Phase 3 scope; pitch-completeness imputation lives in Phase 4+.)
+- [ ] Keep fielding-credit deep proposals diagnostic or weakly weighted unless they pass conservation and leakage checks. (DL fielding-credit dropped from Phase 3 scope — spatial-allocation task that doesn't benefit from shared player embeddings. `dl_credit_proposal_manifest` stays as a zero-row stub; Phase-4 hierarchical Bayes owns it.)
 
 ### Embeddings
 

@@ -11,6 +11,3 @@ from python_models.statistical.deep.targets import (
     advancement as _advancement,  # noqa: F401
 )
 from python_models.statistical.deep.targets import geometry as _geometry  # noqa: F401
-from python_models.statistical.deep.targets import (
-    pitch_summary as _pitch_summary,  # noqa: F401
-)

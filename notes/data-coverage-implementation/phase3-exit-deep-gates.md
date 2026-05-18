@@ -1,34 +1,33 @@
 ---
-title: Phase 3 Exit — Deep Learning Supplements (v6)
+title: Phase 3 Exit — Deep Learning Supplements
 type: phase-exit-summary
 status: in-flight
 audience: humans-and-agents
-last-verified: 2026-05-16
+last-verified: 2026-05-17
 ---
 
-# Phase 3 Exit — Deep Learning Supplements (v6)
+# Phase 3 Exit — Deep Learning Supplements
 
-Phase-3 ships every DL supplement on **inference-aligned inputs** and
+Phase-3 ships every DL supplement on inference-aligned inputs and
 warms each per-target Embedding from a shared `event_universe`
-pretrain. v6 is the rearchitecture that replaces v5 after the v5 A8
-ablation winner failed the trajectory entity gates because the
-trajectory input layout included post-event columns
-(`fielder_chain`, `pa_result`, etc.) — the model shortcuts to those and
-never has to learn entity priors. v6 closes the leak across every
-supplement.
+residual-decomposition pretrain. Stage-1 fits a context-only
+spec; offsets are emitted per head; stage-2 fits the full layout
+(with `('player', ('batter_id', 'pitcher_id'))` embedding group plus
+ungrouped `park_id` / `scorer`) on the residual.
 
-## What changed vs v5
+## Scope
 
-| Surface | v5 | v6 |
-| --- | --- | --- |
-| Trajectory layout | Includes `fielder_chain`, `pa_result`, `batted_to_fielder*`, `outs_on_play*` | Pre-event only |
-| Pitch_summary LOW_CARD | + `result_family` | Pre-event only |
-| Fielding_credit LOW_CARD | + `gap_class`, `fielding_evidence_status` | Pre-event only |
-| Pretrain pretext heads | 3 (`pa_result`, `hit_or_out`, `trajectory_remapped`) in `EVENT_UNIVERSE_HEADS`; OR 13 in `EVENT_UNIVERSE_HEADS_V4` | 11 non-redundant (`EVENT_UNIVERSE_HEADS_V6`) — drops `result_family` and `hit_or_out` (both deterministic from `pa_result`); remaining 11 still correlate but each adds residual variance |
-| Hard-head EarlyStopping watchlist | `(pa_result, trajectory_remapped, hit_or_out)` | `(pa_result, trajectory_remapped, batted_to_fielder_class)` — replaces deterministic-from-pa_result watcher with a non-derivable one |
-| `validate_pre_event` deny-list | absent | `feature_layout.validate_pre_event(layout)` called from every `_register()` |
-| Acceptance gate slice | `primary_fold` (HASH(game_id)) | `time_forward_fold` (season=2023) |
-| Advancement spec | not registered | 3 per-runner specs registered (fit pending dataset gap) |
+| Surface | Phase 3 |
+| --- | --- |
+| Pretrain architecture | residual decomposition: stage-1 context-only logits → stage-2 full layout fits the residual via cached offset inputs |
+| Pretrain inputs | pre-event context + observed-outcome columns (`pa_result`, `outs_on_play_capped`, `runs_on_play_capped`, `r1/r2/r3_advancement`); pretrain layout is intentionally exempt from `validate_pre_event` |
+| Pretrain heads | 5 imputation targets: `trajectory_remapped`, `batted_location_general`, `batted_location_depth`, `batted_location_edge`, `batted_to_fielder_class` |
+| Pretrain row filter | `pa_result IN (11 batted-ball outcomes)` |
+| Training labels (downstream + heads) | `observed_status = 'observed'` only — no heuristic deductions in DL training-label path |
+| Pitch-summary DL | dropped — `has_count` + `has_pitch_sequence` + per-stream dims move to Phase 4+ |
+| Fielding-credit DL | dropped — `dl_credit_proposal_manifest` materializes as zero-row stub; Phase-4 hierarchical Bayes owns spatial allocation. `batted_to_fielder_class` remains as an auxiliary pretrain head |
+| Advancement DL | deferred — `model_input_advancement` lacks `advancement_class` + `time_forward_fold` columns. Specs defined in tree but not registered on import |
+| Active downstream supplements | trajectory + 3 location dims (4 specs total) |
 
 ## Acceptance criteria
 
@@ -37,41 +36,45 @@ supplement.
 | 1 | OOF predictions present for every training row | scaffolding ready | `deep/training.run_target()` |
 | 2 | Calibration passes by slice (era / scorer / source / hit-vs-out / missingness) | calibrator wrappers shipped | `deep/calibrators.py` |
 | 3 | Probability vectors normalize within key/class groups | validator shipped | `validate.py:_check_probability_normalization` |
-| 4 | Personnel + structural masks applied before fielding proposals | filter_predicate enforces `eligible_for_allocation` | `deep/targets/fielding_credit.py` |
+| 4 | Personnel + structural masks applied before fielding proposals | N/A (fielding-credit DL out of scope) | `deep/targets/fielding_credit.py` |
 | 5 | Embedding probes documented and per-source-family AUC recorded | probe shipped | `deep/leakage_probes.source_probe_held_out` |
 | 6 | Baseline (deterministic geometry rule) log-loss/Brier comparison | hook present | `validate.py:_compare_against_baseline` |
 | 7 | No SQL artifact exposes only argmax | guarded | `dl_p_class DOUBLE[]` across model_input views; `validate.py:_check_deep_schema` |
-| 8 | **v6: every supplement layout is pre-event** | enforced at registration | `feature_layout.validate_pre_event` + `bc/tests/statistical/deep/test_pre_event_layout.py` |
-| 9 | **v6: pretrain heads non-redundant (no deterministic derivation between heads)** | enforced at registration | `bc/tests/statistical/deep/test_pretrain_heads_v6.py` |
-| 10 | **v6: per-supplement entity Δ_CE ratio ≥ ×1.5 batter/scorer, no regress park/pitcher** | per supplement | [`phase3-acceptance-gates-v6.md`](phase3-acceptance-gates-v6.md) |
+| 8 | Every supplement layout is pre-event | enforced at registration | `feature_layout.validate_pre_event` + `bc/tests/statistical/deep/test_pre_event_layout.py` |
+| 9 | Pretrain heads non-redundant | enforced by spec | `bc/tests/statistical/deep/test_pretrain_layout.py` |
+| 10 | Per-supplement entity Δ_CE ratio ≥ ×1.5 batter/scorer, no regress park/pitcher | per supplement | [`phase3-acceptance-gates-v6.md`](phase3-acceptance-gates-v6.md) |
 
 ## How to evaluate
 
 ```sh
-# 1. Verify every layout passes pre-event validation
+# 1. Verify layouts + pretrain spec contracts
 PYTHONPATH=$(pwd)/bc uv run --group ml pytest \
     bc/tests/statistical/deep/test_pre_event_layout.py \
-    bc/tests/statistical/deep/test_pretrain_heads_v6.py \
+    bc/tests/statistical/deep/test_pretrain_layout.py \
     bc/tests/statistical/deep/test_advancement_targets.py
 
-# 2. v6 pretrain sidecar
-PYTHONPATH=$(pwd)/bc BC_DB_PATH=$(pwd)/bc_dev.db \
-    uv run --group ml python scripts/pretrain_eval_pretrain.py phase3-pretrain-v6
+# 2. Per-supplement gates (after the publish cascade)
+just validate-artifact phase3-trajectory-v8
+just validate-artifact phase3-location-side-v8
+just validate-artifact phase3-location-depth-v8
+just validate-artifact phase3-location-edge-v8
 
-# 3. Per-supplement gates (after each supplement re-fit)
-just validate-artifact phase3-trajectory-v6
-just validate-artifact phase3-pitch-summary-v6
-just validate-artifact phase3-fc-putout-v6
-just validate-artifact phase3-fc-assist-v6
-just validate-artifact phase3-fc-error-v6
+# 3. Exit-gate aggregator (must exit 0)
+BC_STATS_PUBLISHED_ROOT=$(pwd)/artifacts/statistical/published-data_coverage/ \
+    PYTHONPATH=$(pwd)/bc \
+    uv run --group ml python scripts/check_phase3_exit.py
 ```
+
+The active pretrain pointer at
+`artifacts/statistical/published-data_coverage/pretrain/event_universe.json`
+resolves `event_universe` to `phase3-pretrain-clean`. Downstream
+`pretrained_embeddings_artifact_id="event_universe"` resolves directly
+— no `BC_DEEP_PRETRAIN_ARTIFACT_OVERRIDE` needed.
 
 ## Open follow-ups
 
-See [`notes/followups.md` → Phase-3 v6 rearchitecture
-follow-ups](../followups.md#phase-3-v6-rearchitecture-follow-ups) for:
+See `notes/followups.md`:
 
 - `model_input_advancement` SQL gaps blocking advancement fits.
 - Park-factors / run-values stay in Phase 4 (Bayes), not DL.
-- Per-supplement gate measurements pending v6 publish + supplement
-  refit cascade.
+- Pitch-summary DL + fielding-credit DL re-evaluation in Phase 4+.

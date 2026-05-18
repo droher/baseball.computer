@@ -3,9 +3,9 @@
 Grain ``(event_key, player_id, fielding_position, credit_type)``.
 Consumed by ``main_models.model_input_fielding_credit``'s LEFT JOIN.
 
-PR3 ships this as a zero-row fallback; PR5 (fielding-credit proposals)
-replaces the body with the real iteration over published credit
-artifacts.
+Zero-row stub. Fielding-credit DL allocation is out of Phase-3 scope;
+Phase-4 hierarchical Bayes owns spatial allocation. The stub keeps the
+typed schema visible to downstream LEFT JOINs.
 """
 
 from __future__ import annotations
@@ -45,8 +45,8 @@ _AUDITS = [
     audits=_AUDITS,
     description=(
         "DL credit-proposal manifest (grain: event_key x player_id x "
-        "fielding_position x credit_type). PR3 zero-row fallback; PR5 wires "
-        "real per-credit-type published artifacts."
+        "fielding_position x credit_type). Zero-row stub; fielding-credit "
+        "DL is out of Phase-3 scope (Phase-4 Bayes owns spatial allocation)."
     ),
 )
 def execute(context: ExecutionContext, **kwargs: t.Any) -> pl.DataFrame:
@@ -54,7 +54,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> pl.DataFrame:
     import logging
 
     logging.getLogger(__name__).info(
-        "dl_credit_proposal_manifest: PR3 zero-row fallback"
+        "dl_credit_proposal_manifest: zero-row stub (fielding-credit DL out of scope)"
     )
     return pl.DataFrame(
         schema={

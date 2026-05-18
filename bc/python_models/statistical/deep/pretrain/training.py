@@ -35,29 +35,6 @@ from python_models.statistical.deep.pretrain.heads import (
     build_class_labels,
     encode_head,
 )
-from python_models.statistical.deep.pretrain.probes import (
-    build_fielder_slot_probe_inputs,
-    build_fielding_probe_callback,
-    build_mc_probe_inputs,
-    build_mc_slash_probe_callback,
-    build_outfield_arm_probe_callback,
-    build_pa_flags,
-    build_probe_inputs,
-    db_path_for_probe,
-    fielding_probe_enabled,
-    grounder_to_ss_predicate,
-    of_arm_probe_enabled,
-    of_fly_with_runner_predicate,
-    resolve_canonical_ids,
-    resolve_right_fielder_ids,
-    resolve_shortstop_ids,
-    sample_context_row_index,
-    sample_mc_context_indices,
-    slash_probe_enabled,
-)
-from python_models.statistical.deep.pretrain.targets import (
-    ADVANCEMENT_CLASS_LABELS,
-)
 from python_models.statistical.deep.pretrain.spec import HeadSpec, PretrainSpec
 
 _log = logging.getLogger(__name__)
@@ -68,8 +45,8 @@ DEFAULT_KERAS_BATCH_SIZE: int = 2048
 DEFAULT_EARLY_STOPPING_PATIENCE: int = 5
 OFFSET_COL_PREFIX: str = "__off_"
 HARD_HEAD_NAMES: tuple[str, ...] = (
-    "pa_result",
     "trajectory_remapped",
+    "batted_location_general",
     "batted_to_fielder_class",
 )
 
@@ -179,29 +156,6 @@ def _apply_all_remaps(
     for head in head_specs:
         out = apply_target_remap(out, head)
     return out
-
-
-def _load_pa_seed_rows() -> list[dict[str, Any]]:
-    """Load ``seed_plate_appearance_result_types.csv`` rows for probe flags."""
-    import csv
-
-    repo_root = Path(__file__).resolve().parents[5]
-    seed_path = (
-        repo_root
-        / "bc"
-        / "seeds"
-        / "misc"
-        / "seed_plate_appearance_result_types.csv"
-    )
-    if not seed_path.exists():
-        _log.warning("slash_probe seed not found at %s", seed_path)
-        return []
-    rows: list[dict[str, Any]] = []
-    with seed_path.open(encoding="utf-8") as fh:
-        reader = csv.DictReader(fh)
-        for row in reader:
-            rows.append(dict(row))
-    return rows
 
 
 def _offset_logit_cols(head_name: str, num_classes: int) -> tuple[str, ...]:
@@ -393,13 +347,13 @@ def _build_hard_head_callback(
     class HardHeadEarlyStopping(keras.callbacks.Callback):
         """Early-stop on the weighted mean of hard-head val accuracies.
 
-        Hard heads = the head-specs whose accuracy we treat as the primary
-        signal for embedding quality. ``val_loss`` is dominated by easier
-        heads (binary hit_or_out) under uncertainty weighting, so it stops
-        too early; this callback watches the hard heads directly. When
-        ``best_save_path`` is set, the full Keras model is also written to
-        disk whenever a new best score is observed, so a mid-fit process
-        crash still leaves the best checkpoint behind.
+        Hard heads = head-specs whose accuracy is the primary signal for
+        embedding quality. ``val_loss`` under uncertainty weighting is
+        dominated by easier heads and stops too early; this callback
+        watches the hard heads directly. When ``best_save_path`` is set,
+        the full Keras model is written to disk whenever a new best score
+        is observed, so a mid-fit process crash leaves the best checkpoint
+        behind.
         """
 
         def __init__(self) -> None:
@@ -734,138 +688,9 @@ def run_pretrain(
     head_loss_fns = dict(model._head_loss_fns)
     head_metric_objs = {k: list(v) for k, v in model._head_metric_objs.items()}
 
-    slash_probe_cb: Any | None = None
-    if slash_probe_enabled():
-        db_path = db_path_for_probe()
-        if db_path is None:
-            _log.warning("BC_PRETRAIN_SLASH_PROBE=1 but BC_DB_PATH unset; skipping probe")
-        else:
-            try:
-                probe_rows = resolve_canonical_ids(db_path)
-            except Exception as exc:  # pragma: no cover — defensive
-                _log.warning("slash_probe roster resolve failed: %s", exc)
-                probe_rows = ()
-            pa_labels = head_class_labels.get("pa_result", ())
-            if probe_rows and pa_labels:
-                seed_rows = _load_pa_seed_rows()
-                pa_flags = build_pa_flags(pa_labels, seed_rows)
-                vocab_lookup = {
-                    name: {val: i + 1 for i, val in enumerate(vocab.values)}
-                    for name, vocab in vocabularies.items()
-                }
-                n_ctx_env = int(os.environ.get("BC_PRETRAIN_SLASH_PROBE_CONTEXTS", "256"))
-                mc_ctx = sample_mc_context_indices(
-                    train_df, n_contexts=n_ctx_env, seed=0
-                )
-                if mc_ctx is None or mc_ctx.size == 0:
-                    _log.warning("slash_probe: MC context sample empty; skipping probe")
-                else:
-                    probe_x = build_mc_probe_inputs(
-                        layout=layout,
-                        panel_rows=probe_rows,
-                        encoded_train=train_x,
-                        context_indices=mc_ctx,
-                        vocab_lookup=vocab_lookup,
-                    )
-                    slash_probe_cb = build_mc_slash_probe_callback(
-                        panel_rows=probe_rows,
-                        probe_x=probe_x,
-                        n_contexts=int(mc_ctx.size),
-                        pa_flags=pa_flags,
-                    )
-
     base_extras: tuple[Any, ...] = tuple(extra_callbacks)
     metric_log_cbs = _build_metric_log_callback(artifact_dir / "training_metrics.csv")
     base_extras = (*metric_log_cbs, *base_extras)
-    if slash_probe_cb is not None:
-        base_extras = (*base_extras, slash_probe_cb)
-
-    vocab_lookup_shared: dict[str, dict[str, int]] = {
-        name: {val: i + 1 for i, val in enumerate(vocab.values)}
-        for name, vocab in vocabularies.items()
-    }
-
-    if fielding_probe_enabled():
-        db_path = db_path_for_probe()
-        if db_path is None:
-            _log.warning(
-                "BC_PRETRAIN_FIELDING_PROBE=1 but BC_DB_PATH unset; skipping probe"
-            )
-        elif "fielder_pos_6" not in layout.high_card_columns:
-            _log.warning(
-                "fielding_probe: fielder_pos_6 not in high_card_columns; skipping"
-            )
-        else:
-            try:
-                ss_rows = resolve_shortstop_ids(db_path)
-            except Exception as exc:  # pragma: no cover — defensive
-                _log.warning("fielding_probe roster resolve failed: %s", exc)
-                ss_rows = ()
-            ctx_idx = sample_context_row_index(
-                train_df,
-                predicate=grounder_to_ss_predicate(),
-                label="fielding_probe",
-                seed=0,
-            )
-            if ss_rows and ctx_idx is not None:
-                fielding_probe_x = build_fielder_slot_probe_inputs(
-                    layout=layout,
-                    probe_rows=ss_rows,
-                    encoded_train=train_x,
-                    slot_column="fielder_pos_6",
-                    vocab_lookup=vocab_lookup_shared,
-                    context_row_index=ctx_idx,
-                )
-                fielding_probe_cb = build_fielding_probe_callback(
-                    probe_rows=ss_rows,
-                    probe_x=fielding_probe_x,
-                )
-                base_extras = (*base_extras, fielding_probe_cb)
-
-    if of_arm_probe_enabled():
-        db_path = db_path_for_probe()
-        if db_path is None:
-            _log.warning(
-                "BC_PRETRAIN_OF_ARM_PROBE=1 but BC_DB_PATH unset; skipping probe"
-            )
-        elif "fielder_pos_9" not in layout.high_card_columns:
-            _log.warning(
-                "of_arm_probe: fielder_pos_9 not in high_card_columns; skipping"
-            )
-        elif "r1_advancement" not in head_class_labels:
-            _log.warning(
-                "of_arm_probe: r1_advancement head missing from spec; skipping"
-            )
-        else:
-            try:
-                rf_rows = resolve_right_fielder_ids(db_path)
-            except Exception as exc:  # pragma: no cover — defensive
-                _log.warning("of_arm_probe roster resolve failed: %s", exc)
-                rf_rows = ()
-            ctx_idx = sample_context_row_index(
-                train_df,
-                predicate=of_fly_with_runner_predicate(),
-                label="of_arm_probe",
-                seed=1,
-            )
-            if rf_rows and ctx_idx is not None:
-                of_arm_probe_x = build_fielder_slot_probe_inputs(
-                    layout=layout,
-                    probe_rows=rf_rows,
-                    encoded_train=train_x,
-                    slot_column="fielder_pos_9",
-                    vocab_lookup=vocab_lookup_shared,
-                    context_row_index=ctx_idx,
-                )
-                adv_labels = head_class_labels.get(
-                    "r1_advancement", ADVANCEMENT_CLASS_LABELS
-                )
-                of_arm_probe_cb = build_outfield_arm_probe_callback(
-                    probe_rows=rf_rows,
-                    probe_x=of_arm_probe_x,
-                    advancement_class_labels=adv_labels,
-                )
-                base_extras = (*base_extras, of_arm_probe_cb)
 
     use_vicreg = os.environ.get("BC_PRETRAIN_USE_VICREG", "0") in ("1", "true", "TRUE")
     use_siglip = os.environ.get("BC_PRETRAIN_USE_SIGLIP", "0") in ("1", "true", "TRUE")
