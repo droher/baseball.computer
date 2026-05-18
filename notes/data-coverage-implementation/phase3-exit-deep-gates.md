@@ -1,7 +1,7 @@
 ---
 title: Phase 3 Exit — Deep Learning Supplements
 type: phase-exit-summary
-status: in-flight
+status: closed
 audience: humans-and-agents
 last-verified: 2026-05-17
 ---
