@@ -6,13 +6,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda", "pretrain"]
 ValidationStatus = Literal["passed", "failed", "exploratory"]
 AblationStatus = Literal["gamma_dl_zero", "gamma_dl_shrunk", "not_applicable"]
 DiagnosticStatus = Literal["passed", "warn", "failed"]
 FindingSeverity = Literal["block", "warn", "info"]
+GammaDlFlavor = Literal["gamma_dl_zero", "gamma_dl_shrunk"]
 BlockingCode = Literal[
     "source_family_block_as_event_missing",
     "dominant_single_scorer_park_team",
@@ -22,6 +23,67 @@ BlockingCode = Literal[
     "category_absent_in_train_present_in_test",
     "constraint_violation_in_dataset",
 ]
+
+
+class BayesPriorConfig(BaseModel):
+    alpha_loc: float = 0.0
+    alpha_scale: float = 1.5
+    sigma_season_scale: float = 0.5
+    sigma_scorer_scale: float = 0.7
+    sigma_source_scale: float = 0.7
+    gamma_dl_loc: float = 0.0
+    gamma_dl_scale: float = 0.5
+
+
+class BayesSamplerConfig(BaseModel):
+    draws: int
+    tune: int
+    chains: int
+    target_accept: float
+    random_seed: int
+    is_smoke: bool = False
+    backend: str = "pymc"
+
+
+class BayesPosteriorRow(BaseModel):
+    variable: str
+    coord_label: str | None = None
+    mean: float
+    sd: float
+    hdi_lower: float
+    hdi_upper: float
+    ess_bulk: float
+    ess_tail: float
+    rhat: float
+
+
+class BayesPosteriorSummary(BaseModel):
+    rows: tuple[BayesPosteriorRow, ...] = ()
+
+
+class BayesDiagnosticsSummary(BaseModel):
+    rhat_max: float
+    ess_bulk_min: float
+    ess_tail_min: float
+    divergences: int
+    total_draws: int
+    calibration_ece: float | None = None
+    posterior_predictive_max_bucket_dev: float | None = None
+    diagnostics: tuple["Diagnostic", ...] = ()
+
+
+class BayesArtifactExtras(BaseModel):
+    model_name: str
+    model_version: str
+    dimension: str | None = None
+    gamma_dl_flavor: GammaDlFlavor = "gamma_dl_zero"
+    prior_config: BayesPriorConfig
+    sampler_config: BayesSamplerConfig
+    posterior_summary: BayesPosteriorSummary = BayesPosteriorSummary()
+    diagnostics_summary: BayesDiagnosticsSummary
+    ablation_status: AblationStatus = "gamma_dl_zero"
+    dl_proposal_inputs: tuple[str, ...] = ()
+    inference_files: dict[str, Path] = Field(default_factory=dict)
 
 
 class ArtifactManifest(BaseModel):
@@ -42,6 +104,13 @@ class ArtifactManifest(BaseModel):
     ablation_status: AblationStatus = "not_applicable"
     blocking_findings: tuple[str, ...] = ()
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    bayes_extras: BayesArtifactExtras | None = None
+
+    @model_validator(mode="after")
+    def _bayes_extras_required_for_bayes_kind(self) -> "ArtifactManifest":
+        if self.kind == "bayes" and self.bayes_extras is None:
+            raise ValueError("ArtifactManifest with kind='bayes' must set bayes_extras")
+        return self
 
 
 class DatasetColumn(BaseModel):
@@ -138,3 +207,8 @@ class ValidationReport(BaseModel):
     metrics: dict[str, float | int] = Field(default_factory=dict)
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
     generated_at: datetime
+
+
+_ = BayesDiagnosticsSummary.model_rebuild()
+_ = BayesArtifactExtras.model_rebuild()
+_ = ArtifactManifest.model_rebuild()

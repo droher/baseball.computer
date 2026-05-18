@@ -4,7 +4,7 @@ Owns Phase 0–5 of the data-coverage initiative (`notes/data-coverage-implement
 
 ## Layout
 
-- `cli.py` — `bc-stats` CLI. Subcommands: `prepare-dataset`, `run-eda`, `check-split-leakage`, `check-publication-gate`, `fit-deep`, `fit-pretrain`, `publish-pretrain`, `publish-manifest`, `validate`. The fit-deep handler lazy-imports keras inside the function body so `bc-stats --help` stays Torch-free.
+- `cli.py` — `bc-stats` CLI. Subcommands: `prepare-dataset`, `run-eda`, `check-split-leakage`, `check-publication-gate`, `fit-deep`, `fit-pretrain`, `fit-bayes`, `publish-pretrain`, `publish-manifest`, `validate`. The fit-deep handler lazy-imports keras and the fit-bayes handler lazy-imports pymc inside the function body so `bc-stats --help` stays Torch- and PyMC-free.
 - `dataset_registry.py` — per-dataset metadata for the seven `main_models.model_input_*` views. `dataset_version="0.2.0"` after the PR that flipped `dl_p_class` to `DOUBLE[]`.
 - `datasets.py` / `eda.py` — Phase-2 snapshot + EDA producers.
 - `model_config.py` / `publication.py` — Phase-2 publication gate.
@@ -16,6 +16,15 @@ Owns Phase 0–5 of the data-coverage initiative (`notes/data-coverage-implement
 - `splits.py` — `game_hash_fold(game_id, fold_count)` BLAKE2s splits.
 - `leakage.py` — split-registry leakage detection.
 - `outputs.py` / `diagnostics.py` — Phase-4/5 hooks (mostly stubs).
+- `bayes/` — Phase-4 hierarchical-Bayes runtime. `artifacts.py` lays out `artifacts/statistical/bayes/<model_name>/<artifact_id>/{inference,exports,validation,manifest.json}`. `training.py` exposes `run_bayes_model(...)` which builds inputs via `models/_data.prepare_observation_inputs`, samples prior predictive, NUTS posterior (unless `prior_only`), and posterior predictive, then writes `inference/*.nc`, `exports/{posterior_summary,calibration_curve}.parquet`, and `validation/diagnostics.json` atomically. PR1 dispatches `trajectory_observedness` only; PR2 covers the remaining 3 dims and the `gamma_dl_shrunk` flavor.
+- `models/observation.py` — PyMC `build_trajectory_observedness_model(inputs)` (non-centered season/scorer/source intercepts, `gamma_dl=0` frozen, `dl_logit` carried as `pm.Data` to match the PR2 shrunk path). Other three observedness builders raise `NotImplementedError` until PR2. `models/_data.ObservationModelInputs` is a frozen Pydantic model carrying numpy index arrays + label coords.
+- `pymc_utils.py` — `SamplingConfig` + `SMOKE_CONFIG`/`DEFAULT_CONFIG` + `sample_model`/`prior_predictive`/`posterior_predictive`. Imports PyMC and ArviZ at module top; the module is itself lazy-imported by the CLI handler.
+
+### Bayes smoke loop
+
+- `just fit-bayes <model> <dataset-artifact-id> <fit-artifact-id> --smoke` runs `SMOKE_CONFIG` (50 draws × 50 tune × 2 chains) and applies the default 100k-row subsample. `--prior-only` short-circuits before `pm.sample`. Subsampling uses `df.sample(n=N, seed=20260513)` for reproducibility.
+- `BC_STATS_SMOKE_LIMIT=N` overrides the row count (mirrors `BC_PRETRAIN_DATASET_LIMIT`).
+- `validate-artifact <id>` dispatches on `manifest.kind == "bayes"` to thresholds in `validate._validate_bayes`: smoke gates (`rhat_max ≤ 1.5`, `ess_bulk_min ≥ 10`, `divergences ≤ 5% of total_draws`, ECE/bucket-dev warn-level only — sized to catch *broken NUTS* on SMOKE_CONFIG's 100-draw budget, not slow mixing) vs default gates (`rhat ≤ 1.05`, `ess ≥ 400`, zero divergences). SMOKE_CONFIG samples sequentially (`cores=1`) on macOS to dodge the multiprocess-fork-after-Accelerate hang.
 
 ## Deep package (`deep/`)
 

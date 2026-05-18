@@ -59,7 +59,7 @@ def validate_artifact(
         case "dataset":
             return _validate_dataset(manifest, artifact_dir)
         case "bayes":
-            return _validate_bayes_stub(manifest, artifact_dir)
+            return _validate_bayes(manifest, artifact_dir)
         case other:
             return ValidationReport(
                 artifact_id=manifest.artifact_id,
@@ -88,9 +88,7 @@ def _find_manifest(artifact_id: str, roots: tuple[Path, ...]) -> Path:
     )
 
 
-def _validate_deep(
-    manifest: ArtifactManifest, artifact_dir: Path
-) -> ValidationReport:
+def _validate_deep(manifest: ArtifactManifest, artifact_dir: Path) -> ValidationReport:
     findings: list[ValidationFinding] = []
     metrics: dict[str, float | int] = {}
 
@@ -199,9 +197,7 @@ def _check_probability_normalization(
     if "dl_p_class" not in probs.columns:
         return [], {}
     sums = probs.with_columns(pl.col("dl_p_class").list.sum().alias("_p_sum"))
-    bad = sums.filter(
-        (pl.col("_p_sum") < 1.0 - tol) | (pl.col("_p_sum") > 1.0 + tol)
-    )
+    bad = sums.filter((pl.col("_p_sum") < 1.0 - tol) | (pl.col("_p_sum") > 1.0 + tol))
     n_bad = int(bad.height)
     metrics: dict[str, float | int] = {
         "probability_normalization_violations": n_bad,
@@ -213,9 +209,7 @@ def _check_probability_normalization(
             ValidationFinding(
                 severity="block",
                 code="deep_probability_not_normalized",
-                message=(
-                    f"{n_bad} dl_p_class rows do not sum to 1 within {tol}"
-                ),
+                message=(f"{n_bad} dl_p_class rows do not sum to 1 within {tol}"),
             )
         ],
         metrics,
@@ -304,24 +298,159 @@ def _validate_dataset(
     return _finalize(manifest, findings, metrics)
 
 
-def _validate_bayes_stub(
-    manifest: ArtifactManifest, artifact_dir: Path
-) -> ValidationReport:
-    del artifact_dir
-    return ValidationReport(
-        artifact_id=manifest.artifact_id,
-        kind=manifest.kind,
-        name=manifest.name,
-        status="exploratory",
-        findings=(
+_BAYES_THRESHOLDS_SMOKE: dict[str, float] = {
+    "rhat_max": 1.5,
+    "ess_bulk_min": 10.0,
+    "divergence_fraction": 0.05,
+    "calibration_ece_warn": 0.10,
+    "post_pred_bucket_dev_warn": 0.05,
+}
+
+_BAYES_THRESHOLDS_DEFAULT: dict[str, float] = {
+    "rhat_max": 1.05,
+    "ess_bulk_min": 400.0,
+    "divergence_fraction": 0.0,
+    "calibration_ece_warn": 0.10,
+    "post_pred_bucket_dev_warn": 0.05,
+}
+
+
+def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> ValidationReport:
+    findings: list[ValidationFinding] = []
+    metrics: dict[str, float | int] = {}
+    diagnostics_path = artifact_dir / "validation" / "diagnostics.json"
+    if not diagnostics_path.exists():
+        findings.append(
             ValidationFinding(
-                severity="info",
-                code="bayes_validate_stub",
-                message="Bayes validation lands in Phase 4",
-            ),
-        ),
-        generated_at=datetime.now(tz=timezone.utc),
+                severity="block",
+                code="bayes_missing_diagnostics",
+                message=f"diagnostics.json not found at {diagnostics_path}",
+            )
+        )
+        return _finalize(manifest, findings, metrics)
+
+    import json as _json
+    from typing import cast
+
+    payload: dict[str, object] = cast(
+        dict[str, object], _json.loads(diagnostics_path.read_text(encoding="utf-8"))
     )
+    is_smoke = bool(payload.get("is_smoke", False))
+    thresholds = _BAYES_THRESHOLDS_SMOKE if is_smoke else _BAYES_THRESHOLDS_DEFAULT
+    metrics["is_smoke"] = 1 if is_smoke else 0
+
+    rhat_max_raw = payload.get("rhat_max")
+    ess_bulk_min_raw = payload.get("ess_bulk_min")
+    divergences_raw = payload.get("divergences", 0)
+    total_draws_raw = payload.get("total_draws", 0)
+    calibration_ece_raw = payload.get("calibration_ece")
+    bucket_dev_raw = payload.get("posterior_predictive_max_bucket_dev")
+
+    rhat_max = (
+        float(rhat_max_raw) if isinstance(rhat_max_raw, (int, float)) else float("nan")
+    )
+    ess_bulk_min = (
+        float(ess_bulk_min_raw)
+        if isinstance(ess_bulk_min_raw, (int, float))
+        else float("nan")
+    )
+    divergences = (
+        int(divergences_raw) if isinstance(divergences_raw, (int, float)) else 0
+    )
+    total_draws = (
+        int(total_draws_raw) if isinstance(total_draws_raw, (int, float)) else 0
+    )
+    metrics["rhat_max"] = rhat_max
+    metrics["ess_bulk_min"] = ess_bulk_min
+    metrics["divergences"] = divergences
+    metrics["total_draws"] = total_draws
+
+    rhat_threshold = thresholds["rhat_max"]
+    if not (rhat_max == rhat_max):  # NaN check
+        findings.append(
+            ValidationFinding(
+                severity="warn",
+                code="bayes_high_rhat",
+                message="rhat_max not available in diagnostics.json",
+            )
+        )
+    elif rhat_max > rhat_threshold:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="bayes_high_rhat",
+                message=(
+                    f"rhat_max={rhat_max:.4f} exceeds threshold {rhat_threshold} "
+                    f"(smoke={is_smoke})"
+                ),
+            )
+        )
+
+    ess_threshold = thresholds["ess_bulk_min"]
+    if not (ess_bulk_min == ess_bulk_min):
+        findings.append(
+            ValidationFinding(
+                severity="warn",
+                code="bayes_low_ess",
+                message="ess_bulk_min not available in diagnostics.json",
+            )
+        )
+    elif ess_bulk_min < ess_threshold:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="bayes_low_ess",
+                message=(
+                    f"ess_bulk_min={ess_bulk_min:.1f} below threshold {ess_threshold} "
+                    f"(smoke={is_smoke})"
+                ),
+            )
+        )
+
+    divergence_fraction = thresholds["divergence_fraction"]
+    div_limit = divergence_fraction * total_draws if total_draws > 0 else 0
+    if divergences > div_limit:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="bayes_divergences",
+                message=(
+                    f"divergences={divergences} exceeds limit "
+                    f"{div_limit:.1f} ({divergence_fraction:.0%} of {total_draws})"
+                ),
+            )
+        )
+
+    if isinstance(calibration_ece_raw, (int, float)):
+        metrics["calibration_ece"] = float(calibration_ece_raw)
+        if float(calibration_ece_raw) > thresholds["calibration_ece_warn"]:
+            findings.append(
+                ValidationFinding(
+                    severity="warn",
+                    code="bayes_calibration_ece",
+                    message=(
+                        f"calibration_ece={calibration_ece_raw:.4f} exceeds "
+                        f"warn threshold {thresholds['calibration_ece_warn']}"
+                    ),
+                )
+            )
+
+    if isinstance(bucket_dev_raw, (int, float)):
+        metrics["posterior_predictive_max_bucket_dev"] = float(bucket_dev_raw)
+        if float(bucket_dev_raw) > thresholds["post_pred_bucket_dev_warn"]:
+            findings.append(
+                ValidationFinding(
+                    severity="warn",
+                    code="bayes_post_pred_bucket_dev",
+                    message=(
+                        f"posterior_predictive_max_bucket_dev={bucket_dev_raw:.4f} "
+                        f"exceeds warn threshold "
+                        f"{thresholds['post_pred_bucket_dev_warn']}"
+                    ),
+                )
+            )
+
+    return _finalize(manifest, findings, metrics)
 
 
 def _finalize(

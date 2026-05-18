@@ -203,11 +203,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _ = fit_bayes.add_argument("--model", required=True, help="Bayesian model name.")
     _add_dataset_artifact_arg(fit_bayes)
+    _add_artifact_id_arg(fit_bayes)
     _ = fit_bayes.add_argument(
         "--gamma-dl",
         choices=("zero", "shrunk"),
         default="zero",
-        help="DL covariate ablation flavor.",
+        help="DL covariate ablation flavor. PR1 only supports 'zero'.",
+    )
+    _ = fit_bayes.add_argument(
+        "--smoke",
+        action="store_true",
+        help=(
+            "Use SMOKE_CONFIG sampler (50 draws x 50 tune x 2 chains) "
+            "and apply BC_STATS_SMOKE_LIMIT (default 100k rows)."
+        ),
+    )
+    _ = fit_bayes.add_argument(
+        "--prior-only",
+        action="store_true",
+        help="Short-circuit before pm.sample; emit prior predictive only.",
+    )
+    _ = fit_bayes.add_argument(
+        "--source-snapshot-id",
+        default=None,
+        help=(
+            "Override the source_snapshot_id stamped onto the bayes manifest. "
+            "Defaults to the dataset artifact's source_snapshot_id."
+        ),
+    )
+    _ = fit_bayes.add_argument(
+        "--dataset-output-root",
+        default=None,
+        help="Override the dataset artifact root (defaults to artifacts/statistical/datasets).",
+    )
+    _ = fit_bayes.add_argument(
+        "--output-root",
+        default=None,
+        help="Override the bayes artifact root (defaults to artifacts/statistical/bayes).",
     )
 
     export_sql = subparsers.add_parser(
@@ -498,6 +530,54 @@ def _run_fit_deep(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_fit_bayes(args: argparse.Namespace) -> int:
+    from python_models.statistical.bayes.training import run_bayes_model
+    from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
+    from python_models.statistical.dataset_registry import get_spec as _get_dataset_spec
+    from python_models.statistical.manifests import read_manifest
+
+    dataset_spec = _get_dataset_spec("model_input_observation_batted_ball")
+    dataset_root = (
+        Path(args.dataset_output_root) if args.dataset_output_root else DATASETS_ROOT
+    )
+    dataset_dir = dataset_root / dataset_spec.name / args.dataset_artifact
+    parquet_path = dataset_dir / "dataset.parquet"
+    manifest_path = dataset_dir / "manifest.json"
+    if not parquet_path.exists():
+        raise FileNotFoundError(
+            f"dataset Parquet missing at {parquet_path}; run prepare-dataset first."
+        )
+    if args.source_snapshot_id is not None:
+        source_snapshot_id = str(args.source_snapshot_id)
+    elif manifest_path.exists():
+        source_snapshot_id = read_manifest(manifest_path).source_snapshot_id
+    else:
+        raise FileNotFoundError(
+            f"dataset manifest missing at {manifest_path}; pass --source-snapshot-id to override."
+        )
+
+    output_root = Path(args.output_root) if args.output_root else BAYES_ROOT
+    manifest = run_bayes_model(
+        model_name=str(args.model),
+        dataset_artifact_id=str(args.dataset_artifact),
+        artifact_id=str(args.artifact_id),
+        source_snapshot_id=source_snapshot_id,
+        gamma_dl=str(args.gamma_dl),
+        smoke=bool(args.smoke),
+        prior_only=bool(args.prior_only),
+        artifact_root=output_root,
+        dataset_root=dataset_root,
+    )
+    _log.info(
+        "fit-bayes completed model=%s artifact_id=%s smoke=%s prior_only=%s",
+        manifest.name,
+        manifest.artifact_id,
+        bool(args.smoke),
+        bool(args.prior_only),
+    )
+    return 0
+
+
 def _run_validate(args: argparse.Namespace) -> int:
     import os
     import tempfile
@@ -736,6 +816,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return _run_check_publication_gate(args)
         case "fit-deep":
             return _run_fit_deep(args)
+        case "fit-bayes":
+            return _run_fit_bayes(args)
         case "fit-pretrain":
             return _run_fit_pretrain(args)
         case "publish-manifest":

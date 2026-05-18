@@ -149,6 +149,16 @@ fit-deep TARGET DATASET_ARTIFACT ARTIFACT_ID *ARGS:
     shift 3
     {{ _dev_env }} KERAS_BACKEND=torch BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli fit-deep --target {{ TARGET }} --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} "$@"
 
+# --- Phase 4 hierarchical Bayes ---
+
+# Fit a hierarchical Bayesian model on a frozen modeling-dataset snapshot. Writes
+# artifacts/statistical/bayes/<MODEL>/<ARTIFACT_ID>/{inference,exports,validation,manifest.json}.
+# Usage: just fit-bayes <model> <dataset-artifact-id> <fit-artifact-id> [extra args, e.g. --smoke, --prior-only]
+fit-bayes MODEL DATASET_ARTIFACT ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group stats python -m python_models.statistical.cli fit-bayes --model {{ MODEL }} --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} {{ ARGS }}
+
 # Pretrain shared entity embeddings on a multi-head pretext dataset
 # (default target: event_universe). Writes artifacts/statistical/deep/<TARGET>/<ARTIFACT_ID>/
 # {exports/{embeddings.parquet,vocab.json},manifest.json}.
