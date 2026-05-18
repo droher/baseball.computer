@@ -427,8 +427,8 @@ Each Bayes model is fit twice in two `gamma_dl` ablation flavors: `gamma_dl_zero
 - [ ] Write estimand for each observedness dimension.
 - [ ] Draw missingness DAG for each dimension.
 - [ ] Identify post-treatment variables that cannot enter each model.
-- [ ] Run prior predictive checks.
-- [ ] Run small smoke fit.
+- [x] Run prior predictive checks. (`trajectory_observedness` only; PR1 commit `bfe0650`.)
+- [x] Run small smoke fit. (`trajectory_observedness` only — 100k events × 50 draws × 50 tune × 2 sequential chains; `validate-artifact bayes-smoke-1` → `status=passed`; PR1 commit `bfe0650`. Other 3 dims + `gamma_dl_shrunk` flavor → PR2.)
 - [ ] Run simulated-data recovery where feasible.
 - [ ] Run full fit only after smoke diagnostics pass.
 - [ ] Generate posterior predictive checks by era, source, scorer, result, hit/out, leverage, and team affiliation.

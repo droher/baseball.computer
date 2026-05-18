@@ -69,6 +69,12 @@ Active items the latest pretrain + downstream cascade does not fix:
 - **Pretrain → downstream dim alignment for ungrouped low-card cols.** Geometry fits need `BC_DEEP_FORCE_EMBED_DIM=128` to match the pretrain's capped 128-D player embedding. That forces every target embed layer to 128, including `park_id` (pretrain dim 17) and `scorer` (pretrain dim 95). `set_pretrained_embeddings` falls back to `skipped_dim_mismatch=True` on those, so park / scorer warm-start is lost. Two fixes worth trying: (a) zero-pad pretrain embeddings to the target dim before copy; (b) bake the same embedding-group share pattern into geometry layouts so `park_id` / `scorer` are looked up through the union vocab and dim resolves consistently. Until then, downstream park / scorer signal is whatever the geometry fit alone recovers.
 - **Park-factors / run-values DL specs deferred.** Per `04-deep-learning-supplements.md`, park factors and run values are hierarchical-Bayes territory in Phase 4, not Phase-3 DL targets. Skipped intentionally.
 
+### Phase-4 bayes follow-ups
+
+- **`SamplingConfig.cores=1` is a macOS workaround.** `pm.sample(cores=2)` on the 100k-row `trajectory_observedness` model wedges parent + child workers immediately after the PyTensor compile (fork-after-Accelerate). Sequential sampling adds ~30 s per chain at 100k rows but completes. Revisit when the runner moves off macOS, or swap the NUTS backend to `numpyro` / `nutpie` (which manage their own parallelism) before the full 12M-row fit.
+- **Smoke-gate thresholds are sized for catastrophe detection.** `validate._BAYES_THRESHOLDS_SMOKE` (`rhat ≤ 1.5`, `ess_bulk ≥ 10`) reflect `SMOKE_CONFIG`'s 100 total draws — ess ≥ 100 is structurally unreachable from 100 draws. The smoke gate detects broken sampling (NaN, divergence storm), not slow mixing. Default thresholds (`rhat ≤ 1.05`, `ess_bulk ≥ 400`, zero divergences) apply at production sample sizes.
+- **Aggregated Binomial-per-cell formulation.** doc-03 §943 notes that the 12M event-grain Bernoulli with ~100 distinct scorer × source effects may be the wrong shape for naive NUTS. PR2 should evaluate the aggregated `Binomial(n_cell, p_cell)` parameterization before committing to the 12M-row event-grain fit.
+
 ### Artifact backfill
 
 Six third-wave targets shipped code + tests but their `predictions_*` `@model`s gate on `python_models.ml.artifact_exists(target)`. `enabled=False` until the pin JSON lands. Run the matching `scripts/train_<name>.py --epochs 1 --rows-per-batch 100000` once each to land the artifact JSONs:
