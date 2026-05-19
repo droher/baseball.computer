@@ -85,6 +85,16 @@ class BayesArtifactExtras(BaseModel):
     dl_proposal_inputs: tuple[str, ...] = ()
     inference_files: dict[str, Path] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _ablation_status_matches_flavor(self) -> "BayesArtifactExtras":
+        if self.ablation_status != self.gamma_dl_flavor:
+            raise ValueError(
+                f"ablation_status={self.ablation_status!r} must match gamma_dl_flavor={self.gamma_dl_flavor!r}"
+            )
+        if self.gamma_dl_flavor == "gamma_dl_shrunk" and not self.dl_proposal_inputs:
+            raise ValueError("gamma_dl_shrunk requires at least one dl_proposal_inputs entry")
+        return self
+
 
 class ArtifactManifest(BaseModel):
     artifact_id: str

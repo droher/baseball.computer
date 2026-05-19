@@ -1,17 +1,11 @@
 """End-to-end Bayes fit dispatcher.
 
-PR1 wires a single dispatcher (``run_bayes_model``) that:
-
-1. Loads the dataset Parquet for the named model.
-2. Builds inputs + prior predictive.
-3. Samples (NUTS) unless ``prior_only``.
-4. Generates posterior predictive draws.
-5. Computes posterior summary, calibration curve, diagnostics summary.
-6. Writes ``inference/*.nc``, ``exports/*.parquet``, ``validation/diagnostics.json``,
-   ``manifest.json`` atomically.
-
-Only ``trajectory_observedness`` resolves in PR1; other model names raise
-``NotImplementedError`` until PR2.
+Looks up a registered ``BayesTargetSpec`` by name, prepares observation
+inputs (optionally joining a published DL artifact for the
+``gamma_dl_shrunk`` covariate), samples prior predictive, NUTS posterior
+(unless ``prior_only``), and posterior predictive. Writes
+``inference/*.nc``, ``exports/{posterior_summary,calibration_curve}.parquet``,
+``validation/diagnostics.json``, and the manifest atomically.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnusedCallResult=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false, reportArgumentType=false, reportCallIssue=false
@@ -35,13 +29,18 @@ from python_models.statistical.bayes.artifacts import (
     bayes_inference_dir,
     bayes_validation_dir,
 )
+from python_models.statistical.bayes.registry import get_target
+from python_models.statistical.bayes.specs import BayesTargetSpec
 from python_models.statistical.calibration import (
     expected_calibration_error,
     reliability_curve,
 )
-from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
+from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT, DEEP_ROOT
 from python_models.statistical.manifests import (
+    find_published_manifest,
     package_versions,
+    read_manifest,
+    read_published_pointer,
     utc_now,
     write_manifest,
 )
@@ -49,9 +48,6 @@ from python_models.statistical.models._data import (
     DEFAULT_SEED,
     DEFAULT_SMOKE_LIMIT,
     prepare_observation_inputs,
-)
-from python_models.statistical.models.observation import (
-    build_trajectory_observedness_model,
 )
 from python_models.statistical.outputs import write_parquet_atomic
 from python_models.statistical.pymc_utils import (
@@ -70,15 +66,18 @@ from python_models.statistical.schemas import (
     BayesPosteriorSummary,
     BayesPriorConfig,
     BayesSamplerConfig,
+    GammaDlFlavor,
 )
 
 _log = logging.getLogger(__name__)
 
-MODEL_VERSION: str = "0.1.0"
+MODEL_VERSION: str = "0.2.0"
 
-_DATASET_NAME: str = "model_input_observation_batted_ball"
-_DIMENSION_BY_MODEL: dict[str, str] = {
-    "trajectory_observedness": "trajectory",
+_GAMMA_DL_CLI_TO_FLAVOR: dict[str, GammaDlFlavor] = {
+    "zero": "gamma_dl_zero",
+    "shrunk": "gamma_dl_shrunk",
+    "gamma_dl_zero": "gamma_dl_zero",
+    "gamma_dl_shrunk": "gamma_dl_shrunk",
 }
 
 
@@ -133,12 +132,13 @@ def _resolve_sampler_config(
     )
 
 
-def _build_posterior_summary(idata: az.InferenceData) -> BayesPosteriorSummary:
-    summary_df = az.summary(
-        idata,
-        var_names=["alpha", "sigma_season", "sigma_scorer", "sigma_source"],
-        hdi_prob=0.94,
-    )
+def _build_posterior_summary(
+    idata: az.InferenceData, *, include_gamma_dl: bool
+) -> BayesPosteriorSummary:
+    var_names = ["alpha", "sigma_season", "sigma_scorer", "sigma_source"]
+    if include_gamma_dl:
+        var_names.append("gamma_dl")
+    summary_df = az.summary(idata, var_names=var_names, hdi_prob=0.94)
     rows: list[BayesPosteriorRow] = []
     for variable, row in summary_df.iterrows():
         rows.append(
@@ -279,6 +279,49 @@ def _posterior_summary_dataframe(summary: BayesPosteriorSummary) -> pl.DataFrame
     )
 
 
+def _resolve_dl_artifact_dir(dl_proposal_dimension: str) -> tuple[Path, str]:
+    """Locate the published DL artifact for the named proposal dimension.
+
+    Returns ``(artifact_dir, dl_artifact_id)``. Raises if no published
+    pointer exists — gamma_dl_shrunk needs a real DL artifact.
+    """
+    manifest_name = f"dl_proposal_{dl_proposal_dimension}"
+    pointer_path = find_published_manifest(manifest_name)
+    if pointer_path is None:
+        raise FileNotFoundError(
+            f"no published DL manifest pointer for {manifest_name!r}; "
+            "fit and publish the DL proposal before requesting gamma_dl_shrunk."
+        )
+    pointer = read_published_pointer(pointer_path)
+    manifest_path = Path(pointer.manifest_path)
+    if not manifest_path.exists():
+        for candidate in DEEP_ROOT.rglob(f"{pointer.artifact_id}/manifest.json"):
+            manifest_path = candidate
+            break
+        else:
+            raise FileNotFoundError(
+                f"DL manifest at {pointer.manifest_path} missing and no rglob "
+                f"match for artifact_id={pointer.artifact_id!r} under {DEEP_ROOT}"
+            )
+    manifest = read_manifest(manifest_path)
+    return manifest_path.parent, manifest.artifact_id
+
+
+def _ensure_flavor_supported(
+    spec: BayesTargetSpec, flavor: GammaDlFlavor
+) -> None:
+    if flavor not in spec.default_flavors:
+        raise ValueError(
+            f"bayes target {spec.name!r} does not declare flavor {flavor!r}; "
+            f"supported: {spec.default_flavors}"
+        )
+    if flavor == "gamma_dl_shrunk" and spec.dl_proposal_dimension is None:
+        raise ValueError(
+            f"bayes target {spec.name!r} has dl_proposal_dimension=None; "
+            "gamma_dl_shrunk requires a published DL proposal dimension."
+        )
+
+
 def run_bayes_model(
     *,
     model_name: str,
@@ -293,18 +336,19 @@ def run_bayes_model(
     artifact_root: Path = BAYES_ROOT,
     dataset_root: Path = DATASETS_ROOT,
 ) -> ArtifactManifest:
-    if gamma_dl != "zero":
-        raise NotImplementedError(
-            f"gamma_dl flavor {gamma_dl!r} lands in PR2; PR1 fixes gamma_dl=0"
+    # eager-import target modules so the registry is populated before lookup
+    from python_models.statistical.bayes import targets as _targets  # noqa: F401
+
+    if gamma_dl not in _GAMMA_DL_CLI_TO_FLAVOR:
+        raise ValueError(
+            f"unknown --gamma-dl value {gamma_dl!r}; expected one of {sorted(_GAMMA_DL_CLI_TO_FLAVOR)}"
         )
-    if model_name not in _DIMENSION_BY_MODEL:
-        raise NotImplementedError(
-            f"model_name {model_name!r} not in PR1 scope; available: {sorted(_DIMENSION_BY_MODEL)}"
-        )
-    dimension = _DIMENSION_BY_MODEL[model_name]
+    flavor: GammaDlFlavor = _GAMMA_DL_CLI_TO_FLAVOR[gamma_dl]
+    spec = get_target(model_name)
+    _ensure_flavor_supported(spec, flavor)
 
     dataset_parquet = (
-        dataset_root / _DATASET_NAME / dataset_artifact_id / "dataset.parquet"
+        dataset_root / spec.dataset_name / dataset_artifact_id / "dataset.parquet"
     )
     if not dataset_parquet.exists():
         raise FileNotFoundError(
@@ -318,14 +362,30 @@ def run_bayes_model(
         elif smoke:
             smoke_limit = DEFAULT_SMOKE_LIMIT
 
+    dl_artifact_dir: Path | None = None
+    dl_artifact_ids: tuple[str, ...] = ()
+    if flavor == "gamma_dl_shrunk":
+        assert spec.dl_proposal_dimension is not None
+        dl_artifact_dir, dl_artifact_id = _resolve_dl_artifact_dir(
+            spec.dl_proposal_dimension
+        )
+        dl_artifact_ids = (dl_artifact_id,)
+
     inputs = prepare_observation_inputs(
         dataset_parquet,
-        dimension=dimension,
+        dimension=spec.dataset_dimension_filter,
         smoke_limit=smoke_limit,
         seed=seed,
+        dl_artifact_dir=dl_artifact_dir,
+        dl_class_collapse_positive=spec.dl_class_collapse_positive,
     )
     priors = BayesPriorConfig()
-    model = build_trajectory_observedness_model(inputs, priors=priors)
+    model = spec.builder(
+        inputs,
+        priors=priors,
+        gamma_dl_flavor=flavor,
+        dimension=spec.dimension,
+    )
 
     sampler = _resolve_sampler_config(smoke=smoke, override_seed=seed)
     sampler_record = BayesSamplerConfig(
@@ -343,7 +403,12 @@ def run_bayes_model(
     validation_dir = bayes_validation_dir(model_name, artifact_id, root=artifact_root)
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    _log.info("bayes prior_predictive model=%s artifact=%s", model_name, artifact_id)
+    _log.info(
+        "bayes prior_predictive model=%s artifact=%s flavor=%s",
+        model_name,
+        artifact_id,
+        flavor,
+    )
     prior_idata = prior_predictive(model, sampler)
     prior_path = inference_dir / "prior_predictive.nc"
     _atomic_write_netcdf(prior_idata, prior_path)
@@ -355,7 +420,12 @@ def run_bayes_model(
     posterior_idata: az.InferenceData | None = None
 
     if not prior_only:
-        _log.info("bayes sample model=%s artifact=%s", model_name, artifact_id)
+        _log.info(
+            "bayes sample model=%s artifact=%s flavor=%s",
+            model_name,
+            artifact_id,
+            flavor,
+        )
         posterior_idata = sample_model(model, sampler)
         posterior_path = inference_dir / "posterior.nc"
         _atomic_write_netcdf(posterior_idata, posterior_path)
@@ -372,7 +442,9 @@ def run_bayes_model(
         _atomic_write_netcdf(posterior_idata, pp_path)
         inference_files["posterior_predictive"] = pp_path
 
-        posterior_summary = _build_posterior_summary(posterior_idata)
+        posterior_summary = _build_posterior_summary(
+            posterior_idata, include_gamma_dl=flavor == "gamma_dl_shrunk"
+        )
         p_mean = _posterior_mean_p_observed(posterior_idata)
         y_int = inputs.y.astype(np.int64)
         calibration_ece = expected_calibration_error(p_mean, y_int, n_bins=15)
@@ -422,6 +494,7 @@ def run_bayes_model(
             diagnostics_summary.posterior_predictive_max_bucket_dev
         ),
         "is_smoke": smoke,
+        "gamma_dl_flavor": flavor,
     }
     _atomic_write_text(
         validation_dir / "diagnostics.json",
@@ -431,17 +504,18 @@ def run_bayes_model(
     extras = BayesArtifactExtras(
         model_name=model_name,
         model_version=MODEL_VERSION,
-        dimension=dimension,
-        gamma_dl_flavor="gamma_dl_zero",
+        dimension=spec.dimension,
+        gamma_dl_flavor=flavor,
         prior_config=priors,
         sampler_config=sampler_record,
         posterior_summary=posterior_summary,
         diagnostics_summary=diagnostics_summary,
-        ablation_status="gamma_dl_zero",
-        dl_proposal_inputs=(),
+        ablation_status=flavor,
+        dl_proposal_inputs=dl_artifact_ids,
         inference_files=inference_files,
     )
 
+    input_artifact_ids = (dataset_artifact_id, *dl_artifact_ids)
     manifest = ArtifactManifest(
         artifact_id=artifact_id,
         kind="bayes",
@@ -450,11 +524,11 @@ def run_bayes_model(
         created_at=utc_now(),
         source_snapshot_id=source_snapshot_id,
         dataset_artifact_id=dataset_artifact_id,
-        input_artifact_ids=(dataset_artifact_id,),
+        input_artifact_ids=input_artifact_ids,
         output_paths={k: v for k, v in inference_files.items()},
         package_versions=package_versions(),
         random_seed=sampler.random_seed,
-        ablation_status="gamma_dl_zero",
+        ablation_status=flavor,
         metadata={
             "is_smoke": smoke,
             "prior_only": prior_only,
@@ -466,11 +540,12 @@ def run_bayes_model(
     manifest_path = artifact_dir / "manifest.json"
     write_manifest(manifest, manifest_path)
     _log.info(
-        "bayes fit complete model=%s artifact=%s rows=%d smoke=%s",
+        "bayes fit complete model=%s artifact=%s rows=%d smoke=%s flavor=%s",
         model_name,
         artifact_id,
         int(inputs.y.shape[0]),
         smoke,
+        flavor,
     )
     return manifest
 

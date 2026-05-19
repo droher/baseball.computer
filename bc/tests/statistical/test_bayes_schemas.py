@@ -86,6 +86,42 @@ def test_bayes_manifest_round_trip() -> None:
     assert reloaded.bayes_extras.sampler_config.is_smoke is True
 
 
+def test_bayes_shrunk_round_trip_carries_dl_proposal_inputs() -> None:
+    extras = _make_extras().model_copy(
+        update={
+            "gamma_dl_flavor": "gamma_dl_shrunk",
+            "ablation_status": "gamma_dl_shrunk",
+            "dl_proposal_inputs": ("phase3-trajectory-v8",),
+        }
+    )
+    manifest = _make_manifest(extras=extras)
+    payload = manifest.model_dump_json()
+    reloaded = ArtifactManifest.model_validate_json(payload)
+    assert reloaded.bayes_extras is not None
+    assert reloaded.bayes_extras.gamma_dl_flavor == "gamma_dl_shrunk"
+    assert reloaded.bayes_extras.dl_proposal_inputs == ("phase3-trajectory-v8",)
+
+
+def test_bayes_extras_rejects_flavor_status_mismatch() -> None:
+    from python_models.statistical.schemas import BayesArtifactExtras
+
+    payload = _make_extras().model_dump()
+    payload["ablation_status"] = "gamma_dl_shrunk"
+    with pytest.raises(ValidationError):
+        _ = BayesArtifactExtras.model_validate(payload)
+
+
+def test_bayes_extras_rejects_shrunk_without_dl_inputs() -> None:
+    from python_models.statistical.schemas import BayesArtifactExtras
+
+    payload = _make_extras().model_dump()
+    payload["gamma_dl_flavor"] = "gamma_dl_shrunk"
+    payload["ablation_status"] = "gamma_dl_shrunk"
+    payload["dl_proposal_inputs"] = ()
+    with pytest.raises(ValidationError):
+        _ = BayesArtifactExtras.model_validate(payload)
+
+
 def test_bayes_kind_requires_extras() -> None:
     with pytest.raises(ValidationError):
         _ = _make_manifest(extras=None)

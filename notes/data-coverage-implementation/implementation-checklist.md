@@ -419,7 +419,7 @@ Each Bayes model is fit twice in two `gamma_dl` ablation flavors: `gamma_dl_zero
 - [ ] Fit trajectory observedness model.
 - [ ] Fit location side observedness model.
 - [ ] Fit location depth observedness model.
-- [ ] Fit broad ground/air contact observedness model.
+- [ ] Fit broad ground/air contact observedness model. (PR2 commit broadens the smoke-fit runtime to all 4 dims at 100k rows; full fits gate on the PR3 scaling spike.)
 - [ ] Keep detailed fly/line/pop label confusion out of first publication unless broad models calibrate.
 
 #### Statistical Workflow
@@ -427,8 +427,8 @@ Each Bayes model is fit twice in two `gamma_dl` ablation flavors: `gamma_dl_zero
 - [ ] Write estimand for each observedness dimension.
 - [ ] Draw missingness DAG for each dimension.
 - [ ] Identify post-treatment variables that cannot enter each model.
-- [x] Run prior predictive checks. (`trajectory_observedness` only; PR1 commit `bfe0650`.)
-- [x] Run small smoke fit. (`trajectory_observedness` only — 100k events × 50 draws × 50 tune × 2 sequential chains; `validate-artifact bayes-smoke-1` → `status=passed`; PR1 commit `bfe0650`. Other 3 dims + `gamma_dl_shrunk` flavor → PR2.)
+- [x] Run prior predictive checks. (All 4 dims wired through `bayes/targets/observation.py`; PR2 broadens registry + builder dispatch.)
+- [x] Run small smoke fit. (All 4 dims × both `gamma_dl_zero`/`gamma_dl_shrunk` flavors at 100k events × 50 draws × 50 tune × 2 sequential chains via the registry-driven `run_bayes_model`. PR1 commit `bfe0650` shipped `trajectory_observedness` only; PR2 broadens to `location_side` / `location_depth` / `broad_contact` + `gamma_dl_shrunk` via shared `build_observation_model`.)
 - [ ] Run simulated-data recovery where feasible.
 - [ ] Run full fit only after smoke diagnostics pass.
 - [ ] Generate posterior predictive checks by era, source, scorer, result, hit/out, leverage, and team affiliation.
@@ -438,9 +438,9 @@ Each Bayes model is fit twice in two `gamma_dl` ablation flavors: `gamma_dl_zero
 
 #### Gamma_dl Ablation
 
-- [ ] Fit `gamma_dl_zero` flavor of each observation model.
-- [ ] Fit `gamma_dl_shrunk` flavor of each observation model.
-- [ ] Select publication tier per observation model and record it in the manifest.
+- [x] Fit `gamma_dl_zero` flavor of each observation model. (Smoke parity at 100k rows across all 4 dims; PR2.)
+- [x] Fit `gamma_dl_shrunk` flavor of each observation model. (Smoke parity at 100k rows; covariate sourced via `manifests.find_published_manifest("dl_proposal_<dim>")` joined by `event_key`; broad_contact collapses trajectory→AirBall classes. PR2 smoke parity only — full fits gate on PR3 scaling spike.)
+- [ ] Select publication tier per observation model and record it in the manifest. (Comparison utility `bayes/ablation.summarize_random_effect_shift` ships in PR2; the tier selection runs on full-fit posteriors in PR3.)
 
 #### Outputs
 

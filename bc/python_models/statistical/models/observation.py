@@ -1,11 +1,13 @@
-"""Scorer and source-family observation models (A, B).
+"""Scorer and source-family observation models (Model A).
 
-PR1 ships Model A for the trajectory dimension only. Other three
-dimensions (location_side, location_depth, broad_contact) stay
-``NotImplementedError`` until PR2.
+PR2 ships the shared 4-dim builder ``build_observation_model`` covering
+trajectory, location_side, location_depth, and broad_contact dimensions
+in both ``gamma_dl_zero`` and ``gamma_dl_shrunk`` flavors. Prior
+structure (non-centered season/scorer/source random intercepts,
+Bernoulli likelihood on ``is_observed``) is shared across dims.
 """
 
-# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportOperatorIssue=false
+# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportOperatorIssue=false, reportCallIssue=false
 
 from __future__ import annotations
 
@@ -14,15 +16,30 @@ import pymc as pm
 from pymc import math as pmm
 
 from python_models.statistical.models._data import ObservationModelInputs
-from python_models.statistical.schemas import BayesPriorConfig
+from python_models.statistical.schemas import BayesPriorConfig, GammaDlFlavor
 
 
-def build_trajectory_observedness_model(
+def build_observation_model(
     inputs: ObservationModelInputs,
     *,
     priors: BayesPriorConfig | None = None,
+    gamma_dl_flavor: GammaDlFlavor = "gamma_dl_zero",
+    dimension: str = "trajectory",
 ) -> pm.Model:
+    """Construct the Model A observation-propensity PyMC model.
+
+    `gamma_dl_flavor = "gamma_dl_zero"` freezes the DL covariate at zero
+    (``dl_logit`` still carried as ``pm.Data`` so the shrunk path can
+    swap it in without rebuilding). `gamma_dl_flavor = "gamma_dl_shrunk"`
+    samples a scalar `gamma_dl ~ Normal(0, gamma_dl_scale)` and adds
+    ``gamma_dl * dl_logit`` to the linear predictor.
+
+    ``dimension`` is carried for diagnostics only — variable names stay
+    bare so downstream posterior-summary queries (``var_names=["alpha", ...]``)
+    don't need per-dim plumbing.
+    """
     cfg = priors if priors is not None else BayesPriorConfig()
+    _ = dimension
     n_events = int(inputs.y.shape[0])
     coords: dict[str, list[str]] = {
         "event": [str(i) for i in range(n_events)],
@@ -58,14 +75,20 @@ def build_trajectory_observedness_model(
             "beta_source", z_source * sigma_source, dims="source"
         )
 
-        gamma_dl: float = 0.0
+        if gamma_dl_flavor == "gamma_dl_shrunk":
+            gamma_dl = pm.Normal(
+                "gamma_dl", mu=cfg.gamma_dl_loc, sigma=cfg.gamma_dl_scale
+            )
+            dl_term = gamma_dl * dl_logit
+        else:
+            dl_term = 0.0 * dl_logit
 
         eta = (
             alpha
             + beta_season[season_idx]
             + beta_scorer[scorer_idx]
             + beta_source[source_idx]
-            + gamma_dl * dl_logit
+            + dl_term
         )
         p_observed = pm.Deterministic("p_observed", pmm.sigmoid(eta), dims="event")
         _ = pm.Bernoulli("observed", p=p_observed, observed=y, dims="event")
@@ -73,13 +96,15 @@ def build_trajectory_observedness_model(
     return model
 
 
-def build_location_side_observedness_model() -> pm.Model:
-    raise NotImplementedError("location_side observedness lands in PR2")
-
-
-def build_location_depth_observedness_model() -> pm.Model:
-    raise NotImplementedError("location_depth observedness lands in PR2")
-
-
-def build_broad_contact_observedness_model() -> pm.Model:
-    raise NotImplementedError("broad_contact observedness lands in PR2")
+def build_trajectory_observedness_model(
+    inputs: ObservationModelInputs,
+    *,
+    priors: BayesPriorConfig | None = None,
+    gamma_dl_flavor: GammaDlFlavor = "gamma_dl_zero",
+) -> pm.Model:
+    return build_observation_model(
+        inputs,
+        priors=priors,
+        gamma_dl_flavor=gamma_dl_flavor,
+        dimension="trajectory",
+    )

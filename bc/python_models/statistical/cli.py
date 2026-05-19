@@ -208,7 +208,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--gamma-dl",
         choices=("zero", "shrunk"),
         default="zero",
-        help="DL covariate ablation flavor. PR1 only supports 'zero'.",
+        help=(
+            "DL covariate ablation flavor. 'zero' freezes gamma_dl=0; "
+            "'shrunk' samples gamma_dl ~ Normal(0, 0.5) and consumes the "
+            "published DL artifact named by the target's dl_proposal_dimension."
+        ),
     )
     _ = fit_bayes.add_argument(
         "--smoke",
@@ -531,12 +535,15 @@ def _run_fit_deep(args: argparse.Namespace) -> int:
 
 
 def _run_fit_bayes(args: argparse.Namespace) -> int:
+    from python_models.statistical.bayes import targets as _bayes_targets  # noqa: F401
+    from python_models.statistical.bayes.registry import get_target
     from python_models.statistical.bayes.training import run_bayes_model
     from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
     from python_models.statistical.dataset_registry import get_spec as _get_dataset_spec
     from python_models.statistical.manifests import read_manifest
 
-    dataset_spec = _get_dataset_spec("model_input_observation_batted_ball")
+    spec = get_target(str(args.model))
+    dataset_spec = _get_dataset_spec(spec.dataset_name)
     dataset_root = (
         Path(args.dataset_output_root) if args.dataset_output_root else DATASETS_ROOT
     )
