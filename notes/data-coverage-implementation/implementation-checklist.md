@@ -457,9 +457,9 @@ PR3's aggregated `Binomial(n_cell, p_cell)` formulation has been retired. Full 1
 
 - [x] Observation propensities calibrate by key slices. (Posterior-predictive `P̂(observed)` within ±0.05 over `(season_decade, source_family, result_family)` slices with `n_slice ≥ 500`. All 6 dims pass on weighted absolute deviation: trajectory 0.020, location_side 0.016, location_depth 0.011, location_edge 0.014, general_location 0.014, ball_handler_position 0.021. Per-slice pass rates 87-100%; failures concentrated in small `play_by_play × sacrifice` cells and a systematic 1980s `play_by_play × hit` underestimate across 4 dims. Per-dim payload at `<artifact>/validation/calibration_by_slice.json`.)
 - [~] Scorer/source holdouts do not collapse. (Scorer + park holdouts pass via natural unseen-entity events in the 200K OOS pool with population-mean RE substitution: scorer holdout AUC 0.74-0.92 across 6 dims, abs_dev ≤ 0.06; park holdout AUC 0.88-1.00, abs_dev ≤ 0.05. Per-dim `validation/holdouts.json`. Season + source true-holdouts deferred — natural unseen events are zero under the saturated-season filter + single-source production population, would require explicit per-era refits.)
-- [ ] MNAR sensitivity intervals are published for MNAR-prone outputs.
-- [ ] Existing coverage-weighted metrics can be reproduced as a baseline.
-- [ ] Detailed contact normalization remains withheld until broad geometry/contact models calibrate.
+- [~] MNAR sensitivity intervals are published for MNAR-prone outputs. (Deferred to downstream Models B / E. Model A's output `P(observed)` is directly observable, not MNAR-prone. MNAR sensitivity applies when downstream models reweight observed events by `1 / p_observed_mean` to back out a population estimand — that's where MNAR assumptions about the latent value can shift the result.)
+- [~] Existing coverage-weighted metrics can be reproduced as a baseline. (Deferred — no existing coverage-weighted metric model in the SQLMesh tree to reproduce. Pre-Model A aggregates use raw `is_observed` counts (no propensity weighting). IPW-equivalence is implicit in the calibration-by-slice pass at line 458: `mean(p_pred) ≈ mean(is_observed)` per slice ⇒ `Σ 1/p_observed ≈ raw N` per slice. Re-evaluate when a concrete heuristic metric needs reproduction.)
+- [x] Detailed contact normalization remains withheld until broad geometry/contact models calibrate. (Trivially satisfied — Model B does not exist yet; no detailed contact label is being published.)
 
 ### Fielding Credit Allocation (C)
 
