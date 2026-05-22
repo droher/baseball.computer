@@ -668,13 +668,15 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
     found: Path | None = None
     for root in candidate_roots:
         for candidate in root.rglob(f"{artifact_id}/manifest.json"):
+            if candidate.parent.parent.name != model_name:
+                continue
             found = candidate
             break
         if found is not None:
             break
     if found is None:
         raise FileNotFoundError(
-            f"no manifest.json for artifact_id={artifact_id!r} under {[str(r) for r in candidate_roots]}"
+            f"no manifest.json for model={model_name!r} artifact_id={artifact_id!r} under {[str(r) for r in candidate_roots]}"
         )
 
     manifest = read_manifest(found)
