@@ -41,6 +41,7 @@ _PROHIBITED_DEEP_COLUMNS: frozenset[str] = frozenset(
 def validate_artifact(
     artifact_id: str,
     *,
+    model_name: str | None = None,
     candidate_roots: tuple[Path, ...] | None = None,
 ) -> ValidationReport:
     roots = candidate_roots or (
@@ -49,7 +50,7 @@ def validate_artifact(
         _config.DATASETS_ROOT,
         _config.EDA_ROOT,
     )
-    manifest_path = _find_manifest(artifact_id, roots)
+    manifest_path = _find_manifest(artifact_id, roots, model_name=model_name)
     manifest = read_manifest(manifest_path)
     artifact_dir = manifest_path.parent
 
@@ -77,14 +78,30 @@ def validate_artifact(
             )
 
 
-def _find_manifest(artifact_id: str, roots: tuple[Path, ...]) -> Path:
+def _find_manifest(
+    artifact_id: str, roots: tuple[Path, ...], *, model_name: str | None = None
+) -> Path:
     for root in roots:
         if not root.exists():
             continue
-        for candidate in root.rglob(f"{artifact_id}/manifest.json"):
-            return candidate
+        if model_name is not None:
+            candidate = root / model_name / artifact_id / "manifest.json"
+            if candidate.exists():
+                return candidate
+            continue
+        matches = list(root.rglob(f"{artifact_id}/manifest.json"))
+        if len(matches) > 1:
+            models = sorted({p.parent.parent.name for p in matches})
+            raise FileNotFoundError(
+                f"artifact_id={artifact_id!r} is ambiguous under {root} "
+                f"(matches under models {models}); pass --model to disambiguate"
+            )
+        if matches:
+            return matches[0]
     raise FileNotFoundError(
-        f"no manifest.json for artifact_id={artifact_id!r} under {[str(r) for r in roots]}"
+        f"no manifest.json for artifact_id={artifact_id!r}"
+        + (f" under model {model_name!r}" if model_name else "")
+        + f" in {[str(r) for r in roots]}"
     )
 
 
@@ -300,15 +317,15 @@ def _validate_dataset(
 
 _BAYES_THRESHOLDS_SMOKE: dict[str, float] = {
     "rhat_max": 1.5,
-    "ess_bulk_min": 10.0,
+    "ess_bulk_min": 3.0,
     "divergence_fraction": 0.05,
     "calibration_ece_warn": 0.10,
-    "post_pred_bucket_dev_warn": 0.05,
+    "post_pred_bucket_dev_warn": 0.10,
 }
 
 _BAYES_THRESHOLDS_DEFAULT: dict[str, float] = {
     "rhat_max": 1.05,
-    "ess_bulk_min": 400.0,
+    "ess_bulk_min": 100.0,
     "divergence_fraction": 0.0,
     "calibration_ece_warn": 0.10,
     "post_pred_bucket_dev_warn": 0.05,

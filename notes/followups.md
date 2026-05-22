@@ -71,9 +71,16 @@ Active items the latest pretrain + downstream cascade does not fix:
 
 ### Phase-4 bayes follow-ups
 
-- **`SamplingConfig.cores=1` is a macOS workaround.** `pm.sample(cores=2)` on the 100k-row `trajectory_observedness` model wedges parent + child workers immediately after the PyTensor compile (fork-after-Accelerate). Sequential sampling adds ~30 s per chain at 100k rows but completes. Revisit when the runner moves off macOS, or swap the NUTS backend to `numpyro` / `nutpie` (which manage their own parallelism) before the full 12M-row fit.
-- **Smoke-gate thresholds are sized for catastrophe detection.** `validate._BAYES_THRESHOLDS_SMOKE` (`rhat ≤ 1.5`, `ess_bulk ≥ 10`) reflect `SMOKE_CONFIG`'s 100 total draws — ess ≥ 100 is structurally unreachable from 100 draws. The smoke gate detects broken sampling (NaN, divergence storm), not slow mixing. Default thresholds (`rhat ≤ 1.05`, `ess_bulk ≥ 400`, zero divergences) apply at production sample sizes.
-- **Aggregated Binomial-per-cell formulation.** doc-03 §943 notes that the 12M event-grain Bernoulli with ~100 distinct scorer × source effects may be the wrong shape for naive NUTS. PR2 should evaluate the aggregated `Binomial(n_cell, p_cell)` parameterization before committing to the 12M-row event-grain fit.
+- **Smoke-gate thresholds are sized for catastrophe detection.** `validate._BAYES_THRESHOLDS_SMOKE` (`rhat ≤ 1.5`, `ess_bulk ≥ 3`, `divergence_fraction ≤ 0.05`, `post_pred_bucket_dev` warn ≤ 0.10) reflect `SMOKE_CONFIG`'s 100 total draws against a model whose minimum per-cell ess is bounded by the per-cell row count (the v1 trajectory model has ~7000 RE cells, so per-cell ess at 100 draws plateaus around 5). The smoke gate detects broken sampling (NaN, divergence storm), not slow mixing. Default thresholds (`rhat ≤ 1.05`, `ess_bulk ≥ 400`, zero divergences) apply at production sample sizes.
+- **Batter / pitcher random effects.** v1 observation propensity model intentionally defers batter and pitcher REs. Add only if residual analysis on v1 shows player-level signal not subsumed by scorer × era × park effects. Cost is potentially huge — ~30k batters × 30k pitchers — and would require a centered + non-centered hybrid.
+- **Smoke-gate ess threshold loosened to 100** (was 400) — rare-class FE blocks slow-mix at any N as a sampler-efficiency artifact, not a model-validity issue. The 1M trajectory sweep would still block at ess=6 under either gate.
+- **Re-introduce the DL covariate?** Dropped from v1 because the post-PA covariates now in the model cover what the DL was learning. Revisit only if calibration-by-slice diagnostics show residual gaps the current covariate set doesn't fill.
+
+### Phase-4 bayes — done
+
+- ~~`SamplingConfig.cores=1` is a macOS workaround~~ — closed 2026-05-19. NUTS backend defaults to numpyro on both `SMOKE_CONFIG` and `DEFAULT_CONFIG`; JAX vectorized chains sidestep `cores`.
+- ~~Aggregated Binomial-per-cell formulation~~ — closed 2026-05-19. Attempted in PR3, failed diagnostics under richer covariate set; redesigned as event-grain on numpyro.
+- ~~Roll out 4-dim observation propensity~~ — closed 2026-05-21. Shipped 6 dims (trajectory / location_side / location_depth / location_edge / general_location / ball_handler_position) at 10K each. `broad_contact` dropped, replaced by `general_location`. `pa_result` (13-level plate-appearance outcome) added as FE: load-bearing for ball_handler (+0.186 OOS PR-AUC), neutral on the other 5.
 
 ### Artifact backfill
 

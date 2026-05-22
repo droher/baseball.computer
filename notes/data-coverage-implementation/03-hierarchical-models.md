@@ -69,6 +69,8 @@ Each Bayesian model in {A, B, C, E, F, G, H, I, J, K} is fit twice — once with
 
 ## Model A: Scorer And Source Observation
 
+**Implementation as of 2026-05-21 (v1, six dims).** Event-grain Bernoulli on nutpie/numpyro NUTS, one fit per `event_observation_geometry` dimension that has both observed and unobserved rows: `trajectory`, `location_side`, `location_depth`, `location_edge`, `general_location`, `ball_handler_position`. The seventh dim `pulled_opposite` is purely derived (0% observed) and is excluded. The aggregated `Binomial(n_cell, p_cell)` formulation shipped in PR3 was discarded — once we broadened the covariate set beyond `(season, scorer, source)` the cell product no longer captured the variation we needed, and stock PyMC posterior diagnostics blew up (rhat=3.26, ess=4.47, 1411 divergences) on the resulting 12M-row fit. The redesign drops aggregation, picks up numpyro vectorized chains, and consumes the full pre+post-PA covariate surface directly (post-PA columns are not leakage here — the target is `is_observed`, a separate scoring channel). The sample-size sweep (trajectory, 10K → 1M) fixed the operating budget at 10K rows per dim: OOS AUC plateau hit by 10K, calibration plateau by 100K, mixing collapses past 500K. Each dim fits in ~2.5 min on nutpie.
+
 ### Estimand
 
 For event `i` and dimension `d`:
@@ -79,7 +81,7 @@ For event `i` and dimension `d`:
 
 where `R` is whether the field is observed as source truth, `x_i` is baseball context, `s_i` is scorer/source context, and `q_i` is provenance reliability.
 
-### Likelihood
+### Likelihood (v1, event-grain)
 
 ```latex
 R_{i,d} \sim \operatorname{Bernoulli}(p_{i,d})
@@ -87,52 +89,53 @@ R_{i,d} \sim \operatorname{Bernoulli}(p_{i,d})
 
 ```latex
 \operatorname{logit}(p_{i,d}) =
-\alpha_d
-+ a^{season,league}_{d,t_i,l_i}
-+ a^{source}_{d,u_i}
-+ a^{scorer}_{d,c_i}
-+ a^{park}_{d,p_i}
-+ \beta^{result}_{d,r_i}
-+ \beta^{hitout}_{d,h_i}
-+ \beta^{affil}_{d} A_i
-+ \beta^{lev}_{d} L_i
-+ \gamma^{dl}_{d} \operatorname{logit}(\tilde p^{dl}_{i,d})
+\alpha
++ \beta^{season}_{t_i}
++ \beta^{scorer}_{c_i}
++ \beta^{park}_{p_i}
++ \mathbb{1}[|U|>1]\,\beta^{source}_{u_i}
++ \sum_k X^{(k)}_i \delta^{(k)}
++ \sum_j \gamma_j \tilde x^{(j)}_i + \sum_j \delta^{miss}_j m^{(j)}_i
 ```
+
+where `\beta^{season}` is centered with sum-to-zero identification (`\beta^{season} \sim \mathrm{ZeroSumNormal}(0, \sigma_{season})`, `\sigma_{season} \sim \mathrm{HalfNormal}(s_{season})`); `\beta^{scorer}`, `\beta^{park}`, and (when active) `\beta^{source}` are non-centered random intercepts (`\beta = \sigma_* z_*`, `z_* \sim N(0,1)`, `\sigma_* \sim \mathrm{HalfNormal}(s_*)`). Each `X^{(k)}` is the one-hot design matrix for a low-card categorical covariate; coefficients `\delta^{(k)} \sim \mathrm{ZeroSumNormal}(0, s_{fe})` over the full level coord (sum-to-zero identification — no level is dropped). Each `\tilde x^{(j)}` is a standardized continuous covariate, and `m^{(j)}` is its missing indicator. The source-family random effect is conditionally declared only when more than one `source_family` level is present in the training data — the production population (`target_population_status='event_level'`) is single-source by construction and the term would be unidentified. The DL covariate has been dropped from v1; revisit only if posterior-predictive calibration shows residual gaps.
 
 `\tilde p^{dl}` is optional and must be out-of-fold calibrated before use. The symbol `\tilde p^{dl}` is used globally across all models for DL proposal probabilities; older drafts used `\tilde \pi^{dl}` in some places and have been normalized.
 
-### Pooling
+### Pooling (v1)
 
-- Season/league effects use a random walk or dynamic hierarchy.
-- Scorer, inputter, translator, park, and team-affiliation effects use partial pooling.
-- Source family is a fixed or hierarchical effect depending on support.
-- Park and scorer effects should be merged or strongly regularized when EDA shows collinearity.
+- Season, scorer, and park effects use non-centered partial pooling on the logit scale.
+- Source family is conditional: declared as a non-centered random effect only when the dataset contains multiple `source_family` levels. The v1 training population is single-source.
+- Batter and pitcher random effects are deferred. Only add if residual analysis on v1 shows player-level signal not subsumed by scorer × era effects.
+- Low-card categoricals (game_type, frame_start, exposure_status, league, result_family, pa_result, leverage_bucket, batter_hand, pitcher_hand, personnel_confidence, context_confidence) enter as design-matrix fixed effects with sum-to-zero identification via `pm.ZeroSumNormal` over the full level coord — no reference level dropped. `pa_result` is the 13-level plate-appearance outcome category — load-bearing for `ball_handler_position` (+0.186 OOS PR-AUC vs without) and neutral on the other 5 dims.
 
-### Priors
+### Priors (v1)
 
-- Intercepts centered on observed base rates by dimension.
-- Group standard deviations use half-normal priors on logit scale with prior predictive checks.
-- Dynamic season effects use small step-scale priors to prevent year-to-year noise from becoming signal.
-- Deep-proposal coefficient `gamma_dl` is regularized toward zero so deep models cannot dominate without validation.
+- Intercept `\alpha \sim N(0, 1.5)`.
+- Group scales `\sigma_{season}, \sigma_{scorer} \sim \mathrm{HalfNormal}(1.5)`; `\sigma_{park} \sim \mathrm{HalfNormal}(1.0)`; `\sigma_{source} \sim \mathrm{HalfNormal}(0.7)` when active.
+- Fixed-effect coefficients `\delta^{(k)} \sim \mathrm{ZeroSumNormal}(0, 1)` (`fixed_effect_scale = 1.0`).
+- Continuous slopes `\gamma_j \sim N(0, 0.5)` on standardized inputs; paired missing-indicator slopes `\delta^{miss}_j \sim N(0, 1)`.
+- NUTS settings on `DEFAULT_CONFIG`: numpyro backend, `target_accept=0.95`, `max_treedepth=12`, 4 chains × 1000 draws × 1000 tune.
 
-### Outputs
+### Outputs (v1)
 
 | Table | Grain | Contents |
 | --- | --- | --- |
-| `scorer_observation_propensities` | `event_key, dimension` | Posterior mean and intervals for `P(observed)`, source/scorer effects, and weak-identification flags. |
-| `observation_model_draws` | `draw_id, event_key, dimension` | Draw-level propensities for downstream weighting. |
-| `observation_model_diagnostics` | run/slice | Calibration, posterior predictive rates, and grouped holdout metrics. |
+| `exports/event_propensity.parquet` | `event_key, dimension` | Per-event posterior mean `p_observed_mean`. Computed by chunked sigmoid average over posterior draws. |
+| `main_models.scorer_observation_propensities` | `event_key, dimension` | SQLMesh `@model` thin-gather over published `event_propensity.parquet` artifacts, stamped with `bayes_artifact_id`. |
+| `exports/{posterior_summary,calibration_curve}.parquet` | per-variable / per-bin | Hyperparameter posterior summary + reliability curve. |
+| `validation/diagnostics.json` | per-fit | rhat / ess / divergences / calibration_ece + backend + source_effect_active flag. |
 
-### Validation
+### Validation (v1)
 
-- Prior predictive knownness rates by dimension.
+- Prior predictive knownness rates.
 - Scorer holdouts.
 - Park holdouts.
-- Source-family holdouts.
+- Source-family holdouts (once data contains multiple sources — currently a no-op).
 - Hit/out-specific holdouts.
-- MNAR sensitivity for hit location and detailed contact labels.
+- Calibration by `(season_decade, source_family, result_family)` slice.
 
-Block publication when scorer, park, team, and source cannot be separated in the target slice.
+Block publication when scorer, park, team, and source cannot be separated in the target slice. The DL covariate ablation / per-flavor publication policy from earlier drafts has been retired — there is one flavor.
 
 ## Model B: Contact Label Confusion
 

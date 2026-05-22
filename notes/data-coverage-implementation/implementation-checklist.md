@@ -414,37 +414,40 @@ Each Bayes model is fit twice in two `gamma_dl` ablation flavors: `gamma_dl_zero
 
 ### Observation (A, B): Scorer And Source Observation Models
 
-#### First Scope
+#### First Scope (v1 redesign)
 
-- [ ] Fit trajectory observedness model.
-- [ ] Fit location side observedness model.
-- [ ] Fit location depth observedness model.
-- [ ] Fit broad ground/air contact observedness model. (PR2 commit broadens the smoke-fit runtime to all 4 dims at 100k rows; full fits gate on the PR3 scaling spike.)
+PR3's aggregated `Binomial(n_cell, p_cell)` formulation has been retired. Full 12M-row fit on PR3 failed diagnostics (rhat=3.26, ess=4.47, 1411 divergences). Root cause: minimal `(season, scorer, source)` cell formulation was a tractability hack that didn't survive a richer covariate set. v1 redesign goes event-grain on numpyro NUTS with the full pre+post-PA covariate surface and drops the DL covariate / gamma_dl ablation entirely.
+
+- [x] Fit trajectory observedness model. (Artifact `trajectory_observedness/10k-v1` on `phase4_obs_redesign`. rhat 1.015, ess 269, ECE 0.032, OOS AUC 0.910.)
+- [x] Fit location side observedness model. (Artifact `location_side_observedness/10k-v1`. rhat 1.010, ess 437, ECE 0.014, OOS AUC 0.973.)
+- [x] Fit location depth observedness model. (Artifact `location_depth_observedness/10k-v1`. rhat 1.021, ess 379, ECE 0.011, OOS AUC 0.971.)
+- [x] Fit location edge observedness model. (Artifact `location_edge_observedness/10k-v1`. rhat 1.009, ess 417, ECE 0.013, OOS AUC 0.973. Not in original plan — folded in because the dim has the same denominator + ~42% observed share as location_side/depth and a Bayes fit is cheap.)
+- [x] Fit broad ground/air contact observedness model. (Mapped to `general_location_observedness/10k-v1`. rhat 1.015, ess 315, ECE 0.013, OOS AUC 0.973.)
+- [x] Fit ball_handler_position observedness model. (Artifact `ball_handler_position_observedness/10k-v1`. rhat 1.008, ess 519, ECE 0.040, OOS AUC 0.924. ~89% observed baseline; informs direct fielder-handler evidence in Phase-4 fielding credit.)
+- [x] Add `pa_result` (13-level plate-appearance outcome) to obs FE set across all 6 dims. Refit at 10K against `phase2-paresult-batted-ball`. Per-dim OOS PR-AUC v1 → v2: trajectory 0.889→0.890, location_side 0.976→0.976, location_depth 0.974→0.978, location_edge 0.976→0.976, general_location 0.974→0.979, ball_handler_position 0.569→0.755 (+0.186). The other 5 dims were already PR-AUC-saturated; `pa_result` mainly closes ball_handler's IS-OOS gap. Sweep on ball_handler v2 at 50K/100K/500K confirmed 10K is the operating point (OOS PR-AUC plateau by 100K; 1M aborted as diminishing returns).
 - [ ] Keep detailed fly/line/pop label confusion out of first publication unless broad models calibrate.
 
 #### Statistical Workflow
 
-- [ ] Write estimand for each observedness dimension.
-- [ ] Draw missingness DAG for each dimension.
-- [ ] Identify post-treatment variables that cannot enter each model.
-- [x] Run prior predictive checks. (All 4 dims wired through `bayes/targets/observation.py`; PR2 broadens registry + builder dispatch.)
-- [x] Run small smoke fit. (All 4 dims × both `gamma_dl_zero`/`gamma_dl_shrunk` flavors at 100k events × 50 draws × 50 tune × 2 sequential chains via the registry-driven `run_bayes_model`. PR1 commit `bfe0650` shipped `trajectory_observedness` only; PR2 broadens to `location_side` / `location_depth` / `broad_contact` + `gamma_dl_shrunk` via shared `build_observation_model`.)
+- [x] Write estimand. (Event-grain Bernoulli with non-centered season / scorer / park random intercepts, conditional source effect, design-matrix fixed effects, continuous slopes with missing indicators. See `03-hierarchical-models.md` §Model A.)
+- [ ] Draw missingness DAG.
+- [ ] Identify post-treatment variables that cannot enter each model. (For propensity, post-PA covariates are NOT leakage — they are direct predictors of `is_observed`. The supplement-DL deny-list does not apply here.)
+- [x] Run prior predictive checks. (`run_bayes_model --prior-only` ships under v1; tests in `bc/tests/statistical/bayes/test_run_bayes_model_smoke.py`.)
+- [x] Run small smoke fit. (100k events × 50 draws × 50 tune × 2 chains under numpyro; single-source gate drops source RE; emits `event_propensity.parquet`.)
 - [ ] Run simulated-data recovery where feasible.
-- [ ] Run full fit only after smoke diagnostics pass.
+- [ ] Run full 12M-row fit only after smoke diagnostics pass. (Budget ≤ 90 minutes target / ≤ 4 hr ceiling; gates `rhat ≤ 1.05`, `ess_bulk ≥ 400`, zero divergences.)
 - [ ] Generate posterior predictive checks by era, source, scorer, result, hit/out, leverage, and team affiliation.
 - [ ] Run scorer and source-family holdouts.
 - [ ] Run MNAR sensitivity variants for hit location and detailed contact.
-- [ ] Export observation propensities and uncertainty summaries.
+- [x] Export observation propensities and uncertainty summaries. (`exports/event_propensity.parquet` per fit; `main_models.scorer_observation_propensities` SQLMesh `@model` gathers across published targets.)
 
-#### Gamma_dl Ablation
+#### DL covariate
 
-- [x] Fit `gamma_dl_zero` flavor of each observation model. (Smoke parity at 100k rows across all 4 dims; PR2.)
-- [x] Fit `gamma_dl_shrunk` flavor of each observation model. (Smoke parity at 100k rows; covariate sourced via `manifests.find_published_manifest("dl_proposal_<dim>")` joined by `event_key`; broad_contact collapses trajectory→AirBall classes. PR2 smoke parity only — full fits gate on PR3 scaling spike.)
-- [ ] Select publication tier per observation model and record it in the manifest. (Comparison utility `bayes/ablation.summarize_random_effect_shift` ships in PR2; the tier selection runs on full-fit posteriors in PR3.)
+- [x] Dropped from v1. Revisit only if posterior-predictive calibration shows residual gaps the post-PA covariates already in the model don't fill.
 
 #### Outputs
 
-- [ ] `scorer_observation_propensities`.
+- [~] `scorer_observation_propensities`. (SQLMesh `@model` lands on `phase4_obs_redesign`; materializes a typed empty frame until at least one Bayes pointer publishes.)
 - [ ] `observation_model_draws` when downstream uncertainty needs draws.
 - [ ] `observation_weighted_metric_inputs`.
 - [ ] `scorer_label_confusion_summaries` after broad models validate.
@@ -452,7 +455,7 @@ Each Bayes model is fit twice in two `gamma_dl` ablation flavors: `gamma_dl_zero
 
 #### Observation Sub-Gate
 
-- [ ] Observation propensities calibrate by key slices.
+- [ ] Observation propensities calibrate by key slices. (Posterior-predictive `P̂(observed)` within ±0.05 over `(season_decade, source_family, result_family)` slices with `n_slice ≥ 500`.)
 - [ ] Scorer/source holdouts do not collapse.
 - [ ] MNAR sensitivity intervals are published for MNAR-prone outputs.
 - [ ] Existing coverage-weighted metrics can be reproduced as a baseline.

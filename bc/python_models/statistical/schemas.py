@@ -10,10 +10,8 @@ from pydantic import BaseModel, Field, model_validator
 
 ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda", "pretrain"]
 ValidationStatus = Literal["passed", "failed", "exploratory"]
-AblationStatus = Literal["gamma_dl_zero", "gamma_dl_shrunk", "not_applicable"]
 DiagnosticStatus = Literal["passed", "warn", "failed"]
 FindingSeverity = Literal["block", "warn", "info"]
-GammaDlFlavor = Literal["gamma_dl_zero", "gamma_dl_shrunk"]
 BlockingCode = Literal[
     "source_family_block_as_event_missing",
     "dominant_single_scorer_park_team",
@@ -28,11 +26,12 @@ BlockingCode = Literal[
 class BayesPriorConfig(BaseModel):
     alpha_loc: float = 0.0
     alpha_scale: float = 1.5
-    sigma_season_scale: float = 0.5
-    sigma_scorer_scale: float = 0.7
+    sigma_season_scale: float = 1.5
+    sigma_scorer_scale: float = 1.5
+    sigma_park_scale: float = 1.0
     sigma_source_scale: float = 0.7
-    gamma_dl_loc: float = 0.0
-    gamma_dl_scale: float = 0.5
+    fixed_effect_scale: float = 1.0
+    continuous_slope_scale: float = 0.5
 
 
 class BayesSamplerConfig(BaseModel):
@@ -41,6 +40,7 @@ class BayesSamplerConfig(BaseModel):
     chains: int
     target_accept: float
     random_seed: int
+    max_treedepth: int = 10
     is_smoke: bool = False
     backend: str = "pymc"
 
@@ -76,24 +76,13 @@ class BayesArtifactExtras(BaseModel):
     model_name: str
     model_version: str
     dimension: str | None = None
-    gamma_dl_flavor: GammaDlFlavor = "gamma_dl_zero"
     prior_config: BayesPriorConfig
     sampler_config: BayesSamplerConfig
     posterior_summary: BayesPosteriorSummary = BayesPosteriorSummary()
     diagnostics_summary: BayesDiagnosticsSummary
-    ablation_status: AblationStatus = "gamma_dl_zero"
-    dl_proposal_inputs: tuple[str, ...] = ()
     inference_files: dict[str, Path] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _ablation_status_matches_flavor(self) -> "BayesArtifactExtras":
-        if self.ablation_status != self.gamma_dl_flavor:
-            raise ValueError(
-                f"ablation_status={self.ablation_status!r} must match gamma_dl_flavor={self.gamma_dl_flavor!r}"
-            )
-        if self.gamma_dl_flavor == "gamma_dl_shrunk" and not self.dl_proposal_inputs:
-            raise ValueError("gamma_dl_shrunk requires at least one dl_proposal_inputs entry")
-        return self
+    source_effect_active: bool = True
+    event_row_count: int = 0
 
 
 class ArtifactManifest(BaseModel):
@@ -111,7 +100,6 @@ class ArtifactManifest(BaseModel):
     package_versions: dict[str, str]
     random_seed: int | None = None
     validation_status: ValidationStatus = "exploratory"
-    ablation_status: AblationStatus = "not_applicable"
     blocking_findings: tuple[str, ...] = ()
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
     bayes_extras: BayesArtifactExtras | None = None

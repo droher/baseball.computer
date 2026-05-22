@@ -1,14 +1,13 @@
-"""End-to-end Bayes fit dispatcher.
+"""End-to-end Bayes fit dispatcher (event-grain v1).
 
-Looks up a registered ``BayesTargetSpec`` by name, prepares observation
-inputs (optionally joining a published DL artifact for the
-``gamma_dl_shrunk`` covariate), samples prior predictive, NUTS posterior
-(unless ``prior_only``), and posterior predictive. Writes
-``inference/*.nc``, ``exports/{posterior_summary,calibration_curve}.parquet``,
+Looks up a registered ``BayesTargetSpec`` by name, prepares event-grain
+inputs, samples prior predictive, NUTS posterior (unless ``prior_only``),
+and posterior predictive. Writes ``inference/*.nc``,
+``exports/{posterior_summary,calibration_curve,event_propensity}.parquet``,
 ``validation/diagnostics.json``, and the manifest atomically.
 """
 
-# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnusedCallResult=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false, reportArgumentType=false, reportCallIssue=false
+# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnusedCallResult=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false, reportArgumentType=false, reportCallIssue=false, reportAny=false
 
 from __future__ import annotations
 
@@ -18,6 +17,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 import arviz as az
 import numpy as np
@@ -30,31 +30,27 @@ from python_models.statistical.bayes.artifacts import (
     bayes_validation_dir,
 )
 from python_models.statistical.bayes.registry import get_target
-from python_models.statistical.bayes.specs import BayesTargetSpec
 from python_models.statistical.calibration import (
     expected_calibration_error,
     reliability_curve,
 )
-from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT, DEEP_ROOT
+from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
 from python_models.statistical.manifests import (
-    find_published_manifest,
     package_versions,
-    read_manifest,
-    read_published_pointer,
     utc_now,
     write_manifest,
 )
-from python_models.statistical.models._data import (
+from python_models.statistical.models._event_data import (
     DEFAULT_SEED,
     DEFAULT_SMOKE_LIMIT,
-    prepare_observation_inputs,
+    EventObservationInputs,
 )
 from python_models.statistical.outputs import write_parquet_atomic
 from python_models.statistical.pymc_utils import (
     DEFAULT_CONFIG,
     SMOKE_CONFIG,
+    NutsBackend,
     SamplingConfig,
-    posterior_predictive,
     prior_predictive,
     sample_model,
 )
@@ -66,19 +62,14 @@ from python_models.statistical.schemas import (
     BayesPosteriorSummary,
     BayesPriorConfig,
     BayesSamplerConfig,
-    GammaDlFlavor,
 )
 
 _log = logging.getLogger(__name__)
 
-MODEL_VERSION: str = "0.2.0"
+MODEL_VERSION: str = "0.3.0"
 
-_GAMMA_DL_CLI_TO_FLAVOR: dict[str, GammaDlFlavor] = {
-    "zero": "gamma_dl_zero",
-    "shrunk": "gamma_dl_shrunk",
-    "gamma_dl_zero": "gamma_dl_zero",
-    "gamma_dl_shrunk": "gamma_dl_shrunk",
-}
+POSTERIOR_CHUNK_DEFAULT: int = 250_000
+POSTERIOR_EXPORT_FILENAME: str = "event_propensity.parquet"
 
 
 def _atomic_write_text(target: Path, payload: str) -> None:
@@ -98,6 +89,69 @@ def _atomic_write_text(target: Path, payload: str) -> None:
         raise
 
 
+_NETCDF_ALLOWED_ATTR_TYPES: tuple[type, ...] = (
+    str,
+    int,
+    float,
+    bool,
+    bytes,
+    list,
+    tuple,
+    np.ndarray,
+    np.number,
+    type(None),
+)
+
+
+def _sanitize_attrs_dict(attrs: dict[str, object]) -> None:
+    for key, value in list(attrs.items()):
+        if not isinstance(value, _NETCDF_ALLOWED_ATTR_TYPES):
+            attrs[key] = json.dumps(value, default=str)
+
+
+def _sanitize_idata_attrs(idata: az.InferenceData) -> None:
+    """Stringify non-primitive attrs so xarray's netcdf writer accepts them.
+
+    nutpie attaches a nested ``dict`` to one of the group attrs at full
+    sample sizes (it survives the small smoke probe but trips the
+    netcdf writer at DEFAULT_CONFIG). The netcdf engine only allows
+    ``str / Number / ndarray / bytes / list / tuple`` attr values, so
+    JSON-encode anything else in place across every group, data
+    variable, and coord.
+    """
+    found_non_primitive: list[tuple[str, str, str]] = []
+    root_attrs = getattr(idata, "_attrs", None) or getattr(idata, "attrs", None)
+    if root_attrs is not None:
+        for k, v in root_attrs.items():
+            if not isinstance(v, _NETCDF_ALLOWED_ATTR_TYPES):
+                found_non_primitive.append(("root", k, type(v).__name__))
+        _sanitize_attrs_dict(root_attrs)
+    for group_name in idata.groups():
+        group = getattr(idata, group_name)
+        for k, v in group.attrs.items():
+            if not isinstance(v, _NETCDF_ALLOWED_ATTR_TYPES):
+                found_non_primitive.append((f"group:{group_name}", k, type(v).__name__))
+        _sanitize_attrs_dict(group.attrs)
+        for var_name, da in group.data_vars.items():
+            for k, v in da.attrs.items():
+                if not isinstance(v, _NETCDF_ALLOWED_ATTR_TYPES):
+                    found_non_primitive.append(
+                        (f"var:{group_name}.{var_name}", k, type(v).__name__)
+                    )
+            _sanitize_attrs_dict(da.attrs)
+        for coord_name, da in group.coords.items():
+            for k, v in da.attrs.items():
+                if not isinstance(v, _NETCDF_ALLOWED_ATTR_TYPES):
+                    found_non_primitive.append(
+                        (f"coord:{group_name}.{coord_name}", k, type(v).__name__)
+                    )
+            _sanitize_attrs_dict(da.attrs)
+    if found_non_primitive:
+        _log.info(
+            "sanitized non-primitive idata attrs: %s", found_non_primitive
+        )
+
+
 def _atomic_write_netcdf(idata: az.InferenceData, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
@@ -106,7 +160,15 @@ def _atomic_write_netcdf(idata: az.InferenceData, target: Path) -> None:
     os.close(fd)
     tmp_path = Path(tmp_name)
     try:
-        idata.to_netcdf(str(tmp_path))
+        _sanitize_idata_attrs(idata)
+        try:
+            idata.to_netcdf(str(tmp_path))
+        except TypeError:
+            _log.error(
+                "to_netcdf TypeError; per-group attrs dump:\n%s",
+                _format_idata_attrs_dump(idata),
+            )
+            raise
         os.replace(tmp_path, target)
     except BaseException:
         try:
@@ -116,28 +178,70 @@ def _atomic_write_netcdf(idata: az.InferenceData, target: Path) -> None:
         raise
 
 
+def _format_idata_attrs_dump(idata: az.InferenceData) -> str:
+    lines: list[str] = []
+    root_attrs = getattr(idata, "_attrs", None) or getattr(idata, "attrs", None)
+    if root_attrs is not None:
+        for k, v in root_attrs.items():
+            lines.append(
+                f"  root.attrs[{k!r}] type={type(v).__name__} value={repr(v)[:200]}"
+            )
+    for group_name in idata.groups():
+        group = getattr(idata, group_name)
+        for k, v in group.attrs.items():
+            lines.append(
+                f"  group {group_name}.attrs[{k!r}] type={type(v).__name__} value={repr(v)[:200]}"
+            )
+        for var_name, da in group.data_vars.items():
+            for k, v in da.attrs.items():
+                lines.append(
+                    f"  var {group_name}.{var_name}.attrs[{k!r}] type={type(v).__name__} value={repr(v)[:200]}"
+                )
+        for coord_name, da in group.coords.items():
+            for k, v in da.attrs.items():
+                lines.append(
+                    f"  coord {group_name}.{coord_name}.attrs[{k!r}] type={type(v).__name__} value={repr(v)[:200]}"
+                )
+    return "\n".join(lines)
+
+
 def _resolve_sampler_config(
     *, smoke: bool, override_seed: int | None
 ) -> SamplingConfig:
     base = SMOKE_CONFIG if smoke else DEFAULT_CONFIG
-    if override_seed is None:
+    backend_override = os.environ.get("BC_STATS_BAYES_BACKEND")
+    if override_seed is None and backend_override is None:
         return base
+    backend_str = backend_override if backend_override is not None else base.backend
+    backend = cast("NutsBackend", backend_str)
     return SamplingConfig(
         draws=base.draws,
         tune=base.tune,
         chains=base.chains,
         target_accept=base.target_accept,
-        random_seed=override_seed,
+        random_seed=override_seed if override_seed is not None else base.random_seed,
         cores=base.cores,
+        max_treedepth=base.max_treedepth,
+        backend=backend,
     )
 
 
-def _build_posterior_summary(
-    idata: az.InferenceData, *, include_gamma_dl: bool
-) -> BayesPosteriorSummary:
-    var_names = ["alpha", "sigma_season", "sigma_scorer", "sigma_source"]
-    if include_gamma_dl:
-        var_names.append("gamma_dl")
+def _build_posterior_summary(idata: az.InferenceData) -> BayesPosteriorSummary:
+    posterior = idata.posterior
+    candidate_names = [
+        "alpha",
+        "sigma_season",
+        "sigma_scorer",
+        "sigma_park",
+        "sigma_source",
+    ]
+    candidate_names.extend(
+        name for name in posterior.data_vars if str(name).startswith("gamma_")
+    )
+    candidate_names.extend(
+        name for name in posterior.data_vars if str(name).startswith("delta_missing_")
+    )
+    var_names = [n for n in candidate_names if n in posterior.data_vars]
     summary_df = az.summary(idata, var_names=var_names, hdi_prob=0.94)
     rows: list[BayesPosteriorRow] = []
     for variable, row in summary_df.iterrows():
@@ -200,24 +304,90 @@ def _diagnostics_from_idata(
     )
 
 
-def _posterior_mean_p_observed(idata: az.InferenceData) -> np.ndarray:
-    p = idata.posterior["p_observed"]
-    return np.asarray(p.mean(dim=("chain", "draw")).values, dtype=np.float64)
+def _posterior_event_means(
+    idata: az.InferenceData,
+    inputs: EventObservationInputs,
+    *,
+    chunk_size: int = POSTERIOR_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Compute ``E[sigmoid(η_e)] | data`` per event from posterior parameter draws.
+
+    Reconstructs the linear predictor per event by indexing the posterior
+    parameter arrays (alpha, betas, deltas, gammas) — no per-event
+    posterior tensor is ever materialized in the model graph (the
+    Bernoulli uses ``logit_p=eta`` directly). One ``(chain, draw,
+    chunk_size)`` slab is built at a time, sigmoided, and reduced over
+    the sample dims; only the chunk-wide mean vector stays in RAM after
+    each iteration.
+    """
+    posterior = idata.posterior
+    n_event = inputs.n_events
+    alpha = np.asarray(posterior["alpha"].values, dtype=np.float64)
+    beta_season = np.asarray(posterior["beta_season"].values, dtype=np.float64)
+    beta_scorer = np.asarray(posterior["beta_scorer"].values, dtype=np.float64)
+    beta_park = np.asarray(posterior["beta_park"].values, dtype=np.float64)
+    n_chain = beta_season.shape[0]
+    n_draw = beta_season.shape[1]
+
+    beta_source: np.ndarray | None = None
+    if "beta_source" in posterior:
+        beta_source = np.asarray(posterior["beta_source"].values, dtype=np.float64)
+
+    deltas_full: dict[str, np.ndarray] = {}
+    for column, design in inputs.fixed_effects.items():
+        if len(design.levels) <= 1:
+            continue
+        deltas_full[column] = np.asarray(
+            posterior[f"delta_{column}"].values, dtype=np.float64
+        )
+
+    gammas: dict[str, np.ndarray] = {}
+    delta_missing: dict[str, np.ndarray] = {}
+    for column in inputs.continuous:
+        gammas[column] = np.asarray(
+            posterior[f"gamma_{column}"].values, dtype=np.float64
+        )
+        if f"delta_missing_{column}" in posterior:
+            delta_missing[column] = np.asarray(
+                posterior[f"delta_missing_{column}"].values, dtype=np.float64
+            )
+
+    means = np.empty(n_event, dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        eta = np.broadcast_to(alpha[:, :, None], (n_chain, n_draw, stop - start)).copy()
+        eta += beta_season[:, :, inputs.season_idx[sl]]
+        eta += beta_scorer[:, :, inputs.scorer_idx[sl]]
+        eta += beta_park[:, :, inputs.park_idx[sl]]
+        if beta_source is not None:
+            eta += beta_source[:, :, inputs.source_idx[sl]]
+        for column, df in deltas_full.items():
+            eta += df[:, :, inputs.fixed_effects[column].codes[sl]]
+        for column, gamma in gammas.items():
+            values = inputs.continuous[column].values[sl].astype(np.float64)
+            eta += gamma[:, :, None] * values[None, None, :]
+            if column in delta_missing:
+                is_missing = inputs.continuous[column].is_missing[sl].astype(np.float64)
+                eta += delta_missing[column][:, :, None] * is_missing[None, None, :]
+        p = 1.0 / (1.0 + np.exp(-eta))
+        means[sl] = p.mean(axis=(0, 1))
+    return means
 
 
-def _posterior_predictive_bucket_dev(
-    idata: az.InferenceData, y: np.ndarray, *, n_bins: int = 10
+def _bucket_dev_from_p_mean(
+    p_mean: np.ndarray, y: np.ndarray, *, n_bins: int = 10
 ) -> tuple[float | None, pl.DataFrame]:
-    if (
-        idata.posterior_predictive is None
-        or "observed" not in idata.posterior_predictive
-    ):
+    """Bin events by ``p_mean`` and report max ``|empirical - p_mean|`` per bucket.
+
+    Since ``E[y_rep] = E[sigmoid(η)] = p_mean`` analytically for the
+    Bernoulli likelihood, the historical bucket dev (``|empirical -
+    rep_mean|``) is — modulo Bernoulli sampling noise that vanishes at
+    1000+ draws — the same statistic, and we no longer need to draw
+    posterior-predictive samples to compute it.
+    """
+    if p_mean.size == 0:
         return None, pl.DataFrame()
-    p_mean = _posterior_mean_p_observed(idata)
-    rep_mean = np.asarray(
-        idata.posterior_predictive["observed"].mean(dim=("chain", "draw")).values,
-        dtype=np.float64,
-    )
     bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
     bin_ids = np.clip(np.digitize(p_mean, bin_edges[1:-1], right=False), 0, n_bins - 1)
     out_records: list[dict[str, float | int]] = []
@@ -228,9 +398,8 @@ def _posterior_predictive_bucket_dev(
         if n == 0:
             continue
         emp = float(np.mean(y[mask]))
-        rep = float(np.mean(rep_mean[mask]))
         pred = float(np.mean(p_mean[mask]))
-        dev = abs(emp - rep)
+        dev = abs(emp - pred)
         if dev > max_dev:
             max_dev = dev
         out_records.append(
@@ -238,7 +407,6 @@ def _posterior_predictive_bucket_dev(
                 "bin": b,
                 "count": n,
                 "predicted_mean": pred,
-                "posterior_predictive_mean": rep,
                 "empirical_rate": emp,
                 "abs_deviation": dev,
             }
@@ -279,47 +447,27 @@ def _posterior_summary_dataframe(summary: BayesPosteriorSummary) -> pl.DataFrame
     )
 
 
-def _resolve_dl_artifact_dir(dl_proposal_dimension: str) -> tuple[Path, str]:
-    """Locate the published DL artifact for the named proposal dimension.
-
-    Returns ``(artifact_dir, dl_artifact_id)``. Raises if no published
-    pointer exists — gamma_dl_shrunk needs a real DL artifact.
-    """
-    manifest_name = f"dl_proposal_{dl_proposal_dimension}"
-    pointer_path = find_published_manifest(manifest_name)
-    if pointer_path is None:
-        raise FileNotFoundError(
-            f"no published DL manifest pointer for {manifest_name!r}; "
-            "fit and publish the DL proposal before requesting gamma_dl_shrunk."
-        )
-    pointer = read_published_pointer(pointer_path)
-    manifest_path = Path(pointer.manifest_path)
-    if not manifest_path.exists():
-        for candidate in DEEP_ROOT.rglob(f"{pointer.artifact_id}/manifest.json"):
-            manifest_path = candidate
-            break
-        else:
-            raise FileNotFoundError(
-                f"DL manifest at {pointer.manifest_path} missing and no rglob "
-                f"match for artifact_id={pointer.artifact_id!r} under {DEEP_ROOT}"
-            )
-    manifest = read_manifest(manifest_path)
-    return manifest_path.parent, manifest.artifact_id
-
-
-def _ensure_flavor_supported(
-    spec: BayesTargetSpec, flavor: GammaDlFlavor
-) -> None:
-    if flavor not in spec.default_flavors:
-        raise ValueError(
-            f"bayes target {spec.name!r} does not declare flavor {flavor!r}; "
-            f"supported: {spec.default_flavors}"
-        )
-    if flavor == "gamma_dl_shrunk" and spec.dl_proposal_dimension is None:
-        raise ValueError(
-            f"bayes target {spec.name!r} has dl_proposal_dimension=None; "
-            "gamma_dl_shrunk requires a published DL proposal dimension."
-        )
+def _export_event_propensities(
+    means: np.ndarray,
+    inputs: EventObservationInputs,
+    *,
+    target_path: Path,
+) -> pl.DataFrame:
+    """Write per-event posterior mean ``p_observed`` to parquet."""
+    df = pl.DataFrame(
+        {
+            "event_key": inputs.event_keys.astype(np.int64),
+            "dimension": [inputs.dimension] * inputs.n_events,
+            "p_observed_mean": means,
+        }
+    )
+    write_parquet_atomic(df, target_path)
+    _log.info(
+        "wrote event_propensity export rows=%d path=%s",
+        inputs.n_events,
+        target_path,
+    )
+    return df
 
 
 def run_bayes_model(
@@ -328,7 +476,6 @@ def run_bayes_model(
     dataset_artifact_id: str,
     artifact_id: str,
     source_snapshot_id: str,
-    gamma_dl: str = "zero",
     smoke: bool = False,
     prior_only: bool = False,
     smoke_limit: int | None = None,
@@ -336,17 +483,9 @@ def run_bayes_model(
     artifact_root: Path = BAYES_ROOT,
     dataset_root: Path = DATASETS_ROOT,
 ) -> ArtifactManifest:
-    # eager-import target modules so the registry is populated before lookup
-    from python_models.statistical.bayes import targets as _targets  # noqa: F401
+    from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 
-    if gamma_dl not in _GAMMA_DL_CLI_TO_FLAVOR:
-        raise ValueError(
-            f"unknown --gamma-dl value {gamma_dl!r}; expected one of {sorted(_GAMMA_DL_CLI_TO_FLAVOR)}"
-        )
-    flavor: GammaDlFlavor = _GAMMA_DL_CLI_TO_FLAVOR[gamma_dl]
     spec = get_target(model_name)
-    _ensure_flavor_supported(spec, flavor)
-
     dataset_parquet = (
         dataset_root / spec.dataset_name / dataset_artifact_id / "dataset.parquet"
     )
@@ -361,31 +500,17 @@ def run_bayes_model(
             smoke_limit = int(env_limit)
         elif smoke:
             smoke_limit = DEFAULT_SMOKE_LIMIT
+        elif spec.sample_size is not None:
+            smoke_limit = spec.sample_size
 
-    dl_artifact_dir: Path | None = None
-    dl_artifact_ids: tuple[str, ...] = ()
-    if flavor == "gamma_dl_shrunk":
-        assert spec.dl_proposal_dimension is not None
-        dl_artifact_dir, dl_artifact_id = _resolve_dl_artifact_dir(
-            spec.dl_proposal_dimension
-        )
-        dl_artifact_ids = (dl_artifact_id,)
-
-    inputs = prepare_observation_inputs(
+    inputs = spec.prep_fn(
         dataset_parquet,
         dimension=spec.dataset_dimension_filter,
         smoke_limit=smoke_limit,
         seed=seed,
-        dl_artifact_dir=dl_artifact_dir,
-        dl_class_collapse_positive=spec.dl_class_collapse_positive,
     )
     priors = BayesPriorConfig()
-    model = spec.builder(
-        inputs,
-        priors=priors,
-        gamma_dl_flavor=flavor,
-        dimension=spec.dimension,
-    )
+    model = spec.builder(inputs, priors=priors)
 
     sampler = _resolve_sampler_config(smoke=smoke, override_seed=seed)
     sampler_record = BayesSamplerConfig(
@@ -394,7 +519,18 @@ def run_bayes_model(
         chains=sampler.chains,
         target_accept=sampler.target_accept,
         random_seed=sampler.random_seed,
+        max_treedepth=sampler.max_treedepth,
         is_smoke=smoke,
+        backend=sampler.backend,
+    )
+
+    source_effect_active = len(inputs.coords["source"]) > 1
+    _log.info(
+        "bayes model=%s artifact=%s source_effect_active=%s backend=%s",
+        model_name,
+        artifact_id,
+        source_effect_active,
+        sampler.backend,
     )
 
     artifact_dir = bayes_artifact_dir(model_name, artifact_id, root=artifact_root)
@@ -404,10 +540,7 @@ def run_bayes_model(
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     _log.info(
-        "bayes prior_predictive model=%s artifact=%s flavor=%s",
-        model_name,
-        artifact_id,
-        flavor,
+        "bayes prior_predictive model=%s artifact=%s", model_name, artifact_id
     )
     prior_idata = prior_predictive(model, sampler)
     prior_path = inference_dir / "prior_predictive.nc"
@@ -420,36 +553,26 @@ def run_bayes_model(
     posterior_idata: az.InferenceData | None = None
 
     if not prior_only:
+        progress_log = validation_dir / "sampling_progress.log"
         _log.info(
-            "bayes sample model=%s artifact=%s flavor=%s",
+            "bayes sample model=%s artifact=%s progress_log=%s",
             model_name,
             artifact_id,
-            flavor,
+            progress_log,
         )
-        posterior_idata = sample_model(model, sampler)
+        posterior_idata = sample_model(
+            model, sampler, progress_log_path=progress_log
+        )
         posterior_path = inference_dir / "posterior.nc"
         _atomic_write_netcdf(posterior_idata, posterior_path)
         inference_files["posterior"] = posterior_path
 
-        _log.info(
-            "bayes posterior_predictive model=%s artifact=%s",
-            model_name,
-            artifact_id,
-        )
-        pp_idata = posterior_predictive(model, posterior_idata, sampler)
-        posterior_idata.extend(pp_idata)
-        pp_path = inference_dir / "posterior_predictive.nc"
-        _atomic_write_netcdf(posterior_idata, pp_path)
-        inference_files["posterior_predictive"] = pp_path
-
-        posterior_summary = _build_posterior_summary(
-            posterior_idata, include_gamma_dl=flavor == "gamma_dl_shrunk"
-        )
-        p_mean = _posterior_mean_p_observed(posterior_idata)
+        posterior_summary = _build_posterior_summary(posterior_idata)
+        p_mean = _posterior_event_means(posterior_idata, inputs)
         y_int = inputs.y.astype(np.int64)
         calibration_ece = expected_calibration_error(p_mean, y_int, n_bins=15)
-        max_bucket_dev, bucket_df = _posterior_predictive_bucket_dev(
-            posterior_idata, y_int, n_bins=10
+        max_bucket_dev, bucket_df = _bucket_dev_from_p_mean(
+            p_mean, y_int, n_bins=10
         )
 
         write_parquet_atomic(
@@ -463,6 +586,9 @@ def run_bayes_model(
         write_parquet_atomic(
             _posterior_summary_dataframe(posterior_summary),
             exports_dir / "posterior_summary.parquet",
+        )
+        _ = _export_event_propensities(
+            p_mean, inputs, target_path=exports_dir / POSTERIOR_EXPORT_FILENAME
         )
 
     diagnostics_summary = (
@@ -494,7 +620,8 @@ def run_bayes_model(
             diagnostics_summary.posterior_predictive_max_bucket_dev
         ),
         "is_smoke": smoke,
-        "gamma_dl_flavor": flavor,
+        "source_effect_active": source_effect_active,
+        "backend": sampler.backend,
     }
     _atomic_write_text(
         validation_dir / "diagnostics.json",
@@ -505,17 +632,15 @@ def run_bayes_model(
         model_name=model_name,
         model_version=MODEL_VERSION,
         dimension=spec.dimension,
-        gamma_dl_flavor=flavor,
         prior_config=priors,
         sampler_config=sampler_record,
         posterior_summary=posterior_summary,
         diagnostics_summary=diagnostics_summary,
-        ablation_status=flavor,
-        dl_proposal_inputs=dl_artifact_ids,
         inference_files=inference_files,
+        source_effect_active=source_effect_active,
+        event_row_count=int(inputs.n_events),
     )
 
-    input_artifact_ids = (dataset_artifact_id, *dl_artifact_ids)
     manifest = ArtifactManifest(
         artifact_id=artifact_id,
         kind="bayes",
@@ -524,28 +649,29 @@ def run_bayes_model(
         created_at=utc_now(),
         source_snapshot_id=source_snapshot_id,
         dataset_artifact_id=dataset_artifact_id,
-        input_artifact_ids=input_artifact_ids,
+        input_artifact_ids=(dataset_artifact_id,),
         output_paths={k: v for k, v in inference_files.items()},
         package_versions=package_versions(),
         random_seed=sampler.random_seed,
-        ablation_status=flavor,
         metadata={
             "is_smoke": smoke,
             "prior_only": prior_only,
             "smoke_limit": smoke_limit if smoke_limit is not None else 0,
-            "row_count": int(inputs.y.shape[0]),
+            "row_count": int(inputs.n_events),
+            "backend": sampler.backend,
+            "source_effect_active": source_effect_active,
         },
         bayes_extras=extras,
     )
     manifest_path = artifact_dir / "manifest.json"
     write_manifest(manifest, manifest_path)
     _log.info(
-        "bayes fit complete model=%s artifact=%s rows=%d smoke=%s flavor=%s",
+        "bayes fit complete model=%s artifact=%s rows=%d smoke=%s backend=%s",
         model_name,
         artifact_id,
-        int(inputs.y.shape[0]),
+        int(inputs.n_events),
         smoke,
-        flavor,
+        sampler.backend,
     )
     return manifest
 

@@ -15,8 +15,8 @@ The semantics:
 AUC thresholds (doc-04 lines 235-241):
 
 - ``>= 0.75`` → ``publication_tier = 'diagnostic_only'`` — embedding
-  encodes the source family well enough that the Bayes layer must
-  exclude this artifact from ``gamma_dl_shrunk`` runs.
+  encodes the source family well enough that downstream consumers must
+  exclude this artifact from any DL covariate flow.
 - ``< 0.65`` → ``'full'`` — publication-eligible.
 - ``[0.65, 0.75)`` → ``'manual_review'`` — recorded in manifest
   metadata for human triage.

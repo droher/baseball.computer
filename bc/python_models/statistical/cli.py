@@ -205,16 +205,6 @@ def build_parser() -> argparse.ArgumentParser:
     _add_dataset_artifact_arg(fit_bayes)
     _add_artifact_id_arg(fit_bayes)
     _ = fit_bayes.add_argument(
-        "--gamma-dl",
-        choices=("zero", "shrunk"),
-        default="zero",
-        help=(
-            "DL covariate ablation flavor. 'zero' freezes gamma_dl=0; "
-            "'shrunk' samples gamma_dl ~ Normal(0, 0.5) and consumes the "
-            "published DL artifact named by the target's dl_proposal_dimension."
-        ),
-    )
-    _ = fit_bayes.add_argument(
         "--smoke",
         action="store_true",
         help=(
@@ -258,6 +248,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run conservation/calibration/holdout/sensitivity checks on an artifact.",
     )
     _add_artifact_id_arg(validate)
+    _ = validate.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Model name to disambiguate when multiple models share an "
+            "artifact id (e.g. trajectory_observedness vs "
+            "location_side_observedness both at 10k-v1)."
+        ),
+    )
     _ = validate.add_argument(
         "--output-path",
         default=None,
@@ -569,7 +568,6 @@ def _run_fit_bayes(args: argparse.Namespace) -> int:
         dataset_artifact_id=str(args.dataset_artifact),
         artifact_id=str(args.artifact_id),
         source_snapshot_id=source_snapshot_id,
-        gamma_dl=str(args.gamma_dl),
         smoke=bool(args.smoke),
         prior_only=bool(args.prior_only),
         artifact_root=output_root,
@@ -595,9 +593,14 @@ def _run_validate(args: argparse.Namespace) -> int:
     )
 
     artifact_id = str(args.artifact_id)
+    model_name = getattr(args, "model", None)
     candidate_roots = _build_candidate_roots()
-    report = validate_artifact(artifact_id, candidate_roots=candidate_roots)
-    artifact_dir = _find_manifest(artifact_id, candidate_roots).parent
+    report = validate_artifact(
+        artifact_id, model_name=model_name, candidate_roots=candidate_roots
+    )
+    artifact_dir = _find_manifest(
+        artifact_id, candidate_roots, model_name=model_name
+    ).parent
     output_path = (
         Path(args.output_path)
         if args.output_path

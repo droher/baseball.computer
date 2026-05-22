@@ -46,6 +46,7 @@ MODEL (
     context_confidence VARCHAR,
     exposure_status VARCHAR,
     result_family VARCHAR,
+    pa_result VARCHAR,
     alignment_regime VARCHAR,
     dl_artifact_id VARCHAR,
     dl_p_class DOUBLE[],
@@ -78,7 +79,8 @@ MODEL (
     source_snapshot_id = 'Stamp from the source_snapshot_id var. Carried through every modeling-dataset row so downstream exporters can identify the source-data snapshot the dataset was built against.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
     dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land.',
-    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.'
+    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
+    pa_result = 'ml_event_outcomes.outcome_plate_appearance_cat (Single, Double, Triple, HomeRun, InPlayOut, ReachedOnError, SacrificeHit, SacrificeFly, StrikeOut, Walk, HitByPitch, IntentionalWalk, Other). NULL-coalesced to Other.'
   ),
   audits (
     not_null(columns := (event_key, dimension, observed_status, game_id, season, batting_team_id, fielding_team_id, primary_fold, source_snapshot_id)),
@@ -94,6 +96,11 @@ MODEL (
       'pre_shift_era', 'shift_growth_era', 'full_shift_era', 'post_restriction'
     )),
     accepted_values(column := leverage_bucket, is_in := ('low', 'medium', 'high')),
+    accepted_values(column := pa_result, is_in := (
+      'Single', 'Double', 'Triple', 'HomeRun', 'InPlayOut',
+      'ReachedOnError', 'SacrificeHit', 'SacrificeFly',
+      'StrikeOut', 'Walk', 'HitByPitch', 'IntentionalWalk', 'Other'
+    )),
     relationships(column := event_key, to_model := main_models.event_observation_context, to_column := event_key)
   )
 );
@@ -141,6 +148,7 @@ SELECT
     c.context_confidence,
     c.exposure_status,
     c.result_family,
+    COALESCE(m.outcome_plate_appearance_cat, 'Other') AS pa_result,
     c.alignment_regime,
     p.dl_artifact_id,
     p.dl_p_class,
@@ -164,5 +172,6 @@ FROM main_models.event_observation_geometry AS o
 INNER JOIN main_models.event_observation_context AS c USING (event_key)
 LEFT JOIN main_models.dl_proposal_manifest AS p
     ON p.event_key = o.event_key AND p.dimension = o.dimension
+LEFT JOIN main_models.ml_event_outcomes AS m USING (event_key)
 LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)
 WHERE c.target_population_status = 'event_level'
