@@ -455,7 +455,7 @@ PR3's aggregated `Binomial(n_cell, p_cell)` formulation has been retired. Full 1
 
 #### Observation Sub-Gate
 
-- [ ] Observation propensities calibrate by key slices. (Posterior-predictive `P̂(observed)` within ±0.05 over `(season_decade, source_family, result_family)` slices with `n_slice ≥ 500`.)
+- [x] Observation propensities calibrate by key slices. (Posterior-predictive `P̂(observed)` within ±0.05 over `(season_decade, source_family, result_family)` slices with `n_slice ≥ 500`. All 6 dims pass on weighted absolute deviation: trajectory 0.020, location_side 0.016, location_depth 0.011, location_edge 0.014, general_location 0.014, ball_handler_position 0.021. Per-slice pass rates 87-100%; failures concentrated in small `play_by_play × sacrifice` cells and a systematic 1980s `play_by_play × hit` underestimate across 4 dims. Per-dim payload at `<artifact>/validation/calibration_by_slice.json`.)
 - [ ] Scorer/source holdouts do not collapse.
 - [ ] MNAR sensitivity intervals are published for MNAR-prone outputs.
 - [ ] Existing coverage-weighted metrics can be reproduced as a baseline.
