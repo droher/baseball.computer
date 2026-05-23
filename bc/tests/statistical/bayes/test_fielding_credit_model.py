@@ -83,6 +83,7 @@ def _synthetic_dataset(
                             "outs_start": 1,
                             "frame_start": "Top",
                             "alignment_regime": "shift_growth_era",
+                            "direct_handler_position": k_pos if known_credit > 0 else None,
                             "personnel_confidence": "high",
                             "context_confidence": "high",
                             "exposure_status": "complete",

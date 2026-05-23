@@ -1,4 +1,4 @@
-"""Event-grain hierarchical Bayes builder for fielding-credit allocation (Model C v1.5).
+"""Event-grain hierarchical Bayes builder for fielding-credit allocation (Model C v1.6).
 
 Two-arm likelihood over a shared softmax:
 
@@ -42,7 +42,7 @@ def build_fielding_credit_model(
     *,
     priors: BayesPriorConfig | None = None,
 ) -> pm.Model:
-    """Construct the event-grain v1.5 dual-arm credit-allocation PyMC model."""
+    """Construct the event-grain v1.6 dual-arm credit-allocation PyMC model."""
     cfg = priors if priors is not None else BayesPriorConfig()
     coords: dict[str, list[str]] = dict(inputs.coords)
     coords["event"] = [str(k) for k in range(inputs.n_events)]

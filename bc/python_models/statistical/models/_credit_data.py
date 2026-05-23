@@ -1,4 +1,4 @@
-"""Event-grain prep for Phase-4 Model C v1.5: dual-arm synthetic-mask credit allocation.
+"""Event-grain prep for Phase-4 Model C v1.6: dual-arm synthetic-mask credit allocation with direct-handler FE.
 
 Reads the frozen ``model_input_fielding_credit`` Parquet at grain
 ``(event_key, player_id, fielding_position, credit_type)``, filters to
@@ -82,6 +82,7 @@ FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
     "outs_start",
     "frame_start",
     "alignment_regime",
+    "direct_handler_position",
 )
 
 GLOBAL_EFFECT_COLUMNS: tuple[str, ...] = (
@@ -566,7 +567,7 @@ def prepare_event_credit_inputs(
     held_out_fold_id: int = HOLDOUT_FOLD_ID,
     held_out_fold_count: int = HOLDOUT_FOLD_COUNT,
 ) -> EventCreditInputs:
-    """Read the modeling-dataset parquet and shape v1.5 dual-arm inputs.
+    """Read the modeling-dataset parquet and shape v1.6 dual-arm inputs.
 
     Filters to well-attributed events (``known_credit > 0,
     personnel_hard_mask_available=TRUE``), holds out

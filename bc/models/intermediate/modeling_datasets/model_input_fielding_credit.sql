@@ -48,6 +48,7 @@ MODEL (
     exposure_status VARCHAR,
     result_family VARCHAR,
     alignment_regime VARCHAR,
+    direct_handler_position UTINYINT,
     dl_artifact_id VARCHAR,
     dl_p_class DOUBLE[],
     holdout_flags STRUCT(
@@ -80,7 +81,8 @@ MODEL (
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
     dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land. Manifest joined on (event_key, dimension = credit_type) for forward-compat.',
-    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.'
+    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
+    direct_handler_position = 'stg_events.batted_to_fielder (1-9 = the position that fielded the batted ball first; NULL when not batted or handler unrecorded — both surface as the __unknown__ FE level downstream). Per-event scalar; same value across all 27 (player, position, credit_type) rows of a given event.'
   ),
   audits (
     not_null(columns := (event_key, player_id, fielding_position, credit_type, game_id, season, batting_team_id, fielding_team_id, primary_fold, source_snapshot_id)),
@@ -130,6 +132,13 @@ known AS (
         assists,
         errors
     FROM main_models.event_player_fielding_stats
+),
+
+handler AS (
+    SELECT
+        event_key,
+        NULLIF(batted_to_fielder, 0) AS direct_handler_position
+    FROM main_models.stg_events
 )
 
 SELECT
@@ -188,6 +197,7 @@ SELECT
     c.exposure_status,
     c.result_family,
     c.alignment_regime,
+    h.direct_handler_position,
     p.dl_artifact_id,
     p.dl_p_class,
     STRUCT_PACK(
@@ -220,5 +230,6 @@ LEFT JOIN main_models.dl_credit_proposal_manifest AS p
     AND p.player_id = o.player_id
     AND p.fielding_position = o.fielding_position
     AND p.credit_type = o.credit_type
+LEFT JOIN handler AS h USING (event_key)
 LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)
 WHERE c.target_population_status = 'event_level'

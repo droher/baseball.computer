@@ -124,7 +124,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
     "model_input_fielding_credit": DatasetSpec(
         name="model_input_fielding_credit",
         sqlmesh_table="model_input_fielding_credit",
-        dataset_version="0.2.0",
+        dataset_version="0.3.0",
         grain=("event_key", "player_id", "fielding_position", "credit_type"),
         categorical_columns=_merge(
             (
