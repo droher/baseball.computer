@@ -545,14 +545,21 @@ Purpose: estimate official fielding credit without confusing official credit, ha
 - [x] Multinomial diagnostics filter widened to include `beta_season / z_scorer / z_park` (now data-informed via the supervised arm).
 - [x] OOS held-out top-1 accuracy beats the per-position-prior baseline at production N. `full-10k-v15-tuned`: 0.529 vs baseline 0.358 (+17.1pp). Lift is consistent across positions where direct-handler signal is weak; structural 1B over-prediction (+3.6pp) deferred to v1.6.
 - [x] Held-out per-position PR-AUC ≥ macro baseline on the 9 positions at production N. `full-10k-v15-tuned`: C 0.95, 1B 0.49, 2B 0.22, 3B 0.10, SS 0.16, LF 0.10, CF 0.14, RF 0.11; macro 0.26 (P excluded — near-trivial 0.03). Distribution calibration TV gate (`result_family weighted_tv ≤ 0.05`) passes at 0.054 marginal.
-- [x] N-sweep (1K / 5K / 10K, tuned with `BC_CREDIT_NONCENTER_SEASON=1 BC_CREDIT_MIN_NATURAL_UNK_RATE=0.01`) — top-1 plateaus by 1K (+0.7pp from 1K to 10K), result_family weighted TV improves monotonically 0.076 → 0.063 → 0.054. Operating point `full-10k-v15-tuned`: cheapest fit that clears every slice gate. Bigger N is not the lever — structural per-event evidence (v1.6) is.
+- [x] N-sweep (1K / 5K / 10K, tuned with `BC_CREDIT_NONCENTER_SEASON=1 BC_CREDIT_MIN_NATURAL_UNK_RATE=0.01`) — top-1 plateaus by 1K (+0.7pp from 1K to 10K), result_family weighted TV improves monotonically 0.076 → 0.063 → 0.054. Operating point `full-10k-v15-tuned`: cheapest fit that clears every slice gate.
 
-##### v1.6 implementation sub-gates
+##### v1.6 retraction (2026-05-23)
 
-- [x] `direct_handler_position UTINYINT` column on `model_input_fielding_credit` from `NULLIF(stg_events.batted_to_fielder, 0)`. Dataset version bumped 0.2.0 → 0.3.0.
-- [x] `FIXED_EFFECT_COLUMNS` in `_credit_data.py` extended with `direct_handler_position` — the per-FE × position interaction loop in `build_fielding_credit_model` creates a (10×9) `delta_direct_handler_position` matrix automatically. No new term in `credit.py`.
-- [x] Test fixtures (`test_fielding_credit_prep.py`, `test_fielding_credit_model.py`) populate `direct_handler_position = k_pos when known_credit > 0 else None`. 12/12 unit tests pass.
-- [x] `full-10k-v16-tuned` published + applied. Held-out: top-1 0.529 → 0.786 (+25.7pp; +43.3pp over baseline 0.358), top-3 0.743 → 0.985, log-loss 1.472 → 0.538 (−63%), TV 0.046 → 0.008 (−82%), max per-position abs dev 0.036 → 0.005, max slice weighted TV 0.054 → 0.018. Diagnostics rhat 1.008, ess 1398, 0 divergences. OF positions PR-AUC ~0.10 → ~0.997 (caught flies become near-deterministic with handler signal). 1B over-prediction (the v1.5 structural bias) is gone.
+v1.6 added `direct_handler_position` as a per-event FE. Held-out top-1 jumped 0.529 → 0.786 (+25.7pp) and OF PR-AUC ≈0.10 → ≈0.997, but those numbers were a sample-composition artifact: the held-out set is 77% handler-recorded while the production inference target is **0.09% handler-recorded** (3,663 of 4,167,837 events). The two columns share upstream coverage — sources that record the putout chain also record `batted_to_fielder`; sources that don't record the putout (= our inference target) also don't record the handler. The v1.6 deployed model behaved essentially identically to v1.5 on the dominant production slice.
+
+Retraction actions:
+
+- [x] Drop `direct_handler_position` from `model_input_fielding_credit` (column + descriptions + handler CTE + join + select). Roll dataset_version back to `0.2.0`.
+- [x] Drop `direct_handler_position` from `FIXED_EFFECT_COLUMNS` in `_credit_data.py` and from the test fixtures.
+- [x] Add `PRODUCTION_FE_COVERAGE_FLOOR = 0.01` and `_assert_fixed_effects_cover_production_slice` to `prepare_event_credit_inputs` so any future FE candidate with <1% coverage on the production unknown slice raises at prep time. Guarded by three new tests in `test_fielding_credit_prep.py`.
+- [x] Re-publish `full-10k-v15-tuned` as the `putout_credit_allocation` pointer on the revert env and restate `main_models.imputed_fielding_credit` (89,577 rows back on v1.5 shares).
+- [x] Document the coverage-asymmetry trap in `notes/data-coverage-implementation/03-hierarchical-models.md` and the CLAUDE.md "Caveat on held-out PR-AUC".
+
+Reintroducing handler evidence is not blocked, but any future PR must either lift production-slice coverage above the floor or restrict held-out metric reporting to the `direct_handler_position IS NULL` slice (the production-equivalent population).
 
 ### Shift Propensity (K)
 

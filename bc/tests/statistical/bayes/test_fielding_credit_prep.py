@@ -1,4 +1,4 @@
-"""Synthetic-fixture tests for ``prepare_event_credit_inputs`` (v1.5 dual-arm)."""
+"""Synthetic-fixture tests for the dual-arm ``prepare_event_credit_inputs``."""
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAny=false
 
@@ -84,7 +84,6 @@ def _synthetic_dataset(
                             "outs_start": 1,
                             "frame_start": "Top",
                             "alignment_regime": "shift_growth_era",
-                            "direct_handler_position": k_pos if known_credit > 0 else None,
                             "personnel_confidence": "high",
                             "context_confidence": "high",
                             "exposure_status": "complete",
@@ -264,3 +263,110 @@ def test_per_position_mask_rate_roughly_matches_weights(tmp_path: Path) -> None:
     assert shares[dominant] > shares.mean(), (
         f"dominant position {dominant + 1} share {shares[dominant]:.3f} not above mean {shares.mean():.3f}"
     )
+
+
+def _dataset_with_production_rows(
+    tmp_path: Path,
+    *,
+    n_production_events: int = 200,
+    sparse_fe: str = "result_family",
+    sparse_fe_non_null_rate: float = 0.005,
+) -> Path:
+    dataset_path, _ = _synthetic_dataset(tmp_path)
+    df = pl.read_parquet(dataset_path)
+    rng = np.random.default_rng(0)
+    base_event_id = 900_000
+    rows: list[dict[str, object]] = []
+    for i in range(n_production_events):
+        eid = base_event_id + i
+        keep_value = rng.random() < sparse_fe_non_null_rate
+        for k_pos in range(1, N_POSITIONS + 1):
+            for ct in ("putout", "assist", "error"):
+                rows.append(
+                    {
+                        "event_key": eid,
+                        "player_id": f"PX_{k_pos:02d}",
+                        "fielding_position": k_pos,
+                        "credit_type": ct,
+                        "known_credit": 0.0,
+                        "unknown_credit_need": 1.0 if ct == "putout" else 0.0,
+                        "fielding_evidence_status": "complete_with_known_unknowns",
+                        "gap_class": "unknown_putout",
+                        "personnel_hard_mask_available": True,
+                        "eligible_for_allocation": True,
+                        "game_id": f"GP{i:04d}",
+                        "season": 1944,
+                        "league": "AL",
+                        "game_type": "RegularSeason",
+                        "source_type": "pbp",
+                        "source_family": "play_by_play",
+                        "park_id": "ARL01",
+                        "scorer": "scorerA",
+                        "fielding_team_id": "TEX",
+                        "result_family": "out_in_play" if keep_value else None,
+                        "base_state_start": 0,
+                        "outs_start": 1,
+                        "frame_start": "Top",
+                        "alignment_regime": "shift_growth_era",
+                        "personnel_confidence": "high",
+                        "context_confidence": "high",
+                        "exposure_status": "complete",
+                    }
+                )
+    extra = pl.DataFrame(rows, schema=df.schema)
+    assert sparse_fe in df.columns, f"sparse_fe={sparse_fe!r} missing from fixture"
+    pl.concat([df, extra]).write_parquet(dataset_path)
+    return dataset_path
+
+
+def test_coverage_guard_raises_when_fe_under_one_percent_on_production(
+    tmp_path: Path,
+) -> None:
+    dataset_path = _dataset_with_production_rows(
+        tmp_path, n_production_events=300, sparse_fe_non_null_rate=0.0
+    )
+    with pytest.raises(ValueError, match=r"production unknown slice.*result_family"):
+        _ = prepare_event_credit_inputs(
+            dataset_path,
+            dimension="putout",
+            min_events_per_season=1,
+            held_out_fold_count=DEFAULT_N_GAMES + 1,
+        )
+
+
+def test_coverage_guard_passes_when_fe_above_one_percent_on_production(
+    tmp_path: Path,
+) -> None:
+    from python_models.statistical.models._credit_data import (
+        _assert_fixed_effects_cover_production_slice,
+    )
+
+    dataset_path = _dataset_with_production_rows(
+        tmp_path, n_production_events=300, sparse_fe_non_null_rate=0.50
+    )
+    production_event_count = (
+        pl.read_parquet(dataset_path)
+        .filter(
+            (pl.col("credit_type") == "putout")
+            & (pl.col("unknown_credit_need") > 0)
+            & pl.col("personnel_hard_mask_available")
+            & pl.col("eligible_for_allocation")
+        )
+        .get_column("event_key")
+        .n_unique()
+    )
+    assert production_event_count == 300, (
+        f"fixture must seed the guard with production rows; got {production_event_count}"
+    )
+    _assert_fixed_effects_cover_production_slice(dataset_path, dimension="putout")
+
+
+def test_coverage_guard_skipped_when_no_production_events(tmp_path: Path) -> None:
+    dataset_path, _ = _synthetic_dataset(tmp_path)
+    inputs = prepare_event_credit_inputs(
+        dataset_path,
+        dimension="putout",
+        min_events_per_season=1,
+        held_out_fold_count=DEFAULT_N_GAMES + 1,
+    )
+    assert inputs.n_events > 0

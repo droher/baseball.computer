@@ -1,4 +1,4 @@
-"""Builder + supervised-arm inference test for Model C v1.5."""
+"""Builder + supervised-arm inference test for the fielding-credit model."""
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAny=false, reportAttributeAccessIssue=false
 
@@ -83,7 +83,6 @@ def _synthetic_dataset(
                             "outs_start": 1,
                             "frame_start": "Top",
                             "alignment_regime": "shift_growth_era",
-                            "direct_handler_position": k_pos if known_credit > 0 else None,
                             "personnel_confidence": "high",
                             "context_confidence": "high",
                             "exposure_status": "complete",
@@ -124,7 +123,7 @@ def test_required_rvs_declared(tmp_path: Path) -> None:
     )
     observed_names = {rv.name for rv in model.observed_RVs}
     assert "Y_supervised" in observed_names, (
-        "v1.5 supervised multinomial arm missing"
+        "supervised multinomial arm missing"
     )
 
 

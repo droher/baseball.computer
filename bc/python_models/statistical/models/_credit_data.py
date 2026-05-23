@@ -1,4 +1,4 @@
-"""Event-grain prep for Phase-4 Model C v1.6: dual-arm synthetic-mask credit allocation with direct-handler FE.
+"""Event-grain prep for the dual-arm synthetic-mask credit allocation model.
 
 Reads the frozen ``model_input_fielding_credit`` Parquet at grain
 ``(event_key, player_id, fielding_position, credit_type)``, filters to
@@ -82,8 +82,9 @@ FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
     "outs_start",
     "frame_start",
     "alignment_regime",
-    "direct_handler_position",
 )
+
+PRODUCTION_FE_COVERAGE_FLOOR: float = 0.01
 
 GLOBAL_EFFECT_COLUMNS: tuple[str, ...] = (
     "personnel_confidence",
@@ -556,6 +557,61 @@ def _build_supervised_arrays(
     return sup_idx_int, counts_sup, U_sup
 
 
+def _assert_fixed_effects_cover_production_slice(
+    parquet_path: Path,
+    *,
+    dimension: str,
+    floor: float = PRODUCTION_FE_COVERAGE_FLOOR,
+) -> None:
+    production = (
+        pl.scan_parquet(parquet_path)
+        .filter(
+            (pl.col("credit_type") == dimension)
+            & (pl.col("unknown_credit_need") > 0)
+            & (pl.col("personnel_hard_mask_available") == True)  # noqa: E712
+            & (pl.col("eligible_for_allocation") == True)  # noqa: E712
+        )
+        .select(["event_key", *FIXED_EFFECT_COLUMNS])
+        .collect()
+    )
+    n_production = production.get_column("event_key").n_unique()
+    if n_production == 0:
+        _log.info(
+            "FE coverage guard skipped: no production-target events "
+            "(credit_type=%r, unknown_credit_need>0)",
+            dimension,
+        )
+        return
+    sparse: list[tuple[str, float]] = []
+    for column in FIXED_EFFECT_COLUMNS:
+        if column not in production.columns:
+            sparse.append((column, 0.0))
+            continue
+        events_with_value = (
+            production.filter(pl.col(column).is_not_null())
+            .get_column("event_key")
+            .n_unique()
+        )
+        rate = events_with_value / n_production
+        if rate < floor:
+            sparse.append((column, rate))
+        else:
+            _log.info(
+                "FE coverage on production slice (n=%d): %s = %.4f",
+                n_production,
+                column,
+                rate,
+            )
+    if sparse:
+        detail = ", ".join(f"{name}={rate:.4f}" for name, rate in sparse)
+        raise ValueError(
+            f"fixed-effect coverage on the production unknown slice "
+            f"(n={n_production}) below floor {floor:.4f}: {detail}. "
+            "Drop the column from FIXED_EFFECT_COLUMNS — features that "
+            "are not populated on the inference target cannot generalize."
+        )
+
+
 def prepare_event_credit_inputs(
     parquet_path: Path,
     *,
@@ -567,7 +623,7 @@ def prepare_event_credit_inputs(
     held_out_fold_id: int = HOLDOUT_FOLD_ID,
     held_out_fold_count: int = HOLDOUT_FOLD_COUNT,
 ) -> EventCreditInputs:
-    """Read the modeling-dataset parquet and shape v1.6 dual-arm inputs.
+    """Read the modeling-dataset parquet and shape dual-arm inputs.
 
     Filters to well-attributed events (``known_credit > 0,
     personnel_hard_mask_available=TRUE``), holds out
@@ -578,6 +634,8 @@ def prepare_event_credit_inputs(
     and the aggregate arm (masked events with T computed from hidden
     Y).
     """
+    _assert_fixed_effects_cover_production_slice(parquet_path, dimension=dimension)
+
     df = (
         pl.scan_parquet(parquet_path)
         .filter(

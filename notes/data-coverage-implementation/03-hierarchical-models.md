@@ -197,7 +197,7 @@ An argmax convenience column may be emitted for inspection but is never the cano
 
 ## Model C: Fielding Credit Allocation
 
-**Implementation as of 2026-05-23 (v1.6, putouts only).** Dual-arm hierarchical multinomial on numpyro NUTS, one fit per credit-type scope (v1.6 = `putout` only). v1.6 adds direct-handler evidence on top of the v1.5 dual-arm; v1.5 superseded v1's aggregate-only formulation:
+**Implementation as of 2026-05-23 (v1.5, putouts only).** Dual-arm hierarchical multinomial on numpyro NUTS, one fit per credit-type scope (currently `putout` only). v1.5 superseded v1's aggregate-only formulation. v1.6 added `direct_handler_position` as a fixed effect and was retracted (see "v1.6 retraction" below):
 
 - **Training pool** is well-attributed events (`credit_type='putout' AND known_credit > 0 AND personnel_hard_mask_available=TRUE`, ~9.9M candidates) where Y is observed per event. v1's aggregate-only pool was naturally-unknown events where Y is latent — that pool gave the model the marginal distribution but no per-event discriminative signal.
 - **Synthetic-mask layer.** Per-event Bernoulli mask probability `P_e = clip(α_c · w[true_pos(e)], 0, 1)`. Per-position weights `w` come from the empirical natural-unknown distribution in the v1 authority cache (1B 42%, OF 8–13%, etc.; `REAL_UNKNOWN_RATES_BY_POSITION` in `_credit_data.py`). Per-(season, source_family) intensity `α_c` calibrates the cell-mean mask rate to the empirical natural-unknown rate per cell (1944 PBP ~20%, 1972+ PBP ~0%) so synthetic unknowns share the joint distribution real unknowns have at inference time. Per-game floor: at least one event stays unmasked.
@@ -208,8 +208,28 @@ An argmax convenience column may be emitted for inspection but is never the cano
 - **Identification.** `alpha_position` and each per-FE `delta_<fe>` are `ZeroSumNormal` over the position axis. Continuous slopes are skipped in v1.5; add only if calibration shows residual signal.
 - **Held-out OOS.** 10% of games via `game_hash_fold(game_id, fold_count=10) == 0`. Held-out events are excluded from both arms and scored after sampling: top-1 / top-3 / log-loss / per-position PR-AUC / macro PR-AUC, written to `validation/held_out_metrics.json`. Real OOS metrics (not aggregate-residual proxies) gate the operating point alongside rhat / ess / divergences.
 - `MIN_EVENTS_PER_SEASON=50` row floor replaces the Model A saturated-season filter.
-- **v1.6 direct-handler evidence.** `model_input_fielding_credit` surfaces `direct_handler_position UTINYINT` from `stg_events.batted_to_fielder` (NULL when not batted or handler unrecorded; `NULLIF(batted_to_fielder, 0)` in SQL). Plumbed through `EventCreditInputs.fixed_effects` so the existing per-FE × position interaction loop in `build_fielding_credit_model` creates a `delta_direct_handler_position` of shape `(10 levels, 9 positions)` — encoding the (handler-from, putout-to) interaction directly. No new term needed in `credit.py`. The (handler-from, putout-to) matrix lets the model learn that "ball hit to SS (handler 6) ⇒ putout most likely at 1B (pos 3)" for ground balls, while "ball hit to CF (handler 8) ⇒ putout at CF" for caught flies. Holdout impact at 10K-tuned: top-1 0.529 → 0.786 (+25.7pp; +43.3pp over baseline 0.358), top-3 0.743 → 0.985, log-loss 1.472 → 0.538 (−63%), global TV 0.046 → 0.008 (−82%). Per-position max abs dev 0.036 → 0.005 — the structural 1B over-prediction is gone. OF positions PR-AUC ~0.10 → ~0.997 (caught flies become near-deterministic with the handler signal). Max slice weighted TV 0.054 → 0.018, well under the 0.05 gate on every slice. Same sampler tuning as v1.5 (`BC_CREDIT_NONCENTER_SEASON=1 BC_CREDIT_MIN_NATURAL_UNK_RATE=0.01`); diagnostics rhat 1.008, ess 1398, 0 divergences.
 - Deferred: v2 player REs, v3 assists allocation (needs Dirichlet-multinomial count submodel), v4 errors + double plays, v5 team-residual fallback for `withheld` rows.
+
+### v1.6 retraction (`direct_handler_position` FE)
+
+v1.6 added `direct_handler_position` (`NULLIF(stg_events.batted_to_fielder, 0)`) as a per-event FE. The held-out lift looked dramatic — top-1 0.529 → 0.786 (+25.7pp), per-position max abs dev 0.036 → 0.005, OF PR-AUC ≈0.10 → ≈0.997 — but the held-out gain was a sample-composition artifact, not a generalizable signal.
+
+Coverage breakdown on the held-out set vs the production inference target (events with `unknown_credit_need > 0 AND personnel_hard_mask_available AND eligible_for_allocation`):
+
+| slice | events | `direct_handler_position` recorded | NULL |
+|---|---:|---:|---:|
+| held-out eval | 10,554,569 | 8,131,306 (77.0%) | 2,423,263 (23.0%) |
+| production unknowns | 4,167,837 | 3,663 (**0.09%**) | 4,164,174 (99.91%) |
+
+The two columns are coverage-correlated upstream: sources that record the putout chain (i.e. our training/held-out population) also record `batted_to_fielder`; sources that don't record the putout (i.e. our inference target) typically don't record `batted_to_fielder` either. So the +25.7pp held-out lift came from events that share the handler signal with the model, and the production benefit is `0.0009 × big + 0.9991 × 0 ≈ 0`. The v1.6 deployed model behaved essentially identically to v1.5 on the dominant unknown-handler slice.
+
+We retracted v1.6 by:
+
+1. Removing `direct_handler_position` from `model_input_fielding_credit` and from `FIXED_EFFECT_COLUMNS`.
+2. Adding a 1% production-coverage floor (`PRODUCTION_FE_COVERAGE_FLOOR`) — `_assert_fixed_effects_cover_production_slice` raises if any FE is populated on less than 1% of the production unknown slice. Tested at the unit-test layer (`test_fielding_credit_prep.py`).
+3. Re-promoting `full-10k-v15-tuned` as the published `putout_credit_allocation` pointer.
+
+The retraction does not block a future return to handler evidence — but any reintroduction needs (a) an upstream pipeline that surfaces `batted_to_fielder` on the unknown-putout slice at >1% coverage, or (b) a separate model specifically scoped to the small handler-known production subset (with the rest falling through to the FE-only model), and any held-out metric must be reported restricted to the `direct_handler_position IS NULL` slice as the production-equivalent number.
 
 Artifact paths: per-fit exports under `artifacts/statistical/bayes/<model_name>/<artifact_id>/exports/event_credit.parquet` (grain `(event_key, fielding_position, credit_type)`, value `expected_share`); SQLMesh consumer `main_models.imputed_fielding_credit` at grain `(event_key, player_id, fielding_position, credit_type)`.
 
