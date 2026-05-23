@@ -467,26 +467,26 @@ Purpose: estimate official fielding credit without confusing official credit, ha
 
 #### First Scope
 
-- [ ] Target event-level games only.
-- [ ] Target unknown putouts first.
-- [ ] Target hidden assist risk with a separate assist-count model.
-- [ ] Use clean official aggregate constraints where available.
-- [ ] Tag no-box estimates as lower confidence.
-- [ ] Model or withhold battery and baserunning-related credits separately.
-- [ ] Use direct handler evidence only; do not consume posterior `ball_handler_probabilities` in the first fielding-credit model.
+- [x] Target event-level games only.
+- [x] Target unknown putouts first. (v1 ships `putout_credit_allocation` only.)
+- [ ] Target hidden assist risk with a separate assist-count model. (Deferred to v3 — needs Dirichlet-multinomial count submodel.)
+- [x] Use clean official aggregate constraints where available. (Targets sourced from `official_aggregate_availability.residual_value` joined to `official_credit_authority.authority_source`; `withheld` excluded.)
+- [ ] Tag no-box estimates as lower confidence. (Authority source already discriminates `event_box_reconciled` / `box` / `event` / `estimated_with_aggregate_constraint`; v1 propagates `authority_source` via the per-target `sigma_box` mapping. Confidence column on the downstream @model is a follow-up.)
+- [ ] Model or withhold battery and baserunning-related credits separately. (Deferred to v4.)
+- [x] Use direct handler evidence only; do not consume posterior `ball_handler_probabilities` in the first fielding-credit model. (Trivially satisfied in v1 — no handler covariate enters the model. v1.1 will add `D_{e,k}` direct-handler evidence column.)
 
 ### Putout Model
 
-- [ ] Build known-putout training set from complete events.
-- [ ] Apply hard personnel masks only from high-confidence personnel states.
-- [ ] Fit putout multinomial by eligible player/position.
-- [ ] Include event result, base/out state, broad contact, direct handler evidence, team-season, scorer/source, and calibrated deep proposal only when available out-of-fold.
-- [ ] Condition allocations on clean box-score residual constraints.
-- [ ] Run no-box prior validation separately.
+- [x] Build known-putout training set from complete events. (`prepare_event_credit_inputs` in `bc/python_models/statistical/models/_credit_data.py`.)
+- [x] Apply hard personnel masks only from high-confidence personnel states. (Eligibility joined from `personnel_fielding_states` via `event_personnel_lookup`.)
+- [x] Fit putout multinomial by eligible player/position. (`build_fielding_credit_model` in `bc/python_models/statistical/models/credit.py`; per-event softmax over personnel-eligible positions.)
+- [~] Include event result, base/out state, broad contact, direct handler evidence, team-season, scorer/source, and calibrated deep proposal only when available out-of-fold. (v1 includes per-FE × position interactions for the available covariate set. Direct handler evidence + DL proposal deferred per follow-ups.)
+- [x] Condition allocations on clean box-score residual constraints. (Aggregate-only Normal likelihood at the authority-target grain — see v1 implemented block in `03-hierarchical-models.md`.)
+- [ ] Run no-box prior validation separately. (DEFERRED — runtime, after publication.)
 
 #### Assist Model
 
-- [ ] Build complete-event training set for assist counts by play type.
+- [ ] Build complete-event training set for assist counts by play type. (Deferred to v3.)
 - [ ] Estimate missing assist count before player allocation.
 - [ ] Fit assist-count model with result, base/out state, force/double-play opportunity, broad contact, scorer/source, and personnel context.
 - [ ] Fit assist-allocation model conditional on estimated assist count.
@@ -495,35 +495,57 @@ Purpose: estimate official fielding credit without confusing official credit, ha
 
 #### Validation
 
-- [ ] Hide known fielding credit in complete games.
-- [ ] Hide clean aggregate constraints and test no-box drift.
-- [ ] Validate player-game residual conservation.
-- [ ] Validate event-out conservation.
-- [ ] Validate no credit assigned outside personnel state.
-- [ ] Report calibration by position, credit type, event result, scorer/source, era, and aggregate-total availability.
-- [ ] Report no-box confidence and weak-identification flags.
+- [ ] Hide known fielding credit in complete games. (DEFERRED — runtime.)
+- [ ] Hide clean aggregate constraints and test no-box drift. (DEFERRED — runtime.)
+- [ ] Validate player-game residual conservation. (DEFERRED — runtime.)
+- [ ] Validate event-out conservation. (DEFERRED — runtime.)
+- [ ] Validate no credit assigned outside personnel state. (DEFERRED — runtime. v1 model graph enforces eligibility-masked softmax by construction; runtime audit confirms on exported shares.)
+- [ ] Report calibration by position, credit type, event result, scorer/source, era, and aggregate-total availability. (DEFERRED — runtime.)
+- [ ] Report no-box confidence and weak-identification flags. (DEFERRED — runtime.)
 
 #### Gamma_dl Ablation
 
-- [ ] Fit `gamma_dl_zero` flavor of putout, assist-count, and assist-allocation models.
-- [ ] Fit `gamma_dl_shrunk` flavor of putout, assist-count, and assist-allocation models.
-- [ ] Select publication tier per fielding-credit submodel and record it in the manifest.
+- [ ] Fit `gamma_dl_zero` flavor of putout, assist-count, and assist-allocation models. (Retired alongside Model A's ablation policy — no DL covariate in v1.)
+- [ ] Fit `gamma_dl_shrunk` flavor of putout, assist-count, and assist-allocation models. (Retired.)
+- [ ] Select publication tier per fielding-credit submodel and record it in the manifest. (Retired.)
 
 #### Outputs
 
-- [ ] `imputed_fielding_credit`.
+- [x] `imputed_fielding_credit`. (SQLMesh `@model` at `bc/models/intermediate/coverage/imputed_fielding_credit.py`; grain `(event_key, player_id, fielding_position, credit_type)`. Zero-row typed stub until a Bayes credit artifact publishes.)
 - [ ] `fielding_credit_draws` if downstream nonlinear summaries require draws.
 - [ ] `fielding_credit_expected_counters`.
 - [ ] `fielding_credit_validation`.
 
 #### Fielding Credit Sub-Gate
 
-- [ ] Conservation audits pass.
-- [ ] Held-out known credit backtests beat legacy allocation or match it with calibrated uncertainty.
-- [ ] Aggregate-total holdouts pass.
-- [ ] Assist-count model passes separate validation.
-- [ ] No-box estimates are always included; `fielding_credit_confidence` exposes their reliability rather than a hard suppression threshold.
+- [ ] Conservation audits pass. (DEFERRED — runtime.)
+- [ ] Held-out known credit backtests beat legacy allocation or match it with calibrated uncertainty. (DEFERRED — runtime.)
+- [ ] Aggregate-total holdouts pass. (DEFERRED — runtime.)
+- [ ] Assist-count model passes separate validation. (DEFERRED to v3.)
+- [ ] No-box estimates are always included; `fielding_credit_confidence` exposes their reliability rather than a hard suppression threshold. (DEFERRED — runtime + downstream @model surface.)
 - [ ] Outputs remain in estimated namespace until explicit publication decision.
+
+##### v1 implementation sub-gates
+
+- [x] `EventCreditInputs` + `prepare_event_credit_inputs` in `bc/python_models/statistical/models/_credit_data.py`. _(Superseded by v1.5 — `materialize_credit_authority_targets` is gone; `EventCreditInputs` now carries `is_masked`, supervised arrays, and the held-out OOS set.)_
+- [x] `build_fielding_credit_model` in `bc/python_models/statistical/models/credit.py`.
+- [x] `putout_credit_allocation` target registered in `bc/python_models/statistical/bayes/targets/credit.py` with `outcome_kind="multinomial"`, `sample_size=50_000`.
+- [x] `training.py` branches on `outcome_kind`; adds `_posterior_event_softmax` + `_export_event_credit_shares`; renames Bernoulli helper to `_posterior_event_means_bernoulli`. Writes `exports/event_credit.parquet`.
+- [x] `manifest_ingest.aggregate_fielding_credit_frames` + `CREDIT_SHARE_SCHEMA`.
+- [x] `imputed_fielding_credit.py` SQLMesh `@model` rewritten from stub, joins `personnel_fielding_states` via `event_personnel_lookup` inside `execute()`.
+- [x] Unit tests: `test_fielding_credit_prep.py` (8), `test_fielding_credit_model.py` (3 + 1 slow inference), `test_imputed_fielding_credit.py` (2). `test_bayes_registry.py` partitioned by `outcome_kind`.
+
+##### v1.5 implementation sub-gates
+
+- [x] Dual-arm builder: supervised `pm.Multinomial("Y_supervised", ...)` on unmasked well-attributed events + aggregate Normal on masked subset, sharing the same `softmax(eta)`.
+- [x] `_apply_synthetic_mask` per-event Bernoulli, per-position weights from v1 authority cache (`REAL_UNKNOWN_RATES_BY_POSITION`), per-(season, source_family) intensity from `_CACHED_NATURAL_UNKNOWN_RATES`, per-game at-least-one-unmasked floor.
+- [x] Deterministic 10%-of-games holdout via `game_hash_fold(g, fold_count=10) == 0`; held-out events excluded from training and surfaced as `inputs.held_out`.
+- [x] `_evaluate_held_out` + `validation/held_out_metrics.json` emitting top-1 / top-3 / log-loss / per-position PR-AUC / macro PR-AUC / baseline top-1.
+- [x] `BayesPriorConfig.sigma_box_aggregate` replaces the v1 `sigma_by_authority` mapping (no authority_source split — we control masking).
+- [x] Multinomial diagnostics filter widened to include `beta_season / z_scorer / z_park` (now data-informed via the supervised arm).
+- [ ] OOS held-out top-1 accuracy beats the per-position-prior baseline at production N (gate: confirmed at smoke 10K + full fit at chosen N).
+- [ ] Held-out per-position PR-AUC ≥ macro baseline on the 9 positions at production N.
+- [ ] N-sweep (10K / 50K / 100K) — operating point chosen on diminishing-returns of OOS metrics, not just rhat / ess.
 
 ### Shift Propensity (K)
 
@@ -887,7 +909,7 @@ Update this table as implementation proceeds.
 | 2. Datasets + EDA + split registry | `[ ]` |  |  |  |
 | 3. Deep-learning supplements | `[ ]` |  |  |  |
 | 4a. Observation models (A, B) | `[ ]` |  |  |  |
-| 4b. Fielding credit (C) | `[ ]` |  |  |  |
+| 4b. Fielding credit (C) | `[~]` | branch `phase4_model_c_v1`; putout-only multinomial v1 (prep + builder + target + training generalization + manifest ingest + @model rewrite + unit tests) | runtime sub-gates (smoke fit, N-sweep, full fit, calibration-by-slice, conservation audits) deferred to post-publication | Run smoke fit on `putout_credit_allocation`; then full fit + publish |
 | 4c. Shift propensity (K) | `[ ]` |  |  |  |
 | 4d. Handler + geometry | `[ ]` |  |  |  |
 | 4e. Park factors | `[ ]` |  |  |  |

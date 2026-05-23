@@ -7,7 +7,7 @@ and posterior predictive. Writes ``inference/*.nc``,
 ``validation/diagnostics.json``, and the manifest atomically.
 """
 
-# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnusedCallResult=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false, reportArgumentType=false, reportCallIssue=false, reportAny=false
+# pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportUnusedCallResult=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false, reportArgumentType=false, reportCallIssue=false
 
 from __future__ import annotations
 
@@ -40,6 +40,10 @@ from python_models.statistical.manifests import (
     utc_now,
     write_manifest,
 )
+from python_models.statistical.models._credit_data import (
+    EventCreditInputs,
+    HeldOutSet,
+)
 from python_models.statistical.models._event_data import (
     DEFAULT_SEED,
     DEFAULT_SMOKE_LIMIT,
@@ -69,7 +73,9 @@ _log = logging.getLogger(__name__)
 MODEL_VERSION: str = "0.3.0"
 
 POSTERIOR_CHUNK_DEFAULT: int = 250_000
+POSTERIOR_CREDIT_CHUNK_DEFAULT: int = 5_000
 POSTERIOR_EXPORT_FILENAME: str = "event_propensity.parquet"
+CREDIT_EXPORT_FILENAME: str = "event_credit.parquet"
 
 
 def _atomic_write_text(target: Path, payload: str) -> None:
@@ -147,9 +153,7 @@ def _sanitize_idata_attrs(idata: az.InferenceData) -> None:
                     )
             _sanitize_attrs_dict(da.attrs)
     if found_non_primitive:
-        _log.info(
-            "sanitized non-primitive idata attrs: %s", found_non_primitive
-        )
+        _log.info("sanitized non-primitive idata attrs: %s", found_non_primitive)
 
 
 def _atomic_write_netcdf(idata: az.InferenceData, target: Path) -> None:
@@ -226,21 +230,41 @@ def _resolve_sampler_config(
     )
 
 
-def _build_posterior_summary(idata: az.InferenceData) -> BayesPosteriorSummary:
+def _build_posterior_summary(
+    idata: az.InferenceData, *, outcome_kind: str = "bernoulli"
+) -> BayesPosteriorSummary:
     posterior = idata.posterior
-    candidate_names = [
-        "alpha",
-        "sigma_season",
-        "sigma_scorer",
-        "sigma_park",
-        "sigma_source",
-    ]
-    candidate_names.extend(
-        name for name in posterior.data_vars if str(name).startswith("gamma_")
-    )
-    candidate_names.extend(
-        name for name in posterior.data_vars if str(name).startswith("delta_missing_")
-    )
+    if outcome_kind == "multinomial":
+        candidate_names: list[str] = [
+            "alpha_position",
+            "sigma_season",
+            "sigma_scorer",
+            "sigma_park",
+            "sigma_source",
+            "beta_season",
+            "beta_scorer",
+            "beta_park",
+            "beta_source",
+        ]
+        candidate_names.extend(
+            name for name in posterior.data_vars if str(name).startswith("delta_")
+        )
+    else:
+        candidate_names = [
+            "alpha",
+            "sigma_season",
+            "sigma_scorer",
+            "sigma_park",
+            "sigma_source",
+        ]
+        candidate_names.extend(
+            name for name in posterior.data_vars if str(name).startswith("gamma_")
+        )
+        candidate_names.extend(
+            name
+            for name in posterior.data_vars
+            if str(name).startswith("delta_missing_")
+        )
     var_names = [n for n in candidate_names if n in posterior.data_vars]
     summary_df = az.summary(idata, var_names=var_names, hdi_prob=0.94)
     rows: list[BayesPosteriorRow] = []
@@ -266,10 +290,30 @@ def _diagnostics_from_idata(
     *,
     calibration_ece: float | None,
     posterior_predictive_max_bucket_dev: float | None,
+    outcome_kind: str = "bernoulli",
 ) -> BayesDiagnosticsSummary:
-    rhat_ds = az.rhat(idata)
-    ess_bulk_ds = az.ess(idata, method="bulk")
-    ess_tail_ds = az.ess(idata, method="tail")
+    posterior = idata.posterior
+    if outcome_kind == "multinomial":
+        multinomial_focus = {
+            "alpha_position",
+            "beta_season",
+            "beta_scorer",
+            "beta_park",
+            "beta_source",
+            "z_scorer",
+            "z_park",
+            "z_source",
+        }
+        relevant_names = [
+            name
+            for name in posterior.data_vars
+            if str(name) in multinomial_focus or str(name).startswith("delta_")
+        ]
+    else:
+        relevant_names = list(posterior.data_vars)
+    rhat_ds = az.rhat(idata, var_names=relevant_names)
+    ess_bulk_ds = az.ess(idata, var_names=relevant_names, method="bulk")
+    ess_tail_ds = az.ess(idata, var_names=relevant_names, method="tail")
 
     def _finite_floats(ds: object) -> list[float]:
         out: list[float] = []
@@ -304,7 +348,7 @@ def _diagnostics_from_idata(
     )
 
 
-def _posterior_event_means(
+def _posterior_event_means_bernoulli(
     idata: az.InferenceData,
     inputs: EventObservationInputs,
     *,
@@ -470,6 +514,286 @@ def _export_event_propensities(
     return df
 
 
+def _posterior_held_out_softmax(
+    idata: az.InferenceData,
+    held_out: HeldOutSet,
+    *,
+    n_positions: int,
+    chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Compute ``E[softmax(eta_e)] | data`` per held-out event from posterior draws."""
+    posterior = idata.posterior
+    K = n_positions
+    n_event = held_out.n_events
+    if n_event == 0:
+        return np.zeros((0, K), dtype=np.float64)
+    alpha_position = np.asarray(posterior["alpha_position"].values, dtype=np.float64)
+    n_chain, n_draw = alpha_position.shape[0], alpha_position.shape[1]
+    deltas_fe: dict[str, np.ndarray] = {}
+    for column, design in held_out.fixed_effects.items():
+        if len(design.levels) <= 1:
+            continue
+        if f"delta_{column}" not in posterior:
+            continue
+        deltas_fe[column] = np.asarray(
+            posterior[f"delta_{column}"].values, dtype=np.float64
+        )
+
+    means = np.empty((n_event, K), dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        n_chunk = stop - start
+        eta = np.broadcast_to(
+            alpha_position[:, :, None, :], (n_chain, n_draw, n_chunk, K)
+        ).copy()
+        for column, df in deltas_fe.items():
+            codes = held_out.fixed_effects[column].codes[sl]
+            valid = codes >= 0
+            if valid.all():
+                eta += df[:, :, codes, :]
+            else:
+                safe_codes = np.where(valid, codes, 0)
+                contrib = df[:, :, safe_codes, :]
+                eta += contrib * valid[None, None, :, None]
+        eta -= eta.max(axis=-1, keepdims=True)
+        exp_eta = np.exp(eta)
+        pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
+        means[sl, :] = pi.mean(axis=(0, 1))
+    return means
+
+
+def _evaluate_held_out(
+    inputs: EventCreditInputs,
+    idata: az.InferenceData,
+) -> dict[str, object]:
+    """Compute OOS top-k accuracy, log-loss, and per-position PR-AUC.
+
+    Held-out events have observed Y (true position) and are excluded
+    from training via the deterministic game-hash holdout.
+    """
+    from sklearn.metrics import average_precision_score, log_loss
+
+    held = inputs.held_out
+    if held.n_events == 0:
+        return {"n_events": 0}
+
+    shares = _posterior_held_out_softmax(
+        idata, held, n_positions=inputs.n_positions
+    )
+    y_true = held.true_position.astype(np.int64)
+    valid = y_true >= 0
+    if not valid.any():
+        return {"n_events": int(held.n_events), "valid": 0}
+    shares = shares[valid]
+    y = y_true[valid]
+    eps = 1e-12
+    safe_shares = np.clip(shares, eps, 1.0)
+    top1 = float((np.argmax(safe_shares, axis=1) == y).mean())
+    top3_idx = np.argsort(-safe_shares, axis=1)[:, :3]
+    top3 = float(np.any(top3_idx == y[:, None], axis=1).mean())
+    ll = float(
+        log_loss(
+            y,
+            safe_shares,
+            labels=list(range(inputs.n_positions)),
+        )
+    )
+    pr_auc_per_pos: dict[str, float] = {}
+    for k in range(inputs.n_positions):
+        y_bin = (y == k).astype(np.int64)
+        if int(y_bin.sum()) == 0 or int(y_bin.sum()) == y_bin.shape[0]:
+            pr_auc_per_pos[str(k + 1)] = float("nan")
+            continue
+        try:
+            pr_auc_per_pos[str(k + 1)] = float(
+                average_precision_score(y_bin, safe_shares[:, k])
+            )
+        except ValueError:
+            pr_auc_per_pos[str(k + 1)] = float("nan")
+    finite_aucs = [v for v in pr_auc_per_pos.values() if np.isfinite(v)]
+    pr_auc_macro = float(np.mean(finite_aucs)) if finite_aucs else float("nan")
+    baseline_top1 = float(
+        max(
+            (int((y == k).sum()) for k in range(inputs.n_positions)),
+            default=0,
+        )
+        / max(y.shape[0], 1)
+    )
+    distribution = _distribution_calibration(safe_shares, y, n_positions=inputs.n_positions)
+    slice_columns: dict[str, np.ndarray] = {
+        "season": held.season_idx[valid],
+        "source_family": held.source_idx[valid],
+        "scorer": held.scorer_idx[valid],
+        "park": held.park_idx[valid],
+    }
+    for col, design in held.fixed_effects.items():
+        slice_columns[col] = design.codes[valid]
+    slice_calibration: dict[str, dict[str, float | int]] = {
+        name: _slice_calibration_summary(
+            safe_shares, y, codes=codes, n_positions=inputs.n_positions
+        )
+        for name, codes in slice_columns.items()
+    }
+
+    return {
+        "n_events": int(held.n_events),
+        "n_evaluated": int(valid.sum()),
+        "top1_accuracy": top1,
+        "top3_accuracy": top3,
+        "log_loss": ll,
+        "pr_auc_per_position": pr_auc_per_pos,
+        "pr_auc_macro": pr_auc_macro,
+        "baseline_top1_accuracy": baseline_top1,
+        "distribution_calibration": distribution,
+        "slice_calibration": slice_calibration,
+    }
+
+
+def _distribution_calibration(
+    shares: np.ndarray, y: np.ndarray, *, n_positions: int
+) -> dict[str, object]:
+    """Global per-position predicted vs empirical share + total variation distance."""
+    n = int(y.shape[0])
+    if n == 0:
+        return {"n_evaluated": 0}
+    predicted_share = shares.mean(axis=0)
+    empirical_share = np.bincount(y, minlength=n_positions) / n
+    abs_dev = np.abs(predicted_share - empirical_share)
+    tv = 0.5 * float(abs_dev.sum())
+    per_position: dict[str, dict[str, float]] = {}
+    for k in range(n_positions):
+        per_position[str(k + 1)] = {
+            "predicted_share": float(predicted_share[k]),
+            "empirical_share": float(empirical_share[k]),
+            "abs_dev": float(abs_dev[k]),
+        }
+    return {
+        "n_evaluated": n,
+        "per_position": per_position,
+        "max_abs_dev": float(abs_dev.max()) if abs_dev.size else 0.0,
+        "total_variation_distance": tv,
+    }
+
+
+def _slice_calibration_summary(
+    shares: np.ndarray,
+    y: np.ndarray,
+    *,
+    codes: np.ndarray,
+    n_positions: int,
+    min_slice_n: int = 50,
+) -> dict[str, float | int]:
+    """Per-slice total-variation distance: weighted mean + max across qualifying slices."""
+    codes = np.asarray(codes, dtype=np.int64)
+    unique = np.unique(codes)
+    n_qualifying = 0
+    total_n = 0
+    weighted_sum = 0.0
+    max_tv = 0.0
+    for s in unique:
+        mask = codes == s
+        n_s = int(mask.sum())
+        if n_s < min_slice_n:
+            continue
+        pred = shares[mask].mean(axis=0)
+        emp = np.bincount(y[mask], minlength=n_positions) / n_s
+        tv = 0.5 * float(np.abs(pred - emp).sum())
+        n_qualifying += 1
+        total_n += n_s
+        weighted_sum += tv * n_s
+        if tv > max_tv:
+            max_tv = tv
+    return {
+        "n_slices_scored": n_qualifying,
+        "n_events_scored": total_n,
+        "min_slice_n_threshold": int(min_slice_n),
+        "weighted_total_variation": (weighted_sum / total_n) if total_n > 0 else 0.0,
+        "max_total_variation": max_tv,
+    }
+
+
+def _posterior_event_softmax(
+    idata: az.InferenceData,
+    inputs: EventCreditInputs,
+    *,
+    chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Compute ``E[softmax(eta_e)] | data`` per (event, position) from posterior draws.
+
+    Per-event additive RE / global FE terms cancel exactly inside the
+    per-event softmax, so the export only reconstructs ``alpha_position``
+    and the per-position FE deltas. One chunk of events at a time keeps
+    RAM bounded.
+    """
+    posterior = idata.posterior
+    K = inputs.n_positions
+    n_event = inputs.n_events
+
+    alpha_position = np.asarray(posterior["alpha_position"].values, dtype=np.float64)
+    n_chain, n_draw = alpha_position.shape[0], alpha_position.shape[1]
+    deltas_fe: dict[str, np.ndarray] = {}
+    for column, design in inputs.fixed_effects.items():
+        if len(design.levels) <= 1:
+            continue
+        deltas_fe[column] = np.asarray(
+            posterior[f"delta_{column}"].values, dtype=np.float64
+        )
+
+    means = np.empty((n_event, K), dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        n_chunk = stop - start
+        eta = np.broadcast_to(
+            alpha_position[:, :, None, :], (n_chain, n_draw, n_chunk, K)
+        ).copy()
+        for column, df in deltas_fe.items():
+            codes = inputs.fixed_effects[column].codes[sl]
+            eta += df[:, :, codes, :]
+        eta -= eta.max(axis=-1, keepdims=True)
+        exp_eta = np.exp(eta)
+        pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
+        means[sl, :] = pi.mean(axis=(0, 1))
+    return means
+
+
+def _export_event_credit_shares(
+    means: np.ndarray,
+    inputs: EventCreditInputs,
+    *,
+    target_path: Path,
+) -> pl.DataFrame:
+    """Write per-event-per-position expected share to parquet.
+
+    Schema: ``(event_key int64, fielding_position int8,
+    credit_type utf8, expected_share float64)``.
+    """
+    n_event, K = means.shape
+    if K != inputs.n_positions:
+        raise AssertionError(
+            f"means shape mismatch: K={K}, inputs.n_positions={inputs.n_positions}"
+        )
+    event_keys = np.repeat(inputs.event_keys, K).astype(np.int64)
+    positions = np.tile(np.arange(1, K + 1, dtype=np.int8), n_event)
+    shares = means.reshape(-1).astype(np.float64)
+    df = pl.DataFrame(
+        {
+            "event_key": event_keys,
+            "fielding_position": positions,
+            "credit_type": [inputs.credit_type] * (n_event * K),
+            "expected_share": shares,
+        }
+    )
+    write_parquet_atomic(df, target_path)
+    _log.info(
+        "wrote event_credit export rows=%d path=%s",
+        n_event * K,
+        target_path,
+    )
+    return df
+
+
 def run_bayes_model(
     *,
     model_name: str,
@@ -503,12 +827,13 @@ def run_bayes_model(
         elif spec.sample_size is not None:
             smoke_limit = spec.sample_size
 
-    inputs = spec.prep_fn(
-        dataset_parquet,
-        dimension=spec.dataset_dimension_filter,
-        smoke_limit=smoke_limit,
-        seed=seed,
-    )
+    prep_kwargs: dict[str, object] = {
+        "dimension": spec.dataset_dimension_filter,
+        "smoke_limit": smoke_limit,
+        "seed": seed,
+    }
+
+    inputs = spec.prep_fn(dataset_parquet, **prep_kwargs)
     priors = BayesPriorConfig()
     model = spec.builder(inputs, priors=priors)
 
@@ -539,9 +864,7 @@ def run_bayes_model(
     validation_dir = bayes_validation_dir(model_name, artifact_id, root=artifact_root)
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    _log.info(
-        "bayes prior_predictive model=%s artifact=%s", model_name, artifact_id
-    )
+    _log.info("bayes prior_predictive model=%s artifact=%s", model_name, artifact_id)
     prior_idata = prior_predictive(model, sampler)
     prior_path = inference_dir / "prior_predictive.nc"
     _atomic_write_netcdf(prior_idata, prior_path)
@@ -560,42 +883,66 @@ def run_bayes_model(
             artifact_id,
             progress_log,
         )
-        posterior_idata = sample_model(
-            model, sampler, progress_log_path=progress_log
-        )
+        posterior_idata = sample_model(model, sampler, progress_log_path=progress_log)
         posterior_path = inference_dir / "posterior.nc"
         _atomic_write_netcdf(posterior_idata, posterior_path)
         inference_files["posterior"] = posterior_path
 
-        posterior_summary = _build_posterior_summary(posterior_idata)
-        p_mean = _posterior_event_means(posterior_idata, inputs)
-        y_int = inputs.y.astype(np.int64)
-        calibration_ece = expected_calibration_error(p_mean, y_int, n_bins=15)
-        max_bucket_dev, bucket_df = _bucket_dev_from_p_mean(
-            p_mean, y_int, n_bins=10
+        posterior_summary = _build_posterior_summary(
+            posterior_idata, outcome_kind=spec.outcome_kind
         )
-
-        write_parquet_atomic(
-            _reliability_dataframe(p_mean, y_int),
-            exports_dir / "calibration_curve.parquet",
-        )
-        if not bucket_df.is_empty():
-            write_parquet_atomic(
-                bucket_df, exports_dir / "posterior_predictive_buckets.parquet"
+        if spec.outcome_kind == "bernoulli":
+            p_mean = _posterior_event_means_bernoulli(posterior_idata, inputs)
+            y_int = inputs.y.astype(np.int64)
+            calibration_ece = expected_calibration_error(p_mean, y_int, n_bins=15)
+            max_bucket_dev, bucket_df = _bucket_dev_from_p_mean(
+                p_mean, y_int, n_bins=10
             )
-        write_parquet_atomic(
-            _posterior_summary_dataframe(posterior_summary),
-            exports_dir / "posterior_summary.parquet",
-        )
-        _ = _export_event_propensities(
-            p_mean, inputs, target_path=exports_dir / POSTERIOR_EXPORT_FILENAME
-        )
+
+            write_parquet_atomic(
+                _reliability_dataframe(p_mean, y_int),
+                exports_dir / "calibration_curve.parquet",
+            )
+            if not bucket_df.is_empty():
+                write_parquet_atomic(
+                    bucket_df, exports_dir / "posterior_predictive_buckets.parquet"
+                )
+            write_parquet_atomic(
+                _posterior_summary_dataframe(posterior_summary),
+                exports_dir / "posterior_summary.parquet",
+            )
+            _ = _export_event_propensities(
+                p_mean, inputs, target_path=exports_dir / POSTERIOR_EXPORT_FILENAME
+            )
+        else:
+            shares = _posterior_event_softmax(posterior_idata, inputs)
+            write_parquet_atomic(
+                _posterior_summary_dataframe(posterior_summary),
+                exports_dir / "posterior_summary.parquet",
+            )
+            _ = _export_event_credit_shares(
+                shares, inputs, target_path=exports_dir / CREDIT_EXPORT_FILENAME
+            )
+            held_out_metrics = _evaluate_held_out(inputs, posterior_idata)
+            _atomic_write_text(
+                validation_dir / "held_out_metrics.json",
+                json.dumps(held_out_metrics, indent=2, default=_json_default),
+            )
+            _log.info(
+                "bayes held-out metrics model=%s artifact=%s n_eval=%s top1=%.4f baseline_top1=%.4f",
+                model_name,
+                artifact_id,
+                held_out_metrics.get("n_evaluated", 0),
+                float(held_out_metrics.get("top1_accuracy", float("nan"))),
+                float(held_out_metrics.get("baseline_top1_accuracy", float("nan"))),
+            )
 
     diagnostics_summary = (
         _diagnostics_from_idata(
             posterior_idata,
             calibration_ece=calibration_ece,
             posterior_predictive_max_bucket_dev=max_bucket_dev,
+            outcome_kind=spec.outcome_kind,
         )
         if posterior_idata is not None
         else BayesDiagnosticsSummary(

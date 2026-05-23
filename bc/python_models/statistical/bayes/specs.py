@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Callable, ClassVar
+from typing import Callable, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+OutcomeKind = Literal["bernoulli", "multinomial"]
 
 
 class BayesTargetSpec(BaseModel):
@@ -32,9 +34,7 @@ class BayesTargetSpec(BaseModel):
         )
     )
     builder: Callable[..., object] = Field(
-        description=(
-            "PyMC model factory. Called as builder(inputs, priors=...)."
-        )
+        description=("PyMC model factory. Called as builder(inputs, priors=...).")
     )
     sample_size: int | None = Field(
         default=None,
@@ -42,6 +42,15 @@ class BayesTargetSpec(BaseModel):
             "Production row budget for this target's prep step. None means "
             "use the full filtered dataset. Explicit smoke_limit / env "
             "override / --smoke still take precedence in run_bayes_model."
+        ),
+    )
+    outcome_kind: OutcomeKind = Field(
+        default="bernoulli",
+        description=(
+            "Selects the posterior export and likelihood branch in "
+            "run_bayes_model. 'bernoulli' writes event_propensity.parquet "
+            "with p_observed_mean; 'multinomial' writes "
+            "event_credit.parquet with per-position expected_share."
         ),
     )
 

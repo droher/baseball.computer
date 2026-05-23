@@ -32,6 +32,8 @@ class BayesPriorConfig(BaseModel):
     sigma_source_scale: float = 0.7
     fixed_effect_scale: float = 1.0
     continuous_slope_scale: float = 0.5
+    fixed_effect_scale_credit: float = 0.5
+    sigma_box_aggregate: float = 0.5
 
 
 class BayesSamplerConfig(BaseModel):

@@ -197,6 +197,25 @@ An argmax convenience column may be emitted for inspection but is never the cano
 
 ## Model C: Fielding Credit Allocation
 
+**Implementation as of 2026-05-22 (v1.5, putouts only).** Dual-arm hierarchical multinomial on numpyro NUTS, one fit per credit-type scope (v1.5 = `putout` only). v1.5 supersedes v1's aggregate-only formulation:
+
+- **Training pool** is well-attributed events (`credit_type='putout' AND known_credit > 0 AND personnel_hard_mask_available=TRUE`, ~9.9M candidates) where Y is observed per event. v1's aggregate-only pool was naturally-unknown events where Y is latent — that pool gave the model the marginal distribution but no per-event discriminative signal.
+- **Synthetic-mask layer.** Per-event Bernoulli mask probability `P_e = clip(α_c · w[true_pos(e)], 0, 1)`. Per-position weights `w` come from the empirical natural-unknown distribution in the v1 authority cache (1B 42%, OF 8–13%, etc.; `REAL_UNKNOWN_RATES_BY_POSITION` in `_credit_data.py`). Per-(season, source_family) intensity `α_c` calibrates the cell-mean mask rate to the empirical natural-unknown rate per cell (1944 PBP ~20%, 1972+ PBP ~0%) so synthetic unknowns share the joint distribution real unknowns have at inference time. Per-game floor: at least one event stays unmasked.
+- **Dual likelihood, shared softmax.** Same `π_e = softmax(η_e)` over the personnel-eligible position set with `α_position` + per-FE × position `δ_<fe>` interactions.
+  - Supervised arm on unmasked events: `Y_{e,1:K} ~ Multinomial(U_e, π_e)` with Y the observed `known_credit` count vector. This is the load-bearing per-event signal — without it the per-event REs cancel under softmax.
+  - Aggregate arm on masked events: `T_target[m] ~ Normal(Σ U_e · π_{e,k}, σ_box)` at grain `(game_id, fielding_team_id, player_id, fielding_position)`, with `T_target[m] = Σ known_credit` over the masked subset (deterministic, since we control the mask). Single `sigma_box_aggregate` (no `authority_source` split — we make the unknowns ourselves).
+- **Per-event REs** (season / scorer / park / source) and per-event global FEs are kept. In v1 they cancelled under softmax and NUTS sampled them from the prior; in v1.5 the supervised arm makes them data-informed (one full draw of Y per supervised event identifies how scorers / parks / eras shift the per-position distribution).
+- **Identification.** `alpha_position` and each per-FE `delta_<fe>` are `ZeroSumNormal` over the position axis. Continuous slopes are skipped in v1.5; add only if calibration shows residual signal.
+- **Held-out OOS.** 10% of games via `game_hash_fold(game_id, fold_count=10) == 0`. Held-out events are excluded from both arms and scored after sampling: top-1 / top-3 / log-loss / per-position PR-AUC / macro PR-AUC, written to `validation/held_out_metrics.json`. Real OOS metrics (not aggregate-residual proxies) gate the operating point alongside rhat / ess / divergences.
+- `MIN_EVENTS_PER_SEASON=50` row floor replaces the Model A saturated-season filter.
+- Deferred: v1.6 direct-handler evidence column, v2 player REs, v3 assists allocation (needs Dirichlet-multinomial count submodel), v4 errors + double plays, v5 team-residual fallback for `withheld` rows.
+
+Artifact paths: per-fit exports under `artifacts/statistical/bayes/<model_name>/<artifact_id>/exports/event_credit.parquet` (grain `(event_key, fielding_position, credit_type)`, value `expected_share`); SQLMesh consumer `main_models.imputed_fielding_credit` at grain `(event_key, player_id, fielding_position, credit_type)`.
+
+### v1 archive (aggregate-only, superseded)
+
+v1 trained only on naturally-occurring unknown putouts and consumed `official_aggregate_availability.residual_value` joined to `official_credit_authority.authority_source` (excluding `withheld`) as targets, with a per-authority-source `sigma_box` map. It survives in git history (`30bb5fe`); v1.5 retains the aggregate-arm scatter structure but rebuilds the target from masked Y rather than from the box residual.
+
 ### Estimand
 
 For event `e`, eligible player-position `k`, and credit type `c`:

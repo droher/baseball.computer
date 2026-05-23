@@ -14,9 +14,17 @@ def test_at_least_one_target_registered() -> None:
 
 
 def test_observation_targets_share_dataset() -> None:
-    targets = all_targets()
+    targets = [t for t in all_targets() if t.outcome_kind == "bernoulli"]
     datasets = {spec.dataset_name for spec in targets}
     assert datasets == {"model_input_observation_batted_ball"}
+
+
+def test_credit_targets_share_dataset() -> None:
+    targets = [t for t in all_targets() if t.outcome_kind == "multinomial"]
+    if not targets:
+        return
+    datasets = {spec.dataset_name for spec in targets}
+    assert datasets == {"model_input_fielding_credit"}
 
 
 def test_trajectory_observedness_registered() -> None:
@@ -37,9 +45,9 @@ def test_unknown_target_raises() -> None:
 
 def test_every_obs_spec_pins_a_sample_size() -> None:
     for spec in all_targets():
-        assert (
-            spec.sample_size is not None and spec.sample_size > 0
-        ), f"{spec.name} must declare a positive sample_size budget"
+        assert spec.sample_size is not None and spec.sample_size > 0, (
+            f"{spec.name} must declare a positive sample_size budget"
+        )
 
 
 def test_every_obs_spec_filter_matches_dimension() -> None:
@@ -56,3 +64,12 @@ def test_obs_specs_dimensions_are_unique() -> None:
     assert len(dims) == len(set(dims)), (
         f"duplicate dimension across obs specs: {sorted(dims)}"
     )
+
+
+def test_putout_credit_allocation_registered() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    spec = get_target("putout_credit_allocation")
+    assert spec.outcome_kind == "multinomial"
+    assert spec.dataset_name == "model_input_fielding_credit"
+    assert spec.dataset_dimension_filter == "putout"
