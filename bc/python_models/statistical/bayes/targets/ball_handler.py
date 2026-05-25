@@ -22,7 +22,7 @@ from python_models.statistical.models._ball_handler_data import (
 from python_models.statistical.models.ball_handler import build_ball_handler_model
 
 DATASET_NAME: str = "model_input_observation_batted_ball"
-SAMPLE_SIZE: int = 50_000
+SAMPLE_SIZE: int = 10_000
 
 BALL_HANDLER_IMPUTATION = BayesTargetSpec(
     name="ball_handler_imputation",

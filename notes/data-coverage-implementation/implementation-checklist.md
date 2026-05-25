@@ -607,11 +607,18 @@ fit on `phase2-paresult-batted-ball` (50×50×2, 100k subsample) cleared the smo
 held-out top-1 0.220 vs 0.171 per-position baseline; production slice (1.30M
 handler-unobserved events) scored, shares sum to 1.
 
+Operating point: `d-cut1-10k` (nutpie, 1000×1000×4, `sample_size=10_000`). 1k→10k
+N-sweep on the 1.07M-event held-out fold — top-1 0.2065→0.2168, top-3 0.558→0.590,
+log-loss 1.980→1.946, aggregate TV 0.039→0.013, macro PR-AUC 0.164→0.169; 10k wins on
+every axis. `validate-artifact` passed at default gates (rhat_max 1.023, ess_bulk_min
+217, 0 divergences). Pointer published. `aggregate_ball_handler_frames` reads the real
+export (11.71M rows over 1.30M events, per-event shares = 1.0, schema exact).
+
 - [x] Define handler estimand separately from official fielding credit and responsibility. (K=9 over handler position, no credit/responsibility coupling.)
 - [ ] Use fielding-credit expected counters as optional validated inputs, not as raw truth. (γ_credit read-across deferred to a follow-up.)
 - [~] Use direct fielding-play evidence, `batted_to_fielder`, personnel state, event result, broad contact, base/out state, season/league, scorer/source, and alignment regime. (Cut-1: `result_family` as contact proxy + base/out + season-league RE + scorer RE + alignment_regime. `batted_to_fielder` / DL `batted_to_fielder_class` proposal (γ_dl) and broad contact deferred — both are unobserved on the handler-unobserved production slice and fail the 1% production-coverage floor.)
-- [~] Validate by batter hand, base state, result, position, era, and source. (Held-out slice calibration over season-league / source / scorer / park + per-FE; full operating-point validate + N-sweep deferred to a follow-up.)
-- [ ] Publish `ball_handler_probabilities`. (Full operating-point fit + `validate-artifact` at default gates + `publish-manifest` + `plan-model` against the real artifact deferred to a follow-up.)
+- [x] Validate by batter hand, base state, result, position, era, and source. (`d-cut1-10k` held-out slice calibration: season weighted-TV 0.025, source 0.013, scorer 0.019, park 0.023, result_family 0.022, base_state 0.023, outs 0.020, alignment 0.020 over the 1.07M-event fold.)
+- [~] Publish `ball_handler_probabilities`. (Operating-point fit + `validate-artifact` at default gates + `publish-manifest` done; `aggregate_ball_handler_frames` verified against the real export. Full `@model imputed_ball_handler_probabilities` materialization needs the `data_coverage` dev env built — its ~100 upstream models were never planned into a dev env — so it is left for the next env build / prod rebuild.)
 
 #### Geometry Model
 

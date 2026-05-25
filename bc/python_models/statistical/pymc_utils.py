@@ -57,7 +57,7 @@ DEFAULT_CONFIG: SamplingConfig = SamplingConfig(
     random_seed=20260513,
     cores=1,
     max_treedepth=12,
-    backend="numpyro",
+    backend="nutpie",
 )
 
 
