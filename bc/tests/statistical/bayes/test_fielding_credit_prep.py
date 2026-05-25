@@ -14,7 +14,11 @@ from python_models.statistical.models._credit_data import (
     HOLDOUT_FOLD_COUNT,
     HOLDOUT_FOLD_ID,
     N_POSITIONS,
+    N_POSITIONS_ASSIST,
+    NONE_POSITION_LABEL,
+    PUTOUT_POSITION_FE_COLUMN,
     REAL_UNKNOWN_RATES_BY_POSITION,
+    build_production_scoring_frame,
     prepare_event_credit_inputs,
 )
 from python_models.statistical.splits import game_hash_fold
@@ -370,3 +374,307 @@ def test_coverage_guard_skipped_when_no_production_events(tmp_path: Path) -> Non
         held_out_fold_count=DEFAULT_N_GAMES + 1,
     )
     assert inputs.n_events > 0
+
+
+def _synthetic_assist_dataset(
+    tmp_path: Path,
+    *,
+    n_games: int = DEFAULT_N_GAMES,
+    events_per_game: int = DEFAULT_EVENTS_PER_GAME,
+    season: int = 1925,
+    fielding_team_id: str = "TEX",
+    seed: int = 20260523,
+    multi_assist_event_keys: tuple[int, ...] = (),
+    extra_assist_positions: dict[int, int] | None = None,
+    no_assist_event_keys: tuple[int, ...] = (),
+) -> tuple[Path, dict[str, list[str]]]:
+    """Build a fixture with putout + assist credit rows per event.
+
+    Each event has a randomly chosen putout_position 1..9 and either a
+    single assist at a different position (default) or no assist (if
+    ``no_assist_event_keys`` lists the event). Events listed in
+    ``multi_assist_event_keys`` get a second assist at
+    ``extra_assist_positions[eid]`` (or position 5) — used to verify
+    the multi-assist filter.
+    """
+    rng = np.random.default_rng(seed)
+    lineups: dict[str, list[str]] = {
+        f"G{g:03d}": [f"P{g:02d}_{p:02d}" for p in range(N_POSITIONS)]
+        for g in range(n_games)
+    }
+    rows: list[dict[str, object]] = []
+    extras = extra_assist_positions or {}
+    no_assist_set = set(no_assist_event_keys)
+    multi_assist_set = set(multi_assist_event_keys)
+    for g in range(n_games):
+        for e in range(events_per_game):
+            eid = 100_000 + g * events_per_game + e
+            putout_pos_0 = int(rng.integers(0, N_POSITIONS))
+            if eid in no_assist_set:
+                assist_pos_0 = None
+                extra_assist_pos_0 = None
+            else:
+                candidates = [p for p in range(N_POSITIONS) if p != putout_pos_0]
+                assist_pos_0 = int(rng.choice(candidates))
+                extra_assist_pos_0 = (
+                    int(extras.get(eid, 4)) - 1 if eid in multi_assist_set else None
+                )
+            lineup = lineups[f"G{g:03d}"]
+            for k_pos in range(1, N_POSITIONS + 1):
+                for ct in ("putout", "assist", "error"):
+                    if ct == "putout":
+                        known_credit = 1.0 if (k_pos - 1) == putout_pos_0 else 0.0
+                    elif ct == "assist":
+                        if assist_pos_0 is None:
+                            known_credit = 0.0
+                        else:
+                            primary = 1.0 if (k_pos - 1) == assist_pos_0 else 0.0
+                            extra = (
+                                1.0
+                                if extra_assist_pos_0 is not None
+                                and (k_pos - 1) == extra_assist_pos_0
+                                else 0.0
+                            )
+                            known_credit = primary + extra
+                    else:
+                        known_credit = 0.0
+                    rows.append(
+                        {
+                            "event_key": eid,
+                            "player_id": lineup[k_pos - 1],
+                            "fielding_position": k_pos,
+                            "credit_type": ct,
+                            "known_credit": known_credit,
+                            "unknown_credit_need": 0.0,
+                            "fielding_evidence_status": "complete_with_zero_unknowns",
+                            "gap_class": "complete",
+                            "personnel_hard_mask_available": True,
+                            "eligible_for_allocation": False,
+                            "game_id": f"G{g:03d}",
+                            "season": season,
+                            "league": "AL",
+                            "game_type": "RegularSeason",
+                            "source_type": "pbp",
+                            "source_family": "play_by_play",
+                            "park_id": "ARL01",
+                            "scorer": "scorerA",
+                            "fielding_team_id": fielding_team_id,
+                            "result_family": "out_in_play",
+                            "base_state_start": 0,
+                            "outs_start": 1,
+                            "frame_start": "Top",
+                            "alignment_regime": "shift_growth_era",
+                            "personnel_confidence": "high",
+                            "context_confidence": "high",
+                            "exposure_status": "complete",
+                        }
+                    )
+    df = pl.DataFrame(rows)
+    dataset_path = tmp_path / "dataset_assist.parquet"
+    df.write_parquet(dataset_path)
+    return dataset_path, lineups
+
+
+def test_assist_inputs_use_K10(tmp_path: Path) -> None:
+    dataset_path, _ = _synthetic_assist_dataset(tmp_path)
+    inputs = prepare_event_credit_inputs(
+        dataset_path,
+        dimension="assist",
+        min_events_per_season=1,
+        held_out_fold_count=DEFAULT_N_GAMES + 1,
+    )
+    assert inputs.n_positions == N_POSITIONS_ASSIST == 10
+    assert inputs.credit_type == "assist"
+    assert inputs.coords["position"][-1] == NONE_POSITION_LABEL
+    assert len(inputs.coords["position"]) == N_POSITIONS_ASSIST
+    assert inputs.Y_supervised_counts.shape[1] == N_POSITIONS_ASSIST
+    assert (inputs.U == 1).all(), "assist v3 cut 1 should have U_e == 1 always"
+
+
+def test_assist_truth_filters_multi_assist_events(tmp_path: Path) -> None:
+    n_games = DEFAULT_N_GAMES
+    events_per_game = DEFAULT_EVENTS_PER_GAME
+    multi_keys = tuple(100_000 + i for i in range(0, events_per_game * 2, 4))
+    dataset_path, _ = _synthetic_assist_dataset(
+        tmp_path,
+        n_games=n_games,
+        events_per_game=events_per_game,
+        multi_assist_event_keys=multi_keys,
+    )
+    inputs = prepare_event_credit_inputs(
+        dataset_path,
+        dimension="assist",
+        min_events_per_season=1,
+        held_out_fold_count=n_games + 1,
+    )
+    kept_keys = set(inputs.event_keys.tolist())
+    for k in multi_keys:
+        assert k not in kept_keys, (
+            f"multi-assist event {k} should have been filtered out"
+        )
+
+
+def test_putout_position_fe_present_for_assist_credit_type(tmp_path: Path) -> None:
+    dataset_path, _ = _synthetic_assist_dataset(tmp_path)
+    inputs = prepare_event_credit_inputs(
+        dataset_path,
+        dimension="assist",
+        min_events_per_season=1,
+        held_out_fold_count=DEFAULT_N_GAMES + 1,
+    )
+    assert PUTOUT_POSITION_FE_COLUMN in inputs.fixed_effects
+    design = inputs.fixed_effects[PUTOUT_POSITION_FE_COLUMN]
+    assert design.codes.shape[0] == inputs.n_events
+    levels = set(design.levels)
+    assert levels.issubset({str(p) for p in range(1, N_POSITIONS + 1)}), (
+        f"unexpected putout_position levels: {levels}"
+    )
+
+
+def _dataset_with_assist_production_rows(
+    tmp_path: Path,
+    *,
+    n_production_events: int = 200,
+    sparse_fe_non_null_rate: float = 0.0,
+) -> Path:
+    """Seed both well-attributed and production-target rows for assist v3.
+
+    The assist production slice is filtered through ``credit_type='putout'
+    AND unknown_credit_need > 0`` per the v3 coverage guard.
+    """
+    dataset_path, _ = _synthetic_assist_dataset(tmp_path)
+    df = pl.read_parquet(dataset_path)
+    rng = np.random.default_rng(0)
+    base_event_id = 950_000
+    rows: list[dict[str, object]] = []
+    for i in range(n_production_events):
+        eid = base_event_id + i
+        keep_value = rng.random() < sparse_fe_non_null_rate
+        for k_pos in range(1, N_POSITIONS + 1):
+            for ct in ("putout", "assist", "error"):
+                rows.append(
+                    {
+                        "event_key": eid,
+                        "player_id": f"PX_{k_pos:02d}",
+                        "fielding_position": k_pos,
+                        "credit_type": ct,
+                        "known_credit": 0.0,
+                        "unknown_credit_need": 1.0 if ct == "putout" else 0.0,
+                        "fielding_evidence_status": "complete_with_known_unknowns",
+                        "gap_class": "unknown_putout",
+                        "personnel_hard_mask_available": True,
+                        "eligible_for_allocation": True,
+                        "game_id": f"GP{i:04d}",
+                        "season": 1944,
+                        "league": "AL",
+                        "game_type": "RegularSeason",
+                        "source_type": "pbp",
+                        "source_family": "play_by_play",
+                        "park_id": "ARL01",
+                        "scorer": "scorerA",
+                        "fielding_team_id": "TEX",
+                        "result_family": "out_in_play" if keep_value else None,
+                        "base_state_start": 0,
+                        "outs_start": 1,
+                        "frame_start": "Top",
+                        "alignment_regime": "shift_growth_era",
+                        "personnel_confidence": "high",
+                        "context_confidence": "high",
+                        "exposure_status": "complete",
+                    }
+                )
+    extra = pl.DataFrame(rows, schema=df.schema)
+    pl.concat([df, extra]).write_parquet(dataset_path)
+    return dataset_path
+
+
+def test_assist_coverage_guard_uses_unknown_putouts_predicate(tmp_path: Path) -> None:
+    """For credit_type='assist' the guard inspects credit_type='putout'
+    rows with ``unknown_credit_need > 0`` — assist rows always have
+    ``unknown_credit_need = 0`` upstream.
+    """
+    dataset_path = _dataset_with_assist_production_rows(
+        tmp_path, n_production_events=300, sparse_fe_non_null_rate=0.0
+    )
+    with pytest.raises(
+        ValueError, match=r"production unknown slice.*dimension='assist'.*result_family"
+    ):
+        _ = prepare_event_credit_inputs(
+            dataset_path,
+            dimension="assist",
+            min_events_per_season=1,
+            held_out_fold_count=DEFAULT_N_GAMES + 1,
+        )
+
+
+def test_assist_coverage_guard_passes_when_fe_above_one_percent(
+    tmp_path: Path,
+) -> None:
+    from python_models.statistical.models._credit_data import (
+        _assert_fixed_effects_cover_production_slice,
+    )
+
+    dataset_path = _dataset_with_assist_production_rows(
+        tmp_path, n_production_events=300, sparse_fe_non_null_rate=0.50
+    )
+    _assert_fixed_effects_cover_production_slice(dataset_path, dimension="assist")
+
+
+def test_build_production_scoring_frame_assist(tmp_path: Path) -> None:
+    n_production_events = 300
+    dataset_path = _dataset_with_assist_production_rows(
+        tmp_path,
+        n_production_events=n_production_events,
+        sparse_fe_non_null_rate=0.50,
+    )
+    inputs = prepare_event_credit_inputs(
+        dataset_path,
+        dimension="assist",
+        min_events_per_season=1,
+        held_out_fold_count=DEFAULT_N_GAMES + 1,
+    )
+
+    frame = build_production_scoring_frame(
+        dataset_path, dimension="assist", fixed_effects=inputs.fixed_effects
+    )
+
+    production_event_keys = set(
+        pl.scan_parquet(dataset_path)
+        .filter(
+            (pl.col("credit_type") == "putout")
+            & (pl.col("unknown_credit_need") > 0)
+            & pl.col("personnel_hard_mask_available")
+            & pl.col("eligible_for_allocation")
+        )
+        .select("event_key")
+        .unique()
+        .collect()
+        .get_column("event_key")
+        .to_list()
+    )
+    assert production_event_keys, "fixture should seed production-slice events"
+
+    frame_keys = frame.event_keys.tolist()
+    assert len(frame_keys) == len(set(frame_keys)), "one row per production event_key"
+    assert set(frame_keys) == production_event_keys, (
+        "only production events should be present"
+    )
+    assert frame.n_events == len(production_event_keys)
+    assert frame_keys == sorted(frame_keys), "event_keys must be sorted"
+
+    assert set(frame.fixed_effects.keys()) == set(inputs.fixed_effects.keys())
+
+    n = frame.n_events
+    for column, design in frame.fixed_effects.items():
+        train_design = inputs.fixed_effects[column]
+        assert design.levels == train_design.levels
+        assert design.codes.shape[0] == n, f"{column} codes length mismatch"
+        n_levels = len(design.levels)
+        for code in design.codes.tolist():
+            assert code == -1 or 0 <= code < n_levels, (
+                f"{column} code {code} out of range [0, {n_levels}) and not UNKNOWN(-1)"
+            )
+
+    putout_design = frame.fixed_effects[PUTOUT_POSITION_FE_COLUMN]
+    assert (putout_design.codes == 0).all(), "putout_position codes must be zeros"
+    assert putout_design.levels == inputs.fixed_effects[PUTOUT_POSITION_FE_COLUMN].levels

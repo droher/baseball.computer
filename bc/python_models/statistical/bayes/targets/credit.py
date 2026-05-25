@@ -1,13 +1,15 @@
-"""Phase-4 fielding-credit allocation targets (Model C).
+"""Fielding-credit allocation targets (Model C).
 
-v1 ships one target: ``putout_credit_allocation``. Reads
-``model_input_fielding_credit`` filtered to ``credit_type='putout'``
-plus the credit-authority targets parquet (materialized on demand
-by ``run_bayes_model`` from ``official_aggregate_availability`` joined
-to ``official_credit_authority``).
+Two registered targets share the dual-arm builder + prep_fn:
 
-v2/v3/v4/v5 extensions (player REs, assists, errors, team-residual
-fallback) ship as separate targets per the design doc.
+* ``putout_credit_allocation`` — K=9 softmax over fielder positions
+  for events whose putout fielder is unknown. v1.5 operating point.
+* ``assist_credit_allocation`` — K=10 softmax with a NONE sentinel
+  class, single-assist cut. v3 cut 1.
+
+Both consume ``model_input_fielding_credit`` filtered to their
+respective ``credit_type`` (the assist prep_fn also joins the putout
+known_credit rows internally to derive ``putout_position``).
 """
 
 from __future__ import annotations
@@ -33,7 +35,21 @@ PUTOUT_CREDIT_ALLOCATION = BayesTargetSpec(
     outcome_kind="multinomial",
 )
 
-CREDIT_SPECS: tuple[BayesTargetSpec, ...] = (PUTOUT_CREDIT_ALLOCATION,)
+ASSIST_CREDIT_ALLOCATION = BayesTargetSpec(
+    name="assist_credit_allocation",
+    dimension="assist",
+    dataset_name=DATASET_NAME,
+    dataset_dimension_filter="assist",
+    prep_fn=prepare_event_credit_inputs,
+    builder=build_fielding_credit_model,
+    sample_size=SAMPLE_SIZE,
+    outcome_kind="multinomial",
+)
+
+CREDIT_SPECS: tuple[BayesTargetSpec, ...] = (
+    PUTOUT_CREDIT_ALLOCATION,
+    ASSIST_CREDIT_ALLOCATION,
+)
 
 
 def _register() -> None:

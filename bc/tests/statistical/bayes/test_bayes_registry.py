@@ -73,3 +73,13 @@ def test_putout_credit_allocation_registered() -> None:
     assert spec.outcome_kind == "multinomial"
     assert spec.dataset_name == "model_input_fielding_credit"
     assert spec.dataset_dimension_filter == "putout"
+
+
+def test_assist_credit_allocation_registered() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    spec = get_target("assist_credit_allocation")
+    assert spec.outcome_kind == "multinomial"
+    assert spec.dataset_name == "model_input_fielding_credit"
+    assert spec.dataset_dimension_filter == "assist"
+    assert spec.dimension == "assist"

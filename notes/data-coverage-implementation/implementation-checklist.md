@@ -469,7 +469,7 @@ Purpose: estimate official fielding credit without confusing official credit, ha
 
 - [x] Target event-level games only.
 - [x] Target unknown putouts first. (v1 ships `putout_credit_allocation` only.)
-- [ ] Target hidden assist risk with a separate assist-count model. (Deferred to v3 — needs Dirichlet-multinomial count submodel.)
+- [~] Target hidden assist risk with a separate assist-count model. (v3 cut 1 in progress — `assist_credit_allocation` registered. K=10 softmax folds `P(any assist)` and `P(position | A_count=1)` into one model via a NONE sentinel class; single-assist events only. Multi-assist Dirichlet-multinomial count submodel still deferred to v3.1.)
 - [x] Use clean official aggregate constraints where available. (Targets sourced from `official_aggregate_availability.residual_value` joined to `official_credit_authority.authority_source`; `withheld` excluded.)
 - [ ] Tag no-box estimates as lower confidence. (Authority source already discriminates `event_box_reconciled` / `box` / `event` / `estimated_with_aggregate_constraint`; v1 propagates `authority_source` via the per-target `sigma_box` mapping. Confidence column on the downstream @model is a follow-up.)
 - [ ] Model or withhold battery and baserunning-related credits separately. (Deferred to v4.)
@@ -486,12 +486,21 @@ Purpose: estimate official fielding credit without confusing official credit, ha
 
 #### Assist Model
 
-- [ ] Build complete-event training set for assist counts by play type. (Deferred to v3.)
-- [ ] Estimate missing assist count before player allocation.
-- [ ] Fit assist-count model with result, base/out state, force/double-play opportunity, broad contact, scorer/source, and personnel context.
-- [ ] Fit assist-allocation model conditional on estimated assist count.
-- [ ] Validate putouts and assists separately.
-- [ ] Treat catcher, pitcher, strikeout, steal, pickoff, bunt, passed-ball, and rundown mechanisms separately.
+- [~] Build complete-event training set for assist counts by play type. (v3 cut 1: well-attributed events with `personnel_hard_mask_available` AND `putout_position` resolved, restricted to `A_count ∈ {0, 1}`. Multi-assist events filtered until v3.1.)
+- [~] Estimate missing assist count before player allocation. (v3 cut 1 folds `P(any assist)` into the K=10 softmax via a NONE sentinel; a separate Dirichlet-multinomial count head over `M ∈ {1..4}` event classes is v3.1.)
+- [~] Fit assist-count model with result, base/out state, force/double-play opportunity, broad contact, scorer/source, and personnel context. (v3 cut 1 carries `result_family`, `base_state_start`, `outs_start`, `frame_start`, `alignment_regime`, plus the new `putout_position` FE, all as per-event × position interactions on the K=10 softmax.)
+- [~] Fit assist-allocation model conditional on estimated assist count. (v3 cut 1: single-assist allocation only. K=10 softmax conditional on A_count==1 reduces to the 9-class fielder distribution; the NONE class absorbs A_count==0 mass.)
+- [~] Validate putouts and assists separately. (v3 ships its own held-out metrics — top-1 over the K=10 categorical, log-loss, per-position PR-AUC, plus an `any_assist` block with binary PR-AUC vs the empirical-rate baseline. Conservation against `aggregate_residual_assists` per (game, position) at production-fit time is the conservation sub-gate.)
+- [ ] Treat catcher, pitcher, strikeout, steal, pickoff, bunt, passed-ball, and rundown mechanisms separately. (Deferred — v3 cut 1 treats all single-assist events uniformly; per-mechanism breakouts go alongside the v3.1 count submodel.)
+
+##### v3 Sub-gates (cut 1)
+
+Metrics are putout-marginalized over the published v1.5 putout posterior (production-faithful: `putout_position` is observed on held-out events but unknown on the production target). The `observed_putout_upper_bound` numbers in the artifact condition on the true putout and are an upper bound only, not the production metric.
+
+- [~] Held-out top-1 over the K=10 categorical (marginalized): 0.6635 vs most-frequent-class baseline 0.6523 — +1.1 pt, essentially baseline. Per-fielder identification on the production slice does not beat baseline meaningfully; pinpointing the assister needs a sharp putout production lacks.
+- [x] Held-out `any_assist.pr_auc` (NONE vs ¬NONE) beats `any_assist.baseline_pr_auc`: 0.5155 vs 0.3477 base rate — a real, meaningful lift. The model predicts P(any assist), which is the part that survives marginalization.
+- [ ] Per-(game, position) conservation against `aggregate_residual_assists` within `σ_box_aggregate` on masked events at the published operating point.
+- [~] Calibration-by-slice `weighted_total_variation` across `result_family`, `base_state_start` for slices with `n ≥ 500`: marginal TV 0.052, per-slice 0.052–0.061 — right at the 0.05 gate. NONE under-predicted ~5 pt (0.604 vs 0.652), an expected consequence of marginalizing v1.5's diffuse putout posterior. `putout_position` is excluded from slice calibration when marginalizing (slicing by a marginalized variable is meaningless).
 
 #### Validation
 

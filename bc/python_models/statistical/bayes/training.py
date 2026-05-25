@@ -36,13 +36,17 @@ from python_models.statistical.calibration import (
 )
 from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
 from python_models.statistical.manifests import (
+    find_published_manifest,
     package_versions,
     utc_now,
     write_manifest,
 )
 from python_models.statistical.models._credit_data import (
     EventCreditInputs,
+    FixedEffectDesign,
     HeldOutSet,
+    ProductionScoringFrame,
+    build_production_scoring_frame,
 )
 from python_models.statistical.models._event_data import (
     DEFAULT_SEED,
@@ -76,6 +80,10 @@ POSTERIOR_CHUNK_DEFAULT: int = 250_000
 POSTERIOR_CREDIT_CHUNK_DEFAULT: int = 5_000
 POSTERIOR_EXPORT_FILENAME: str = "event_propensity.parquet"
 CREDIT_EXPORT_FILENAME: str = "event_credit.parquet"
+
+N_POSITIONS_EXPORT: int = 9
+
+HELD_OUT_MARGINALIZED_LIMIT: int = 100_000
 
 
 def _atomic_write_text(target: Path, payload: str) -> None:
@@ -566,11 +574,18 @@ def _posterior_held_out_softmax(
 def _evaluate_held_out(
     inputs: EventCreditInputs,
     idata: az.InferenceData,
+    *,
+    putout_idata: az.InferenceData | None = None,
 ) -> dict[str, object]:
     """Compute OOS top-k accuracy, log-loss, and per-position PR-AUC.
 
     Held-out events have observed Y (true position) and are excluded
-    from training via the deterministic game-hash holdout.
+    from training via the deterministic game-hash holdout. For the assist
+    K=10 model, when ``putout_idata`` is supplied the per-event softmax is
+    marginalized over the putout posterior — the production-faithful
+    metric, since putout_position is unobserved on the inference target.
+    Without it (or for putout), the observed-putout softmax is scored and
+    ``putout_marginalized`` is recorded ``False``.
     """
     from sklearn.metrics import average_precision_score, log_loss
 
@@ -578,9 +593,28 @@ def _evaluate_held_out(
     if held.n_events == 0:
         return {"n_events": 0}
 
-    shares = _posterior_held_out_softmax(
-        idata, held, n_positions=inputs.n_positions
+    marginalize = (
+        inputs.credit_type == "assist"
+        and inputs.n_positions == 10
+        and putout_idata is not None
     )
+    observed_shares: np.ndarray | None = None
+    if marginalize:
+        assert putout_idata is not None
+        held = _subsample_held_out(
+            held, limit=HELD_OUT_MARGINALIZED_LIMIT, seed=DEFAULT_SEED
+        )
+        putout_weights = _score_putout_posterior(putout_idata, held)
+        shares = _posterior_event_softmax_putout_marginalized(
+            idata, held, putout_posterior=putout_weights, n_positions=inputs.n_positions
+        )
+        observed_shares = _posterior_held_out_softmax(
+            idata, held, n_positions=inputs.n_positions
+        )
+    else:
+        shares = _posterior_held_out_softmax(
+            idata, held, n_positions=inputs.n_positions
+        )
     y_true = held.true_position.astype(np.int64)
     valid = y_true >= 0
     if not valid.any():
@@ -628,6 +662,8 @@ def _evaluate_held_out(
         "park": held.park_idx[valid],
     }
     for col, design in held.fixed_effects.items():
+        if marginalize and col == "putout_position":
+            continue
         slice_columns[col] = design.codes[valid]
     slice_calibration: dict[str, dict[str, float | int]] = {
         name: _slice_calibration_summary(
@@ -636,9 +672,10 @@ def _evaluate_held_out(
         for name, codes in slice_columns.items()
     }
 
-    return {
+    result: dict[str, object] = {
         "n_events": int(held.n_events),
         "n_evaluated": int(valid.sum()),
+        "putout_marginalized": marginalize,
         "top1_accuracy": top1,
         "top3_accuracy": top3,
         "log_loss": ll,
@@ -648,6 +685,36 @@ def _evaluate_held_out(
         "distribution_calibration": distribution,
         "slice_calibration": slice_calibration,
     }
+    if inputs.credit_type == "assist" and inputs.n_positions == 10:
+        none_idx = inputs.n_positions - 1
+        y_any = (y != none_idx).astype(np.int64)
+        any_score = 1.0 - safe_shares[:, none_idx]
+        if 0 < int(y_any.sum()) < y_any.shape[0]:
+            try:
+                pr_auc_any = float(average_precision_score(y_any, any_score))
+            except ValueError:
+                pr_auc_any = float("nan")
+        else:
+            pr_auc_any = float("nan")
+        baseline_pr_auc_any = float(y_any.mean())
+        result["any_assist"] = {
+            "n_events": int(y_any.shape[0]),
+            "empirical_rate": float(y_any.mean()),
+            "pr_auc": pr_auc_any,
+            "baseline_pr_auc": baseline_pr_auc_any,
+        }
+        if observed_shares is not None:
+            obs = np.clip(observed_shares[valid], eps, 1.0)
+            obs_any = 1.0 - obs[:, none_idx]
+            try:
+                obs_pr_auc_any = float(average_precision_score(y_any, obs_any))
+            except ValueError:
+                obs_pr_auc_any = float("nan")
+            result["observed_putout_upper_bound"] = {
+                "top1_accuracy": float((np.argmax(obs, axis=1) == y).mean()),
+                "any_assist_pr_auc": obs_pr_auc_any,
+            }
+    return result
 
 
 def _distribution_calibration(
@@ -713,6 +780,198 @@ def _slice_calibration_summary(
     }
 
 
+_FixedEffectCarrier = EventCreditInputs | HeldOutSet | ProductionScoringFrame
+
+
+def _posterior_event_softmax_putout_marginalized(
+    idata: az.InferenceData,
+    carrier: _FixedEffectCarrier,
+    *,
+    putout_posterior: np.ndarray,
+    n_positions: int,
+    chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Compute ``E[π_e | data]`` marginalized over a per-event putout posterior.
+
+    For each event ``e`` and putout candidate ``j ∈ {1..9}``,
+    ``softmax_k(η_e + δ_PO[j])`` is weighted-averaged by
+    ``P(PO_e = j) = putout_posterior[e, j-1]``. ``putout_posterior`` is
+    shape ``(n_event, 9)`` with row-sums close to 1. Works on any carrier
+    exposing ``fixed_effects`` + ``n_events`` (training inputs, held-out
+    set, or production scoring frame).
+    """
+    posterior = idata.posterior
+    k_out = n_positions
+    n_event = carrier.n_events
+    if "delta_putout_position" not in posterior:
+        raise ValueError(
+            "putout-marginalized softmax requires a putout_position FE in the model"
+        )
+    if putout_posterior.shape != (n_event, N_POSITIONS_EXPORT):
+        raise AssertionError(
+            f"putout_posterior shape mismatch: got {putout_posterior.shape}, "
+            f"want ({n_event}, {N_POSITIONS_EXPORT})"
+        )
+
+    alpha_position = np.asarray(posterior["alpha_position"].values, dtype=np.float64)
+    delta_po = np.asarray(
+        posterior["delta_putout_position"].values, dtype=np.float64
+    )
+    n_chain, n_draw = alpha_position.shape[0], alpha_position.shape[1]
+
+    po_design = carrier.fixed_effects.get("putout_position")
+    if po_design is None:
+        raise ValueError(
+            "putout-marginalized softmax requires fixed_effects['putout_position']"
+        )
+    po_level_lookup: list[int] = []
+    for position in range(1, N_POSITIONS_EXPORT + 1):
+        label = str(position)
+        if label not in po_design.levels:
+            raise ValueError(
+                f"cannot marginalize over putout_position={position}: level missing "
+                "from training. Ensure _assert_putout_position_levels_in_training held."
+            )
+        po_level_lookup.append(po_design.levels.index(label))
+
+    deltas_other: dict[str, np.ndarray] = {}
+    for column, design in carrier.fixed_effects.items():
+        if column == "putout_position" or len(design.levels) <= 1:
+            continue
+        deltas_other[column] = np.asarray(
+            posterior[f"delta_{column}"].values, dtype=np.float64
+        )
+
+    means = np.empty((n_event, k_out), dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        n_chunk = stop - start
+        eta_base = np.broadcast_to(
+            alpha_position[:, :, None, :], (n_chain, n_draw, n_chunk, k_out)
+        ).copy()
+        for column, df in deltas_other.items():
+            codes = carrier.fixed_effects[column].codes[sl]
+            valid = codes >= 0
+            safe = np.where(valid, codes, 0)
+            eta_base += df[:, :, safe, :] * valid[None, None, :, None]
+
+        weights = np.asarray(putout_posterior[sl], dtype=np.float64)
+        pi_marg = np.zeros((n_chain, n_draw, n_chunk, k_out), dtype=np.float64)
+        for position_idx, level_idx in enumerate(po_level_lookup):
+            eta_j = eta_base + delta_po[:, :, level_idx, :][:, :, None, :]
+            eta_j -= eta_j.max(axis=-1, keepdims=True)
+            exp_eta = np.exp(eta_j)
+            pi_j = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
+            pi_marg += pi_j * weights[None, None, :, position_idx, None]
+        means[sl, :] = pi_marg.mean(axis=(0, 1))
+    return means
+
+
+PUTOUT_MARGINALIZATION_MODEL: str = "putout_credit_allocation"
+
+
+def _resolve_published_putout_idata(
+    model_name: str = PUTOUT_MARGINALIZATION_MODEL,
+) -> az.InferenceData | None:
+    """Load the published putout posterior the assist model marginalizes over."""
+    pointer = find_published_manifest(model_name)
+    if pointer is None:
+        return None
+    data = json.loads(pointer.read_text())
+    manifest_path = Path(data["manifest_path"])
+    posterior_path = manifest_path.parent / "inference" / "posterior.nc"
+    if not posterior_path.exists():
+        _log.warning(
+            "published putout pointer at %s but posterior missing at %s",
+            pointer,
+            posterior_path,
+        )
+        return None
+    _log.info("resolved putout posterior for marginalization: %s", posterior_path)
+    return az.from_netcdf(posterior_path)
+
+
+def _score_putout_posterior(
+    putout_idata: az.InferenceData,
+    carrier: _FixedEffectCarrier,
+    *,
+    chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Posterior-mean ``P(putout = j | data)`` per event, shape ``(n_event, 9)``.
+
+    The putout model's FE level vocabularies are aligned to ``carrier``'s
+    by label, so a putout fit with different level ordering or an extra
+    level (e.g. ``walk``) still scores correctly.
+    """
+    posterior = putout_idata.posterior
+    alpha = np.asarray(posterior["alpha_position"].values, dtype=np.float64)
+    n_chain, n_draw = alpha.shape[0], alpha.shape[1]
+    k_po = alpha.shape[-1]
+    deltas: dict[str, np.ndarray] = {}
+    remaps: dict[str, np.ndarray] = {}
+    for column, design in carrier.fixed_effects.items():
+        var = f"delta_{column}"
+        if var not in posterior:
+            continue
+        da = posterior[var]
+        level_dim = next(
+            d for d in da.dims if d not in ("chain", "draw", "position")
+        )
+        putout_levels = [str(x) for x in da.coords[level_dim].values]
+        index = {label: i for i, label in enumerate(putout_levels)}
+        remaps[column] = np.array(
+            [index.get(str(label), -1) for label in design.levels], dtype=np.int64
+        )
+        deltas[column] = np.asarray(da.values, dtype=np.float64)
+
+    n_event = carrier.n_events
+    out = np.empty((n_event, k_po), dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        n_chunk = stop - start
+        eta = np.broadcast_to(
+            alpha[:, :, None, :], (n_chain, n_draw, n_chunk, k_po)
+        ).copy()
+        for column, df in deltas.items():
+            codes = carrier.fixed_effects[column].codes[sl]
+            remapped = remaps[column][np.where(codes >= 0, codes, 0)]
+            present = (codes >= 0) & (remapped >= 0)
+            safe = np.where(remapped >= 0, remapped, 0)
+            eta += df[:, :, safe, :] * present[None, None, :, None]
+        eta -= eta.max(axis=-1, keepdims=True)
+        exp_eta = np.exp(eta)
+        pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
+        out[sl, :] = pi.mean(axis=(0, 1))
+    return out
+
+
+def _subsample_held_out(
+    held: HeldOutSet, *, limit: int, seed: int
+) -> HeldOutSet:
+    """Deterministically subsample a held-out set for tractable scoring."""
+    n = held.n_events
+    if n <= limit:
+        return held
+    rng = np.random.default_rng(seed)
+    idx = np.sort(rng.choice(n, size=limit, replace=False))
+    fixed_effects = {
+        column: FixedEffectDesign(levels=design.levels, codes=design.codes[idx])
+        for column, design in held.fixed_effects.items()
+    }
+    return HeldOutSet(
+        event_keys=held.event_keys[idx],
+        true_position=held.true_position[idx],
+        U=held.U[idx],
+        season_idx=held.season_idx[idx],
+        scorer_idx=held.scorer_idx[idx],
+        park_idx=held.park_idx[idx],
+        source_idx=held.source_idx[idx],
+        fixed_effects=fixed_effects,
+    )
+
+
 def _posterior_event_softmax(
     idata: az.InferenceData,
     inputs: EventCreditInputs,
@@ -760,35 +1019,64 @@ def _posterior_event_softmax(
 
 def _export_event_credit_shares(
     means: np.ndarray,
-    inputs: EventCreditInputs,
     *,
+    event_keys: np.ndarray,
+    credit_type: str,
+    n_positions: int,
     target_path: Path,
 ) -> pl.DataFrame:
     """Write per-event-per-position expected share to parquet.
 
     Schema: ``(event_key int64, fielding_position int8,
-    credit_type utf8, expected_share float64)``.
+    credit_type utf8, expected_share float64, none_share float64?)``.
+
+    For K=9 (putout), one row per (event, position 1..9); ``none_share``
+    is NULL. For K=10 (assist with NONE sentinel at column 9), emit
+    positions 1..9 only — the NONE share rides along on every row as
+    ``none_share = π[:, 9]`` so downstream can compute P(any assist).
     """
-    n_event, K = means.shape
-    if K != inputs.n_positions:
+    n_event, k = means.shape
+    if k != n_positions:
         raise AssertionError(
-            f"means shape mismatch: K={K}, inputs.n_positions={inputs.n_positions}"
+            f"means shape mismatch: K={k}, n_positions={n_positions}"
         )
-    event_keys = np.repeat(inputs.event_keys, K).astype(np.int64)
-    positions = np.tile(np.arange(1, K + 1, dtype=np.int8), n_event)
-    shares = means.reshape(-1).astype(np.float64)
-    df = pl.DataFrame(
-        {
-            "event_key": event_keys,
-            "fielding_position": positions,
-            "credit_type": [inputs.credit_type] * (n_event * K),
-            "expected_share": shares,
-        }
-    )
+    if n_event != event_keys.shape[0]:
+        raise AssertionError(
+            f"event count mismatch: means={n_event}, event_keys={event_keys.shape[0]}"
+        )
+    n_emit_positions = N_POSITIONS_EXPORT
+    if k == n_emit_positions:
+        none_per_event: np.ndarray | None = None
+        shares_export = means
+    elif k == n_emit_positions + 1:
+        none_per_event = means[:, n_emit_positions].astype(np.float64)
+        shares_export = means[:, :n_emit_positions]
+    else:
+        raise AssertionError(
+            f"_export_event_credit_shares: unexpected K={k}; expected 9 (putout) or 10 (assist with NONE)"
+        )
+
+    repeated_keys = np.repeat(event_keys, n_emit_positions).astype(np.int64)
+    positions = np.tile(np.arange(1, n_emit_positions + 1, dtype=np.int8), n_event)
+    shares = shares_export.reshape(-1).astype(np.float64)
+    data: dict[str, object] = {
+        "event_key": repeated_keys,
+        "fielding_position": positions,
+        "credit_type": [credit_type] * (n_event * n_emit_positions),
+        "expected_share": shares,
+    }
+    if none_per_event is not None:
+        data["none_share"] = np.repeat(none_per_event, n_emit_positions).astype(np.float64)
+    else:
+        data["none_share"] = pl.Series(
+            "none_share", [None] * (n_event * n_emit_positions), dtype=pl.Float64
+        )
+    df = pl.DataFrame(data)
     write_parquet_atomic(df, target_path)
     _log.info(
-        "wrote event_credit export rows=%d path=%s",
-        n_event * K,
+        "wrote event_credit export rows=%d K=%d path=%s",
+        n_event * n_emit_positions,
+        k,
         target_path,
     )
     return df
@@ -915,15 +1203,70 @@ def run_bayes_model(
                 p_mean, inputs, target_path=exports_dir / POSTERIOR_EXPORT_FILENAME
             )
         else:
-            shares = _posterior_event_softmax(posterior_idata, inputs)
             write_parquet_atomic(
                 _posterior_summary_dataframe(posterior_summary),
                 exports_dir / "posterior_summary.parquet",
             )
-            _ = _export_event_credit_shares(
-                shares, inputs, target_path=exports_dir / CREDIT_EXPORT_FILENAME
+            putout_idata = (
+                _resolve_published_putout_idata()
+                if inputs.credit_type == "assist"
+                else None
             )
-            held_out_metrics = _evaluate_held_out(inputs, posterior_idata)
+            credit_export_path = exports_dir / CREDIT_EXPORT_FILENAME
+            if inputs.credit_type == "assist" and putout_idata is not None:
+                production = build_production_scoring_frame(
+                    dataset_parquet,
+                    dimension=spec.dataset_dimension_filter,
+                    fixed_effects=inputs.fixed_effects,
+                )
+                if production.n_events > 0:
+                    putout_weights = _score_putout_posterior(putout_idata, production)
+                    production_shares = _posterior_event_softmax_putout_marginalized(
+                        posterior_idata,
+                        production,
+                        putout_posterior=putout_weights,
+                        n_positions=inputs.n_positions,
+                    )
+                    _ = _export_event_credit_shares(
+                        production_shares,
+                        event_keys=production.event_keys,
+                        credit_type=inputs.credit_type,
+                        n_positions=inputs.n_positions,
+                        target_path=credit_export_path,
+                    )
+                    _log.info(
+                        "assist export scored production slice events=%d (putout-marginalized)",
+                        production.n_events,
+                    )
+                else:
+                    _log.warning(
+                        "assist production slice empty; exporting training grain instead"
+                    )
+                    shares = _posterior_event_softmax(posterior_idata, inputs)
+                    _ = _export_event_credit_shares(
+                        shares,
+                        event_keys=inputs.event_keys,
+                        credit_type=inputs.credit_type,
+                        n_positions=inputs.n_positions,
+                        target_path=credit_export_path,
+                    )
+            else:
+                if inputs.credit_type == "assist":
+                    _log.warning(
+                        "no published putout posterior resolved; assist export uses "
+                        "training grain and held-out metrics are observed-putout only"
+                    )
+                shares = _posterior_event_softmax(posterior_idata, inputs)
+                _ = _export_event_credit_shares(
+                    shares,
+                    event_keys=inputs.event_keys,
+                    credit_type=inputs.credit_type,
+                    n_positions=inputs.n_positions,
+                    target_path=credit_export_path,
+                )
+            held_out_metrics = _evaluate_held_out(
+                inputs, posterior_idata, putout_idata=putout_idata
+            )
             _atomic_write_text(
                 validation_dir / "held_out_metrics.json",
                 json.dumps(held_out_metrics, indent=2, default=_json_default),

@@ -58,16 +58,20 @@ _AUDITS = [
         "fielding_position": "UTINYINT",
         "credit_type": "VARCHAR",
         "expected_share": "DOUBLE",
+        "none_share": "DOUBLE",
         "bayes_artifact_id": "VARCHAR",
     },
     grain=["event_key", "player_id", "fielding_position", "credit_type"],
     audits=_AUDITS,
     description=(
         "Per-(event, player, position, credit_type) expected fielding-credit "
-        "share from the Phase-4 Bayes allocation model. Grain "
+        "share from the Bayes allocation model. Grain "
         "(event_key, player_id, fielding_position, credit_type). Sourced from "
         "each published Bayes credit target's exports/event_credit.parquet, "
-        "with player_id stamped via a join to personnel_fielding_states."
+        "with player_id stamped via a join to personnel_fielding_states. "
+        "none_share is the per-event P(no credit allocation) from the K=10 "
+        "softmax for credit_types that carry a NONE sentinel (assist v3); "
+        "NULL for credit_types that don't (putout v1.5)."
     ),
     depends_on={
         "main_models.event_personnel_lookup",
@@ -125,6 +129,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
                 pl.col("fielding_position").cast(pl.UInt8),
                 pl.col("credit_type").cast(pl.Utf8),
                 pl.col("expected_share").cast(pl.Float64),
+                pl.col("none_share").cast(pl.Float64),
                 pl.col("bayes_artifact_id").cast(pl.Utf8),
             ]
         )
@@ -144,6 +149,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
             "fielding_position": pl.UInt8(),
             "credit_type": pl.Utf8(),
             "expected_share": pl.Float64(),
+            "none_share": pl.Float64(),
             "bayes_artifact_id": pl.Utf8(),
         }
         yield pl.DataFrame(schema=empty_schema)

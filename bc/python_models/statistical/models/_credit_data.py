@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
 
@@ -47,6 +48,13 @@ DEFAULT_SEED: int = 20260513
 MIN_EVENTS_PER_SEASON: int = 50
 N_POSITIONS: int = 9
 POSITION_LABELS: tuple[str, ...] = tuple(str(p) for p in range(1, N_POSITIONS + 1))
+
+NONE_POSITION_LABEL: str = "NONE"
+N_POSITIONS_ASSIST: int = 10
+POSITION_LABELS_ASSIST: tuple[str, ...] = (*POSITION_LABELS, NONE_POSITION_LABEL)
+
+PUTOUT_POSITION_FE_COLUMN: str = "putout_position"
+PUTOUT_POSITION_LEVELS: tuple[str, ...] = POSITION_LABELS
 
 UNKNOWN_LEVEL: str = "__unknown__"
 
@@ -114,6 +122,26 @@ class HeldOutSet(BaseModel):
     scorer_idx: IntArray
     park_idx: IntArray
     source_idx: IntArray
+    fixed_effects: dict[str, FixedEffectDesign]
+
+    @property
+    def n_events(self) -> int:
+        return int(self.event_keys.shape[0])
+
+
+class ProductionScoringFrame(BaseModel):
+    """Event-grain FE codes for scoring the production (unknown-credit) slice.
+
+    Carries one entry per production event_key plus per-FE codes encoded
+    in the training vocabulary; the per-event softmax depends only on
+    these fixed-effect codes.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        arbitrary_types_allowed=True, frozen=True
+    )
+
+    event_keys: IntArray
     fixed_effects: dict[str, FixedEffectDesign]
 
     @property
@@ -203,6 +231,28 @@ def _build_fixed_effect_design(df: pl.DataFrame, column: str) -> FixedEffectDesi
     return FixedEffectDesign(levels=tuple(labels), codes=codes)
 
 
+def _encode_codes_with_vocab(
+    per_event: pl.DataFrame, column: str, labels: Sequence[str]
+) -> IntArray:
+    """Map a per-event column to int codes against a fixed ``labels`` vocab.
+
+    Booleans cast to utf8, NULLs fill to ``UNKNOWN_LEVEL``; unseen values
+    (and NULLs) fall back to ``UNKNOWN_LEVEL``'s index, or ``-1`` when
+    ``UNKNOWN_LEVEL`` is not in the vocab.
+    """
+    series = per_event.get_column(column)
+    if series.dtype == pl.Boolean:
+        series = series.cast(pl.Utf8)
+    series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
+    mapping = {c: i for i, c in enumerate(labels)}
+    fallback = mapping.get(UNKNOWN_LEVEL, -1)
+    return np.fromiter(
+        (mapping.get(str(v), fallback) for v in series.to_list()),
+        dtype=np.int64,
+        count=series.len(),
+    )
+
+
 def _collapse_event_grain(df: pl.DataFrame) -> pl.DataFrame:
     sorted_df = df.sort(["event_key", "fielding_position"])
     position_grid = sorted_df.group_by("event_key", maintain_order=True).agg(
@@ -254,6 +304,84 @@ def _per_event_true_position(known_grid: list[list[float]]) -> IntArray:
     return out
 
 
+def n_positions_for(dimension: str) -> int:
+    if dimension == "assist":
+        return N_POSITIONS_ASSIST
+    return N_POSITIONS
+
+
+def position_labels_for(dimension: str) -> tuple[str, ...]:
+    if dimension == "assist":
+        return POSITION_LABELS_ASSIST
+    return POSITION_LABELS
+
+
+def _resolve_putout_position_per_event(parquet_path: Path) -> pl.DataFrame:
+    """Return one row per event_key with the observed putout position 1..9.
+
+    Events with zero putouts (no putout known_credit) or more than one
+    putout (DPs / TPs) are excluded. v3 cut 1 restricts the assist
+    training set to single-putout events so the putout_position FE is
+    well-defined per event.
+    """
+    putout = (
+        pl.scan_parquet(parquet_path)
+        .filter(
+            (pl.col("credit_type") == "putout")
+            & (pl.col("known_credit") > 0)
+            & (pl.col("personnel_hard_mask_available") == True)  # noqa: E712
+        )
+        .select(["event_key", "fielding_position", "known_credit"])
+        .collect()
+    )
+    if putout.height == 0:
+        return pl.DataFrame(
+            schema={"event_key": putout.schema.get("event_key", pl.UInt32()), "putout_position": pl.Int64()}
+        )
+    per_event = (
+        putout.group_by("event_key", maintain_order=True)
+        .agg(
+            pl.col("known_credit").sum().alias("_total_putout"),
+            pl.col("fielding_position").alias("_putout_positions"),
+        )
+        .filter(
+            (pl.col("_total_putout") == 1.0)
+            & (pl.col("_putout_positions").list.len() == 1)
+        )
+        .with_columns(
+            pl.col("_putout_positions")
+            .list.first()
+            .cast(pl.Int64)
+            .alias("putout_position"),
+        )
+        .select(["event_key", "putout_position"])
+    )
+    return per_event
+
+
+def _assist_truth_per_event(per_event: pl.DataFrame) -> tuple[IntArray, IntArray]:
+    """Compute A_count and A_position_0based per event from the assist grid.
+
+    ``per_event`` must already carry ``known_credit_grid`` of length 9
+    (the per-position assist counts) — built by ``_collapse_event_grain``.
+    Returns ``(A_count, A_position_0based)`` where ``A_position_0based``
+    is ``N_POSITIONS`` (= NONE sentinel index) for zero-assist events
+    and the argmax otherwise. Rounds the grid to integers; multi-assist
+    events (A_count > 1) are filtered upstream and are not expected.
+    """
+    grids = per_event.get_column("known_credit_grid").to_list()
+    n = len(grids)
+    a_count = np.zeros(n, dtype=np.int64)
+    a_pos = np.full(n, N_POSITIONS, dtype=np.int64)
+    for i, grid in enumerate(grids):
+        arr = np.rint(np.asarray(grid, dtype=np.float64)).astype(np.int64)
+        total = int(arr.sum())
+        a_count[i] = total
+        if total == 1:
+            a_pos[i] = int(arr.argmax())
+    return a_count, a_pos
+
+
 def _natural_unknown_rate_lookup() -> dict[str, float]:
     return {
         f"{season}|{source}": rate
@@ -279,15 +407,17 @@ def _apply_synthetic_mask(
     from the cache fall back to ``fallback_rate``. At least one event
     per game stays unmasked so the supervised arm always covers every
     game.
+
+    ``per_position_weights`` is length-K (9 for putout, 10 for assist
+    with the NONE sentinel as the last entry). For the assist v3 cut 1
+    we pass uniform weights — there is no empirical assist-unknown
+    per-position rate yet.
     """
     rng = np.random.default_rng(seed)
     n = per_event.height
     w = np.asarray(per_position_weights, dtype=np.float64)
-    if w.shape[0] != N_POSITIONS:
-        raise ValueError(
-            f"per_position_weights must have {N_POSITIONS} entries, got {w.shape[0]}"
-        )
-    w_e = w[np.clip(true_pos_0based, 0, N_POSITIONS - 1)]
+    k = int(w.shape[0])
+    w_e = w[np.clip(true_pos_0based, 0, k - 1)]
 
     natural_rate = _natural_unknown_rate_lookup()
     cell_keys = (
@@ -528,26 +658,28 @@ def _build_aggregate_targets_from_mask(
 
 
 def _build_supervised_arrays(
-    per_event: pl.DataFrame,
+    counts_per_event: IntArray,
     *,
     is_masked: npt.NDArray[np.bool_],
     U: IntArray,
 ) -> tuple[IntArray, IntArray, IntArray]:
-    n = per_event.height
+    """Slice the K-wide per-event truth counts to the unmasked subset.
+
+    ``counts_per_event`` is shape ``(n_events, K)``. K is 9 for putout
+    and 10 for assist (the trailing column is the NONE sentinel). The
+    caller asserts ``counts_per_event.sum(axis=1) == U`` so a per-event
+    Multinomial likelihood matches.
+    """
+    n, k = counts_per_event.shape
     sup_idx_int = np.where(~is_masked)[0].astype(np.int64)
     if sup_idx_int.size == 0:
         return (
             np.zeros(0, dtype=np.int64),
-            np.zeros((0, N_POSITIONS), dtype=np.int64),
+            np.zeros((0, k), dtype=np.int64),
             np.zeros(0, dtype=np.int64),
         )
 
-    known_grid = per_event.get_column("known_credit_grid").to_list()
-    counts = np.zeros((n, N_POSITIONS), dtype=np.int64)
-    for i, row in enumerate(known_grid):
-        arr = np.asarray(row, dtype=np.float64)
-        counts[i] = np.rint(arr).astype(np.int64)
-    counts_sup = counts[sup_idx_int]
+    counts_sup = counts_per_event[sup_idx_int]
     U_sup = U[sup_idx_int]
     if int(counts_sup.sum()) != int(U_sup.sum()):
         raise AssertionError(
@@ -557,33 +689,86 @@ def _build_supervised_arrays(
     return sup_idx_int, counts_sup, U_sup
 
 
+def _counts_grid_from_known(known_grid_list: list[list[float]]) -> IntArray:
+    """Round a list-of-length-9 known_credit grid to a (n, 9) int matrix."""
+    n = len(known_grid_list)
+    out = np.zeros((n, N_POSITIONS), dtype=np.int64)
+    for i, row in enumerate(known_grid_list):
+        out[i] = np.rint(np.asarray(row, dtype=np.float64)).astype(np.int64)
+    return out
+
+
+def _counts_grid_for_assists(a_count: IntArray, a_pos_0based: IntArray) -> IntArray:
+    """Build a (n, 10) one-hot for assists with NONE at column 9.
+
+    A_count == 1 events get a 1 at the assist position. A_count == 0
+    events get a 1 at the NONE sentinel column. Multi-assist events
+    (A_count > 1) are filtered upstream and must not appear.
+    """
+    n = int(a_count.shape[0])
+    out = np.zeros((n, N_POSITIONS_ASSIST), dtype=np.int64)
+    out[np.arange(n), a_pos_0based] = 1
+    sums = out.sum(axis=1)
+    if not (sums == 1).all():
+        bad = int((sums != 1).sum())
+        raise AssertionError(
+            f"_counts_grid_for_assists: {bad} rows do not sum to 1"
+        )
+    return out
+
+
 def _assert_fixed_effects_cover_production_slice(
     parquet_path: Path,
     *,
     dimension: str,
     floor: float = PRODUCTION_FE_COVERAGE_FLOOR,
 ) -> None:
+    """Each FE must be populated on more than ``floor`` of the production target.
+
+    For ``putout``: filter on ``credit_type='putout' AND
+    unknown_credit_need > 0`` directly (the natural production slice).
+    For ``assist``: the dataset always has ``unknown_credit_need = 0``
+    on assist rows (no upstream signal for unknown_assist yet), so we
+    use the putout rows' ``unknown_credit_need > 0`` predicate to
+    identify the inference target slice — events whose putout is
+    unknown are the same events whose assist chain is unknown.
+    ``putout_position`` is excluded from the standard check on
+    assists because it's structurally NULL on the production slice
+    (the whole point of v3 is to marginalize over it).
+    """
+    if dimension == "assist":
+        production_credit_filter = "putout"
+        guarded_columns = tuple(
+            c for c in FIXED_EFFECT_COLUMNS if c != PUTOUT_POSITION_FE_COLUMN
+        )
+    else:
+        production_credit_filter = dimension
+        guarded_columns = FIXED_EFFECT_COLUMNS
+
     production = (
         pl.scan_parquet(parquet_path)
         .filter(
-            (pl.col("credit_type") == dimension)
+            (pl.col("credit_type") == production_credit_filter)
             & (pl.col("unknown_credit_need") > 0)
             & (pl.col("personnel_hard_mask_available") == True)  # noqa: E712
             & (pl.col("eligible_for_allocation") == True)  # noqa: E712
         )
-        .select(["event_key", *FIXED_EFFECT_COLUMNS])
+        .select(["event_key", *[c for c in guarded_columns if c != PUTOUT_POSITION_FE_COLUMN]])
         .collect()
     )
     n_production = production.get_column("event_key").n_unique()
     if n_production == 0:
         _log.info(
             "FE coverage guard skipped: no production-target events "
-            "(credit_type=%r, unknown_credit_need>0)",
+            "(production_filter=%r, dimension=%r)",
+            production_credit_filter,
             dimension,
         )
         return
     sparse: list[tuple[str, float]] = []
-    for column in FIXED_EFFECT_COLUMNS:
+    for column in guarded_columns:
+        if column == PUTOUT_POSITION_FE_COLUMN:
+            continue
         if column not in production.columns:
             sparse.append((column, 0.0))
             continue
@@ -597,8 +782,9 @@ def _assert_fixed_effects_cover_production_slice(
             sparse.append((column, rate))
         else:
             _log.info(
-                "FE coverage on production slice (n=%d): %s = %.4f",
+                "FE coverage on production slice (n=%d, dimension=%s): %s = %.4f",
                 n_production,
+                dimension,
                 column,
                 rate,
             )
@@ -606,10 +792,101 @@ def _assert_fixed_effects_cover_production_slice(
         detail = ", ".join(f"{name}={rate:.4f}" for name, rate in sparse)
         raise ValueError(
             f"fixed-effect coverage on the production unknown slice "
-            f"(n={n_production}) below floor {floor:.4f}: {detail}. "
+            f"(n={n_production}, dimension={dimension!r}) below floor {floor:.4f}: {detail}. "
             "Drop the column from FIXED_EFFECT_COLUMNS — features that "
             "are not populated on the inference target cannot generalize."
         )
+
+
+def _assert_putout_position_levels_in_training(
+    putout_position_codes: IntArray,
+    *,
+    floor: float = PRODUCTION_FE_COVERAGE_FLOOR,
+) -> None:
+    """Every j ∈ {1..9} must appear on at least ``floor`` of training events.
+
+    Per the v3 plan: ``putout_position`` is structurally unobserved on
+    the production target slice, so the standard per-event coverage
+    check can't apply. Instead, every level needs to appear on a
+    non-trivial fraction of training events so the per-level
+    ``delta_putout_position`` is identifiable at the inference-time
+    marginalization step.
+    """
+    n = int(putout_position_codes.shape[0])
+    if n == 0:
+        return
+    sparse: list[tuple[int, float]] = []
+    for j in range(1, N_POSITIONS + 1):
+        rate = float((putout_position_codes == j).mean())
+        if rate < floor:
+            sparse.append((j, rate))
+        else:
+            _log.info(
+                "training-set putout_position coverage (n=%d): pos=%d rate=%.4f",
+                n,
+                j,
+                rate,
+            )
+    if sparse:
+        detail = ", ".join(f"pos={j} rate={rate:.4f}" for j, rate in sparse)
+        raise ValueError(
+            f"putout_position levels under floor {floor:.4f} on training set "
+            f"(n={n}): {detail}. Each j ∈ {{1..9}} must be observed on at "
+            "least the floor fraction so delta_putout_position[j] is "
+            "identifiable at inference-time marginalization."
+        )
+
+
+def build_production_scoring_frame(
+    parquet_path: Path,
+    *,
+    dimension: str,
+    fixed_effects: dict[str, FixedEffectDesign],
+) -> ProductionScoringFrame:
+    """One row per production-slice event with FE codes in the training vocab.
+
+    The production slice is the unknown-credit inference target:
+    ``credit_type='putout' AND unknown_credit_need > 0 AND
+    personnel_hard_mask_available AND eligible_for_allocation`` (same
+    predicate for both ``putout`` and ``assist``). ``putout_position`` is
+    structurally NULL on this slice, so its codes are placeholder zeros and
+    are never consumed downstream (it gets marginalized at scoring time).
+    Every other FE is encoded against its training ``levels`` vocabulary.
+    """
+    fe_source_columns = [c for c in fixed_effects if c != PUTOUT_POSITION_FE_COLUMN]
+    per_event = (
+        pl.scan_parquet(parquet_path)
+        .filter(
+            (pl.col("credit_type") == "putout")
+            & (pl.col("unknown_credit_need") > 0)
+            & (pl.col("personnel_hard_mask_available") == True)  # noqa: E712
+            & (pl.col("eligible_for_allocation") == True)  # noqa: E712
+        )
+        .select(["event_key", *fe_source_columns])
+        .unique(subset=["event_key"])
+        .sort("event_key")
+        .collect()
+    )
+    if per_event.height == 0:
+        return ProductionScoringFrame(
+            event_keys=np.zeros(0, dtype=np.int64),
+            fixed_effects={},
+        )
+
+    event_keys = (
+        per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
+    )
+    n = int(event_keys.shape[0])
+
+    scoring_fe: dict[str, FixedEffectDesign] = {}
+    for column, design in fixed_effects.items():
+        if column == PUTOUT_POSITION_FE_COLUMN:
+            codes = np.zeros(n, dtype=np.int64)
+        else:
+            codes = _encode_codes_with_vocab(per_event, column, list(design.levels))
+        scoring_fe[column] = FixedEffectDesign(levels=design.levels, codes=codes)
+
+    return ProductionScoringFrame(event_keys=event_keys, fixed_effects=scoring_fe)
 
 
 def prepare_event_credit_inputs(
@@ -625,14 +902,15 @@ def prepare_event_credit_inputs(
 ) -> EventCreditInputs:
     """Read the modeling-dataset parquet and shape dual-arm inputs.
 
-    Filters to well-attributed events (``known_credit > 0,
-    personnel_hard_mask_available=TRUE``), holds out
-    ``1/held_out_fold_count`` of GAMES via deterministic
-    ``game_hash_fold``, subsamples the remainder at the game level if
-    ``smoke_limit`` is set, applies per-event synthetic masking, and
-    builds both the supervised arm (unmasked events with observed Y)
-    and the aggregate arm (masked events with T computed from hidden
-    Y).
+    For ``putout`` (v1.5): filter to well-attributed events
+    (``known_credit > 0`` AND ``personnel_hard_mask_available``);
+    truth = per-event known_credit grid.
+
+    For ``assist`` (v3): filter to ``personnel_hard_mask_available`` AND
+    events with a single putout (so ``putout_position`` is unique).
+    Drop events with assist count > 1 — v3 cut 1 is single-assist
+    only. Truth = K=10 one-hot with NONE sentinel for zero-assist
+    events. Adds ``putout_position`` (1..9) as a FE.
     """
     _assert_fixed_effects_cover_production_slice(parquet_path, dimension=dimension)
 
@@ -649,16 +927,54 @@ def prepare_event_credit_inputs(
             f"no rows for credit_type={dimension!r} in {parquet_path}"
         )
 
-    eligible_event_keys = (
-        df.group_by("event_key")
-        .agg(pl.col("known_credit").sum().alias("_sum_known"))
-        .filter(pl.col("_sum_known") > 0)
-        .get_column("event_key")
-    )
-    df = df.filter(pl.col("event_key").is_in(eligible_event_keys.implode()))
-    if df.height == 0:
+    putout_position_lookup_cache: pl.DataFrame | None = None
+
+    if dimension == "putout":
+        eligible_event_keys = (
+            df.group_by("event_key")
+            .agg(pl.col("known_credit").sum().alias("_sum_known"))
+            .filter(pl.col("_sum_known") > 0)
+            .get_column("event_key")
+        )
+        df = df.filter(pl.col("event_key").is_in(eligible_event_keys.implode()))
+        if df.height == 0:
+            raise ValueError(
+                f"no events with known_credit>0 for credit_type={dimension!r}"
+            )
+    elif dimension == "assist":
+        putout_position_lookup_cache = _resolve_putout_position_per_event(
+            parquet_path
+        )
+        if putout_position_lookup_cache.height == 0:
+            raise ValueError(
+                "no events with a single resolved putout_position; cannot fit assist v3"
+            )
+        df = df.join(putout_position_lookup_cache, on="event_key", how="inner")
+        a_count_per_event = (
+            df.group_by("event_key")
+            .agg(pl.col("known_credit").sum().alias("_a_count"))
+        )
+        single_or_none_keys = (
+            a_count_per_event.filter(pl.col("_a_count") <= 1)
+            .get_column("event_key")
+        )
+        before = df.get_column("event_key").n_unique()
+        df = df.filter(pl.col("event_key").is_in(single_or_none_keys.implode()))
+        after = df.get_column("event_key").n_unique()
+        _log.info(
+            "prepare_event_credit_inputs assist: dropped %d multi-assist events "
+            "(kept %d single-or-zero-assist)",
+            before - after,
+            after,
+        )
+        if df.height == 0:
+            raise ValueError(
+                "no single-or-zero-assist events after multi-assist filter"
+            )
+    else:
         raise ValueError(
-            f"no events with known_credit>0 for credit_type={dimension!r}"
+            f"unsupported dimension={dimension!r}; only 'putout' and 'assist' are "
+            "wired for the dual-arm credit model"
         )
 
     natural_rate_threshold_env = os.environ.get(NATURAL_UNK_RATE_FILTER_ENV)
@@ -768,28 +1084,48 @@ def prepare_event_credit_inputs(
 
     per_event = _collapse_event_grain(df_train)
 
+    n_positions = n_positions_for(dimension)
+    position_labels = position_labels_for(dimension)
+
     season_idx, season_labels = _category_index(per_event, "season")
     scorer_idx, scorer_labels = _category_index(per_event, "scorer")
     park_idx, park_labels = _category_index(per_event, "park_id")
     source_idx, source_labels = _category_index(per_event, "source_family")
 
-    U_array = np.asarray(
-        [int(round(sum(grid))) for grid in per_event.get_column("known_credit_grid").to_list()],
-        dtype=np.int64,
-    )
-    if (U_array <= 0).any():
-        bad = int((U_array <= 0).sum())
-        raise AssertionError(
-            f"{bad} events have U_e <= 0 after the known_credit filter; upstream view inconsistent"
+    if dimension == "putout":
+        U_array = np.asarray(
+            [int(round(sum(grid))) for grid in per_event.get_column("known_credit_grid").to_list()],
+            dtype=np.int64,
         )
+        if (U_array <= 0).any():
+            bad = int((U_array <= 0).sum())
+            raise AssertionError(
+                f"{bad} events have U_e <= 0 after the known_credit filter; upstream view inconsistent"
+            )
+        a_count = U_array
+        a_pos_0based = _per_event_true_position(
+            per_event.get_column("known_credit_grid").to_list()
+        )
+        counts_per_event = _counts_grid_from_known(
+            per_event.get_column("known_credit_grid").to_list()
+        )
+        per_position_weights: tuple[float, ...] = REAL_UNKNOWN_RATES_BY_POSITION
+    else:
+        a_count, a_pos_0based = _assist_truth_per_event(per_event)
+        U_array = np.ones_like(a_count, dtype=np.int64)
+        counts_per_event = _counts_grid_for_assists(a_count, a_pos_0based)
+        per_position_weights = tuple(1.0 for _ in range(n_positions))
 
     event_keys = (
         per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
     )
 
+    fe_columns = list(FIXED_EFFECT_COLUMNS)
+    if dimension == "assist" and PUTOUT_POSITION_FE_COLUMN not in fe_columns:
+        fe_columns.append(PUTOUT_POSITION_FE_COLUMN)
     fixed_effects: dict[str, FixedEffectDesign] = {}
     per_event_cols = set(per_event.columns)
-    for column in FIXED_EFFECT_COLUMNS:
+    for column in fe_columns:
         if column not in per_event_cols:
             _log.info(
                 "prepare_event_credit_inputs skipping FE column %r — not present",
@@ -798,6 +1134,14 @@ def prepare_event_credit_inputs(
             continue
         fixed_effects[column] = _build_fixed_effect_design(per_event, column)
 
+    if dimension == "assist" and PUTOUT_POSITION_FE_COLUMN in fixed_effects:
+        po_design = fixed_effects[PUTOUT_POSITION_FE_COLUMN]
+        po_codes_as_position = np.asarray(
+            [int(po_design.levels[c]) for c in po_design.codes.tolist()],
+            dtype=np.int64,
+        )
+        _assert_putout_position_levels_in_training(po_codes_as_position)
+
     global_effects: dict[str, FixedEffectDesign] = {}
     for column in GLOBAL_EFFECT_COLUMNS:
         if column not in per_event_cols:
@@ -805,7 +1149,7 @@ def prepare_event_credit_inputs(
         global_effects[column] = _build_fixed_effect_design(per_event, column)
 
     coords: dict[str, list[str]] = {
-        "position": list(POSITION_LABELS),
+        "position": list(position_labels),
         "season": list(season_labels),
         "scorer": list(scorer_labels),
         "park": list(park_labels),
@@ -816,13 +1160,11 @@ def prepare_event_credit_inputs(
     for name, design in global_effects.items():
         coords[f"{name}_levels"] = list(design.levels)
 
-    true_pos_0based = _per_event_true_position(
-        per_event.get_column("known_credit_grid").to_list()
-    )
     is_masked = _apply_synthetic_mask(
         per_event,
-        true_pos_0based=true_pos_0based,
+        true_pos_0based=a_pos_0based,
         seed=seed,
+        per_position_weights=per_position_weights,
     )
     _log.info(
         "prepare_event_credit_inputs synthetic mask: %d/%d events masked (%.3f)",
@@ -832,7 +1174,7 @@ def prepare_event_credit_inputs(
     )
 
     sup_event_idx, sup_counts, sup_U = _build_supervised_arrays(
-        per_event, is_masked=is_masked, U=U_array
+        counts_per_event, is_masked=is_masked, U=U_array
     )
 
     (
@@ -849,17 +1191,20 @@ def prepare_event_credit_inputs(
 
     held_out = _build_held_out_set(
         held_out_df,
+        dimension=dimension,
         season_labels=season_labels,
         scorer_labels=scorer_labels,
         park_labels=park_labels,
         source_labels=source_labels,
         fixed_effects=fixed_effects,
+        putout_position_lookup=putout_position_lookup_cache,
     )
 
     _log.info(
-        "prepare_event_credit_inputs credit_type=%s train_events=%d supervised=%d "
+        "prepare_event_credit_inputs credit_type=%s K=%d train_events=%d supervised=%d "
         "masked=%d targets=%d held_out_events=%d seasons=%d scorers=%d parks=%d sources=%d",
         dimension,
+        n_positions,
         per_event.height,
         int(sup_event_idx.shape[0]),
         int(is_masked.sum()),
@@ -875,7 +1220,7 @@ def prepare_event_credit_inputs(
         U=U_array,
         event_keys=event_keys,
         credit_type=dimension,
-        n_positions=N_POSITIONS,
+        n_positions=n_positions,
         season_idx=season_idx,
         scorer_idx=scorer_idx,
         park_idx=park_idx,
@@ -899,11 +1244,13 @@ def prepare_event_credit_inputs(
 def _build_held_out_set(
     df: pl.DataFrame,
     *,
+    dimension: str,
     season_labels: list[str],
     scorer_labels: list[str],
     park_labels: list[str],
     source_labels: list[str],
     fixed_effects: dict[str, FixedEffectDesign],
+    putout_position_lookup: pl.DataFrame | None = None,
 ) -> HeldOutSet:
     if df.height == 0:
         empty = np.zeros(0, dtype=np.int64)
@@ -918,14 +1265,42 @@ def _build_held_out_set(
             fixed_effects={},
         )
 
+    if dimension == "assist" and putout_position_lookup is not None:
+        df = df.join(putout_position_lookup, on="event_key", how="inner")
+        if df.height == 0:
+            empty = np.zeros(0, dtype=np.int64)
+            return HeldOutSet(
+                event_keys=empty,
+                true_position=empty,
+                U=empty,
+                season_idx=empty,
+                scorer_idx=empty,
+                park_idx=empty,
+                source_idx=empty,
+                fixed_effects={},
+            )
+        a_count_per = (
+            df.group_by("event_key")
+            .agg(pl.col("known_credit").sum().alias("_a_count"))
+        )
+        keep_keys = (
+            a_count_per.filter(pl.col("_a_count") <= 1).get_column("event_key")
+        )
+        df = df.filter(pl.col("event_key").is_in(keep_keys.implode()))
+
     per_event = _collapse_event_grain(df)
     grids = per_event.get_column("known_credit_grid").to_list()
-    u_counts = np.asarray([int(round(sum(g))) for g in grids], dtype=np.int64)
-    keep_mask = u_counts > 0
-    if not keep_mask.all():
-        per_event = per_event.filter(pl.Series("_keep", keep_mask.tolist()))
-        u_counts = u_counts[keep_mask]
-        grids = per_event.get_column("known_credit_grid").to_list()
+    if dimension == "putout":
+        u_counts = np.asarray([int(round(sum(g))) for g in grids], dtype=np.int64)
+        keep_mask = u_counts > 0
+        if not keep_mask.all():
+            per_event = per_event.filter(pl.Series("_keep", keep_mask.tolist()))
+            u_counts = u_counts[keep_mask]
+            grids = per_event.get_column("known_credit_grid").to_list()
+        true_pos_0based = _per_event_true_position(grids)
+    else:
+        a_count_held, true_pos_0based = _assist_truth_per_event(per_event)
+        u_counts = np.ones_like(a_count_held, dtype=np.int64)
     if per_event.height == 0:
         empty = np.zeros(0, dtype=np.int64)
         return HeldOutSet(
@@ -939,24 +1314,12 @@ def _build_held_out_set(
             fixed_effects={},
         )
 
-    true_pos_0based = _per_event_true_position(grids)
     event_keys = (
         per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
     )
 
     def _resolve(col: str, labels: list[str]) -> IntArray:
-        series = per_event.get_column(col)
-        if series.dtype == pl.Boolean:
-            series = series.cast(pl.Utf8)
-        series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
-        mapping = {c: i for i, c in enumerate(labels)}
-        fallback = mapping.get(UNKNOWN_LEVEL, -1)
-        codes = np.fromiter(
-            (mapping.get(str(v), fallback) for v in series.to_list()),
-            dtype=np.int64,
-            count=series.len(),
-        )
-        return codes
+        return _encode_codes_with_vocab(per_event, col, labels)
 
     season_idx = _resolve("season", season_labels)
     scorer_idx = _resolve("scorer", scorer_labels)

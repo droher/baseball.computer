@@ -39,6 +39,7 @@ CREDIT_SHARE_SCHEMA: dict[str, pl.DataType] = {
     "fielding_position": pl.UInt8(),
     "credit_type": pl.Utf8(),
     "expected_share": pl.Float64(),
+    "none_share": pl.Float64(),
     "bayes_artifact_id": pl.Utf8(),
 }
 
@@ -155,11 +156,16 @@ def iterate_published_credit_frames() -> Iterator[pl.DataFrame]:
                 spec.published_manifest_name(),
             )
             continue
+        if "none_share" not in df.columns:
+            df = df.with_columns(
+                pl.lit(None, dtype=pl.Float64).alias("none_share")
+            )
         df = df.with_columns(
             pl.col("event_key").cast(pl.UInt32),
             pl.col("fielding_position").cast(pl.UInt8),
             pl.col("credit_type").cast(pl.Utf8),
             pl.col("expected_share").cast(pl.Float64),
+            pl.col("none_share").cast(pl.Float64),
             pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
         )
         _log.info(
@@ -182,6 +188,7 @@ def aggregate_fielding_credit_frames() -> Iterator[pl.DataFrame]:
                 pl.col("fielding_position").cast(pl.UInt8),
                 pl.col("credit_type").cast(pl.Utf8),
                 pl.col("expected_share").cast(pl.Float64),
+                pl.col("none_share").cast(pl.Float64),
                 pl.col("bayes_artifact_id").cast(pl.Utf8),
             ]
         )
