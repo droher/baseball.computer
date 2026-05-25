@@ -278,7 +278,9 @@ def test_supervised_arm_drives_pi_to_true_position(tmp_path: Path) -> None:
         backend="numpyro",
     )
     idata = sample_model(model, cfg)
-    pi_mean = _posterior_event_softmax(idata, inputs, chunk_size=50)
+    pi_mean = _posterior_event_softmax(
+        idata, inputs, n_positions=inputs.n_positions, chunk_size=50
+    )
     pos1_share = float(pi_mean[:, 0].mean())
     other_share = float(pi_mean[:, 1:].mean())
     assert pos1_share > other_share + 0.1, (

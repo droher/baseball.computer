@@ -33,6 +33,7 @@ PUTOUT_CREDIT_ALLOCATION = BayesTargetSpec(
     builder=build_fielding_credit_model,
     sample_size=SAMPLE_SIZE,
     outcome_kind="multinomial",
+    multinomial_export="credit",
 )
 
 ASSIST_CREDIT_ALLOCATION = BayesTargetSpec(
@@ -44,6 +45,7 @@ ASSIST_CREDIT_ALLOCATION = BayesTargetSpec(
     builder=build_fielding_credit_model,
     sample_size=SAMPLE_SIZE,
     outcome_kind="multinomial",
+    multinomial_export="credit",
 )
 
 CREDIT_SPECS: tuple[BayesTargetSpec, ...] = (

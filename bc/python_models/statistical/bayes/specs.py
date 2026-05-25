@@ -53,6 +53,16 @@ class BayesTargetSpec(BaseModel):
             "event_credit.parquet with per-position expected_share."
         ),
     )
+    multinomial_export: Literal["credit", "ball_handler"] | None = Field(
+        default=None,
+        description=(
+            "Routes the multinomial export branch in run_bayes_model. "
+            "'credit' writes event_credit.parquet (with putout "
+            "marginalization for the assist target); 'ball_handler' writes "
+            "ball_handler_probabilities.parquet with a plain per-event "
+            "softmax. None for bernoulli targets."
+        ),
+    )
 
     def published_manifest_name(self) -> str:
         return self.name

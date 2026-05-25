@@ -44,12 +44,24 @@ CREDIT_SHARE_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
+BALL_HANDLER_SCHEMA: dict[str, pl.DataType] = {
+    "event_key": pl.UInt32(),
+    "fielding_position": pl.UInt8(),
+    "expected_share": pl.Float64(),
+    "bayes_artifact_id": pl.Utf8(),
+}
+
+
 def empty_propensity_frame() -> pl.DataFrame:
     return pl.DataFrame(schema=PROPENSITY_SCHEMA)
 
 
 def empty_credit_share_frame() -> pl.DataFrame:
     return pl.DataFrame(schema=CREDIT_SHARE_SCHEMA)
+
+
+def empty_ball_handler_frame() -> pl.DataFrame:
+    return pl.DataFrame(schema=BALL_HANDLER_SCHEMA)
 
 
 def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
@@ -130,6 +142,8 @@ def aggregate_observation_propensity_frames() -> Iterator[pl.DataFrame]:
 def iterate_published_credit_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes fielding-credit (multinomial) target."""
     for spec in _iter_specs_by_kind("multinomial"):
+        if spec.multinomial_export != "credit":
+            continue
         pointer_path = find_published_manifest(spec.published_manifest_name())
         if pointer_path is None:
             _log.info(
@@ -157,9 +171,7 @@ def iterate_published_credit_frames() -> Iterator[pl.DataFrame]:
             )
             continue
         if "none_share" not in df.columns:
-            df = df.with_columns(
-                pl.lit(None, dtype=pl.Float64).alias("none_share")
-            )
+            df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("none_share"))
         df = df.with_columns(
             pl.col("event_key").cast(pl.UInt32),
             pl.col("fielding_position").cast(pl.UInt8),
@@ -197,3 +209,73 @@ def aggregate_fielding_credit_frames() -> Iterator[pl.DataFrame]:
             "bayes.manifest_ingest: no fielding-credit targets published; yielding empty frame"
         )
         yield empty_credit_share_frame()
+
+
+def iterate_published_ball_handler_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes ball-handler (multinomial) target."""
+    for spec in _iter_specs_by_kind("multinomial"):
+        if spec.multinomial_export != "ball_handler":
+            continue
+        pointer_path = find_published_manifest(spec.published_manifest_name())
+        if pointer_path is None:
+            _log.info(
+                "bayes.manifest_ingest: no pointer for %s; skipping",
+                spec.published_manifest_name(),
+            )
+            continue
+        pointer = PublishedPointer.model_validate_json(
+            pointer_path.read_text(encoding="utf-8")
+        )
+        manifest = read_manifest(pointer.manifest_path)
+        share_path = (
+            pointer.manifest_path.parent
+            / "exports"
+            / "ball_handler_probabilities.parquet"
+        )
+        if not share_path.exists():
+            _log.warning(
+                "bayes.manifest_ingest: missing ball_handler_probabilities.parquet for %s at %s",
+                spec.published_manifest_name(),
+                share_path,
+            )
+            continue
+        df = pl.read_parquet(str(share_path))
+        if df.height == 0:
+            _log.info(
+                "bayes.manifest_ingest: ball_handler_probabilities empty for %s",
+                spec.published_manifest_name(),
+            )
+            continue
+        df = df.with_columns(
+            pl.col("event_key").cast(pl.UInt32),
+            pl.col("fielding_position").cast(pl.UInt8),
+            pl.col("expected_share").cast(pl.Float64),
+            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+        )
+        _log.info(
+            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+            df.height,
+            spec.published_manifest_name(),
+            spec.dimension,
+        )
+        yield df
+
+
+def aggregate_ball_handler_frames() -> Iterator[pl.DataFrame]:
+    """Adapter that always yields at least one typed frame for the @model."""
+    emitted = False
+    for frame in iterate_published_ball_handler_frames():
+        emitted = True
+        yield frame.select(
+            [
+                pl.col("event_key").cast(pl.UInt32),
+                pl.col("fielding_position").cast(pl.UInt8),
+                pl.col("expected_share").cast(pl.Float64),
+                pl.col("bayes_artifact_id").cast(pl.Utf8),
+            ]
+        )
+    if not emitted:
+        _log.info(
+            "bayes.manifest_ingest: no ball-handler targets published; yielding empty frame"
+        )
+        yield empty_ball_handler_frame()

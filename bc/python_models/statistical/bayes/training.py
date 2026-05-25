@@ -41,6 +41,10 @@ from python_models.statistical.manifests import (
     utc_now,
     write_manifest,
 )
+from python_models.statistical.models._ball_handler_data import (
+    BallHandlerInputs,
+    build_ball_handler_production_frame,
+)
 from python_models.statistical.models._credit_data import (
     EventCreditInputs,
     FixedEffectDesign,
@@ -80,6 +84,7 @@ POSTERIOR_CHUNK_DEFAULT: int = 250_000
 POSTERIOR_CREDIT_CHUNK_DEFAULT: int = 5_000
 POSTERIOR_EXPORT_FILENAME: str = "event_propensity.parquet"
 CREDIT_EXPORT_FILENAME: str = "event_credit.parquet"
+BALL_HANDLER_EXPORT_FILENAME: str = "ball_handler_probabilities.parquet"
 
 N_POSITIONS_EXPORT: int = 9
 
@@ -246,10 +251,12 @@ def _build_posterior_summary(
         candidate_names: list[str] = [
             "alpha_position",
             "sigma_season",
+            "sigma_season_league",
             "sigma_scorer",
             "sigma_park",
             "sigma_source",
             "beta_season",
+            "beta_season_league",
             "beta_scorer",
             "beta_park",
             "beta_source",
@@ -305,6 +312,9 @@ def _diagnostics_from_idata(
         multinomial_focus = {
             "alpha_position",
             "beta_season",
+            "beta_season_league",
+            "z_season_league",
+            "sigma_season_league",
             "beta_scorer",
             "beta_park",
             "beta_source",
@@ -654,7 +664,9 @@ def _evaluate_held_out(
         )
         / max(y.shape[0], 1)
     )
-    distribution = _distribution_calibration(safe_shares, y, n_positions=inputs.n_positions)
+    distribution = _distribution_calibration(
+        safe_shares, y, n_positions=inputs.n_positions
+    )
     slice_columns: dict[str, np.ndarray] = {
         "season": held.season_idx[valid],
         "source_family": held.source_idx[valid],
@@ -780,7 +792,9 @@ def _slice_calibration_summary(
     }
 
 
-_FixedEffectCarrier = EventCreditInputs | HeldOutSet | ProductionScoringFrame
+_FixedEffectCarrier = (
+    EventCreditInputs | BallHandlerInputs | HeldOutSet | ProductionScoringFrame
+)
 
 
 def _posterior_event_softmax_putout_marginalized(
@@ -814,9 +828,7 @@ def _posterior_event_softmax_putout_marginalized(
         )
 
     alpha_position = np.asarray(posterior["alpha_position"].values, dtype=np.float64)
-    delta_po = np.asarray(
-        posterior["delta_putout_position"].values, dtype=np.float64
-    )
+    delta_po = np.asarray(posterior["delta_putout_position"].values, dtype=np.float64)
     n_chain, n_draw = alpha_position.shape[0], alpha_position.shape[1]
 
     po_design = carrier.fixed_effects.get("putout_position")
@@ -915,9 +927,7 @@ def _score_putout_posterior(
         if var not in posterior:
             continue
         da = posterior[var]
-        level_dim = next(
-            d for d in da.dims if d not in ("chain", "draw", "position")
-        )
+        level_dim = next(d for d in da.dims if d not in ("chain", "draw", "position"))
         putout_levels = [str(x) for x in da.coords[level_dim].values]
         index = {label: i for i, label in enumerate(putout_levels)}
         remaps[column] = np.array(
@@ -947,9 +957,7 @@ def _score_putout_posterior(
     return out
 
 
-def _subsample_held_out(
-    held: HeldOutSet, *, limit: int, seed: int
-) -> HeldOutSet:
+def _subsample_held_out(held: HeldOutSet, *, limit: int, seed: int) -> HeldOutSet:
     """Deterministically subsample a held-out set for tractable scoring."""
     n = held.n_events
     if n <= limit:
@@ -974,8 +982,9 @@ def _subsample_held_out(
 
 def _posterior_event_softmax(
     idata: az.InferenceData,
-    inputs: EventCreditInputs,
+    inputs: _FixedEffectCarrier,
     *,
+    n_positions: int,
     chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
 ) -> np.ndarray:
     """Compute ``E[softmax(eta_e)] | data`` per (event, position) from posterior draws.
@@ -983,10 +992,12 @@ def _posterior_event_softmax(
     Per-event additive RE / global FE terms cancel exactly inside the
     per-event softmax, so the export only reconstructs ``alpha_position``
     and the per-position FE deltas. One chunk of events at a time keeps
-    RAM bounded.
+    RAM bounded. FE codes of ``-1`` (levels unseen at training time, which
+    a production scoring frame can emit) drop their delta contribution via
+    the validity mask.
     """
     posterior = idata.posterior
-    K = inputs.n_positions
+    K = n_positions
     n_event = inputs.n_events
 
     alpha_position = np.asarray(posterior["alpha_position"].values, dtype=np.float64)
@@ -1009,7 +1020,9 @@ def _posterior_event_softmax(
         ).copy()
         for column, df in deltas_fe.items():
             codes = inputs.fixed_effects[column].codes[sl]
-            eta += df[:, :, codes, :]
+            valid = codes >= 0
+            safe = np.where(valid, codes, 0)
+            eta += df[:, :, safe, :] * valid[None, None, :, None]
         eta -= eta.max(axis=-1, keepdims=True)
         exp_eta = np.exp(eta)
         pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
@@ -1037,9 +1050,7 @@ def _export_event_credit_shares(
     """
     n_event, k = means.shape
     if k != n_positions:
-        raise AssertionError(
-            f"means shape mismatch: K={k}, n_positions={n_positions}"
-        )
+        raise AssertionError(f"means shape mismatch: K={k}, n_positions={n_positions}")
     if n_event != event_keys.shape[0]:
         raise AssertionError(
             f"event count mismatch: means={n_event}, event_keys={event_keys.shape[0]}"
@@ -1066,7 +1077,9 @@ def _export_event_credit_shares(
         "expected_share": shares,
     }
     if none_per_event is not None:
-        data["none_share"] = np.repeat(none_per_event, n_emit_positions).astype(np.float64)
+        data["none_share"] = np.repeat(none_per_event, n_emit_positions).astype(
+            np.float64
+        )
     else:
         data["none_share"] = pl.Series(
             "none_share", [None] * (n_event * n_emit_positions), dtype=pl.Float64
@@ -1076,6 +1089,46 @@ def _export_event_credit_shares(
     _log.info(
         "wrote event_credit export rows=%d K=%d path=%s",
         n_event * n_emit_positions,
+        k,
+        target_path,
+    )
+    return df
+
+
+def _export_ball_handler_probabilities(
+    means: np.ndarray,
+    *,
+    event_keys: np.ndarray,
+    n_positions: int,
+    target_path: Path,
+) -> pl.DataFrame:
+    """Write per-event-per-position handler probabilities to parquet.
+
+    Schema: ``(event_key int64, fielding_position int8,
+    expected_share float64)``. One row per (event, position 1..K); the
+    per-event shares over the K positions sum to 1.
+    """
+    n_event, k = means.shape
+    if k != n_positions:
+        raise AssertionError(f"means shape mismatch: K={k}, n_positions={n_positions}")
+    if n_event != event_keys.shape[0]:
+        raise AssertionError(
+            f"event count mismatch: means={n_event}, event_keys={event_keys.shape[0]}"
+        )
+    repeated_keys = np.repeat(event_keys, k).astype(np.int64)
+    positions = np.tile(np.arange(1, k + 1, dtype=np.int8), n_event)
+    shares = means.reshape(-1).astype(np.float64)
+    df = pl.DataFrame(
+        {
+            "event_key": repeated_keys,
+            "fielding_position": positions,
+            "expected_share": shares,
+        }
+    )
+    write_parquet_atomic(df, target_path)
+    _log.info(
+        "wrote ball_handler export rows=%d K=%d path=%s",
+        n_event * k,
         k,
         target_path,
     )
@@ -1207,42 +1260,105 @@ def run_bayes_model(
                 _posterior_summary_dataframe(posterior_summary),
                 exports_dir / "posterior_summary.parquet",
             )
-            putout_idata = (
-                _resolve_published_putout_idata()
-                if inputs.credit_type == "assist"
-                else None
-            )
-            credit_export_path = exports_dir / CREDIT_EXPORT_FILENAME
-            if inputs.credit_type == "assist" and putout_idata is not None:
-                production = build_production_scoring_frame(
+            if spec.multinomial_export == "ball_handler":
+                ball_handler_export_path = exports_dir / BALL_HANDLER_EXPORT_FILENAME
+                production = build_ball_handler_production_frame(
                     dataset_parquet,
                     dimension=spec.dataset_dimension_filter,
                     fixed_effects=inputs.fixed_effects,
                 )
                 if production.n_events > 0:
-                    putout_weights = _score_putout_posterior(putout_idata, production)
-                    production_shares = _posterior_event_softmax_putout_marginalized(
-                        posterior_idata,
-                        production,
-                        putout_posterior=putout_weights,
-                        n_positions=inputs.n_positions,
+                    shares = _posterior_event_softmax(
+                        posterior_idata, production, n_positions=inputs.n_positions
                     )
-                    _ = _export_event_credit_shares(
-                        production_shares,
+                    _ = _export_ball_handler_probabilities(
+                        shares,
                         event_keys=production.event_keys,
-                        credit_type=inputs.credit_type,
                         n_positions=inputs.n_positions,
-                        target_path=credit_export_path,
+                        target_path=ball_handler_export_path,
                     )
                     _log.info(
-                        "assist export scored production slice events=%d (putout-marginalized)",
+                        "ball_handler export scored production slice events=%d",
                         production.n_events,
                     )
                 else:
                     _log.warning(
-                        "assist production slice empty; exporting training grain instead"
+                        "ball_handler production slice empty; exporting training grain instead"
                     )
-                    shares = _posterior_event_softmax(posterior_idata, inputs)
+                    shares = _posterior_event_softmax(
+                        posterior_idata, inputs, n_positions=inputs.n_positions
+                    )
+                    _ = _export_ball_handler_probabilities(
+                        shares,
+                        event_keys=inputs.event_keys,
+                        n_positions=inputs.n_positions,
+                        target_path=ball_handler_export_path,
+                    )
+                held_out_metrics = _evaluate_held_out(
+                    inputs, posterior_idata, putout_idata=None
+                )
+            else:
+                putout_idata = (
+                    _resolve_published_putout_idata()
+                    if (
+                        spec.multinomial_export == "credit"
+                        and inputs.credit_type == "assist"
+                    )
+                    else None
+                )
+                credit_export_path = exports_dir / CREDIT_EXPORT_FILENAME
+                if inputs.credit_type == "assist" and putout_idata is not None:
+                    production = build_production_scoring_frame(
+                        dataset_parquet,
+                        dimension=spec.dataset_dimension_filter,
+                        fixed_effects=inputs.fixed_effects,
+                    )
+                    if production.n_events > 0:
+                        putout_weights = _score_putout_posterior(
+                            putout_idata, production
+                        )
+                        production_shares = (
+                            _posterior_event_softmax_putout_marginalized(
+                                posterior_idata,
+                                production,
+                                putout_posterior=putout_weights,
+                                n_positions=inputs.n_positions,
+                            )
+                        )
+                        _ = _export_event_credit_shares(
+                            production_shares,
+                            event_keys=production.event_keys,
+                            credit_type=inputs.credit_type,
+                            n_positions=inputs.n_positions,
+                            target_path=credit_export_path,
+                        )
+                        _log.info(
+                            "assist export scored production slice events=%d (putout-marginalized)",
+                            production.n_events,
+                        )
+                    else:
+                        _log.warning(
+                            "assist production slice empty; exporting training grain instead"
+                        )
+                        shares = _posterior_event_softmax(
+                            posterior_idata, inputs, n_positions=inputs.n_positions
+                        )
+                        _ = _export_event_credit_shares(
+                            shares,
+                            event_keys=inputs.event_keys,
+                            credit_type=inputs.credit_type,
+                            n_positions=inputs.n_positions,
+                            target_path=credit_export_path,
+                        )
+                else:
+                    if inputs.credit_type == "assist":
+                        _log.warning(
+                            "no published putout posterior resolved; assist export uses "
+                            "training grain and held-out metrics are observed-putout only"
+                        )
+                    shares = _posterior_event_softmax(
+                        posterior_idata, inputs, n_positions=inputs.n_positions
+                    )
                     _ = _export_event_credit_shares(
                         shares,
                         event_keys=inputs.event_keys,
@@ -1250,23 +1366,9 @@ def run_bayes_model(
                         n_positions=inputs.n_positions,
                         target_path=credit_export_path,
                     )
-            else:
-                if inputs.credit_type == "assist":
-                    _log.warning(
-                        "no published putout posterior resolved; assist export uses "
-                        "training grain and held-out metrics are observed-putout only"
-                    )
-                shares = _posterior_event_softmax(posterior_idata, inputs)
-                _ = _export_event_credit_shares(
-                    shares,
-                    event_keys=inputs.event_keys,
-                    credit_type=inputs.credit_type,
-                    n_positions=inputs.n_positions,
-                    target_path=credit_export_path,
+                held_out_metrics = _evaluate_held_out(
+                    inputs, posterior_idata, putout_idata=putout_idata
                 )
-            held_out_metrics = _evaluate_held_out(
-                inputs, posterior_idata, putout_idata=putout_idata
-            )
             _atomic_write_text(
                 validation_dir / "held_out_metrics.json",
                 json.dumps(held_out_metrics, indent=2, default=_json_default),

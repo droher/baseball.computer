@@ -593,11 +593,25 @@ Purpose: estimate handler and geometry probabilities without treating fielder po
 
 #### Handler Model
 
-- [ ] Define handler estimand separately from official fielding credit and responsibility.
-- [ ] Use fielding-credit expected counters as optional validated inputs, not as raw truth.
-- [ ] Use direct fielding-play evidence, `batted_to_fielder`, personnel state, event result, broad contact, base/out state, season/league, scorer/source, and alignment regime.
-- [ ] Validate by batter hand, base state, result, position, era, and source.
-- [ ] Publish `ball_handler_probabilities`.
+Model D (ball-handler imputation). Cut-1 scaffolding + smoke landed: a single-arm
+K=9 categorical softmax over fielder position, a trimmed Model C (supervised softmax
+arm only — no aggregate-box arm, no synthetic mask, no park/source RE). Reuses the
+obs dataset `model_input_observation_batted_ball` filtered to
+`dimension='ball_handler_position' AND observed_status='observed'`; truth is the
+recorded handler in `raw_value` (1..9). Registered as `ball_handler_imputation`
+(multinomial, `multinomial_export='ball_handler'`) — distinct from Model A's
+`ball_handler_position_observedness` Bernoulli, which predicts *whether* the handler
+is recorded. Files: `models/_ball_handler_data.py`, `models/ball_handler.py`,
+`bayes/targets/ball_handler.py`, `@model imputed_ball_handler_probabilities`. Smoke
+fit on `phase2-paresult-batted-ball` (50×50×2, 100k subsample) cleared the smoke gate;
+held-out top-1 0.220 vs 0.171 per-position baseline; production slice (1.30M
+handler-unobserved events) scored, shares sum to 1.
+
+- [x] Define handler estimand separately from official fielding credit and responsibility. (K=9 over handler position, no credit/responsibility coupling.)
+- [ ] Use fielding-credit expected counters as optional validated inputs, not as raw truth. (γ_credit read-across deferred to a follow-up.)
+- [~] Use direct fielding-play evidence, `batted_to_fielder`, personnel state, event result, broad contact, base/out state, season/league, scorer/source, and alignment regime. (Cut-1: `result_family` as contact proxy + base/out + season-league RE + scorer RE + alignment_regime. `batted_to_fielder` / DL `batted_to_fielder_class` proposal (γ_dl) and broad contact deferred — both are unobserved on the handler-unobserved production slice and fail the 1% production-coverage floor.)
+- [~] Validate by batter hand, base state, result, position, era, and source. (Held-out slice calibration over season-league / source / scorer / park + per-FE; full operating-point validate + N-sweep deferred to a follow-up.)
+- [ ] Publish `ball_handler_probabilities`. (Full operating-point fit + `validate-artifact` at default gates + `publish-manifest` + `plan-model` against the real artifact deferred to a follow-up.)
 
 #### Geometry Model
 
