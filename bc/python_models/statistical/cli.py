@@ -14,6 +14,7 @@ import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 from python_models.statistical.dataset_registry import all_dataset_names, get_spec
 from python_models.statistical.datasets import prepare_dataset
@@ -216,6 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--prior-only",
         action="store_true",
         help="Short-circuit before pm.sample; emit prior predictive only.",
+    )
+    _ = fit_bayes.add_argument(
+        "--flavor",
+        choices=["gamma_dl_zero", "gamma_dl_shrunk"],
+        default="gamma_dl_zero",
+        help="DL covariate flavor for the geometry model. Ignored by non-geometry targets.",
     )
     _ = fit_bayes.add_argument(
         "--source-snapshot-id",
@@ -536,6 +543,7 @@ def _run_fit_deep(args: argparse.Namespace) -> int:
 def _run_fit_bayes(args: argparse.Namespace) -> int:
     from python_models.statistical.bayes import targets as _bayes_targets  # noqa: F401
     from python_models.statistical.bayes.registry import get_target
+    from python_models.statistical.bayes.specs import GammaDlFlavor
     from python_models.statistical.bayes.training import run_bayes_model
     from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
     from python_models.statistical.dataset_registry import get_spec as _get_dataset_spec
@@ -570,6 +578,7 @@ def _run_fit_bayes(args: argparse.Namespace) -> int:
         source_snapshot_id=source_snapshot_id,
         smoke=bool(args.smoke),
         prior_only=bool(args.prior_only),
+        gamma_dl_flavor=cast(GammaDlFlavor, args.flavor),
         artifact_root=output_root,
         dataset_root=dataset_root,
     )

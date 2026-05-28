@@ -374,7 +374,7 @@ Purpose: train deep proposal distributions, embeddings, and calibrators on froze
 
 - [x] Train geometry proposal distributions. (4 `DeepTargetSpec`s registered in `deep/targets/geometry.py`: trajectory, location_side, location_depth, location_edge. `geometry_region` dropped — upstream `event_observation_geometry` never emitted the dim.)
 - [ ] Train handler proposal distributions if EDA shows they add calibrated value. (Deferred.)
-- [ ] Train advancement proposal distributions only after geometry inputs exist. (Spec registration deferred — `model_input_advancement` lacks `advancement_class` + `time_forward_fold`. Sibling manifest stub in place.)
+- [ ] Train advancement proposal distributions only after geometry inputs exist. (SQL gap CLOSED — `model_input_advancement` now emits `advancement_class` + `time_forward_fold`, so the deep `advancement_r1/_r2/_r3` specs can register. fit-deep run itself deferred; the Bayes Model H ships at `gamma_dl_zero` until the DL proposal lands.)
 - [ ] Train pitch-summary proposal distributions. (Spec + layout in tree behind `BC_DEEP_REGISTER_PITCH_SUMMARY`. Dropped from Phase 3 scope; pitch-completeness imputation lives in Phase 4+.)
 - [ ] Keep fielding-credit deep proposals diagnostic or weakly weighted unless they pass conservation and leakage checks. (DL fielding-credit dropped from Phase 3 scope — spatial-allocation task that doesn't benefit from shared player embeddings. `dl_credit_proposal_manifest` stays as a zero-row stub; Phase-4 hierarchical Bayes owns it.)
 
@@ -425,7 +425,7 @@ PR3's aggregated `Binomial(n_cell, p_cell)` formulation has been retired. Full 1
 - [x] Fit broad ground/air contact observedness model. (Mapped to `general_location_observedness/10k-v1`. rhat 1.015, ess 315, ECE 0.013, OOS AUC 0.973.)
 - [x] Fit ball_handler_position observedness model. (Artifact `ball_handler_position_observedness/10k-v1`. rhat 1.008, ess 519, ECE 0.040, OOS AUC 0.924. ~89% observed baseline; informs direct fielder-handler evidence in Phase-4 fielding credit.)
 - [x] Add `pa_result` (13-level plate-appearance outcome) to obs FE set across all 6 dims. Refit at 10K against `phase2-paresult-batted-ball`. Per-dim OOS PR-AUC v1 → v2: trajectory 0.889→0.890, location_side 0.976→0.976, location_depth 0.974→0.978, location_edge 0.976→0.976, general_location 0.974→0.979, ball_handler_position 0.569→0.755 (+0.186). The other 5 dims were already PR-AUC-saturated; `pa_result` mainly closes ball_handler's IS-OOS gap. Sweep on ball_handler v2 at 50K/100K/500K confirmed 10K is the operating point (OOS PR-AUC plateau by 100K; 1M aborted as diminishing returns).
-- [ ] Keep detailed fly/line/pop label confusion out of first publication unless broad models calibrate.
+- [~] Keep detailed fly/line/pop label confusion out of first publication unless broad models calibrate. (Permanent — Model B blocked; see line 462.)
 
 #### Statistical Workflow
 
@@ -450,7 +450,7 @@ PR3's aggregated `Binomial(n_cell, p_cell)` formulation has been retired. Full 1
 - [~] `scorer_observation_propensities`. (SQLMesh `@model` lands on `phase4_obs_redesign`; materializes a typed empty frame until at least one Bayes pointer publishes.)
 - [ ] `observation_model_draws` when downstream uncertainty needs draws.
 - [ ] `observation_weighted_metric_inputs`.
-- [ ] `scorer_label_confusion_summaries` after broad models validate.
+- [ ] `scorer_label_confusion_summaries` after broad models validate. (Blocked — Model B cannot be fit; see line 462.)
 - [ ] `observation_model_validation`.
 
 #### Observation Sub-Gate
@@ -459,7 +459,7 @@ PR3's aggregated `Binomial(n_cell, p_cell)` formulation has been retired. Full 1
 - [~] Scorer/source holdouts do not collapse. (Scorer + park holdouts pass via natural unseen-entity events in the 200K OOS pool with population-mean RE substitution: scorer holdout AUC 0.74-0.92 across 6 dims, abs_dev ≤ 0.06; park holdout AUC 0.88-1.00, abs_dev ≤ 0.05. Per-dim `validation/holdouts.json`. Season + source true-holdouts deferred — natural unseen events are zero under the saturated-season filter + single-source production population, would require explicit per-era refits.)
 - [~] MNAR sensitivity intervals are published for MNAR-prone outputs. (Deferred to downstream Models B / E. Model A's output `P(observed)` is directly observable, not MNAR-prone. MNAR sensitivity applies when downstream models reweight observed events by `1 / p_observed_mean` to back out a population estimand — that's where MNAR assumptions about the latent value can shift the result.)
 - [~] Existing coverage-weighted metrics can be reproduced as a baseline. (Deferred — no existing coverage-weighted metric model in the SQLMesh tree to reproduce. Pre-Model A aggregates use raw `is_observed` counts (no propensity weighting). IPW-equivalence is implicit in the calibration-by-slice pass at line 458: `mean(p_pred) ≈ mean(is_observed)` per slice ⇒ `Σ 1/p_observed ≈ raw N` per slice. Re-evaluate when a concrete heuristic metric needs reproduction.)
-- [x] Detailed contact normalization remains withheld until broad geometry/contact models calibrate. (Trivially satisfied — Model B does not exist yet; no detailed contact label is being published.)
+- [x] Detailed contact normalization remains withheld until broad geometry/contact models calibrate. (Model B is BLOCKED, same category as Model K. EDA on prod bc.db: recorded broad contact (GroundBall/AirBall) vs outcome-deduced broad agree on 6.0M of 6.0M recorded-known non-bunt batted balls except 702 (0.0117%), one-directional, no era/scorer structure. The deduction in calc_batted_ball_type is not independent of the recorded label (equals it by construction when recorded is known), and there is no second label source per event, so the scorer/decade confusion matrix Omega is unidentifiable — it would be the identity, driven by priors. Broad normalization is subsumed by Model E's trajectory dimension; detailed FB/LD/PU is the per-event posterior Model E already publishes. Unblock needs a second independent label source (parser-repo ingestion, out of scope) — same as Model K's positioning-source gap.)
 
 ### Fielding Credit Allocation (C)
 
@@ -622,15 +622,29 @@ export (11.71M rows over 1.30M events, per-event shares = 1.0, schema exact).
 
 #### Geometry Model
 
-- [ ] Preserve recorded geometry, deduced geometry, normalized labels, and estimated probabilities as separate layers.
-- [ ] Estimate broad trajectory first.
-- [ ] Estimate side and depth after broad trajectory validates.
-- [ ] Include alignment regimes: pre-shift, shift-growth, full-shift, post-2023 restriction.
-- [ ] Consume `imputed_shift_propensity` as a latent alignment-regime covariate.
-- [ ] Include batter hand and fielder position interactions only where EDA supports them.
-- [ ] Use observation model outputs for missingness and label bias.
-- [ ] Use calibrated deep proposals only as regularized inputs.
-- [ ] Stress-test known 2000-2002 shallow outfield fly/grounder source-pattern slices.
+Model E (latent geometry) cut-1 shipped on `phase4_buildout`: per-dimension categorical
+softmax on the `observed_status='observed'` slice (label = `raw_value`), a trimmed Model C
+(no measurement-error confusion arm, no handler-posterior covariate, no MNAR weighting,
+no park RE). Five dims fit at 10K (nutpie): `geometry_{trajectory,location_side,
+location_depth,location_edge}` shrunk + `geometry_general_location` zero (no DL artifact).
+DL piped in per-class as `gamma_dl · (log dl_p_class − training-class-mean)` — centering
+breaks the alpha_class/DL collinearity ridge. gamma_dl posteriors: trajectory 1.40, depth
+0.88, side 0.78 (all far above the 0.5 prior → DL strongly informative). Held-out top-1:
+trajectory 0.503 vs 0.415; location dims ≈ baseline on top-1 (Default-class dominates the
+argmax) but calibrated (TV 0.006–0.012) with positive gamma_dl; general_location 0.187 vs
+0.135 on 18 classes (FE alone). All 5 validated (rhat ≤ 1.05, ess ≥ 100, 0 div), published,
+and materialized into `@model imputed_batted_ball_geometry` (253M rows, per-(event,dim)
+shares sum to 1).
+
+- [x] Preserve recorded geometry, deduced geometry, normalized labels, and estimated probabilities as separate layers. (Training labels are `raw_value` only; deductions excluded per the training-label policy; estimated probs land in `imputed_batted_ball_geometry`.)
+- [x] Estimate broad trajectory first. (`geometry_trajectory`, K=5, +8.8pp top-1.)
+- [x] Estimate side and depth after broad trajectory validates. (`geometry_location_side` K=6, `geometry_location_depth` K=4, plus `location_edge` K=4 and `general_location` K=18.)
+- [~] Include alignment regimes: pre-shift, shift-growth, full-shift, post-2023 restriction. (`alignment_regime` is a fixed effect; Model K shift posterior is unavailable — no observed shift label in the corpus — so the era-derived enum is the alignment basis.)
+- [ ] Consume `imputed_shift_propensity` as a latent alignment-regime covariate. (Blocked — Model K cannot be fit; see Handler/Shift notes.)
+- [~] Include batter hand and fielder position interactions only where EDA supports them. (`batter_hand` is a class-interaction FE; fielder-position interaction deferred.)
+- [ ] Use observation model outputs for missingness and label bias. (MNAR / propensity weighting deferred to a later cut.)
+- [x] Use calibrated deep proposals only as regularized inputs. (γ_dl shrinkage prior Normal(0, 0.5); DL enters as a per-class log-prob covariate, never as a label.)
+- [ ] Stress-test known 2000-2002 shallow outfield fly/grounder source-pattern slices. (Deferred; per-slice calibration is recorded in each artifact's held_out_metrics.)
 
 #### Validation
 
@@ -725,24 +739,28 @@ Purpose: replace hard sample-size thresholds with hierarchical run-value estimat
 - [ ] Confirm game type inclusion/exclusion policy.
 - [ ] Confirm park/context adjustment is a nuisance adjustment for standard linear weights.
 
-#### Markov Transition Submodel
+#### Markov Transition Submodel (DEFERRED — bundled with Linear Weights)
+
+Per-season-league transition matrices are ~88k feasible parameters (multi-GB posterior, ragged per-start masking) and their only consumer is the deferred context-neutral linear weights. Deferred as a unit with Linear Weights; revisit at era-regime grain.
 
 - [ ] Build base/out state transition matrix from event sequences.
 - [ ] Fit Markov transition submodel with hierarchical priors over season/league and context.
 - [ ] Validate state conservation (outs, bases, runs) under sampled transitions.
 - [ ] Feed transition posterior into run-expectancy and run-value generated quantities.
 
-#### Run Expectancy
+#### Run Expectancy (cut-1 SHIPPED — `run_expectancy_runs`, artifact `re-cut1-full-v2`)
 
-- [ ] Fit run expectancy before win expectancy.
-- [ ] Model `runs_to_end` by base/out state, season, and league.
-- [ ] Include park/context effects as nuisance adjustments only when they improve calibration.
-- [ ] Generate `V^{neutral}` for standard linear weights.
-- [ ] Generate optional `V^{context}` only for park-specific analyses.
-- [ ] Pool sparse states toward structurally similar base/out states.
-- [ ] Report rare-state uncertainty.
+Cell-grain NegativeBinomial on summed `runs_to_end_of_inning` per `(state, season, league)` cell; centered global -> 24-state -> cell hierarchy. Materialized to `main_models.run_expectancy_summary` (5891 cells, rhat ≤ 1.01, held-out lift positive).
 
-#### Linear Weights
+- [x] Fit run expectancy before win expectancy. _(win expectancy out of scope — `win_flag` 100% NULL upstream.)_
+- [x] Model `runs_to_end` by base/out state, season, and league.
+- [x] Include park/context effects as nuisance adjustments only when they improve calibration. _(park dropped in cut-1 = published `V^neutral` by construction.)_
+- [x] Generate `V^{neutral}` for standard linear weights. _(= `re_value`, park absent.)_
+- [ ] Generate optional `V^{context}` only for park-specific analyses. _(deferred with park effects.)_
+- [~] Pool sparse states toward structurally similar base/out states. _(thin season-league cells pool toward their own 24-state base-out mean; cross-state structural pooling not modeled in cut-1.)_
+- [x] Report rare-state uncertainty. _(`re_value_sd` / HDI per cell in the summary.)_
+
+#### Linear Weights (DEFERRED — bundled with Markov Transition)
 
 - [ ] Compute play values as posterior generated quantities from `V^{neutral}`.
 - [ ] Compare against current `linear_weights` in stable high-coverage seasons.
@@ -751,9 +769,9 @@ Purpose: replace hard sample-size thresholds with hierarchical run-value estimat
 
 #### Gamma_dl Ablation
 
-- [ ] Fit `gamma_dl_zero` flavor of Markov transition and run-expectancy models.
-- [ ] Fit `gamma_dl_shrunk` flavor of Markov transition and run-expectancy models.
-- [ ] Select publication tier per submodel and record it in the manifest.
+- [x] Fit `gamma_dl_zero` flavor of run-expectancy. _(no DL proposal source for run_values; `gamma_dl_zero` only.)_
+- [ ] Fit `gamma_dl_shrunk` flavor of Markov transition and run-expectancy models. _(N/A run-expectancy — no DL source; transition deferred.)_
+- [ ] Select publication tier per submodel and record it in the manifest. _(single flavor shipped.)_
 
 #### Run Values Sub-Gate
 
@@ -768,37 +786,39 @@ Purpose: estimate runner/fielder advancement and defensive responsibility only a
 
 #### Advancement
 
-- [ ] Define advancement outcome before adding result labels.
-- [ ] Fit context-only advancement baseline.
-- [ ] Add geometry probability inputs.
-- [ ] Consume `imputed_shift_propensity` as an opportunity covariate.
+_Model H cut-1 SHIPPED (`adv-cut1-10k`): per-(event, baserunner) categorical softmax over the 7 advancement classes (Stayed / Advanced1 / Advanced2 / Scored / OutAdvancing / OutCaughtStealing / OutPickoff), reusing the geometry softmax builder. FEs: base_start, outs_start, base_state_start, leverage_bucket, result_family, alignment_regime, and recorded trajectory / location_depth / ball_handler_position classes (observed-class FE with an `__unknown__` level, not yet Model-E probability vectors). 9,942 train rows / 11.6M scored, rhat 1.024 / ess 236 / 0 div, held-out top-1 0.778 vs 0.536 baseline / top-3 0.989 / macro PR-AUC 0.551. Materializes `main_models.imputed_advancement_probabilities`. Deferred: Model-E geometry probability inputs, runner / fielder player REs, per-class season-league / team REs, DL covariate._
+
+- [x] Define advancement outcome before adding result labels. _(7-class base-relative outcome derived in `model_input_advancement.sql` from `stg_event_baserunners`)_
+- [x] Fit context-only advancement baseline. _(cut-1 is context + observed-geometry FEs, no player effects)_
+- [ ] Add geometry probability inputs. _(cut-1 uses observed geometry classes as FEs; Model-E posterior probability vectors deferred)_
+- [ ] Consume `imputed_shift_propensity` as an opportunity covariate. _(Model K blocked; `alignment_regime` FE used instead)_
 - [ ] Add runner effects only if holdouts show calibrated improvement.
 - [ ] Add fielder effects only if holdouts show calibrated improvement without absorbing opportunity bias.
-- [ ] Do not condition the first model on post-advancement labels such as sacrifice fly when estimating advancement ability.
-- [ ] Validate by base/out state, runner starting base, score state, park, era, and geometry uncertainty.
+- [x] Do not condition the first model on post-advancement labels such as sacrifice fly when estimating advancement ability. _(the view excludes sacrifice flies and post-advancement labels)_
+- [ ] Validate by base/out state, runner starting base, score state, park, era, and geometry uncertainty. _(held-out per-class PR-AUC + distribution calibration only; per-slice report deferred)_
 
 #### Responsibility
 
-- [ ] Define responsibility separately from official credit and handler.
-- [ ] Exclude pitcher/catcher, bunts, deflections, and unusual plays from first range-style responsibility model unless explicitly modeled.
-- [ ] Use latent geometry draws.
-- [ ] Use alignment-regime priors.
+- [x] Define responsibility separately from official credit and handler. _(opportunity-only K=7 softmax over range positions 3..9; `fielder_responsibility_probabilities` never rewrites official credit.)_
+- [x] Exclude pitcher/catcher, bunts, deflections, and unusual plays from first range-style responsibility model unless explicitly modeled. _(view restricts handler to 3..9; prep drops bunt trajectory classes.)_
+- [ ] Use latent geometry draws. _(cut-1 conditions on observed geometry classes as fixed effects; latent-draw propagation deferred to the DL flavor.)_
+- [x] Use alignment-regime priors. _(`alignment_regime` / `alignment_normal_prior` fixed effect; `alignment_actual_post` stays NULL until Model K.)_
 - [ ] Validate against high-coverage location slices.
 - [ ] Hold out alignment regimes.
 - [ ] Quantify responsibility posterior variance caused by geometry uncertainty.
 
 #### Gamma_dl Ablation
 
-- [ ] Fit `gamma_dl_zero` flavor of advancement and responsibility models.
+- [x] Fit `gamma_dl_zero` flavor of advancement and responsibility models. _(advancement + responsibility cut-1, both shipped at 10k operating point.)_
 - [ ] Fit `gamma_dl_shrunk` flavor of advancement and responsibility models.
 - [ ] Select publication tier per submodel and record it in the manifest.
 
 #### Outputs
 
 - [ ] `advancement_expected_counters`.
-- [ ] `runner_advancement_summary`.
+- [x] `runner_advancement_summary`. _(shipped as per-(event, baserunner, class) `main_models.imputed_advancement_probabilities`)_
 - [ ] `fielder_advancement_summary`.
-- [ ] `fielder_responsibility_probabilities`.
+- [x] `fielder_responsibility_probabilities`. _(per-(event, fielding position 3..9) expected share from Model I; shares sum to 1 per event over 5.47M production events.)_
 - [ ] `responsibility_expected_counters`.
 - [ ] `advancement_responsibility_validation`.
 
@@ -806,7 +826,7 @@ Purpose: estimate runner/fielder advancement and defensive responsibility only a
 
 - [ ] Context-only advancement baseline is documented.
 - [ ] Player effects improve calibration without absorbing opportunity bias.
-- [ ] Responsibility estimates do not alter official credits.
+- [x] Responsibility estimates do not alter official credits. _(`fielder_responsibility_probabilities` is a standalone opportunity table; no official-credit model reads it.)_
 - [ ] Geometry uncertainty is propagated into advancement/responsibility uncertainty.
 
 ### Pitch Coverage And Summaries
@@ -823,22 +843,24 @@ Purpose: model pitch coverage and pitch summary distributions after source-famil
 
 #### Summary Models
 
-- [ ] Fit pitch summary counts before ordered sequence generation.
-- [ ] Preserve plate appearance result and count constraints.
-- [ ] Include batter, pitcher, era, source, and result context.
-- [ ] Validate modern-to-historical transport.
+_Model J cut-1 SHIPPED (`ps-cut1-full-v3`): cell-grain Multinomial over the 12 final ball-strike classes per `(result_family, season, league)` cell, centered reference-class softmax (class `b0_s0` pinned). 1,513 cells / 7.6M events, rhat 1.044 / ess 121 / 0 div, held-out loglik lift +0.0149 / TV improvement +0.0316 vs result-mean baseline. Materializes `main_models.pitch_summary_distribution`. Deferred: batter / pitcher / source context, DL covariate, ordered pitch-sequence generation._
+
+- [x] Fit pitch summary counts before ordered sequence generation. _(final-count distribution; cut-1)_
+- [x] Preserve plate appearance result and count constraints. _(cell keyed on `result_family`; classes restricted to the 12 valid balls 0-3 x strikes 0-2)_
+- [ ] Include batter, pitcher, era, source, and result context. _(era / league / result in cut-1; batter / pitcher / source deferred)_
+- [ ] Validate modern-to-historical transport. _(game-fold OOS only in cut-1; explicit era-transport deferred)_
 - [ ] Defer ordered pitch sequence generation until a downstream analysis requires order.
 
 #### Gamma_dl Ablation
 
-- [ ] Fit `gamma_dl_zero` flavor of pitch coverage and pitch summary models.
+- [x] Fit `gamma_dl_zero` flavor of pitch coverage and pitch summary models. _(pitch summary cut-1)_
 - [ ] Fit `gamma_dl_shrunk` flavor of pitch coverage and pitch summary models.
 - [ ] Select publication tier per submodel and record it in the manifest.
 
 #### Outputs
 
 - [ ] `pitch_coverage_propensities`.
-- [ ] `pitch_summary_probabilities`.
+- [x] `pitch_summary_probabilities`. _(shipped as `main_models.pitch_summary_distribution`)_
 - [ ] `pitch_summary_expected_counters`.
 - [ ] `pitch_summary_validation`.
 

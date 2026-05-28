@@ -8,6 +8,7 @@ MODEL (
     baserunner VARCHAR,
     base_start UTINYINT,
     runner_id VARCHAR,
+    advancement_class VARCHAR,
     trajectory_class VARCHAR,
     trajectory_is_observed BOOLEAN,
     location_depth_class VARCHAR,
@@ -61,6 +62,7 @@ MODEL (
       is_heldout_player_group BOOLEAN
     ),
     primary_fold VARCHAR,
+    time_forward_fold VARCHAR,
     training_weight DOUBLE,
     source_snapshot_id VARCHAR
   ),
@@ -69,6 +71,7 @@ MODEL (
     baserunner = 'Baserunner enum from stg_event_baserunners: Batter, First, Second, Third.',
     base_start = 'Numeric base the runner occupies at event start. Batter=0, First=1, Second=2, Third=3.',
     runner_id = 'stg_event_baserunners.runner_id.',
+    advancement_class = 'Recorded advancement outcome for this baserunner, relative to base_start: Stayed, Advanced1, Advanced2, Scored, OutAdvancing, OutCaughtStealing, OutPickoff. NULL for Batter rows and where the base-running outcome is not recorded.',
     trajectory_class = 'raw_value for event_observation_geometry where dimension = trajectory. NULL when not recorded; heuristic deductions excluded.',
     trajectory_is_observed = 'observed_status = observed for trajectory. Heuristic deductions do not count.',
     location_depth_class = 'raw_value for event_observation_geometry where dimension = location_depth. NULL when not recorded; heuristic deductions excluded.',
@@ -78,6 +81,7 @@ MODEL (
     geometry_posterior_artifact_id = 'NULL — geometry-posterior artifact pointer reserved for downstream.',
     responsibility_artifact_id = 'NULL — fielder-responsibility artifact pointer reserved for downstream.',
     primary_fold = 'Default game-hash split. HASH(game_id) mod 100 -> [0,69]=TRAIN, [70,84]=VALIDATE, [85,99]=TEST.',
+    time_forward_fold = 'Eval-only time-forward split. season <= 2022 -> TRAIN, season = 2023 -> VALIDATE, season >= 2024 -> TEST.',
     training_weight = '1.0 universally.',
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
@@ -89,6 +93,7 @@ MODEL (
     unique_grain(columns := (event_key, baserunner)),
     accepted_values(column := baserunner, is_in := ('Batter', 'First', 'Second', 'Third')),
     accepted_values(column := primary_fold, is_in := ('TRAIN', 'VALIDATE', 'TEST')),
+    accepted_values(column := time_forward_fold, is_in := ('TRAIN', 'VALIDATE', 'TEST')),
     accepted_values(column := alignment_regime, is_in := (
       'pre_shift_era', 'shift_growth_era', 'full_shift_era', 'post_restriction'
     )),
@@ -101,7 +106,11 @@ WITH br AS (
     SELECT
         event_key,
         baserunner,
-        runner_id
+        runner_id,
+        baserunning_play_type,
+        is_out,
+        run_scored_flag,
+        base_end
     FROM main_models.stg_event_baserunners
 ),
 
@@ -133,6 +142,21 @@ SELECT
         WHEN 'Third'  THEN 3
     END::UTINYINT AS base_start,
     br.runner_id,
+    CASE
+        WHEN br.baserunner = 'Batter' THEN NULL
+        WHEN br.baserunning_play_type = 'CaughtStealing' AND br.is_out THEN 'OutCaughtStealing'
+        WHEN br.baserunning_play_type = 'PickedOff' AND br.is_out THEN 'OutPickoff'
+        WHEN br.baserunning_play_type = 'PickedOffCaughtStealing' AND br.is_out THEN 'OutCaughtStealing'
+        WHEN br.is_out THEN 'OutAdvancing'
+        WHEN br.run_scored_flag THEN 'Scored'
+        WHEN br.baserunner = 'First' AND br.base_end = 'Third' THEN 'Advanced2'
+        WHEN br.baserunner = 'First' AND br.base_end = 'Second' THEN 'Advanced1'
+        WHEN br.baserunner = 'First' AND br.base_end = 'First' THEN 'Stayed'
+        WHEN br.baserunner = 'Second' AND br.base_end = 'Third' THEN 'Advanced1'
+        WHEN br.baserunner = 'Second' AND br.base_end = 'Second' THEN 'Stayed'
+        WHEN br.baserunner = 'Third' AND br.base_end = 'Third' THEN 'Stayed'
+        ELSE NULL
+    END AS advancement_class,
     trj.raw_value AS trajectory_class,
     (trj.observed_status = 'observed') AS trajectory_is_observed,
     dep.raw_value AS location_depth_class,
@@ -190,6 +214,11 @@ SELECT
         WHEN (HASH(c.game_id)::HUGEINT % 100) < 85 THEN 'VALIDATE'
         ELSE 'TEST'
     END AS primary_fold,
+    CASE
+        WHEN c.season <= 2022 THEN 'TRAIN'
+        WHEN c.season = 2023 THEN 'VALIDATE'
+        ELSE 'TEST'
+    END AS time_forward_fold,
     1.0 AS training_weight,
     @VAR('source_snapshot_id', 'dev') AS source_snapshot_id
 FROM br

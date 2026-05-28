@@ -36,7 +36,10 @@ def _write_synthetic_dataset(
             "training_weight": np.ones(n_rows, dtype=np.float64),
             "season": pl.Series(
                 "season",
-                [str(s) for s in rng.choice(["2010", "2015", "2020"], size=n_rows).tolist()],
+                [
+                    str(s)
+                    for s in rng.choice(["2010", "2015", "2020"], size=n_rows).tolist()
+                ],
                 dtype=pl.Utf8,
             ),
             "scorer": pl.Series(
@@ -56,7 +59,12 @@ def _write_synthetic_dataset(
             ),
             "game_type": pl.Series(
                 "game_type",
-                [str(s) for s in rng.choice(["RegularSeason", "Postseason"], size=n_rows).tolist()],
+                [
+                    str(s)
+                    for s in rng.choice(
+                        ["RegularSeason", "Postseason"], size=n_rows
+                    ).tolist()
+                ],
                 dtype=pl.Utf8,
             ),
             "frame_start": pl.Series(
@@ -77,7 +85,10 @@ def _write_synthetic_dataset(
             ),
             "result_family": pl.Series(
                 "result_family",
-                [str(s) for s in rng.choice(["hit", "out_in_play"], size=n_rows).tolist()],
+                [
+                    str(s)
+                    for s in rng.choice(["hit", "out_in_play"], size=n_rows).tolist()
+                ],
                 dtype=pl.Utf8,
             ),
             "hit_or_out": rng.integers(0, 2, size=n_rows).astype(bool),
@@ -137,9 +148,7 @@ def test_prior_only_writes_prior_predictive(tmp_path: Path) -> None:
 
     dataset_root = tmp_path / "datasets"
     bayes_root = tmp_path / "bayes"
-    dataset_dir = (
-        dataset_root / "model_input_observation_batted_ball" / "ds-prior-only"
-    )
+    dataset_dir = dataset_root / "model_input_observation_batted_ball" / "ds-prior-only"
     _write_synthetic_dataset(dataset_dir / "dataset.parquet", n_rows=300)
     _write_dataset_manifest(dataset_dir / "manifest.json", artifact_id="ds-prior-only")
 
@@ -170,9 +179,7 @@ def test_full_smoke_writes_event_propensity_export(tmp_path: Path) -> None:
 
     dataset_root = tmp_path / "datasets"
     bayes_root = tmp_path / "bayes"
-    dataset_dir = (
-        dataset_root / "model_input_observation_batted_ball" / "ds-full-smoke"
-    )
+    dataset_dir = dataset_root / "model_input_observation_batted_ball" / "ds-full-smoke"
     _write_synthetic_dataset(dataset_dir / "dataset.parquet", n_rows=300)
     _write_dataset_manifest(dataset_dir / "manifest.json", artifact_id="ds-full-smoke")
 
@@ -203,7 +210,11 @@ def test_full_smoke_writes_event_propensity_export(tmp_path: Path) -> None:
         artifact_dir / "exports" / "event_propensity.parquet"
     )
     assert event_propensity.height == 300
-    assert set(event_propensity.columns) == {"event_key", "dimension", "p_observed_mean"}
+    assert set(event_propensity.columns) == {
+        "event_key",
+        "dimension",
+        "p_observed_mean",
+    }
     means = event_propensity.get_column("p_observed_mean").to_numpy()
     assert np.all((means >= 0.0) & (means <= 1.0))
 
@@ -226,9 +237,7 @@ def test_full_smoke_single_source_drops_source_block(tmp_path: Path) -> None:
     dataset_root = tmp_path / "datasets"
     bayes_root = tmp_path / "bayes"
     dataset_dir = (
-        dataset_root
-        / "model_input_observation_batted_ball"
-        / "ds-single-source"
+        dataset_root / "model_input_observation_batted_ball" / "ds-single-source"
     )
     _write_synthetic_dataset(
         dataset_dir / "dataset.parquet",
@@ -261,3 +270,40 @@ def test_full_smoke_single_source_drops_source_block(tmp_path: Path) -> None:
         artifact_dir / "exports" / "event_propensity.parquet"
     )
     assert event_propensity.height == 300
+
+
+def test_resolve_sampler_config_default_is_unmodified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from python_models.statistical.bayes.training import _resolve_sampler_config
+    from python_models.statistical.pymc_utils import DEFAULT_CONFIG, SMOKE_CONFIG
+
+    for var in (
+        "BC_STATS_BAYES_BACKEND",
+        "BC_STATS_BAYES_DRAWS",
+        "BC_STATS_BAYES_TUNE",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    assert _resolve_sampler_config(smoke=False, override_seed=None) is DEFAULT_CONFIG
+    assert _resolve_sampler_config(smoke=True, override_seed=None) is SMOKE_CONFIG
+
+
+def test_resolve_sampler_config_draws_tune_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from python_models.statistical.bayes.training import _resolve_sampler_config
+    from python_models.statistical.pymc_utils import DEFAULT_CONFIG
+
+    monkeypatch.delenv("BC_STATS_BAYES_BACKEND", raising=False)
+    monkeypatch.setenv("BC_STATS_BAYES_DRAWS", "2000")
+    monkeypatch.setenv("BC_STATS_BAYES_TUNE", "3000")
+
+    resolved = _resolve_sampler_config(smoke=False, override_seed=None)
+    assert resolved.draws == 2000
+    assert resolved.tune == 3000
+    assert resolved.draws != DEFAULT_CONFIG.draws
+    assert resolved.tune != DEFAULT_CONFIG.tune
+    assert resolved.chains == DEFAULT_CONFIG.chains
+    assert resolved.target_accept == DEFAULT_CONFIG.target_accept
+    assert resolved.backend == DEFAULT_CONFIG.backend

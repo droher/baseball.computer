@@ -34,6 +34,14 @@ class BayesPriorConfig(BaseModel):
     continuous_slope_scale: float = 0.5
     fixed_effect_scale_credit: float = 0.5
     sigma_box_aggregate: float = 0.5
+    gamma_dl_loc: float = 0.0
+    gamma_dl_scale: float = 0.5
+    sigma_offense_scale: float = 1.0
+    sigma_pitching_scale: float = 1.0
+    nb_phi_prior_alpha: float = 2.0
+    nb_phi_prior_beta: float = 0.1
+    sigma_state_scale: float = 1.0
+    sigma_cell_scale: float = 0.5
 
 
 class BayesSamplerConfig(BaseModel):
@@ -85,6 +93,7 @@ class BayesArtifactExtras(BaseModel):
     inference_files: dict[str, Path] = Field(default_factory=dict)
     source_effect_active: bool = True
     event_row_count: int = 0
+    gamma_dl_flavor: str | None = None
 
 
 class ArtifactManifest(BaseModel):

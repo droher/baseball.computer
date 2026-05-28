@@ -114,3 +114,63 @@ def test_assist_credit_allocation_registered() -> None:
     assert spec.dataset_name == "model_input_fielding_credit"
     assert spec.dataset_dimension_filter == "assist"
     assert spec.dimension == "assist"
+
+
+def test_no_dl_source_restricts_default_flavors() -> None:
+    for spec in all_targets():
+        if spec.dl_proposal_dimension is None:
+            assert spec.default_flavors == ("gamma_dl_zero",), (
+                f"{spec.name} has no dl_proposal_dimension but "
+                f"default_flavors={spec.default_flavors!r}"
+            )
+
+
+GEOMETRY_DL_DIMENSIONS = (
+    "trajectory",
+    "location_side",
+    "location_depth",
+    "location_edge",
+)
+GEOMETRY_ZERO_FLAVOR_DIMENSIONS = ("general_location",)
+
+
+def test_geometry_targets_registered() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    expected = {*GEOMETRY_DL_DIMENSIONS, *GEOMETRY_ZERO_FLAVOR_DIMENSIONS}
+    for dimension in expected:
+        spec = get_target(f"geometry_{dimension}")
+        assert spec.outcome_kind == "multinomial"
+        assert spec.multinomial_export == "geometry"
+        assert spec.dataset_name == "model_input_geometry"
+        assert spec.dataset_dimension_filter == dimension
+        assert spec.dimension == dimension
+        assert spec.sample_size == 10_000
+
+
+def test_geometry_dl_dimensions_carry_both_flavors() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    for dimension in GEOMETRY_DL_DIMENSIONS:
+        spec = get_target(f"geometry_{dimension}")
+        assert spec.dl_proposal_dimension == dimension
+        assert spec.default_flavors == ("gamma_dl_zero", "gamma_dl_shrunk")
+
+
+def test_geometry_general_location_is_zero_flavor_only() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    spec = get_target("geometry_general_location")
+    assert spec.dl_proposal_dimension is None
+    assert spec.default_flavors == ("gamma_dl_zero",)
+
+
+def test_five_geometry_targets_registered() -> None:
+    geometry = [t for t in all_targets() if t.multinomial_export == "geometry"]
+    assert len(geometry) == 5
+    names = {spec.name for spec in geometry}
+    expected = {
+        f"geometry_{dimension}"
+        for dimension in (*GEOMETRY_DL_DIMENSIONS, *GEOMETRY_ZERO_FLAVOR_DIMENSIONS)
+    }
+    assert names == expected

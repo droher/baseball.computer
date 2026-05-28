@@ -22,7 +22,7 @@ from python_models.statistical.models._credit_data import (
 from python_models.statistical.models.credit import build_fielding_credit_model
 
 DATASET_NAME: str = "model_input_fielding_credit"
-SAMPLE_SIZE: int = 50_000
+SAMPLE_SIZE: int = 10_000
 
 PUTOUT_CREDIT_ALLOCATION = BayesTargetSpec(
     name="putout_credit_allocation",
