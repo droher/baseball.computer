@@ -414,9 +414,25 @@ def iterate_published_geometry_frames() -> Iterator[pl.DataFrame]:
                 spec.published_manifest_name(),
             )
             continue
+        if "geometry_dimension" in df.columns:
+            exported_dimensions = (
+                df.get_column("geometry_dimension").cast(pl.Utf8).unique().to_list()
+            )
+            if exported_dimensions != [spec.dimension]:
+                raise ValueError(
+                    f"geometry_probabilities.parquet for "
+                    f"{spec.published_manifest_name()} carries "
+                    f"geometry_dimension={exported_dimensions!r}; expected "
+                    f"{spec.dimension!r}"
+                )
+            dimension_expr = pl.col("geometry_dimension").cast(pl.Utf8)
+        else:
+            dimension_expr = pl.lit(spec.dimension, dtype=pl.Utf8).alias(
+                "geometry_dimension"
+            )
         df = df.with_columns(
             pl.col("event_key").cast(pl.UInt32),
-            pl.lit(spec.dimension, dtype=pl.Utf8).alias("geometry_dimension"),
+            dimension_expr,
             pl.col("class_index").cast(pl.UInt8),
             pl.col("class_label").cast(pl.Utf8),
             pl.col("expected_share").cast(pl.Float64),

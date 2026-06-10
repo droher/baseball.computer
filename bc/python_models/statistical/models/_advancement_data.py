@@ -228,7 +228,6 @@ def prepare_advancement_inputs(
         fixed_effects[column] = _build_fixed_effect_design(per_event, column)
 
     coords: dict[str, list[str]] = {
-        "position": list(vocab),
         "season_league": list(season_league_labels),
         "scorer": list(scorer_labels),
         "source": list(source_labels),

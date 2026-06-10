@@ -23,3 +23,7 @@ WHERE
   OR (aggregate_status = 'negative_residual' AND (residual_value IS NULL OR residual_value >= 0))
   OR (aggregate_status = 'contradicted' AND (residual_value IS NULL OR residual_value <= 0))
   OR (aggregate_status = 'missing' AND aggregate_value IS NOT NULL)
+  OR (
+    aggregate_status IN ('present_clean', 'present_issue_flagged', 'negative_residual', 'contradicted')
+    AND aggregate_value IS NULL
+  )

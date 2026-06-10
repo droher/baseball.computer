@@ -10,6 +10,7 @@ from pathlib import Path
 
 import duckdb
 import polars as pl
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from python_models.statistical.config import DATASETS_ROOT
@@ -196,11 +197,43 @@ def _resolve_artifact_root(
     return root / spec.name / artifact_id
 
 
+def _canonical_arrow_type(dtype: pa.DataType) -> pa.DataType:
+    if pa.types.is_large_string(dtype):
+        return pa.string()
+    if pa.types.is_list(dtype) or pa.types.is_large_list(dtype):
+        return pa.list_(_canonical_arrow_type(dtype.value_type))
+    if pa.types.is_fixed_size_list(dtype):
+        return pa.list_(_canonical_arrow_type(dtype.value_type), dtype.list_size)
+    if pa.types.is_struct(dtype):
+        return pa.struct(
+            [pa.field(field.name, _canonical_arrow_type(field.type)) for field in dtype]
+        )
+    if pa.types.is_map(dtype):
+        return pa.map_(
+            _canonical_arrow_type(dtype.key_type),
+            _canonical_arrow_type(dtype.item_type),
+        )
+    return dtype
+
+
+def _canonical_schema(schema: pa.Schema) -> list[tuple[str, str]]:
+    return [(field.name, str(_canonical_arrow_type(field.type))) for field in schema]
+
+
+def _live_view_schema(
+    con: duckdb.DuckDBPyConnection, *, view_sql: str
+) -> list[tuple[str, str]]:
+    schema = con.execute(f"SELECT * FROM ({view_sql}) AS d LIMIT 0").arrow().schema
+    return _canonical_schema(schema)
+
+
 def _verify_rerun(
     *,
+    artifact_id: str,
     existing_metadata_path: Path,
     new_query_hash: str,
     new_source_snapshot_id: str,
+    live_schema: list[tuple[str, str]],
 ) -> DatasetMetadata:
     existing = DatasetMetadata.model_validate_json(
         existing_metadata_path.read_text(encoding="utf-8")
@@ -215,6 +248,19 @@ def _verify_rerun(
             "rerun of existing dataset artifact_id with a different "
             f"source_snapshot_id is forbidden ({existing.source_snapshot_id!r} "
             f"on disk vs {new_source_snapshot_id!r} requested)."
+        )
+    existing_parquet_path = existing_metadata_path.with_name("dataset.parquet")
+    if not existing_parquet_path.exists():
+        raise FileNotFoundError(
+            f"dataset metadata present but parquet missing at {existing_parquet_path}; "
+            "delete the artifact directory to rebuild."
+        )
+    stored_schema = _canonical_schema(pq.read_schema(existing_parquet_path))
+    if stored_schema != live_schema:
+        raise ValueError(
+            f"view definition changed under artifact_id={artifact_id!r}: stored "
+            f"schema {stored_schema!r} vs live schema {live_schema!r}. "
+            "Use a new artifact_id for the changed view."
         )
     return existing
 
@@ -260,9 +306,11 @@ def prepare_dataset(
 
     if metadata_path.exists():
         existing = _verify_rerun(
+            artifact_id=artifact_id,
             existing_metadata_path=metadata_path,
             new_query_hash=qh,
             new_source_snapshot_id=source_snapshot_id,
+            live_schema=_live_view_schema(con, view_sql=select_sql),
         )
         if not manifest_path.exists():
             raise FileNotFoundError(

@@ -13,6 +13,7 @@ indicators, and the coord dict for PyMC.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
 
@@ -20,6 +21,8 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 from pydantic import BaseModel, ConfigDict
+
+from python_models.statistical.splits import game_hash_fold
 
 _log = logging.getLogger(__name__)
 
@@ -33,6 +36,9 @@ MIN_RARE_CLASS_COUNT_PER_SEASON: int = 100
 MIN_RARE_CLASS_RATE_PER_SEASON: float = 0.005
 
 UNKNOWN_LEVEL: str = "__unknown__"
+
+HOLDOUT_FOLD_COUNT: int = 10
+HOLDOUT_FOLD_ID: int = 0
 
 RANDOM_EFFECT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("season", "season"),
@@ -84,6 +90,27 @@ class ContinuousFeature(BaseModel):
     raw_std: float
 
 
+class ObservationHeldOutSet(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        arbitrary_types_allowed=True, frozen=True
+    )
+
+    y: ByteArray
+    event_keys: IntArray
+
+    season_idx: IntArray
+    scorer_idx: IntArray
+    park_idx: IntArray
+    source_idx: IntArray
+
+    fixed_effects: dict[str, FixedEffectDesign]
+    continuous: dict[str, ContinuousFeature]
+
+    @property
+    def n_events(self) -> int:
+        return int(self.y.shape[0])
+
+
 class EventObservationInputs(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(
         arbitrary_types_allowed=True, frozen=True
@@ -102,6 +129,8 @@ class EventObservationInputs(BaseModel):
     continuous: dict[str, ContinuousFeature]
 
     coords: dict[str, list[str]]
+
+    held_out: ObservationHeldOutSet | None = None
 
     @property
     def n_events(self) -> int:
@@ -167,12 +196,117 @@ def _build_continuous_feature(df: pl.DataFrame, column: str) -> ContinuousFeatur
     )
 
 
+def _encode_codes_with_vocab(
+    per_event: pl.DataFrame, column: str, labels: Sequence[str]
+) -> IntArray:
+    """Map a per-event column to int codes against a fixed ``labels`` vocab.
+
+    Booleans cast to utf8, NULLs fill to ``UNKNOWN_LEVEL``; unseen values
+    (and NULLs) fall back to ``UNKNOWN_LEVEL``'s index, or ``-1`` when
+    ``UNKNOWN_LEVEL`` is not in the vocab.
+    """
+    series = per_event.get_column(column)
+    if series.dtype == pl.Boolean:
+        series = series.cast(pl.Utf8)
+    series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
+    mapping = {c: i for i, c in enumerate(labels)}
+    fallback = mapping.get(UNKNOWN_LEVEL, -1)
+    return np.fromiter(
+        (mapping.get(str(v), fallback) for v in series.to_list()),
+        dtype=np.int64,
+        count=series.len(),
+    )
+
+
+def _standardize_with_training_stats(
+    df: pl.DataFrame, column: str, training: ContinuousFeature
+) -> ContinuousFeature:
+    raw = df.get_column(column).cast(pl.Float64).to_numpy().astype(np.float64)
+    is_missing = (~np.isfinite(raw)).astype(np.int8)
+    finite_mask = is_missing == 0
+    standardized = np.where(
+        finite_mask, (raw - training.raw_mean) / training.raw_std, 0.0
+    )
+    return ContinuousFeature(
+        values=standardized.astype(np.float64),
+        is_missing=is_missing,
+        raw_mean=training.raw_mean,
+        raw_std=training.raw_std,
+    )
+
+
+def _build_observation_held_out_set(
+    df: pl.DataFrame,
+    *,
+    season_labels: list[str],
+    scorer_labels: list[str],
+    park_labels: list[str],
+    source_labels: list[str],
+    fixed_effects: dict[str, FixedEffectDesign],
+    continuous: dict[str, ContinuousFeature],
+) -> ObservationHeldOutSet:
+    empty_int = np.zeros(0, dtype=np.int64)
+    if df.height == 0:
+        return ObservationHeldOutSet(
+            y=np.zeros(0, dtype=np.int8),
+            event_keys=empty_int,
+            season_idx=empty_int,
+            scorer_idx=empty_int,
+            park_idx=empty_int,
+            source_idx=empty_int,
+            fixed_effects={},
+            continuous={},
+        )
+
+    per_event = df.sort("event_key")
+    y = (
+        per_event.get_column("is_observed")
+        .fill_null(False)
+        .cast(pl.Int8)
+        .to_numpy()
+        .astype(np.int8)
+    )
+    event_keys = (
+        per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
+    )
+
+    season_idx = _encode_codes_with_vocab(per_event, "season", season_labels)
+    scorer_idx = _encode_codes_with_vocab(per_event, "scorer", scorer_labels)
+    park_idx = _encode_codes_with_vocab(per_event, "park_id", park_labels)
+    source_idx = _encode_codes_with_vocab(per_event, "source_family", source_labels)
+
+    held_fe: dict[str, FixedEffectDesign] = {
+        column: FixedEffectDesign(
+            levels=design.levels,
+            codes=_encode_codes_with_vocab(per_event, column, list(design.levels)),
+        )
+        for column, design in fixed_effects.items()
+    }
+    held_continuous: dict[str, ContinuousFeature] = {
+        column: _standardize_with_training_stats(per_event, column, feature)
+        for column, feature in continuous.items()
+    }
+
+    return ObservationHeldOutSet(
+        y=y,
+        event_keys=event_keys,
+        season_idx=season_idx,
+        scorer_idx=scorer_idx,
+        park_idx=park_idx,
+        source_idx=source_idx,
+        fixed_effects=held_fe,
+        continuous=held_continuous,
+    )
+
+
 def prepare_event_observation_inputs(
     parquet_path: Path,
     *,
     dimension: str,
     smoke_limit: int | None = None,
     seed: int = DEFAULT_SEED,
+    held_out_fold_id: int = HOLDOUT_FOLD_ID,
+    held_out_fold_count: int = HOLDOUT_FOLD_COUNT,
 ) -> EventObservationInputs:
     """Load and shape the event-grain inputs for the observation builder.
 
@@ -180,7 +314,14 @@ def prepare_event_observation_inputs(
     unobserved row counts, divided by season N) falls below
     ``MIN_RARE_CLASS_RATE_PER_SEASON`` are dropped before sampling, as
     are seasons with a rare-class count below
-    ``MIN_RARE_CLASS_COUNT_PER_SEASON``. The 2021+ trajectory data is
+    ``MIN_RARE_CLASS_COUNT_PER_SEASON``. After the saturated-season
+    filter, a deterministic game-disjoint holdout
+    (``game_hash_fold(game_id, fold_count=held_out_fold_count) ==
+    held_out_fold_id``) is removed before any row subsample; the
+    held-out events ship on ``EventObservationInputs.held_out`` encoded
+    against the training vocabularies (unseen levels -> ``-1``,
+    continuous covariates standardized with the training means/stds)
+    for OOS scoring. The 2021+ trajectory data is
     functionally saturated (1-31 unobserved out of ~125k each year)
     and the modern era is near-saturated; the likelihood gives
     near-zero gradient per parameter and creates ridge correlations
@@ -235,6 +376,24 @@ def prepare_event_observation_inputs(
                 f"dimension={dimension!r}; nothing to fit"
             )
 
+    distinct_game_ids = df.get_column("game_id").unique().to_list()
+    holdout_game_ids = [
+        g
+        for g in distinct_game_ids
+        if game_hash_fold(g, fold_count=held_out_fold_count) == held_out_fold_id
+    ]
+    held_out_df = df.filter(pl.col("game_id").is_in(holdout_game_ids))
+    df = df.filter(~pl.col("game_id").is_in(holdout_game_ids))
+    _log.info(
+        "prepare_event_observation_inputs held-out %d/%d games via fold %d/%d",
+        len(holdout_game_ids),
+        len(distinct_game_ids),
+        held_out_fold_id,
+        held_out_fold_count,
+    )
+    if df.height == 0:
+        raise ValueError("every game landed in the held-out fold; nothing to fit")
+
     if smoke_limit is not None and df.height > smoke_limit:
         df = df.sample(n=smoke_limit, seed=seed)
         _log.info(
@@ -275,10 +434,22 @@ def prepare_event_observation_inputs(
     for name, design in fixed_effects.items():
         coords[f"{name}_levels"] = list(design.levels)
 
+    held_out = _build_observation_held_out_set(
+        held_out_df,
+        season_labels=list(season_labels),
+        scorer_labels=list(scorer_labels),
+        park_labels=list(park_labels),
+        source_labels=list(source_labels),
+        fixed_effects=fixed_effects,
+        continuous=continuous,
+    )
+
     _log.info(
-        "prepare_event_observation_inputs dim=%s rows=%d seasons=%d scorers=%d parks=%d sources=%d",
+        "prepare_event_observation_inputs dim=%s rows=%d held_out_events=%d "
+        "seasons=%d scorers=%d parks=%d sources=%d",
         dimension,
         df.height,
+        held_out.n_events,
         len(season_labels),
         len(scorer_labels),
         len(park_labels),
@@ -296,4 +467,5 @@ def prepare_event_observation_inputs(
         fixed_effects=fixed_effects,
         continuous=continuous,
         coords=coords,
+        held_out=held_out,
     )

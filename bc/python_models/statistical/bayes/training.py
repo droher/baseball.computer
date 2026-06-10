@@ -17,7 +17,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import cast, get_args
 
 import arviz as az
 import numpy as np
@@ -63,6 +63,7 @@ from python_models.statistical.models._event_data import (
     DEFAULT_SEED,
     DEFAULT_SMOKE_LIMIT,
     EventObservationInputs,
+    ObservationHeldOutSet,
 )
 from python_models.statistical.models._geometry_data import (
     GeometryInputs,
@@ -112,6 +113,7 @@ PITCH_SUMMARY_SUMMARY_FILENAME: str = "pitch_summary_summary.parquet"
 N_POSITIONS_EXPORT: int = 9
 
 HELD_OUT_MARGINALIZED_LIMIT: int = 100_000
+HELD_OUT_BERNOULLI_LIMIT: int = 100_000
 
 
 def _atomic_write_text(target: Path, payload: str) -> None:
@@ -259,6 +261,13 @@ def _resolve_sampler_config(
         and tune_override is None
     ):
         return base
+    if backend_override is not None:
+        allowed = get_args(NutsBackend)
+        if backend_override not in allowed:
+            raise ValueError(
+                f"invalid BC_STATS_BAYES_BACKEND={backend_override!r}; "
+                f"allowed values: {', '.join(allowed)}"
+            )
     backend_str = backend_override if backend_override is not None else base.backend
     backend = cast("NutsBackend", backend_str)
     return SamplingConfig(
@@ -514,6 +523,131 @@ def _posterior_event_means_bernoulli(
         p = 1.0 / (1.0 + np.exp(-eta))
         means[sl] = p.mean(axis=(0, 1))
     return means
+
+
+def _posterior_held_out_means_bernoulli(
+    idata: az.InferenceData,
+    held_out: ObservationHeldOutSet,
+    *,
+    chunk_size: int = POSTERIOR_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Compute ``E[sigmoid(η_e)] | data`` per held-out event from posterior draws.
+
+    Mirrors ``_posterior_event_means_bernoulli`` but the held-out idx
+    arrays are encoded against the training vocabularies, so ``-1``
+    (unseen-level) codes are masked the same way
+    ``_posterior_held_out_softmax`` masks FE codes: an unseen
+    random-effect or fixed-effect level contributes 0 — the prior mean.
+    """
+    posterior = idata.posterior
+    n_event = held_out.n_events
+    if n_event == 0:
+        return np.zeros(0, dtype=np.float64)
+
+    alpha = np.asarray(posterior["alpha"].values, dtype=np.float64)
+    n_chain, n_draw = alpha.shape[0], alpha.shape[1]
+
+    random_effects: list[tuple[np.ndarray, np.ndarray]] = []
+    for var, idx in (
+        ("beta_season", held_out.season_idx),
+        ("beta_scorer", held_out.scorer_idx),
+        ("beta_park", held_out.park_idx),
+        ("beta_source", held_out.source_idx),
+    ):
+        if var not in posterior:
+            continue
+        random_effects.append(
+            (np.asarray(posterior[var].values, dtype=np.float64), idx)
+        )
+
+    deltas_full: dict[str, np.ndarray] = {}
+    for column, design in held_out.fixed_effects.items():
+        if len(design.levels) <= 1:
+            continue
+        if f"delta_{column}" not in posterior:
+            continue
+        deltas_full[column] = np.asarray(
+            posterior[f"delta_{column}"].values, dtype=np.float64
+        )
+
+    gammas: dict[str, np.ndarray] = {}
+    delta_missing: dict[str, np.ndarray] = {}
+    for column in held_out.continuous:
+        if f"gamma_{column}" not in posterior:
+            continue
+        gammas[column] = np.asarray(
+            posterior[f"gamma_{column}"].values, dtype=np.float64
+        )
+        if f"delta_missing_{column}" in posterior:
+            delta_missing[column] = np.asarray(
+                posterior[f"delta_missing_{column}"].values, dtype=np.float64
+            )
+
+    means = np.empty(n_event, dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        eta = np.broadcast_to(alpha[:, :, None], (n_chain, n_draw, stop - start)).copy()
+        for values, idx in random_effects:
+            codes = idx[sl]
+            valid = codes >= 0
+            safe = np.where(valid, codes, 0)
+            eta += values[:, :, safe] * valid[None, None, :]
+        for column, df in deltas_full.items():
+            codes = held_out.fixed_effects[column].codes[sl]
+            valid = codes >= 0
+            safe = np.where(valid, codes, 0)
+            eta += df[:, :, safe] * valid[None, None, :]
+        for column, gamma in gammas.items():
+            values_cont = held_out.continuous[column].values[sl].astype(np.float64)
+            eta += gamma[:, :, None] * values_cont[None, None, :]
+            if column in delta_missing:
+                is_missing = (
+                    held_out.continuous[column].is_missing[sl].astype(np.float64)
+                )
+                eta += delta_missing[column][:, :, None] * is_missing[None, None, :]
+        p = 1.0 / (1.0 + np.exp(-eta))
+        means[sl] = p.mean(axis=(0, 1))
+    return means
+
+
+def _held_out_metrics_bernoulli(y: np.ndarray, p_mean: np.ndarray) -> dict[str, object]:
+    """OOS ROC-AUC / PR-AUC / ECE for the Bernoulli observation targets.
+
+    ``baseline_pr_auc`` is the held-out positive rate (the PR-AUC of an
+    uninformative scorer). Single-class label sets keep ``roc_auc`` /
+    ``pr_auc`` null instead of crashing.
+    """
+    from sklearn.metrics import average_precision_score, roc_auc_score
+
+    y_int = np.asarray(y, dtype=np.int64)
+    n = int(y_int.shape[0])
+    metrics: dict[str, object] = {
+        "n_events": n,
+        "roc_auc": None,
+        "pr_auc": None,
+        "baseline_pr_auc": None,
+        "ece_held_out": None,
+    }
+    if n == 0:
+        _log.warning("held-out set is empty; writing null held-out metrics")
+        return metrics
+    positives = int(y_int.sum())
+    metrics["baseline_pr_auc"] = float(y_int.mean())
+    metrics["ece_held_out"] = expected_calibration_error(
+        np.asarray(p_mean, dtype=np.float64), y_int, n_bins=15
+    )
+    if positives == 0 or positives == n:
+        _log.warning(
+            "held-out labels are single-class (positives=%d of %d); "
+            "roc_auc / pr_auc written as null",
+            positives,
+            n,
+        )
+        return metrics
+    metrics["roc_auc"] = float(roc_auc_score(y_int, p_mean))
+    metrics["pr_auc"] = float(average_precision_score(y_int, p_mean))
+    return metrics
 
 
 def _bucket_dev_from_p_mean(
@@ -1087,6 +1221,48 @@ def _subsample_held_out(held: HeldOutSet, *, limit: int, seed: int) -> HeldOutSe
     )
 
 
+def _subsample_observation_held_out(
+    held: ObservationHeldOutSet, *, limit: int, seed: int
+) -> ObservationHeldOutSet:
+    """Deterministically subsample a Bernoulli held-out set for tractable scoring."""
+    n = held.n_events
+    if n <= limit:
+        return held
+    _log.info(
+        "subsampling bernoulli held-out set for scoring: %d -> %d events (seed=%d)",
+        n,
+        limit,
+        seed,
+    )
+    rng = np.random.default_rng(seed)
+    idx = np.sort(rng.choice(n, size=limit, replace=False))
+    fixed_effects = {
+        column: design.model_copy(update={"codes": design.codes[idx]})
+        for column, design in held.fixed_effects.items()
+    }
+    continuous = {
+        column: feature.model_copy(
+            update={
+                "values": feature.values[idx],
+                "is_missing": feature.is_missing[idx],
+            }
+        )
+        for column, feature in held.continuous.items()
+    }
+    return held.model_copy(
+        update={
+            "y": held.y[idx],
+            "event_keys": held.event_keys[idx],
+            "season_idx": held.season_idx[idx],
+            "scorer_idx": held.scorer_idx[idx],
+            "park_idx": held.park_idx[idx],
+            "source_idx": held.source_idx[idx],
+            "fixed_effects": fixed_effects,
+            "continuous": continuous,
+        }
+    )
+
+
 def _posterior_event_softmax(
     idata: az.InferenceData,
     inputs: _FixedEffectCarrier,
@@ -1263,14 +1439,15 @@ def _export_geometry_probabilities(
     *,
     event_keys: np.ndarray,
     class_labels: list[str],
+    geometry_dimension: str,
     target_path: Path,
 ) -> pl.DataFrame:
     """Write per-event-per-class geometry probabilities to parquet.
 
-    Schema: ``(event_key int64, class_index int8, class_label utf8,
-    expected_share float64)``. One row per (event, class); the per-event
-    shares over the classes sum to 1. ``class_index`` is 0-based and
-    aligns with ``class_labels``.
+    Schema: ``(event_key int64, geometry_dimension utf8, class_index int8,
+    class_label utf8, expected_share float64)``. One row per (event,
+    class); the per-event shares over the classes sum to 1.
+    ``class_index`` is 0-based and aligns with ``class_labels``.
     """
     n_event, k = means.shape
     if k != len(class_labels):
@@ -1288,6 +1465,9 @@ def _export_geometry_probabilities(
     df = pl.DataFrame(
         {
             "event_key": repeated_keys,
+            "geometry_dimension": pl.Series(
+                [geometry_dimension] * (n_event * k), dtype=pl.Utf8
+            ),
             "class_index": class_indices,
             "class_label": labels,
             "expected_share": shares,
@@ -1968,6 +2148,33 @@ def run_bayes_model(
             _ = _export_event_propensities(
                 p_mean, inputs, target_path=exports_dir / POSTERIOR_EXPORT_FILENAME
             )
+            if inputs.held_out is not None:
+                held = _subsample_observation_held_out(
+                    inputs.held_out,
+                    limit=HELD_OUT_BERNOULLI_LIMIT,
+                    seed=DEFAULT_SEED,
+                )
+                held_p_mean = _posterior_held_out_means_bernoulli(posterior_idata, held)
+                held_out_metrics = _held_out_metrics_bernoulli(held.y, held_p_mean)
+                held_out_metrics["n_events_scored"] = held_out_metrics["n_events"]
+                held_out_metrics["n_events"] = inputs.held_out.n_events
+                _atomic_write_text(
+                    validation_dir / "held_out_metrics.json",
+                    json.dumps(held_out_metrics, indent=2, default=_json_default),
+                )
+                _log.info(
+                    "bayes held-out bernoulli metrics model=%s artifact=%s "
+                    "n_events=%s n_events_scored=%s roc_auc=%s pr_auc=%s "
+                    "baseline_pr_auc=%s ece=%s",
+                    model_name,
+                    artifact_id,
+                    held_out_metrics.get("n_events"),
+                    held_out_metrics.get("n_events_scored"),
+                    held_out_metrics.get("roc_auc"),
+                    held_out_metrics.get("pr_auc"),
+                    held_out_metrics.get("baseline_pr_auc"),
+                    held_out_metrics.get("ece_held_out"),
+                )
         elif spec.outcome_kind == "count":
             write_parquet_atomic(
                 _posterior_summary_dataframe(posterior_summary),
@@ -2058,6 +2265,7 @@ def run_bayes_model(
                         shares,
                         event_keys=production.event_keys,
                         class_labels=inputs.class_labels,
+                        geometry_dimension=spec.dimension,
                         target_path=geometry_export_path,
                     )
                     _log.info(
@@ -2079,6 +2287,7 @@ def run_bayes_model(
                         shares,
                         event_keys=inputs.event_keys,
                         class_labels=inputs.class_labels,
+                        geometry_dimension=spec.dimension,
                         target_path=geometry_export_path,
                     )
                 held_out_metrics = _evaluate_held_out(

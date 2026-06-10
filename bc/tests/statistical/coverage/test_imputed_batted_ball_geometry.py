@@ -37,6 +37,7 @@ def _write_geometry_artifact_with_pointer(
     tmp_path: Path,
     artifact_id: str,
     events: int,
+    geometry_dimension_value: str | None = None,
 ) -> Path:
     from python_models.statistical.bayes.artifacts import bayes_artifact_dir
     from python_models.statistical.manifests import (
@@ -64,14 +65,17 @@ def _write_geometry_artifact_with_pointer(
     rng = np.random.default_rng(0)
     raw = rng.uniform(0.0, 1.0, size=(events, N_CLASSES))
     shares = (raw / raw.sum(axis=1, keepdims=True)).reshape(-1).astype(np.float64)
-    pl.DataFrame(
-        {
-            "event_key": event_keys,
-            "class_index": class_indices,
-            "class_label": labels,
-            "expected_share": shares,
-        }
-    ).write_parquet(exports_dir / "geometry_probabilities.parquet")
+    columns: dict[str, object] = {
+        "event_key": event_keys,
+        "class_index": class_indices,
+        "class_label": labels,
+        "expected_share": shares,
+    }
+    if geometry_dimension_value is not None:
+        columns["geometry_dimension"] = pl.Series(
+            [geometry_dimension_value] * (events * N_CLASSES), dtype=pl.Utf8
+        )
+    pl.DataFrame(columns).write_parquet(exports_dir / "geometry_probabilities.parquet")
 
     extras = BayesArtifactExtras(
         model_name=MODEL_NAME,
@@ -152,6 +156,39 @@ def test_yields_per_target_frame_with_dimension_and_artifact_id(
         pl.col("expected_share").sum().alias("total")
     )
     np.testing.assert_allclose(per_event.get_column("total").to_numpy(), 1.0, atol=1e-9)
+
+
+def test_exported_dimension_column_matching_spec_is_used(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = 4
+    published_root = _write_geometry_artifact_with_pointer(
+        tmp_path=tmp_path,
+        artifact_id="geo-dim-ok",
+        events=events,
+        geometry_dimension_value=DIMENSION,
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    frames = list(aggregate_geometry_frames())
+    assert len(frames) == 1
+    frame = frames[0]
+    assert frame.height == events * N_CLASSES
+    assert dict(frame.schema) == GEOMETRY_SCHEMA
+    assert frame.get_column("geometry_dimension").unique().to_list() == [DIMENSION]
+
+
+def test_exported_dimension_column_mismatching_spec_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published_root = _write_geometry_artifact_with_pointer(
+        tmp_path=tmp_path,
+        artifact_id="geo-dim-bad",
+        events=4,
+        geometry_dimension_value="location_depth",
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    with pytest.raises(ValueError, match="geometry_dimension"):
+        _ = list(aggregate_geometry_frames())
 
 
 def test_credit_and_ball_handler_iterators_exclude_geometry_spec(

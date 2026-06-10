@@ -1,4 +1,4 @@
-"""Deep-learning supplement modules: proposals, embeddings, calibrators."""
+"""Deep-learning supplement modules: proposal training and embeddings."""
 
 from __future__ import annotations
 

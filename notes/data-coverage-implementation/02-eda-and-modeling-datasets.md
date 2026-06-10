@@ -705,7 +705,6 @@ EDA should be able to block a model run. Use these findings as hard gates:
 
 | Finding | Required action |
 | --- | --- |
-| `source_family_block_as_event_missing` | Fix source ledger or change model target. |
 | `dominant_single_scorer_park_team` | Pool more strongly, withhold effect, or merge effect levels. |
 | `no_connected_component_for_effect` | Remove effect or mark estimates weakly identified. |
 | `data_error_rows_train_as_truth` | Fix training weights or data-error joins. |

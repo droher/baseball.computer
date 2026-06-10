@@ -23,7 +23,7 @@ MODEL (
     deduced_value = 'Always NULL in v1.',
     source_acquisition_status = 'source_acquisition_ledger.source_availability_status for (game_id, fielding_team_id, dimension=box_fielding).',
     data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. Matches per-credit-dimension rows emitted by the risk ledger (putout_credit/assist_credit/error_credit) — non-credit dimensions remain none in v1.',
-    model_input_eligible = 'TRUE when observed_status NOT IN (not_applicable, data_error_prone) AND source_acquisition_status != not_acquired.'
+    model_input_eligible = 'TRUE when seed_observed_status.is_training_eligible for the row''s observed_status AND source_acquisition_status != not_acquired.'
   ),
   audits (
     not_null(columns := (event_key, dimension, observed_status, sentinel_type, source_acquisition_status, data_error_risk, model_input_eligible)),
@@ -40,7 +40,9 @@ MODEL (
       to_model := main_seeds.seed_observed_status,
       to_column := observed_status
     ),
-    sentinel_status_consistent()
+    sentinel_status_consistent(),
+    derived_requires_deduced(),
+    model_input_eligible_matches_seed()
   )
 );
 
@@ -232,10 +234,11 @@ SELECT
     COALESCE(acq.source_availability_status, 'not_acquired') AS source_acquisition_status,
     COALESCE(r.data_error_class, 'none') AS data_error_risk,
     (
-        d.observed_status NOT IN ('not_applicable', 'data_error_prone')
+        st.is_training_eligible
         AND COALESCE(acq.source_availability_status, 'not_acquired') != 'not_acquired'
     ) AS model_input_eligible
 FROM all_dims AS d
+LEFT JOIN main_seeds.seed_observed_status AS st ON st.observed_status = d.observed_status
 LEFT JOIN acq_box_fielding AS acq
     ON acq.game_id = d.game_id AND acq.team_id = d.fielding_team_id
 LEFT JOIN risk_per_game_field AS r ON r.game_id = d.game_id AND r.field_name = d.dimension

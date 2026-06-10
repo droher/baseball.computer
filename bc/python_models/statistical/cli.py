@@ -162,7 +162,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     fit_deep = subparsers.add_parser(
         "fit-deep",
-        help="Train deep proposals/embeddings/calibrators on a frozen dataset.",
+        help="Train deep proposals/embeddings on a frozen dataset.",
     )
     _ = fit_deep.add_argument("--target", required=True, help="Deep target name.")
     _add_dataset_artifact_arg(fit_deep)
@@ -472,6 +472,19 @@ def _run_run_eda(args: argparse.Namespace) -> int:
         output_root=output_root,
         dataset_artifact_root=dataset_artifact_root,
     )
+    if manifest.blocking_findings:
+        for code in manifest.blocking_findings:
+            _log.error(
+                "run_eda_blocking_finding artifact_id=%s code=%s",
+                manifest.artifact_id,
+                code,
+            )
+        _log.error(
+            "run-eda FAILED artifact_id=%s blocking_findings=%d",
+            manifest.artifact_id,
+            len(manifest.blocking_findings),
+        )
+        return 1
     _log.info(
         "run-eda completed artifact_id=%s blocking_findings=%d",
         manifest.artifact_id,

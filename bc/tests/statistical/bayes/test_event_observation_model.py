@@ -16,12 +16,30 @@ import polars as pl
 import pytest
 
 from python_models.statistical.models._event_data import (
+    HOLDOUT_FOLD_COUNT,
+    HOLDOUT_FOLD_ID,
     prepare_event_observation_inputs,
 )
 from python_models.statistical.models.observation import build_observation_model
 from python_models.statistical.pymc_utils import SamplingConfig, sample_model
+from python_models.statistical.splits import game_hash_fold
 
 _SOURCE_VARS = {"sigma_source", "z_source", "beta_source"}
+
+
+def _game_id_pool(*, n_holdout: int, n_train: int) -> list[str]:
+    holdout: list[str] = []
+    train: list[str] = []
+    i = 0
+    while len(holdout) < n_holdout or len(train) < n_train:
+        gid = f"GAME{i:04d}"
+        if game_hash_fold(gid, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID:
+            if len(holdout) < n_holdout:
+                holdout.append(gid)
+        elif len(train) < n_train:
+            train.append(gid)
+        i += 1
+    return holdout + train
 
 
 def _make_dataset(
@@ -29,10 +47,13 @@ def _make_dataset(
 ) -> Path:
     rng = np.random.default_rng(seed)
     n = 96
+    game_pool = _game_id_pool(n_holdout=2, n_train=10)
+    game_ids = [game_pool[i % len(game_pool)] for i in range(n)]
     df = pl.DataFrame(
         {
             "event_key": np.arange(n, dtype=np.int64),
             "dimension": ["trajectory"] * n,
+            "game_id": pl.Series("game_id", game_ids, dtype=pl.Utf8),
             "is_observed": rng.integers(0, 2, size=n).astype(bool),
             "season": pl.Series(
                 "season",

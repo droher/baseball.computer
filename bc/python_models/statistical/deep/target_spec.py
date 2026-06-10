@@ -1,4 +1,4 @@
-"""Per-deep-target metadata: what to fit, on which dataset, how to calibrate."""
+"""Per-deep-target metadata: what to fit and on which dataset."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 DeepTargetKind = Literal["multiclass", "binary"]
 ClassUniverseSource = Literal["train_distinct", "configured"]
-CalibrationMethod = Literal["temperature", "isotonic"]
 LossType = Literal["cross_entropy", "focal"]
 
 
@@ -41,13 +40,12 @@ class DeepTargetSpec(BaseModel):
             "values must appear in configured_class_labels (when configured)."
         ),
     )
-    calibration_method: CalibrationMethod = "temperature"
     loss_type: LossType = "cross_entropy"
     focal_gamma: float = Field(
         default=2.0,
         description="Focusing parameter for focal loss; ignored when loss_type='cross_entropy'.",
     )
-    fold_count: int = 5
+    fold_count: int = Field(default=5, ge=2)
     slice_columns: tuple[str, ...] = ()
     game_id_column: str = "game_id"
     split_column: str = "split_partition"

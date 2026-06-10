@@ -29,12 +29,16 @@ from collections.abc import Sequence
 from typing import ClassVar, Literal
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict
+
+from python_models.statistical.splits import game_hash_fold
 
 _log = logging.getLogger(__name__)
 
 PublicationTier = Literal["full", "manual_review", "diagnostic_only"]
+OofIntegrityStatus = Literal["pass", "fail", "unverifiable"]
 
 
 class ProbeResult(BaseModel):
@@ -64,6 +68,123 @@ class ConfoundLeakReport(BaseModel):
     embed_dim: int
     n_entities: int
     per_confound: tuple[ConfoundProbeResult, ...]
+
+
+class OofIntegrityResult(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    status: OofIntegrityStatus
+    n_oof_rows: int
+    n_distinct_folds: int
+    n_fold_mismatches: int
+    n_cross_partition_grains: int
+    detail: str
+
+
+def oof_integrity_probe(
+    probabilities: pl.DataFrame,
+    game_ids: pl.DataFrame,
+    *,
+    fold_count: int,
+    grain_column: str = "event_key",
+    game_id_column: str = "game_id",
+    partition_column: str = "partition",
+    fold_id_column: str = "fold_id",
+) -> OofIntegrityResult:
+    """Post-hoc fold-provenance check on an exported probabilities frame.
+
+    ``game_ids`` maps ``grain_column`` to ``game_id_column`` (e.g. from the
+    modeling-dataset snapshot). Artifacts that predate fold provenance
+    (no ``fold_id`` column) come back ``unverifiable`` rather than pass/fail.
+    """
+    if fold_id_column not in probabilities.columns:
+        return OofIntegrityResult(
+            status="unverifiable",
+            n_oof_rows=0,
+            n_distinct_folds=0,
+            n_fold_mismatches=0,
+            n_cross_partition_grains=0,
+            detail=(
+                f"no {fold_id_column!r} column; artifact predates OOF fold "
+                "provenance"
+            ),
+        )
+
+    problems: list[str] = []
+
+    n_cross = int(
+        probabilities.group_by(grain_column)
+        .agg(pl.col(partition_column).n_unique().alias("n_partitions"))
+        .filter(pl.col("n_partitions") > 1)
+        .height
+    )
+    if n_cross > 0:
+        problems.append(
+            f"{n_cross} {grain_column} values appear in multiple partitions"
+        )
+
+    oof = probabilities.filter(pl.col(partition_column) == "OOF")
+    n_oof = int(oof.height)
+    if n_oof == 0:
+        problems.append("no OOF rows present")
+        n_distinct_folds = 0
+        n_mismatches = 0
+    else:
+        n_distinct_folds = int(oof[fold_id_column].drop_nulls().n_unique())
+        if n_distinct_folds < 2:
+            problems.append(
+                f"only {n_distinct_folds} distinct fold(s) present in OOF rows"
+            )
+        joined = oof.select(grain_column, fold_id_column).join(
+            game_ids.select(grain_column, game_id_column).unique(
+                subset=grain_column
+            ),
+            on=grain_column,
+            how="left",
+        )
+        expected = pl.Series(
+            "expected_fold",
+            [
+                None
+                if g is None
+                else game_hash_fold(str(g), fold_count=fold_count)
+                for g in joined[game_id_column].to_list()
+            ],
+            dtype=pl.Int32,
+        )
+        annotated = joined.with_columns(expected)
+        n_mismatches = int(
+            annotated.filter(
+                pl.col(fold_id_column).cast(pl.Int32).is_null()
+                | pl.col("expected_fold").is_null()
+                | (pl.col(fold_id_column).cast(pl.Int32) != pl.col("expected_fold"))
+            ).height
+        )
+        if n_mismatches > 0:
+            problems.append(
+                f"{n_mismatches} OOF rows whose {fold_id_column} does not match "
+                f"blake2s({game_id_column}) % {fold_count}"
+            )
+
+    status: OofIntegrityStatus = "fail" if problems else "pass"
+    detail = "; ".join(problems) if problems else "ok"
+    _log.info(
+        "oof_integrity_probe: status=%s n_oof=%d folds=%d mismatches=%d cross_partition=%d (%s)",
+        status,
+        n_oof,
+        n_distinct_folds,
+        n_mismatches,
+        n_cross,
+        detail,
+    )
+    return OofIntegrityResult(
+        status=status,
+        n_oof_rows=n_oof,
+        n_distinct_folds=n_distinct_folds,
+        n_fold_mismatches=n_mismatches,
+        n_cross_partition_grains=n_cross,
+        detail=detail,
+    )
 
 
 def classify_publication_tier(auc: float) -> PublicationTier:

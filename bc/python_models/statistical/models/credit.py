@@ -5,7 +5,7 @@ Two-arm likelihood over a shared softmax:
 * Supervised arm: per-event ``Multinomial(U_e, pi_e)`` on the unmasked
   subset of well-attributed events. Y comes from the observed
   known_credit grid. This is the load-bearing source of per-event
-  signal — without it the per-event REs cancel under softmax.
+  signal.
 * Aggregate arm: per-(game, team, player, position) Normal target
   ``T_target[m] ~ Normal(Σ_{(e,k) in m} U_e * pi_{e,k}, sigma_box)``
   on the masked subset. ``T_target[m]`` is the sum of *hidden but
@@ -13,9 +13,12 @@ Two-arm likelihood over a shared softmax:
 
 Per-position intercept (``alpha_position``) and each per-position FE
 interaction (``delta_<fe>``) use ``pm.ZeroSumNormal`` over the position
-axis so the softmax is identified. Per-event REs (season, scorer,
-park, source) and per-event global FEs are kept — the supervised arm
-makes them data-informed (in v1 they were prior-only).
+axis so the softmax is identified. Scalar-per-event terms (season /
+scorer / park / source random effects and per-event global FEs) are
+omitted: they would enter every position logit equally and cancel
+exactly inside the per-event softmax, in both likelihood arms — the
+supervised arm consumes ``pi`` directly and the aggregate arm consumes
+sums of ``U_e * pi_{e,k}``.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportOperatorIssue=false, reportCallIssue=false, reportArgumentType=false, reportPrivateImportUsage=false, reportIndexIssue=false, reportAttributeAccessIssue=false
@@ -23,7 +26,6 @@ makes them data-informed (in v1 they were prior-only).
 from __future__ import annotations
 
 import logging
-import os
 
 import numpy as np
 import pymc as pm
@@ -33,8 +35,6 @@ from python_models.statistical.models._credit_data import EventCreditInputs
 from python_models.statistical.schemas import BayesPriorConfig
 
 _log = logging.getLogger(__name__)
-
-NONCENTER_SEASON_ENV: str = "BC_CREDIT_NONCENTER_SEASON"
 
 
 def build_fielding_credit_model(
@@ -47,77 +47,19 @@ def build_fielding_credit_model(
     coords: dict[str, list[str]] = dict(inputs.coords)
     coords["event"] = [str(k) for k in range(inputs.n_events)]
     if inputs.n_supervised_events > 0:
-        coords["supervised_event"] = [
-            str(i) for i in range(inputs.n_supervised_events)
-        ]
+        coords["supervised_event"] = [str(i) for i in range(inputs.n_supervised_events)]
     if inputs.n_targets > 0:
         coords["target"] = [str(m) for m in range(inputs.n_targets)]
-    source_effect_active = len(coords["source"]) > 1
     K = inputs.n_positions
 
     with pm.Model(coords=coords) as model:
-        season_idx = pm.Data("season_idx", inputs.season_idx)
-        scorer_idx = pm.Data("scorer_idx", inputs.scorer_idx)
-        park_idx = pm.Data("park_idx", inputs.park_idx)
         U_data = pm.Data("U", inputs.U.astype(np.int64))
 
         alpha = pm.ZeroSumNormal(
             "alpha_position", sigma=cfg.alpha_scale, dims="position"
         )
 
-        sigma_season = pm.HalfNormal("sigma_season", sigma=cfg.sigma_season_scale)
-        sigma_scorer = pm.HalfNormal("sigma_scorer", sigma=cfg.sigma_scorer_scale)
-        sigma_park = pm.HalfNormal("sigma_park", sigma=cfg.sigma_park_scale)
-
-        noncenter_season = os.environ.get(NONCENTER_SEASON_ENV, "0") == "1"
-        if noncenter_season:
-            z_season = pm.ZeroSumNormal("z_season", sigma=1.0, dims="season")
-            beta_season = pm.Deterministic(
-                "beta_season", z_season * sigma_season, dims="season"
-            )
-        else:
-            beta_season = pm.ZeroSumNormal(
-                "beta_season", sigma=sigma_season, dims="season"
-            )
-        z_scorer = pm.Normal("z_scorer", mu=0.0, sigma=1.0, dims="scorer")
-        z_park = pm.Normal("z_park", mu=0.0, sigma=1.0, dims="park")
-        beta_scorer = pm.Deterministic(
-            "beta_scorer", z_scorer * sigma_scorer, dims="scorer"
-        )
-        beta_park = pm.Deterministic("beta_park", z_park * sigma_park, dims="park")
-
-        per_event_terms: list[object] = [
-            beta_season[season_idx],
-            beta_scorer[scorer_idx],
-            beta_park[park_idx],
-        ]
-
-        if source_effect_active:
-            source_idx = pm.Data("source_idx", inputs.source_idx)
-            sigma_source = pm.HalfNormal("sigma_source", sigma=cfg.sigma_source_scale)
-            z_source = pm.Normal("z_source", mu=0.0, sigma=1.0, dims="source")
-            beta_source = pm.Deterministic(
-                "beta_source", z_source * sigma_source, dims="source"
-            )
-            per_event_terms.append(beta_source[source_idx])
-
-        for column, design in inputs.global_effects.items():
-            levels_coord = f"{column}_levels"
-            if len(design.levels) <= 1:
-                continue
-            codes_data = pm.Data(f"{column}_codes", design.codes.astype(np.int64))
-            gamma = pm.ZeroSumNormal(
-                f"gamma_{column}",
-                sigma=cfg.fixed_effect_scale,
-                dims=levels_coord,
-            )
-            per_event_terms.append(gamma[codes_data])
-
-        per_event_sum = per_event_terms[0]
-        for term in per_event_terms[1:]:
-            per_event_sum = per_event_sum + term
-
-        eta = alpha[None, :] + per_event_sum[:, None]
+        eta = pt.broadcast_to(alpha[None, :], (inputs.n_events, K))
 
         for column, design in inputs.fixed_effects.items():
             levels_coord = f"{column}_levels"
@@ -138,9 +80,7 @@ def build_fielding_credit_model(
                 "Y_supervised_event_idx",
                 inputs.Y_supervised_event_idx.astype(np.int64),
             )
-            sup_U = pm.Data(
-                "Y_supervised_U", inputs.Y_supervised_U.astype(np.int64)
-            )
+            sup_U = pm.Data("Y_supervised_U", inputs.Y_supervised_U.astype(np.int64))
             sup_counts_observed = inputs.Y_supervised_counts.astype(np.int64)
             pi_sup = pi[sup_event_idx]
             _ = pm.Multinomial(
@@ -187,12 +127,11 @@ def build_fielding_credit_model(
             )
 
     _log.info(
-        "build_fielding_credit_model credit_type=%s events=%d supervised=%d targets=%d source_effect_active=%s K=%d",
+        "build_fielding_credit_model credit_type=%s events=%d supervised=%d targets=%d K=%d",
         inputs.credit_type,
         inputs.n_events,
         inputs.n_supervised_events,
         inputs.n_targets,
-        source_effect_active,
         K,
     )
     return model

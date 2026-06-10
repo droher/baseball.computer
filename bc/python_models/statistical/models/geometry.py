@@ -7,11 +7,11 @@ flavor-gated per-class deep-learning covariate.
 
 Per-class intercept (``alpha_class``) and each per-class FE interaction
 (``delta_<fe>``) use ``pm.ZeroSumNormal`` over the class axis so the
-softmax is identified. The season-league and scorer random effects are
-scalar-per-event: they enter every class logit equally and cancel inside
-the per-event softmax, so they are nuisance terms kept to mirror the
-ball-handler builder. The DL term is per-class and does NOT cancel in the
-softmax, which is the point of carrying it.
+softmax is identified. The DL term is per-class and does NOT cancel in
+the softmax, which is the point of carrying it. Scalar-per-event terms
+(season-league / scorer random effects) are omitted: they would enter
+every class logit equally and cancel exactly inside the per-event
+softmax.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportOperatorIssue=false, reportCallIssue=false, reportArgumentType=false, reportPrivateImportUsage=false, reportIndexIssue=false, reportAttributeAccessIssue=false
@@ -44,8 +44,6 @@ def build_geometry_model(
     K = inputs.n_classes
 
     with pm.Model(coords=coords) as model:
-        season_league_idx = pm.Data("season_league_idx", inputs.season_league_idx)
-        scorer_idx = pm.Data("scorer_idx", inputs.scorer_idx)
         dl_logit = pm.Data(
             "dl_logit_per_class",
             inputs.dl_logit_per_class,
@@ -54,26 +52,7 @@ def build_geometry_model(
 
         alpha = pm.ZeroSumNormal("alpha_class", sigma=cfg.alpha_scale, dims="class")
 
-        sigma_season_league = pm.HalfNormal(
-            "sigma_season_league", sigma=cfg.sigma_season_scale
-        )
-        sigma_scorer = pm.HalfNormal("sigma_scorer", sigma=cfg.sigma_scorer_scale)
-
-        z_season_league = pm.ZeroSumNormal(
-            "z_season_league", sigma=1.0, dims="season_league"
-        )
-        beta_season_league = pm.Deterministic(
-            "beta_season_league",
-            z_season_league * sigma_season_league,
-            dims="season_league",
-        )
-        z_scorer = pm.Normal("z_scorer", mu=0.0, sigma=1.0, dims="scorer")
-        beta_scorer = pm.Deterministic(
-            "beta_scorer", z_scorer * sigma_scorer, dims="scorer"
-        )
-
-        per_event_sum = beta_season_league[season_league_idx] + beta_scorer[scorer_idx]
-        eta = alpha[None, :] + per_event_sum[:, None]
+        eta = alpha[None, :]
 
         for column, design in inputs.fixed_effects.items():
             levels_coord = f"{column}_levels"

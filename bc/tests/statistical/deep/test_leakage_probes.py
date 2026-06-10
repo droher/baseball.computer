@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import numpy as np
+import polars as pl
 import pytest
 
 from python_models.statistical.deep.leakage_probes import (
+    OofIntegrityResult,
     ProbeResult,
     classify_publication_tier,
+    oof_integrity_probe,
     source_probe_held_out,
 )
+from python_models.statistical.splits import game_hash_fold
 
 SEED = 20260514
 
@@ -106,3 +110,112 @@ def test_raises_on_non_2d_embeddings() -> None:
     labels = ["A", "B"] * 10
     with pytest.raises(ValueError, match="must be 2-d"):
         _ = source_probe_held_out(embeddings, labels, "B")
+
+
+OOF_FOLD_COUNT = 3
+
+
+def _oof_fixture(
+    *, n_games: int = 12, rows_per_game: int = 4
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Probabilities export + grain->game_id mapping with honest fold ids."""
+    records: list[dict[str, object]] = []
+    mapping: list[dict[str, object]] = []
+    event_key = 0
+    for g_idx in range(n_games):
+        game_id = f"GAME{g_idx:04d}"
+        train_game = g_idx < n_games - 2
+        fold = game_hash_fold(game_id, fold_count=OOF_FOLD_COUNT)
+        for _ in range(rows_per_game):
+            partition = "OOF" if train_game else (
+                "VALIDATE" if g_idx == n_games - 2 else "TEST"
+            )
+            records.append(
+                {
+                    "event_key": event_key,
+                    "partition": partition,
+                    "fold_id": fold if partition == "OOF" else None,
+                    "dl_p_class": [0.5, 0.5],
+                }
+            )
+            mapping.append({"event_key": event_key, "game_id": game_id})
+            event_key += 1
+    probabilities = pl.DataFrame(
+        records,
+        schema_overrides={"fold_id": pl.Int32, "dl_p_class": pl.List(pl.Float64)},
+    )
+    game_ids = pl.DataFrame(mapping)
+    assert (
+        probabilities.filter(pl.col("partition") == "OOF")["fold_id"].n_unique()
+        >= 2
+    )
+    return probabilities, game_ids
+
+
+def test_oof_integrity_probe_passes_on_honest_export() -> None:
+    probabilities, game_ids = _oof_fixture()
+    result = oof_integrity_probe(
+        probabilities, game_ids, fold_count=OOF_FOLD_COUNT
+    )
+    assert isinstance(result, OofIntegrityResult)
+    assert result.status == "pass"
+    assert result.n_fold_mismatches == 0
+    assert result.n_cross_partition_grains == 0
+    assert result.n_distinct_folds >= 2
+    assert result.n_oof_rows == int(
+        probabilities.filter(pl.col("partition") == "OOF").height
+    )
+
+
+def test_oof_integrity_probe_fails_on_wrong_fold() -> None:
+    probabilities, game_ids = _oof_fixture()
+    corrupted = probabilities.with_columns(
+        pl.when(pl.col("event_key") == 0)
+        .then((pl.col("fold_id") + 1) % OOF_FOLD_COUNT)
+        .otherwise(pl.col("fold_id"))
+        .cast(pl.Int32)
+        .alias("fold_id")
+    )
+    result = oof_integrity_probe(corrupted, game_ids, fold_count=OOF_FOLD_COUNT)
+    assert result.status == "fail"
+    assert result.n_fold_mismatches == 1
+    assert "does not match" in result.detail
+
+
+def test_oof_integrity_probe_fails_on_cross_partition_duplicate() -> None:
+    probabilities, game_ids = _oof_fixture()
+    oof_key = int(
+        probabilities.filter(pl.col("partition") == "OOF")["event_key"][0]
+    )
+    duplicate = probabilities.filter(pl.col("event_key") == oof_key).with_columns(
+        pl.lit("VALIDATE").alias("partition"),
+        pl.lit(None, dtype=pl.Int32).alias("fold_id"),
+    )
+    result = oof_integrity_probe(
+        pl.concat([probabilities, duplicate]), game_ids, fold_count=OOF_FOLD_COUNT
+    )
+    assert result.status == "fail"
+    assert result.n_cross_partition_grains == 1
+    assert "multiple partitions" in result.detail
+
+
+def test_oof_integrity_probe_fails_on_single_fold() -> None:
+    probabilities, game_ids = _oof_fixture()
+    collapsed = probabilities.with_columns(
+        pl.when(pl.col("partition") == "OOF")
+        .then(pl.lit(0, dtype=pl.Int32))
+        .otherwise(pl.lit(None, dtype=pl.Int32))
+        .alias("fold_id")
+    )
+    result = oof_integrity_probe(collapsed, game_ids, fold_count=OOF_FOLD_COUNT)
+    assert result.status == "fail"
+    assert result.n_distinct_folds == 1
+    assert "distinct fold" in result.detail
+
+
+def test_oof_integrity_probe_unverifiable_without_fold_id_column() -> None:
+    probabilities, game_ids = _oof_fixture()
+    legacy = probabilities.drop("fold_id")
+    result = oof_integrity_probe(legacy, game_ids, fold_count=OOF_FOLD_COUNT)
+    assert result.status == "unverifiable"
+    assert "predates" in result.detail

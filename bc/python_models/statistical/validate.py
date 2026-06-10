@@ -135,6 +135,10 @@ def _validate_deep(manifest: ArtifactManifest, artifact_dir: Path) -> Validation
     findings.extend(uniq_findings)
     metrics.update(uniq_metrics)
 
+    fold_findings, fold_metrics = _check_oof_fold_integrity(probs)
+    findings.extend(fold_findings)
+    metrics.update(fold_metrics)
+
     baseline_path = artifact_dir / "exports" / "baseline_predictions.parquet"
     if baseline_path.exists():
         compare_findings, compare_metrics = _compare_against_baseline(
@@ -266,6 +270,102 @@ def _check_grain_uniqueness_per_partition(
         ],
         metrics,
     )
+
+
+def _check_oof_fold_integrity(
+    probs: pl.DataFrame,
+) -> tuple[list[ValidationFinding], dict[str, float | int]]:
+    if "partition" not in probs.columns:
+        return [], {}
+    if "fold_id" not in probs.columns:
+        return (
+            [
+                ValidationFinding(
+                    severity="warn",
+                    code="deep_oof_fold_provenance_unverifiable",
+                    message=(
+                        "probabilities.parquet has no fold_id column; OOF fold "
+                        "provenance is unverifiable (artifact predates fold stamping)"
+                    ),
+                )
+            ],
+            {},
+        )
+
+    findings: list[ValidationFinding] = []
+    metrics: dict[str, float | int] = {}
+
+    oof = probs.filter(pl.col("partition") == "OOF")
+    n_oof = int(oof.height)
+    metrics["oof_row_count"] = n_oof
+
+    n_null_oof = int(oof.filter(pl.col("fold_id").is_null()).height)
+    metrics["oof_null_fold_id_rows"] = n_null_oof
+    if n_null_oof > 0:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_oof_fold_id_null",
+                message=f"{n_null_oof} OOF rows have a null fold_id",
+            )
+        )
+
+    n_distinct_folds = int(oof.get_column("fold_id").drop_nulls().n_unique())
+    metrics["oof_distinct_fold_count"] = n_distinct_folds
+    if n_distinct_folds < 2:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_oof_single_fold",
+                message=(
+                    f"OOF partition carries {n_distinct_folds} distinct fold_id "
+                    "value(s); out-of-fold predictions require at least 2"
+                ),
+            )
+        )
+
+    n_non_oof_fold = int(
+        probs.filter(
+            (pl.col("partition") != "OOF") & pl.col("fold_id").is_not_null()
+        ).height
+    )
+    metrics["non_oof_fold_id_rows"] = n_non_oof_fold
+    if n_non_oof_fold > 0:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_fold_id_outside_oof",
+                message=(
+                    f"{n_non_oof_fold} non-OOF rows carry a non-null fold_id; "
+                    "fold_id must be null outside the OOF partition"
+                ),
+            )
+        )
+
+    grain_cols = [
+        c for c in probs.columns if c not in {"partition", "fold_id", "dl_p_class"}
+    ]
+    if grain_cols:
+        n_cross = int(
+            probs.group_by(grain_cols)
+            .agg(pl.col("partition").n_unique().alias("_n_partitions"))
+            .filter(pl.col("_n_partitions") > 1)
+            .height
+        )
+        metrics["cross_partition_grain_violations"] = n_cross
+        if n_cross > 0:
+            findings.append(
+                ValidationFinding(
+                    severity="block",
+                    code="deep_grain_spans_partitions",
+                    message=(
+                        f"{n_cross} grain values appear in more than one partition; "
+                        f"grain columns: {tuple(grain_cols)}"
+                    ),
+                )
+            )
+
+    return findings, metrics
 
 
 def _compare_against_baseline(

@@ -4,13 +4,21 @@
 
 from __future__ import annotations
 
+import json
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
 
-from python_models.statistical.bayes.dl_covariate import compute_dl_logits_per_class
+from python_models.statistical import config as cfg
+from python_models.statistical.bayes.dl_covariate import compute_dl_log_probs_per_class
+from python_models.statistical.deep.targets.geometry import (
+    GEOMETRY_SPECS as DEEP_GEOMETRY_SPECS,
+)
+from python_models.statistical.manifests import write_published_pointer
 from python_models.statistical.models._geometry_data import (
     FIXED_EFFECT_COLUMNS,
     GEOMETRY_DIMENSIONS,
@@ -19,11 +27,75 @@ from python_models.statistical.models._geometry_data import (
     build_geometry_production_frame,
     prepare_geometry_inputs,
 )
+from python_models.statistical.schemas import PublishedPointer
 from python_models.statistical.splits import game_hash_fold
 
 _TRAJECTORY_SPEC_LABELS = GEOMETRY_DIMENSIONS["trajectory"].class_labels
 assert _TRAJECTORY_SPEC_LABELS is not None
 TRAJECTORY_LABELS: tuple[str, ...] = _TRAJECTORY_SPEC_LABELS
+
+
+@pytest.fixture(autouse=True)
+def published_root(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    root = tmp_path_factory.mktemp("published")
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(root))
+    return root
+
+
+@pytest.fixture(autouse=True)
+def deep_root(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    root = tmp_path_factory.mktemp("deep_artifacts")
+    monkeypatch.setattr(cfg, "DEEP_ROOT", root)
+    return root
+
+
+def _deep_target_name(dimension: str) -> str:
+    for spec in DEEP_GEOMETRY_SPECS:
+        if spec.published_manifest_name() == f"dl_proposal_{dimension}":
+            return spec.name
+    raise AssertionError(f"no deep geometry spec for dimension={dimension!r}")
+
+
+def _write_dl_artifact(
+    deep_root: Path,
+    *,
+    dimension: str,
+    artifact_id: str,
+    labels: list[str],
+) -> Path:
+    exports = deep_root / _deep_target_name(dimension) / artifact_id / "exports"
+    exports.mkdir(parents=True, exist_ok=True)
+    path = exports / "class_labels.json"
+    path.write_text(json.dumps({"labels": labels}), encoding="utf-8")
+    return path
+
+
+def _publish_dl_proposal(
+    published_root: Path,
+    artifacts_root: Path,
+    *,
+    dimension: str,
+    labels: list[str],
+) -> None:
+    artifact_dir = artifacts_root / f"geometry_{dimension}" / "dl-aid-1"
+    exports = artifact_dir / "exports"
+    exports.mkdir(parents=True, exist_ok=True)
+    (exports / "class_labels.json").write_text(
+        json.dumps({"labels": labels}), encoding="utf-8"
+    )
+    _ = write_published_pointer(
+        PublishedPointer(
+            model_name=f"dl_proposal_{dimension}",
+            artifact_id="dl-aid-1",
+            published_at=datetime.now(tz=timezone.utc),
+            manifest_path=artifact_dir / "manifest.json",
+        ),
+        root=published_root,
+    )
 
 
 def _observed_row(
@@ -163,7 +235,7 @@ def test_counts_one_hot_and_k_equals_vocab(tmp_path: Path) -> None:
     )
     assert inputs.n_classes == len(TRAJECTORY_LABELS)
     assert inputs.class_labels == list(TRAJECTORY_LABELS)
-    assert len(inputs.coords["position"]) == inputs.n_classes
+    assert "position" not in inputs.coords
     assert inputs.counts.shape == (inputs.n_events, inputs.n_classes)
     row_sums = inputs.counts.sum(axis=1)
     assert (row_sums == 1).all()
@@ -391,9 +463,17 @@ def test_dl_logit_is_zero_when_dl_p_class_null(tmp_path: Path) -> None:
     assert np.allclose(inputs.dl_logit_class_means, 0.0)
 
 
-def test_held_out_dl_logit_shape_and_row_alignment(tmp_path: Path) -> None:
+def test_held_out_dl_logit_shape_and_row_alignment(
+    tmp_path: Path, deep_root: Path
+) -> None:
     dataset_path = _trajectory_dataset(
         tmp_path, n_games=24, events_per_game=10, with_dl=True
+    )
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
     )
     inputs = prepare_geometry_inputs(
         dataset_path,
@@ -449,8 +529,16 @@ def test_held_out_dl_logit_zero_when_dl_p_class_null(tmp_path: Path) -> None:
     assert np.allclose(inputs.dl_logit_class_means, 0.0)
 
 
-def test_dl_logit_is_centered_to_training_class_means(tmp_path: Path) -> None:
+def test_dl_logit_is_centered_to_training_class_means(
+    tmp_path: Path, deep_root: Path
+) -> None:
     dataset_path = _trajectory_dataset(tmp_path, with_dl=True)
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
+    )
     inputs = prepare_geometry_inputs(
         dataset_path,
         dimension="trajectory",
@@ -529,12 +617,20 @@ def test_build_production_frame_encodes_against_training_vocab(tmp_path: Path) -
             assert code == -1 or 0 <= code < n_levels
 
 
-def test_production_frame_dl_logit_centered_by_training_means(tmp_path: Path) -> None:
+def test_production_frame_dl_logit_centered_by_training_means(
+    tmp_path: Path, deep_root: Path
+) -> None:
     dataset_path = _trajectory_dataset(
         tmp_path,
         n_production_events=200,
         production_result_family_rate=1.0,
         with_dl=True,
+    )
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
     )
     inputs = prepare_geometry_inputs(
         dataset_path,
@@ -562,7 +658,7 @@ def test_production_frame_dl_logit_centered_by_training_means(tmp_path: Path) ->
         .sort("event_key")
         .collect()
     )
-    raw = compute_dl_logits_per_class(per_event, n_classes=inputs.n_classes)
+    raw = compute_dl_log_probs_per_class(per_event, n_classes=inputs.n_classes)
     expected = raw - inputs.dl_logit_class_means[None, :]
     assert np.allclose(frame.dl_logit_per_class, expected)
 
@@ -592,4 +688,183 @@ def test_class_labels_override_pins_vocab(tmp_path: Path) -> None:
         class_labels=override,
     )
     assert inputs.class_labels == override
-    assert inputs.coords["position"] == override
+
+
+def test_dl_vocab_alignment_matching_passes(
+    tmp_path: Path, published_root: Path
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path)
+    _publish_dl_proposal(
+        published_root,
+        tmp_path / "deep",
+        dimension="trajectory",
+        labels=list(TRAJECTORY_LABELS),
+    )
+    inputs = prepare_geometry_inputs(
+        dataset_path,
+        dimension="trajectory",
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    assert inputs.class_labels == list(TRAJECTORY_LABELS)
+
+
+def test_dl_vocab_alignment_mismatched_order_raises(
+    tmp_path: Path, published_root: Path
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path)
+    _publish_dl_proposal(
+        published_root,
+        tmp_path / "deep",
+        dimension="trajectory",
+        labels=list(TRAJECTORY_LABELS)[::-1],
+    )
+    with pytest.raises(ValueError, match="does not match the.*Bayes class vocabulary"):
+        _ = prepare_geometry_inputs(
+            dataset_path,
+            dimension="trajectory",
+            min_events_per_season=1,
+            held_out_fold_count=999,
+        )
+
+
+def test_dl_vocab_alignment_missing_pointer_skips_with_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path)
+    with caplog.at_level(
+        logging.WARNING, logger="python_models.statistical.models._geometry_data"
+    ):
+        inputs = prepare_geometry_inputs(
+            dataset_path,
+            dimension="trajectory",
+            min_events_per_season=1,
+            held_out_fold_count=999,
+        )
+    assert inputs.n_events > 0
+    assert any(
+        "skipping DL class-vocab alignment" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_dl_vocab_alignment_resolves_dataset_artifact_not_pointer(
+    tmp_path: Path, published_root: Path, deep_root: Path
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path, with_dl=True)
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
+    )
+    _publish_dl_proposal(
+        published_root,
+        tmp_path / "deep",
+        dimension="trajectory",
+        labels=list(TRAJECTORY_LABELS)[::-1],
+    )
+    inputs = prepare_geometry_inputs(
+        dataset_path,
+        dimension="trajectory",
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    assert inputs.class_labels == list(TRAJECTORY_LABELS)
+
+
+def test_dl_vocab_alignment_mismatch_via_dataset_artifact_raises(
+    tmp_path: Path, deep_root: Path
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path, with_dl=True)
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS)[::-1],
+    )
+    with pytest.raises(
+        ValueError, match=r"artifact-x.*does not match the.*Bayes class vocabulary"
+    ):
+        _ = prepare_geometry_inputs(
+            dataset_path,
+            dimension="trajectory",
+            min_events_per_season=1,
+            held_out_fold_count=999,
+        )
+
+
+def test_dl_vocab_alignment_missing_class_labels_raises_contextual(
+    tmp_path: Path,
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path, with_dl=True)
+    with pytest.raises(
+        FileNotFoundError, match=r"artifact-x.*class_labels\.json"
+    ) as excinfo:
+        _ = prepare_geometry_inputs(
+            dataset_path,
+            dimension="trajectory",
+            min_events_per_season=1,
+            held_out_fold_count=999,
+        )
+    message = str(excinfo.value)
+    assert "trajectory" in message
+    assert "re-run" in message or "re-freeze" in message
+
+
+def test_dl_vocab_alignment_no_artifact_id_falls_back_to_pointer_with_warning(
+    tmp_path: Path, published_root: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path, with_dl=False)
+    _publish_dl_proposal(
+        published_root,
+        tmp_path / "deep",
+        dimension="trajectory",
+        labels=list(TRAJECTORY_LABELS),
+    )
+    with caplog.at_level(
+        logging.WARNING, logger="python_models.statistical.models._geometry_data"
+    ):
+        inputs = prepare_geometry_inputs(
+            dataset_path,
+            dimension="trajectory",
+            min_events_per_season=1,
+            held_out_fold_count=999,
+        )
+    assert inputs.n_events > 0
+    assert any(
+        "falling back to the published" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_multiple_distinct_dl_artifact_ids_raise(tmp_path: Path) -> None:
+    rng = np.random.default_rng(20260609)
+    k = len(TRAJECTORY_LABELS)
+    rows: list[dict[str, object]] = []
+    for g in range(4):
+        for e in range(10):
+            eid = 400_000 + g * 10 + e
+            logits = rng.normal(size=k)
+            exp = np.exp(logits - logits.max())
+            row = _observed_row(
+                event_key=eid,
+                dimension="trajectory",
+                raw_value=TRAJECTORY_LABELS[eid % k],
+                game_id=f"M{g:03d}",
+                season=1950,
+                league="AL",
+                dl_p_class=(exp / exp.sum()).tolist(),
+            )
+            row["dl_artifact_id"] = "artifact-x" if g % 2 == 0 else "artifact-y"
+            rows.append(row)
+    dataset_path = tmp_path / "mixed_artifacts.parquet"
+    pl.DataFrame(rows).write_parquet(dataset_path)
+
+    with pytest.raises(ValueError, match=r"distinct dl_artifact_id"):
+        _ = prepare_geometry_inputs(
+            dataset_path,
+            dimension="trajectory",
+            min_events_per_season=1,
+            held_out_fold_count=999,
+        )

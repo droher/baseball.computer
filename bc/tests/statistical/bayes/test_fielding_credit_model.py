@@ -111,16 +111,22 @@ def test_required_rvs_declared(tmp_path: Path) -> None:
     model = build_fielding_credit_model(inputs)
     rv_names = {rv.name for rv in model.unobserved_RVs}
     det_names = {d.name for d in model.deterministics}
+    assert "alpha_position" in rv_names
     assert {
-        "alpha_position",
         "sigma_season",
         "sigma_scorer",
         "sigma_park",
         "beta_season",
+        "z_season",
         "z_scorer",
         "z_park",
-    }.issubset(rv_names)
-    assert {"beta_scorer", "beta_park"}.issubset(det_names)
+    }.isdisjoint(rv_names), (
+        "scalar-per-event REs cancel in the softmax and must not be in the model"
+    )
+    assert {"beta_scorer", "beta_park"}.isdisjoint(det_names)
+    assert not any(name.startswith("gamma_") for name in rv_names), (
+        "per-event global FEs cancel in the softmax and must not be in the model"
+    )
     assert "pi" not in det_names and "T_pred" not in det_names, (
         "pi / T_pred must not be Deterministics — they blow up posterior.nc at scale"
     )
@@ -144,7 +150,7 @@ def test_single_source_drops_source_block(tmp_path: Path) -> None:
     assert _SOURCE_VARS.isdisjoint(rv_names | det_names)
 
 
-def test_multi_source_keeps_source_block(tmp_path: Path) -> None:
+def test_multi_source_has_no_source_block(tmp_path: Path) -> None:
     dataset_path = _synthetic_dataset(
         tmp_path, sources=("play_by_play", "box_score")
     )
@@ -157,7 +163,7 @@ def test_multi_source_keeps_source_block(tmp_path: Path) -> None:
     model = build_fielding_credit_model(inputs)
     rv_names = {rv.name for rv in model.unobserved_RVs}
     det_names = {d.name for d in model.deterministics}
-    assert _SOURCE_VARS.issubset(rv_names | det_names)
+    assert _SOURCE_VARS.isdisjoint(rv_names | det_names)
 
 
 def _synthetic_assist_dataset(

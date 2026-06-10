@@ -16,8 +16,9 @@ import polars as pl
 import pytest
 
 from python_models.ml.features import FeatureLayout
-from python_models.statistical.deep.io import KFOLD_COLUMN
+from python_models.statistical.deep.io import FOLD_ID_COLUMN, KFOLD_COLUMN
 from python_models.statistical.deep.target_spec import DeepTargetSpec
+from python_models.statistical.splits import game_hash_fold
 
 
 pytestmark = pytest.mark.slow
@@ -110,6 +111,18 @@ def test_fold_runner_produces_oof_and_full_fit_predictions(tmp_path: Path) -> No
     assert len(val_keys) == result.validate_rows
     test_keys = set(probs.filter(pl.col("partition") == "TEST")["event_key"].to_list())
     assert len(test_keys) == result.test_rows
+
+    oof = probs.filter(pl.col("partition") == "OOF")
+    assert FOLD_ID_COLUMN in probs.columns
+    assert oof[FOLD_ID_COLUMN].null_count() == 0
+    assert oof[FOLD_ID_COLUMN].n_unique() >= 2
+    non_oof = probs.filter(pl.col("partition") != "OOF")
+    assert non_oof[FOLD_ID_COLUMN].null_count() == non_oof.height
+
+    dataset = pl.read_parquet(dataset_path).select("event_key", "game_id")
+    joined = oof.join(dataset, on="event_key", how="left")
+    for game_id, fold_id in joined.select("game_id", FOLD_ID_COLUMN).iter_rows():
+        assert fold_id == game_hash_fold(game_id, fold_count=spec.fold_count)
 
 
 def test_fold_runner_probabilities_normalize(tmp_path: Path) -> None:

@@ -147,14 +147,17 @@ def test_export_geometry_probabilities_schema_and_sum(tmp_path: Path) -> None:
         means,
         event_keys=event_keys,
         class_labels=class_labels,
+        geometry_dimension="trajectory",
         target_path=target,
     )
 
     assert df.schema["event_key"] == pl.Int64
+    assert df.schema["geometry_dimension"] == pl.Utf8
     assert df.schema["class_index"] == pl.Int8
     assert df.schema["class_label"] == pl.Utf8
     assert df.schema["expected_share"] == pl.Float64
     assert df.height == N_EVENTS * N_CLASSES
+    assert df.get_column("geometry_dimension").unique().to_list() == ["trajectory"]
 
     per_event = df.group_by("event_key").agg(pl.col("expected_share").sum())
     np.testing.assert_allclose(

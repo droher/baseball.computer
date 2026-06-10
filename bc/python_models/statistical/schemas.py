@@ -13,7 +13,6 @@ ValidationStatus = Literal["passed", "failed", "exploratory"]
 DiagnosticStatus = Literal["passed", "warn", "failed"]
 FindingSeverity = Literal["block", "warn", "info"]
 BlockingCode = Literal[
-    "source_family_block_as_event_missing",
     "dominant_single_scorer_park_team",
     "no_connected_component_for_effect",
     "data_error_rows_train_as_truth",

@@ -1,7 +1,7 @@
 MODEL (
   name main_models.official_aggregate_availability,
   kind FULL,
-  description 'Per (game_id, team_id, player_id, fielding_position, stat_name) decision ledger of whether an official box-score aggregate total is available, agrees with event-derived evidence, or is flagged by a data-error signal. Fielding stats only in this PR: putouts, assists, errors, double_plays. Box totals come from stg_box_score_fielding_lines (team_id derived via side + stg_games). Event totals come from event_player_fielding_stats. Personnel presence (a player took the field with zero plays) surfaces event_value = 0 vs event_value IS NULL when no event source exists. aggregate_status is one of: present_clean, present_issue_flagged, missing, not_applicable, negative_residual, contradicted. data_error_risk is the worst training_action from source_data_error_risk_ledger joined on (game_id, team_id, player_id, stat_name) with NULL-tolerant fan-out for team-grain and game-grain risk rows. Consumed by official_credit_authority and every fielding-credit-allocation modeling dataset.',
+  description 'Per (game_id, team_id, player_id, fielding_position, stat_name) decision ledger of whether an official box-score aggregate total is available, agrees with event-derived evidence, or is flagged by a data-error signal. Fielding stats only in this PR: putouts, assists, errors, double_plays. Box totals come from stg_box_score_fielding_lines (team_id derived via side + stg_games). Event totals come from event_player_fielding_stats. Personnel presence (a player took the field with zero plays) surfaces event_value = 0 vs event_value IS NULL when no event source exists. aggregate_status is one of: present_clean, present_issue_flagged, missing, not_applicable, negative_residual, contradicted. missing means box_value IS NULL — whether no box-score row exists for the player-position-game or a box row exists with a NULL value for this stat. data_error_risk is the worst training_action from source_data_error_risk_ledger joined on (game_id, team_id, player_id, stat_name) with NULL-tolerant fan-out for team-grain and game-grain risk rows. Consumed by official_credit_authority and every fielding-credit-allocation modeling dataset.',
   grain (game_id, team_id, player_id, fielding_position, stat_name),
   columns (
     game_id VARCHAR,
@@ -24,8 +24,8 @@ MODEL (
     fielding_position = @doc('fielding_position'),
     stat_name = 'Aggregate stat key. Fielding scope (this PR): putouts, assists, errors, double_plays. Batting / pitching / line_score stat_names will be added in follow-up PRs.',
     aggregate_grain = 'Target grain for the aggregate value. player_position_game for fielding stats. Reserved for team_game, player_game etc. in future stat additions.',
-    aggregate_status = 'How the box-score aggregate compares to event evidence: present_clean (box present, agrees with event or no event evidence), present_issue_flagged (box present and agrees but a confirmed/audit-exception risk signal flags it), missing (box-score aggregate not available for this row), not_applicable (stat does not apply to this position), negative_residual (box value < event value), contradicted (box value > event value and event evidence is present).',
-    aggregate_value = 'Box-score aggregate value when present_clean, present_issue_flagged, negative_residual, or contradicted; NULL otherwise.',
+    aggregate_status = 'How the box-score aggregate compares to event evidence: present_clean (box present, agrees with event or no event evidence), present_issue_flagged (box present and agrees but a confirmed/audit-exception risk signal flags it), missing (box_value IS NULL — no box row exists, or a box row exists with a NULL value for this stat), not_applicable (stat does not apply to this position), negative_residual (box value < event value), contradicted (box value > event value and event evidence is present).',
+    aggregate_value = 'Box-score aggregate value. NULL exactly when aggregate_status = missing (no box row, or a NULL-valued box row).',
     event_value = 'Event-derived comparison value: SUM of event_player_fielding_stats when event source present, 0 when only personnel presence is present (player took the field with zero plays), NULL when no event evidence exists.',
     residual_value = 'aggregate_value - event_value when both are non-null.',
     authority_rank = 'Rank within target grain/stat for resolving the official aggregate. Hardcoded to 1 in this PR (box is the sole source of player-position-game fielding totals).',
@@ -109,7 +109,6 @@ wide AS (
         e.assists AS event_assists,
         e.errors AS event_errors,
         e.double_plays AS event_double_plays,
-        b.game_id IS NOT NULL AS box_present,
         e.game_id IS NOT NULL AS event_present,
         p.game_id IS NOT NULL AS personnel_present
     FROM box_agg AS b
@@ -127,7 +126,6 @@ stat_long AS (
             WHEN personnel_present THEN 0
             ELSE NULL
         END AS event_value,
-        box_present,
         event_present OR personnel_present AS event_evidence_present
     FROM wide
     UNION ALL BY NAME
@@ -140,7 +138,6 @@ stat_long AS (
             WHEN personnel_present THEN 0
             ELSE NULL
         END AS event_value,
-        box_present,
         event_present OR personnel_present AS event_evidence_present
     FROM wide
     UNION ALL BY NAME
@@ -153,7 +150,6 @@ stat_long AS (
             WHEN personnel_present THEN 0
             ELSE NULL
         END AS event_value,
-        box_present,
         event_present OR personnel_present AS event_evidence_present
     FROM wide
     UNION ALL BY NAME
@@ -166,7 +162,6 @@ stat_long AS (
             WHEN personnel_present THEN 0
             ELSE NULL
         END AS event_value,
-        box_present,
         event_present OR personnel_present AS event_evidence_present
     FROM wide
 ),
@@ -232,7 +227,6 @@ stat_long_with_risk AS (
         sl.stat_name,
         sl.box_value,
         sl.event_value,
-        sl.box_present,
         sl.event_evidence_present,
         MAX(rs.severity_rank) AS severity_rank
     FROM stat_long AS sl
@@ -241,7 +235,7 @@ stat_long_with_risk AS (
         AND (rs.team_id IS NULL OR rs.team_id = sl.team_id)
         AND (rs.player_id IS NULL OR rs.player_id = sl.player_id)
         AND rs.stat_name = sl.stat_name
-    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
 ),
 
 scored AS (
@@ -253,7 +247,6 @@ scored AS (
         stat_name,
         box_value,
         event_value,
-        box_present,
         event_evidence_present,
         CASE severity_rank
             WHEN 5 THEN 'exclude'
@@ -275,7 +268,7 @@ SELECT
     stat_name,
     'player_position_game' AS aggregate_grain,
     CASE
-        WHEN NOT box_present THEN 'missing'
+        WHEN box_value IS NULL THEN 'missing'
         WHEN NOT event_evidence_present THEN
             CASE WHEN severity_rank >= 4 THEN 'present_issue_flagged' ELSE 'present_clean' END
         WHEN box_value < event_value THEN 'negative_residual'
@@ -283,10 +276,10 @@ SELECT
             CASE WHEN severity_rank >= 4 THEN 'present_issue_flagged' ELSE 'present_clean' END
         ELSE 'contradicted'
     END AS aggregate_status,
-    CASE WHEN box_present THEN box_value END::DOUBLE AS aggregate_value,
+    box_value::DOUBLE AS aggregate_value,
     event_value::DOUBLE AS event_value,
     CASE
-        WHEN box_present AND event_value IS NOT NULL THEN (box_value - event_value)::DOUBLE
+        WHEN box_value IS NOT NULL AND event_value IS NOT NULL THEN (box_value - event_value)::DOUBLE
     END AS residual_value,
     CAST(1 AS UTINYINT) AS authority_rank,
     data_error_risk

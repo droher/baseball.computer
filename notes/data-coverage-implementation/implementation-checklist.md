@@ -331,7 +331,7 @@ Purpose: freeze model inputs and discover identification problems before fitting
 
 ### Blocking EDA Findings
 
-- [x] Block if source-family block absence is treated as event-level missingness. `BlockingFinding(code='source_family_block_as_event_missing')` fires when `source_acquisition_status='not_acquired'` AND `model_input_eligible=TRUE`.
+- [x] ~~Block if source-family block absence is treated as event-level missingness.~~ Retired: P1.3 folded acquisition into `model_input_eligible` (`is_training_eligible AND source_acquisition_status != 'not_acquired'`), making `not_acquired AND model_input_eligible=TRUE` impossible by construction; the `model_input_eligible_matches_seed` SQLMesh audit enforces that invariant upstream, so the EDA finding was removed.
 - [x] Block if high data-error rows can train as truth. `BlockingFinding(code='data_error_rows_train_as_truth')` fires when `data_error_risk != 'none' AND training_weight > 0`.
 - [x] Block if target categories appear in validation/test but have no training support and no hierarchy/unseen policy. `BlockingFinding(code='category_absent_in_train_present_in_test')` fires per categorical dimension (`source_family`, `park_id`, `scorer`, `league`, `alignment_regime`).
 - [x] Block if a modeled effect has no connected component across the relevant holdout. `BlockingFinding(code='no_connected_component_for_effect')` fires when `connectivity_edges` shows a single-node component for an edge kind.
@@ -538,7 +538,7 @@ Metrics are putout-marginalized over the published v1.5 putout posterior (produc
 
 - [x] `EventCreditInputs` + `prepare_event_credit_inputs` in `bc/python_models/statistical/models/_credit_data.py`. _(Superseded by v1.5 — `materialize_credit_authority_targets` is gone; `EventCreditInputs` now carries `is_masked`, supervised arrays, and the held-out OOS set.)_
 - [x] `build_fielding_credit_model` in `bc/python_models/statistical/models/credit.py`.
-- [x] `putout_credit_allocation` target registered in `bc/python_models/statistical/bayes/targets/credit.py` with `outcome_kind="multinomial"`, `sample_size=50_000`.
+- [x] `putout_credit_allocation` target registered in `bc/python_models/statistical/bayes/targets/credit.py` with `outcome_kind="multinomial"`, `sample_size=10_000`.
 - [x] `training.py` branches on `outcome_kind`; adds `_posterior_event_softmax` + `_export_event_credit_shares`; renames Bernoulli helper to `_posterior_event_means_bernoulli`. Writes `exports/event_credit.parquet`.
 - [x] `manifest_ingest.aggregate_fielding_credit_frames` + `CREDIT_SHARE_SCHEMA`.
 - [x] `imputed_fielding_credit.py` SQLMesh `@model` rewritten from stub, joins `personnel_fielding_states` via `event_personnel_lookup` inside `execute()`.
@@ -554,7 +554,7 @@ Metrics are putout-marginalized over the published v1.5 putout posterior (produc
 - [x] Multinomial diagnostics filter widened to include `beta_season / z_scorer / z_park` (now data-informed via the supervised arm).
 - [x] OOS held-out top-1 accuracy beats the per-position-prior baseline at production N. `full-10k-v15-tuned`: 0.529 vs baseline 0.358 (+17.1pp). Lift is consistent across positions where direct-handler signal is weak; structural 1B over-prediction (+3.6pp) deferred to v1.6.
 - [x] Held-out per-position PR-AUC ≥ macro baseline on the 9 positions at production N. `full-10k-v15-tuned`: C 0.95, 1B 0.49, 2B 0.22, 3B 0.10, SS 0.16, LF 0.10, CF 0.14, RF 0.11; macro 0.26 (P excluded — near-trivial 0.03). Distribution calibration TV gate (`result_family weighted_tv ≤ 0.05`) passes at 0.054 marginal.
-- [x] N-sweep (1K / 5K / 10K, tuned with `BC_CREDIT_NONCENTER_SEASON=1 BC_CREDIT_MIN_NATURAL_UNK_RATE=0.01`) — top-1 plateaus by 1K (+0.7pp from 1K to 10K), result_family weighted TV improves monotonically 0.076 → 0.063 → 0.054. Operating point `full-10k-v15-tuned`: cheapest fit that clears every slice gate.
+- [x] N-sweep (1K / 5K / 10K, tuned with `BC_CREDIT_NONCENTER_SEASON=1 BC_CREDIT_MIN_NATURAL_UNK_RATE=0.01`; the NONCENTER knob has since been removed along with the canceling per-event season RE) — top-1 plateaus by 1K (+0.7pp from 1K to 10K), result_family weighted TV improves monotonically 0.076 → 0.063 → 0.054. Operating point `full-10k-v15-tuned`: cheapest fit that clears every slice gate.
 
 ##### v1.6 retraction (2026-05-23)
 

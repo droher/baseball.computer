@@ -126,7 +126,7 @@ def _seed_parquet(
                 if i % 31 != 0
                 else "not_acquired",
                 "data_error_risk": data_error,
-                "model_input_eligible": is_obs,
+                "model_input_eligible": is_obs and i % 31 != 0,
                 "season": season,
                 "league": league,
                 "source_family": source_family,
@@ -356,6 +356,55 @@ def test_run_eda_writes_full_artifact(tmp_path: Path) -> None:
         "weak_identification_flags",
         "split_leakage_report",
     }
+
+
+def test_run_eda_profiles_full_dataset_including_ineligible_rows(
+    tmp_path: Path,
+) -> None:
+    spec = _spec()
+    datasets_root = tmp_path / "datasets"
+    eda_root = tmp_path / "eda"
+    dataset_dir = _write_dataset_artifact(
+        base_root=datasets_root,
+        spec=spec,
+        dataset_artifact_id="ds-elig",
+        inject_data_error_truth=False,
+        inject_dominant_scorer=False,
+        inject_test_only_category=False,
+    )
+    dataset = pl.read_parquet(dataset_dir / "dataset.parquet")
+    total_rows = dataset.height
+    ineligible_rows = dataset.filter(~pl.col("model_input_eligible")).height
+    not_acquired_rows = dataset.filter(
+        pl.col("source_acquisition_status") == "not_acquired"
+    ).height
+    assert ineligible_rows > 0
+    assert not_acquired_rows > 0
+
+    manifest = run_eda(
+        spec,
+        dataset_artifact_id="ds-elig",
+        artifact_id="eda-elig",
+        output_root=eda_root,
+        dataset_artifact_root=datasets_root,
+        artifact_versions={"duckdb": "test"},
+    )
+
+    assert int(manifest.metadata["row_count"]) == total_rows
+    artifact_dir = eda_root / spec.name / "eda-elig"
+    report = EdaReport.model_validate_json(
+        (artifact_dir / "report.json").read_text(encoding="utf-8")
+    )
+    assert report.row_count == total_rows
+    assert report.source_family_block_missing_count == not_acquired_rows
+
+    missingness = pl.read_parquet(artifact_dir / "missingness_by_slice.parquet")
+    assert int(missingness["rows"].sum()) == total_rows
+
+    block = pl.read_parquet(artifact_dir / "source_family_block_missingness.parquet")
+    assert int(block["rows"].sum()) == total_rows
+    assert int(block["source_block_missing_rows"].sum()) == not_acquired_rows
+    assert "event_present_block_missing_rows" not in block.columns
 
 
 def test_run_eda_idempotent_rerun(tmp_path: Path) -> None:
@@ -640,3 +689,51 @@ def test_run_eda_module_parquet_schemas_are_consistent(tmp_path: Path) -> None:
         table = pq.read_table(artifact_dir / f"{name}.parquet")
         assert table.num_rows >= 0
         assert len(table.column_names) > 0
+
+
+def _cli_manifest(blocking: tuple[str, ...]) -> ArtifactManifest:
+    from datetime import datetime, timezone
+
+    return ArtifactManifest(
+        artifact_id="eda-cli-1",
+        kind="eda",
+        name="model_input_test_eda",
+        version="0.0.1",
+        created_at=datetime.now(tz=timezone.utc),
+        source_snapshot_id="snap-test",
+        output_paths={},
+        package_versions={},
+        blocking_findings=blocking,
+    )
+
+
+def _run_eda_cli(monkeypatch: pytest.MonkeyPatch, blocking: tuple[str, ...]) -> int:
+    from python_models.statistical import cli
+    from python_models.statistical.dataset_registry import all_dataset_names
+
+    monkeypatch.setattr(cli, "run_eda", lambda *args, **kwargs: _cli_manifest(blocking))
+    return cli.main(
+        [
+            "run-eda",
+            "--dataset",
+            all_dataset_names()[0],
+            "--dataset-artifact",
+            "ds-cli-1",
+            "--artifact-id",
+            "eda-cli-1",
+        ]
+    )
+
+
+def test_cli_run_eda_fails_on_blocking_findings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rc = _run_eda_cli(monkeypatch, ("dominant_single_scorer_park_team",))
+    assert rc == 1
+
+
+def test_cli_run_eda_passes_without_blocking_findings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rc = _run_eda_cli(monkeypatch, ())
+    assert rc == 0

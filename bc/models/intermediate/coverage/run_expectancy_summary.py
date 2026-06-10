@@ -50,9 +50,9 @@ _AUDITS = [
     kind="FULL",
     columns={
         "state": "VARCHAR",
-        "base_state": "UTINYINT",
-        "outs": "UTINYINT",
-        "season": "USMALLINT",
+        "base_state": "TINYINT",
+        "outs": "TINYINT",
+        "season": "SMALLINT",
         "league": "VARCHAR",
         "outcome": "VARCHAR",
         "re_value_mean": "DOUBLE",

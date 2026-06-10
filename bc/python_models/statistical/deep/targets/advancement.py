@@ -108,7 +108,6 @@ def _advancement_spec(name: str, baserunner: str) -> DeepTargetSpec:
         proposal_dimension=name,
         class_universe_source="configured",
         configured_class_labels=ADVANCEMENT_CLASS_LABELS,
-        calibration_method="temperature",
         fold_count=5,
         slice_columns=ADVANCEMENT_SLICE_COLUMNS,
         game_id_column=GAME_ID_COLUMN,

@@ -50,8 +50,10 @@ from python_models.statistical.deep.artifacts import (
     write_probabilities_parquet,
 )
 from python_models.statistical.deep.io import (
+    FOLD_ID_COLUMN,
     KFOLD_COLUMN,
     add_kfold_id,
+    assert_export_partition_invariants,
     assert_game_group_invariant,
     load_dataset_parquet,
     partition_by_split,
@@ -690,13 +692,12 @@ def run_target(
     if train_df.height == 0:
         raise ValueError("TRAIN partition is empty after filtering")
 
-    if spec.fold_count > 1:
-        train_df = add_kfold_id(
-            train_df, game_id_column=spec.game_id_column, fold_count=spec.fold_count
-        )
-        assert_game_group_invariant(
-            train_df, game_id_column=spec.game_id_column, kfold_column=KFOLD_COLUMN
-        )
+    train_df = add_kfold_id(
+        train_df, game_id_column=spec.game_id_column, fold_count=spec.fold_count
+    )
+    assert_game_group_invariant(
+        train_df, game_id_column=spec.game_id_column, kfold_column=KFOLD_COLUMN
+    )
 
     if spec.class_universe_source == "configured":
         class_universe: tuple[str, ...] | None = spec.configured_class_labels
@@ -716,7 +717,7 @@ def run_target(
     fit_diagnostics: list[dict[str, float | int | str]] = []
     oof_records: list[pl.DataFrame] = []
     validation_pool: pl.DataFrame | None = validate_df if validate_df.height > 0 else None
-    fold_iter = range(spec.fold_count) if spec.fold_count > 1 else range(0)
+    fold_iter = range(spec.fold_count)
     for k in fold_iter:
         fit_subset = train_df.filter(pl.col(KFOLD_COLUMN) != k)
         oof_subset = train_df.filter(pl.col(KFOLD_COLUMN) == k)
@@ -817,17 +818,11 @@ def run_target(
     )
     full_model = full_outcome.model
 
-    if not oof_records and train_df.height > 0:
-        oof_records.append(
-            _build_partition_frame(
-                train_df,
-                probs=_predict_probabilities(
-                    full_model, train_df, layout=layout, stats=full_stats
-                ),
-                partition_label="OOF",
-                grain_column=layout.grain_column,
-                spec=spec,
-            )
+    if not oof_records:
+        raise RuntimeError(
+            "no per-fold OOF predictions were produced; OOF export requires "
+            "per-fold predictions and full-fit predictions must never be "
+            "exported under the OOF partition"
         )
 
     validate_records = (
@@ -865,6 +860,13 @@ def run_target(
     if not all_frames:
         raise ValueError("no prediction rows produced")
     probabilities = pl.concat(all_frames, how="vertical_relaxed")
+    assert_export_partition_invariants(
+        probabilities,
+        train_df=train_df,
+        grain_column=layout.grain_column,
+        game_id_column=spec.game_id_column,
+        fold_count=spec.fold_count,
+    )
 
     probabilities_path = write_probabilities_parquet(
         spec.name, artifact_id, df=probabilities, root=artifact_root
@@ -912,6 +914,12 @@ def _build_partition_frame(
         p_class = [[1.0 - p, p] for p in flat.tolist()]
     else:
         p_class = [list(row) for row in probs.astype(np.float64).tolist()]
+    if partition_label == "OOF":
+        fold_id = subset[KFOLD_COLUMN].cast(pl.Int32).rename(FOLD_ID_COLUMN)
+    else:
+        fold_id = pl.Series(
+            FOLD_ID_COLUMN, [None] * subset.height, dtype=pl.Int32
+        )
     columns = {
         grain_column: subset[grain_column],
         "partition": pl.Series(
@@ -919,6 +927,7 @@ def _build_partition_frame(
             _partition_label_for_rows(subset.height, partition_label),
             dtype=pl.Utf8,
         ),
+        FOLD_ID_COLUMN: fold_id,
         "dl_p_class": pl.Series(
             "dl_p_class",
             p_class,
@@ -946,7 +955,7 @@ def _build_manifest(
     metadata: dict[str, str | int | float | bool] = {
         "fold_count": spec.fold_count,
         "kind": spec.kind,
-        "calibration_method": spec.calibration_method,
+        "calibration_method": "none",
         "train_rows": train_rows,
         "validate_rows": validate_rows,
         "test_rows": test_rows,

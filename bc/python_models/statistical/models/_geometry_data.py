@@ -28,6 +28,7 @@ geometry-unobserved rows (``observed_status != 'observed'``).
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Sequence
 from pathlib import Path
@@ -38,7 +39,15 @@ import numpy.typing as npt
 import polars as pl
 from pydantic import BaseModel, ConfigDict
 
-from python_models.statistical.bayes.dl_covariate import compute_dl_logits_per_class
+from python_models.statistical import config as cfg
+from python_models.statistical.bayes.dl_covariate import compute_dl_log_probs_per_class
+from python_models.statistical.deep.targets.geometry import (
+    GEOMETRY_SPECS as DEEP_GEOMETRY_SPECS,
+)
+from python_models.statistical.manifests import (
+    find_published_manifest,
+    read_published_pointer,
+)
 from python_models.statistical.models._credit_data import (
     FixedEffectDesign,
     HeldOutSet,
@@ -280,6 +289,129 @@ def _resolve_class_labels(
     return _derive_general_location_vocab(df)
 
 
+def _frame_dl_artifact_id(df: pl.DataFrame, dimension: str) -> str | None:
+    if "dl_artifact_id" not in df.columns:
+        return None
+    distinct = sorted(
+        str(v) for v in df.get_column("dl_artifact_id").drop_nulls().unique().to_list()
+    )
+    if not distinct:
+        return None
+    if len(distinct) > 1:
+        raise ValueError(
+            f"dataset carries {len(distinct)} distinct dl_artifact_id values for "
+            f"dimension={dimension!r}: {distinct}; the dl_p_class covariate must "
+            f"come from a single DL artifact per dimension — re-freeze the dataset"
+        )
+    return distinct[0]
+
+
+def _deep_target_name_for_dimension(dimension: str) -> str | None:
+    pointer_name = f"dl_proposal_{dimension}"
+    for spec in DEEP_GEOMETRY_SPECS:
+        if spec.published_manifest_name() == pointer_name:
+            return spec.name
+    return None
+
+
+def _read_dl_class_labels(
+    labels_path: Path, *, dimension: str, source_desc: str
+) -> list[str]:
+    if not labels_path.is_file():
+        raise FileNotFoundError(
+            f"class_labels.json missing for {source_desc} "
+            f"(dimension={dimension!r}): expected {labels_path}. The DL "
+            f"artifact's exports are incomplete or were pruned; re-run "
+            f"fit-deep for this dimension or re-freeze the dataset against "
+            f"an artifact whose exports/class_labels.json exists"
+        )
+    payload = json.loads(labels_path.read_text(encoding="utf-8"))
+    raw_labels = payload.get("labels", payload.get(dimension))
+    if not isinstance(raw_labels, list):
+        raise ValueError(
+            f"class_labels.json at {labels_path} carries no label list for "
+            f"dimension={dimension!r}"
+        )
+    return [str(v) for v in raw_labels]
+
+
+def _compare_dl_vocab(
+    dl_labels: list[str], vocab: list[str], *, source_desc: str
+) -> None:
+    if dl_labels != vocab:
+        raise ValueError(
+            f"DL proposal class vocabulary from {source_desc} does not match the "
+            f"Bayes class vocabulary (length and order must be identical): "
+            f"DL={dl_labels!r} vs Bayes={vocab!r}"
+        )
+    _log.info(
+        "DL class-vocab alignment verified against %s (K=%d)",
+        source_desc,
+        len(vocab),
+    )
+
+
+def _assert_dl_class_vocab_alignment(
+    dimension: str, vocab: list[str], *, dl_artifact_id: str | None
+) -> None:
+    """Assert the Bayes class vocab matches the DL proposal's labels.
+
+    When the dataset frame carries a ``dl_artifact_id``, resolves
+    ``DEEP_ROOT/<deep_target_name>/<dl_artifact_id>/exports/class_labels.json``
+    directly — the artifact that actually produced the frozen ``dl_p_class``
+    covariate, regardless of where the published pointer has since advanced.
+    Only when the frame lacks a usable ``dl_artifact_id`` does it fall back
+    to the published ``dl_proposal_<dimension>`` pointer (with a warning). A
+    missing pointer logs a warning and skips the check; a
+    present-but-mismatched vocabulary raises.
+    """
+    pointer_name = f"dl_proposal_{dimension}"
+    if dl_artifact_id is not None:
+        target_name = _deep_target_name_for_dimension(dimension)
+        if target_name is not None:
+            source_desc = f"deep target {target_name!r} artifact {dl_artifact_id!r}"
+            labels_path = (
+                cfg.DEEP_ROOT
+                / target_name
+                / dl_artifact_id
+                / "exports"
+                / "class_labels.json"
+            )
+            dl_labels = _read_dl_class_labels(
+                labels_path, dimension=dimension, source_desc=source_desc
+            )
+            _compare_dl_vocab(dl_labels, vocab, source_desc=source_desc)
+            return
+        _log.warning(
+            "no registered deep target publishes %s; falling back to the "
+            "published-pointer resolution despite dataset dl_artifact_id=%s",
+            pointer_name,
+            dl_artifact_id,
+        )
+    else:
+        _log.warning(
+            "dataset frame carries no dl_artifact_id for dimension=%s; "
+            "falling back to the published %s pointer, which may have advanced "
+            "past the artifact that produced the frozen dl_p_class covariate",
+            dimension,
+            pointer_name,
+        )
+    pointer_path = find_published_manifest(pointer_name)
+    if pointer_path is None:
+        _log.warning(
+            "no published pointer for %s; skipping DL class-vocab alignment check",
+            pointer_name,
+        )
+        return
+    pointer = read_published_pointer(pointer_path)
+    source_desc = f"published pointer {pointer_name!r} artifact {pointer.artifact_id!r}"
+    labels_path = pointer.manifest_path.parent / "exports" / "class_labels.json"
+    dl_labels = _read_dl_class_labels(
+        labels_path, dimension=dimension, source_desc=source_desc
+    )
+    _compare_dl_vocab(dl_labels, vocab, source_desc=source_desc)
+
+
 def _one_hot_counts(class_idx: IntArray, n_classes: int) -> IntArray:
     n = int(class_idx.shape[0])
     counts = np.zeros((n, n_classes), dtype=np.int64)
@@ -396,7 +528,7 @@ def build_geometry_production_frame(
         )
         for column, design in fixed_effects.items()
     }
-    dl_logit_per_class = compute_dl_logits_per_class(per_event, n_classes=n_classes)
+    dl_logit_per_class = compute_dl_log_probs_per_class(per_event, n_classes=n_classes)
     dl_logit_per_class = dl_logit_per_class - dl_logit_class_means[None, :]
     return GeometryProductionFrame(
         event_keys=event_keys,
@@ -455,6 +587,10 @@ def prepare_geometry_inputs(
     if not vocab:
         raise ValueError(
             f"empty class vocabulary for dimension={dimension!r}; nothing to fit"
+        )
+    if spec.dl_active:
+        _assert_dl_class_vocab_alignment(
+            dimension, vocab, dl_artifact_id=_frame_dl_artifact_id(df, dimension)
         )
     vocab_set = set(vocab)
 
@@ -568,7 +704,7 @@ def prepare_geometry_inputs(
     event_keys = (
         per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
     )
-    dl_logit_per_class = compute_dl_logits_per_class(per_event, n_classes=n_classes)
+    dl_logit_per_class = compute_dl_log_probs_per_class(per_event, n_classes=n_classes)
     dl_logit_class_means = dl_logit_per_class.mean(axis=0).astype(np.float64)
     dl_logit_per_class = dl_logit_per_class - dl_logit_class_means[None, :]
 
@@ -591,7 +727,6 @@ def prepare_geometry_inputs(
         fixed_effects[column] = _build_fixed_effect_design(per_event, column)
 
     coords: dict[str, list[str]] = {
-        "position": list(vocab),
         "season_league": list(season_league_labels),
         "scorer": list(scorer_labels),
         "source": list(source_labels),
@@ -612,7 +747,7 @@ def prepare_geometry_inputs(
     if held_out_df.height == 0:
         held_out_dl_logit_per_class = np.zeros((0, n_classes), dtype=np.float64)
     else:
-        held_out_dl_logit_per_class = compute_dl_logits_per_class(
+        held_out_dl_logit_per_class = compute_dl_log_probs_per_class(
             held_out_df.sort("event_key"), n_classes=n_classes
         )
         held_out_dl_logit_per_class = (

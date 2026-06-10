@@ -12,7 +12,7 @@ import pytest
 
 from python_models.statistical.bayes.dl_covariate import (
     compute_dl_logits,
-    compute_dl_logits_per_class,
+    compute_dl_log_probs_per_class,
 )
 
 
@@ -103,11 +103,17 @@ def test_clipping_prevents_infinities_at_extremes() -> None:
     assert out_collapse[1] == pytest.approx(upper)
 
 
+def test_per_class_row_length_mismatch_raises() -> None:
+    df = _frame([[0.7, 0.2, 0.1], [0.5, 0.5]])
+    with pytest.raises(ValueError, match="expected n_classes=3"):
+        _ = compute_dl_log_probs_per_class(df, n_classes=3)
+
+
 def test_per_class_shape_and_values() -> None:
     clip = 1e-7
     rows: list[list[float] | None] = [[0.7, 0.2, 0.1], None, [0.0, 1.0, 0.0]]
     df = _frame(rows)
-    out = compute_dl_logits_per_class(df, n_classes=3, clip=clip)
+    out = compute_dl_log_probs_per_class(df, n_classes=3, clip=clip)
     assert out.shape == (3, 3)
     assert np.all(out[1] == 0.0)
     expected_row0 = np.log(np.clip(np.array([0.7, 0.2, 0.1]), clip, 1.0 - clip))

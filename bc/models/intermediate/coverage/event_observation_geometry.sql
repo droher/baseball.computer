@@ -1,7 +1,7 @@
 MODEL (
   name main_models.event_observation_geometry,
   kind FULL,
-  description 'Per (event_key, dimension) observation ledger for batted-ball geometry covariates. Driven by main_models.calc_batted_ball_type, which is itself filtered to batted_trajectory IS NOT NULL; the ledger is sparse by design (no row = dimension does not apply to this event). Atomic dimensions: trajectory, location_side, location_depth, location_edge, general_location, ball_handler_position, pulled_opposite. observed_status drawn from seed_observed_status. raw_value reflects the source value verbatim (recorded_* columns from calc_batted_ball_type for the first five dims, raw batted_to_fielder from stg_events for ball_handler_position, NULL for the purely-derived pulled_opposite). deduced_value populated only when observed_status = derived: trajectory uses calc.is_trajectory_deduced; location_side and location_depth populate when calc inferred from the fielder/inference path; pulled_opposite derives from (deduced location_side × resolved batter_hand). sentinel_type encodes the raw value character (null / unknown / valid_value / zero — zero is the batted_to_fielder 0 sentinel for unknown fielder; default / empty_sequence / not_applicable kept in the enum for sibling-ledger parity but not emitted here). source_acquisition_status joins source_acquisition_ledger (dimension = batted_ball, game-wide). data_error_risk joins source_data_error_risk_ledger on (game_id, field_name); no current field_name maps to a geometry dimension, so the JOIN is a no-op in v1 — kept for forward-compat. model_input_eligible = observed_status NOT IN (not_applicable, data_error_prone) AND source_acquisition_status != not_acquired.',
+  description 'Per (event_key, dimension) observation ledger for batted-ball geometry covariates. Driven by main_models.calc_batted_ball_type, which is itself filtered to batted_trajectory IS NOT NULL; the ledger is sparse by design (no row = dimension does not apply to this event). Atomic dimensions: trajectory, location_side, location_depth, location_edge, general_location, ball_handler_position, pulled_opposite. observed_status drawn from seed_observed_status. raw_value reflects the source value verbatim (recorded_* columns from calc_batted_ball_type for the first five dims, raw batted_to_fielder from stg_events for ball_handler_position, NULL for the purely-derived pulled_opposite). deduced_value populated only when observed_status = derived: trajectory uses calc.is_trajectory_deduced; location_side and location_depth populate when calc inferred from the fielder/inference path; pulled_opposite derives from (location_side × resolved batter_hand): Middle location_side maps to middle regardless of hand, Left/Right crossed with batter hand map to pulled/opposite, anything else (All, Unknown, NULL side, or L/R side with NULL hand) is missing — class domain is exactly pulled / opposite / middle, and the dimension''s sentinel_type is the constant null (raw_value is NULL by construction). sentinel_type encodes the raw value character (null / unknown / valid_value / zero — zero is the batted_to_fielder 0 sentinel for unknown fielder; default / empty_sequence / not_applicable kept in the enum for sibling-ledger parity but not emitted here). source_acquisition_status joins source_acquisition_ledger (dimension = batted_ball, game-wide). data_error_risk joins source_data_error_risk_ledger on (game_id, field_name); no current field_name maps to a geometry dimension, so the JOIN is a no-op in v1 — kept for forward-compat. model_input_eligible = seed_observed_status.is_training_eligible (LEFT JOIN on observed_status, so unseeded statuses surface as NULL and fail the not_null audit) AND source_acquisition_status != not_acquired.',
   grain (event_key, dimension),
   columns (
     event_key UINTEGER,
@@ -18,12 +18,12 @@ MODEL (
     event_key = @doc('event_key'),
     dimension = 'Atomic geometry dimension: trajectory, location_side, location_depth, location_edge, general_location, ball_handler_position, pulled_opposite.',
     observed_status = 'FK to seed_observed_status. observed = raw recorded value is meaningful (non-null, non-Unknown, non-zero-fielder); derived = raw missing/Unknown but a deterministic inference is available (only fires for trajectory/location_side/location_depth/pulled_opposite); unknown_code = raw is the Unknown sentinel and no inference is available; missing = raw is NULL and no inference is available.',
-    sentinel_type = 'Raw-value character: valid_value, unknown (literal Unknown enum value), null (raw is NULL), zero (batted_to_fielder = 0 sentinel for unknown fielder). default/empty_sequence/not_applicable are sibling-ledger enum values, kept here for cross-ledger parity but not emitted.',
+    sentinel_type = 'Raw-value character: valid_value, unknown (literal Unknown enum value), null (raw is NULL), zero (batted_to_fielder = 0 sentinel for unknown fielder). pulled_opposite is always null (raw_value NULL by construction). default/empty_sequence/not_applicable are sibling-ledger enum values, kept here for cross-ledger parity but not emitted.',
     raw_value = 'Source value serialized as text. recorded_* columns from calc_batted_ball_type for the first five dims, stg_events.batted_to_fielder for ball_handler_position (pre-nullification, so HR/GRD events keep the original 0/NULL marker), NULL for pulled_opposite.',
-    deduced_value = 'Deterministic inference serialized as text; non-NULL only when observed_status = derived.',
+    deduced_value = 'Deterministic inference serialized as text; non-NULL only when observed_status = derived. pulled_opposite domain is exactly pulled / opposite / middle.',
     source_acquisition_status = 'source_acquisition_ledger.source_availability_status for (game_id, dimension=batted_ball, team_id IS NULL). COALESCE not_acquired when no row exists.',
     data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. No-op in v1 (no current field_name maps to a geometry dimension).',
-    model_input_eligible = 'TRUE when the (event, dimension) row is admissible to a fitted-model training set: observed_status NOT IN (not_applicable, data_error_prone) AND source_acquisition_status != not_acquired.'
+    model_input_eligible = 'TRUE when the (event, dimension) row is admissible to a fitted-model training set: seed_observed_status.is_training_eligible for the row''s observed_status AND source_acquisition_status != not_acquired.'
   ),
   audits (
     not_null(columns := (event_key, dimension, observed_status, sentinel_type, source_acquisition_status, data_error_risk, model_input_eligible)),
@@ -40,7 +40,10 @@ MODEL (
       to_model := main_seeds.seed_observed_status,
       to_column := observed_status
     ),
-    sentinel_status_consistent()
+    sentinel_status_consistent(),
+    derived_requires_deduced(),
+    deduced_value_in_domain(dimension := 'pulled_opposite', allowed := ('pulled', 'opposite', 'middle')),
+    model_input_eligible_matches_seed()
   )
 );
 
@@ -224,25 +227,23 @@ pulled_opposite AS (
         game_id,
         'pulled_opposite' AS dimension,
         CAST(NULL AS VARCHAR) AS raw_value,
-        CASE
-            WHEN location_side IS NULL OR location_side = 'Unknown' THEN NULL
-            WHEN batter_hand IS NULL THEN NULL
-            WHEN location_side = 'Center' THEN 'straightaway'
-            WHEN (CAST(batter_hand AS VARCHAR) = 'L' AND location_side = 'Right')
-                 OR (CAST(batter_hand AS VARCHAR) = 'R' AND location_side = 'Left') THEN 'pulled'
-            WHEN (CAST(batter_hand AS VARCHAR) = 'L' AND location_side = 'Left')
-                 OR (CAST(batter_hand AS VARCHAR) = 'R' AND location_side = 'Right') THEN 'opposite'
-            ELSE NULL
-        END AS deduced_value,
-        CASE
-            WHEN location_side IS NOT NULL AND location_side != 'Unknown' AND batter_hand IS NOT NULL THEN 'valid_value'
-            ELSE 'null'
-        END AS sentinel_type,
-        CASE
-            WHEN location_side IS NOT NULL AND location_side != 'Unknown' AND batter_hand IS NOT NULL THEN 'derived'
-            ELSE 'missing'
-        END AS observed_status
-    FROM events_in_scope
+        deduced_value,
+        'null' AS sentinel_type,
+        CASE WHEN deduced_value IS NOT NULL THEN 'derived' ELSE 'missing' END AS observed_status
+    FROM (
+        SELECT
+            event_key,
+            game_id,
+            CASE
+                WHEN location_side = 'Middle' THEN 'middle'
+                WHEN (CAST(batter_hand AS VARCHAR) = 'L' AND location_side = 'Right')
+                     OR (CAST(batter_hand AS VARCHAR) = 'R' AND location_side = 'Left') THEN 'pulled'
+                WHEN (CAST(batter_hand AS VARCHAR) = 'L' AND location_side = 'Left')
+                     OR (CAST(batter_hand AS VARCHAR) = 'R' AND location_side = 'Right') THEN 'opposite'
+                ELSE NULL
+            END AS deduced_value
+        FROM events_in_scope
+    )
 ),
 
 all_dims AS (
@@ -265,9 +266,10 @@ SELECT
     COALESCE(acq.source_availability_status, 'not_acquired') AS source_acquisition_status,
     COALESCE(r.data_error_class, 'none') AS data_error_risk,
     (
-        d.observed_status NOT IN ('not_applicable', 'data_error_prone')
+        st.is_training_eligible
         AND COALESCE(acq.source_availability_status, 'not_acquired') != 'not_acquired'
     ) AS model_input_eligible
 FROM all_dims AS d
+LEFT JOIN main_seeds.seed_observed_status AS st ON st.observed_status = d.observed_status
 LEFT JOIN acq_batted_ball AS acq ON acq.game_id = d.game_id
 LEFT JOIN risk_per_game_field AS r ON r.game_id = d.game_id AND r.field_name = d.dimension

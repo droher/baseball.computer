@@ -7,11 +7,12 @@ from collections.abc import Generator
 from pathlib import Path
 
 import duckdb
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
 from python_models.statistical.dataset_registry import DatasetSpec
-from python_models.statistical.datasets import prepare_dataset
+from python_models.statistical.datasets import _canonical_arrow_type, prepare_dataset
 from python_models.statistical.manifests import query_hash
 from python_models.statistical.schemas import DatasetMetadata
 
@@ -30,20 +31,24 @@ def _seed_view(
     *,
     schema: str = "main_models",
     snapshot: str = "dev",
+    weight_type: str = "DOUBLE",
+    list_inner_type: str = "DOUBLE",
+    extra_column: bool = False,
 ) -> None:
+    extra_select = ", 42::INTEGER AS extra_col" if extra_column else ""
     con.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
     con.execute(
         f"""
         CREATE OR REPLACE VIEW {schema}.model_input_test AS
-        SELECT *
+        SELECT *{extra_select}
         FROM (VALUES
-            (1::UINTEGER, 'trajectory', 'observed', 1.0::DOUBLE, 'TRAIN',     'AL', 'play_by_play', '{snapshot}'),
-            (2::UINTEGER, 'trajectory', 'unknown',  0.0::DOUBLE, 'TRAIN',     'NL', 'play_by_play', '{snapshot}'),
-            (3::UINTEGER, 'location',   'observed', 1.0::DOUBLE, 'VALIDATE',  'AL', 'box_score',    '{snapshot}'),
-            (4::UINTEGER, 'location',   'observed', 1.0::DOUBLE, 'TEST',      'NL', 'box_score',    '{snapshot}'),
-            (5::UINTEGER, 'trajectory', 'observed', 1.0::DOUBLE, 'TRAIN',     'AL', NULL,           '{snapshot}')
+            (1::UINTEGER, 'trajectory', 'observed', 1.0::{weight_type}, [0.1, 0.9]::{list_inner_type}[], {{'is_holdout': TRUE}},  'TRAIN',     'AL', 'play_by_play', '{snapshot}'),
+            (2::UINTEGER, 'trajectory', 'unknown',  0.0::{weight_type}, [0.5, 0.5]::{list_inner_type}[], {{'is_holdout': FALSE}}, 'TRAIN',     'NL', 'play_by_play', '{snapshot}'),
+            (3::UINTEGER, 'location',   'observed', 1.0::{weight_type}, [0.2, 0.8]::{list_inner_type}[], {{'is_holdout': FALSE}}, 'VALIDATE',  'AL', 'box_score',    '{snapshot}'),
+            (4::UINTEGER, 'location',   'observed', 1.0::{weight_type}, [0.7, 0.3]::{list_inner_type}[], {{'is_holdout': TRUE}},  'TEST',      'NL', 'box_score',    '{snapshot}'),
+            (5::UINTEGER, 'trajectory', 'observed', 1.0::{weight_type}, [0.4, 0.6]::{list_inner_type}[], {{'is_holdout': FALSE}}, 'TRAIN',     'AL', NULL,           '{snapshot}')
         )
-        AS t(event_key, dimension, observed_status, training_weight, primary_fold, league, source_family, source_snapshot_id)
+        AS t(event_key, dimension, observed_status, training_weight, dl_p_class, holdout_flags, primary_fold, league, source_family, source_snapshot_id)
         """
     )
 
@@ -87,7 +92,15 @@ def test_prepare_dataset_writes_parquet_and_metadata(
 
     table = pq.read_table(parquet_path)
     assert table.num_rows == 5
-    assert set(table.column_names) >= {"event_key", "dimension", "training_weight"}
+    assert set(table.column_names) >= {
+        "event_key",
+        "dimension",
+        "training_weight",
+        "dl_p_class",
+        "holdout_flags",
+    }
+    assert pa.types.is_list(table.schema.field("dl_p_class").type)
+    assert pa.types.is_struct(table.schema.field("holdout_flags").type)
 
     metadata = DatasetMetadata.model_validate_json(
         metadata_path.read_text(encoding="utf-8")
@@ -148,6 +161,112 @@ def test_prepare_dataset_idempotent_rerun(
     assert first.artifact_id == second.artifact_id
     assert first.query_hash == second.query_hash
     assert parquet_path.stat().st_mtime_ns == parquet_mtime
+
+
+def test_prepare_dataset_rerun_rejects_added_column(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    _seed_view(con)
+    _ = prepare_dataset(
+        _spec(),
+        artifact_id="aid-schema-add",
+        con=con,
+        ledger_schema="main_models",
+        output_root=tmp_path,
+        artifact_versions={"duckdb": "test"},
+    )
+    _seed_view(con, extra_column=True)
+    with pytest.raises(
+        ValueError, match="view definition changed under artifact_id='aid-schema-add'"
+    ):
+        _ = prepare_dataset(
+            _spec(),
+            artifact_id="aid-schema-add",
+            con=con,
+            ledger_schema="main_models",
+            output_root=tmp_path,
+            artifact_versions={"duckdb": "test"},
+        )
+
+
+def test_prepare_dataset_rerun_rejects_retyped_column(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    _seed_view(con)
+    _ = prepare_dataset(
+        _spec(),
+        artifact_id="aid-schema-retype",
+        con=con,
+        ledger_schema="main_models",
+        output_root=tmp_path,
+        artifact_versions={"duckdb": "test"},
+    )
+    _seed_view(con, weight_type="REAL")
+    with pytest.raises(
+        ValueError,
+        match="view definition changed under artifact_id='aid-schema-retype'",
+    ):
+        _ = prepare_dataset(
+            _spec(),
+            artifact_id="aid-schema-retype",
+            con=con,
+            ledger_schema="main_models",
+            output_root=tmp_path,
+            artifact_versions={"duckdb": "test"},
+        )
+
+
+def test_prepare_dataset_rerun_rejects_retyped_list_child(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    _seed_view(con)
+    _ = prepare_dataset(
+        _spec(),
+        artifact_id="aid-schema-list-retype",
+        con=con,
+        ledger_schema="main_models",
+        output_root=tmp_path,
+        artifact_versions={"duckdb": "test"},
+    )
+    _seed_view(con, list_inner_type="VARCHAR")
+    with pytest.raises(
+        ValueError,
+        match="view definition changed under artifact_id='aid-schema-list-retype'",
+    ):
+        _ = prepare_dataset(
+            _spec(),
+            artifact_id="aid-schema-list-retype",
+            con=con,
+            ledger_schema="main_models",
+            output_root=tmp_path,
+            artifact_versions={"duckdb": "test"},
+        )
+
+
+def test_canonical_arrow_type_ignores_nested_field_names() -> None:
+    duck_style = pa.list_(pa.field("l", pa.float64()))
+    parquet_style = pa.list_(pa.field("element", pa.float64()))
+    assert _canonical_arrow_type(duck_style) == _canonical_arrow_type(parquet_style)
+
+    nested_duck = pa.struct([pa.field("flags", pa.list_(pa.field("l", pa.bool_())))])
+    nested_parquet = pa.struct(
+        [pa.field("flags", pa.list_(pa.field("element", pa.bool_())))]
+    )
+    assert _canonical_arrow_type(nested_duck) == _canonical_arrow_type(nested_parquet)
+
+    large_variant = pa.large_list(pa.field("element", pa.large_string()))
+    small_variant = pa.list_(pa.field("l", pa.string()))
+    assert _canonical_arrow_type(large_variant) == _canonical_arrow_type(small_variant)
+
+
+def test_canonical_arrow_type_preserves_child_type_differences() -> None:
+    doubles = pa.list_(pa.field("l", pa.float64()))
+    strings = pa.list_(pa.field("element", pa.string()))
+    assert _canonical_arrow_type(doubles) != _canonical_arrow_type(strings)
+
+    struct_a = pa.struct([pa.field("x", pa.float64())])
+    struct_b = pa.struct([pa.field("x", pa.string())])
+    assert _canonical_arrow_type(struct_a) != _canonical_arrow_type(struct_b)
 
 
 def test_prepare_dataset_rejects_snapshot_id_drift(

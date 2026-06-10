@@ -13,14 +13,50 @@ import pytest
 from python_models.statistical.models._event_data import (
     CONTINUOUS_COLUMNS,
     FIXED_EFFECT_COLUMNS,
+    HOLDOUT_FOLD_COUNT,
+    HOLDOUT_FOLD_ID,
     UNKNOWN_LEVEL,
     prepare_event_observation_inputs,
 )
+from python_models.statistical.splits import game_hash_fold
+
+
+def _game_id_pool(*, n_holdout: int, n_train: int) -> list[str]:
+    holdout: list[str] = []
+    train: list[str] = []
+    i = 0
+    while len(holdout) < n_holdout or len(train) < n_train:
+        gid = f"GAME{i:04d}"
+        if game_hash_fold(gid, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID:
+            if len(holdout) < n_holdout:
+                holdout.append(gid)
+        elif len(train) < n_train:
+            train.append(gid)
+        i += 1
+    return holdout + train
+
+
+def _expected_split_event_keys(parquet_path: Path) -> tuple[set[int], set[int]]:
+    df = pl.read_parquet(parquet_path)
+    held_games = {
+        g
+        for g in df.get_column("game_id").unique().to_list()
+        if game_hash_fold(g, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID
+    }
+    held_keys = set(
+        df.filter(pl.col("game_id").is_in(sorted(held_games)))
+        .get_column("event_key")
+        .to_list()
+    )
+    train_keys = set(df.get_column("event_key").to_list()) - held_keys
+    return train_keys, held_keys
 
 
 def _synthetic_dataset(tmp_path: Path, *, dimension: str = "trajectory") -> Path:
     rng = np.random.default_rng(20260519)
     n = 200
+    game_pool = _game_id_pool(n_holdout=4, n_train=16)
+    game_ids = [game_pool[i % len(game_pool)] for i in range(n)]
     seasons = rng.choice(["1995", "2005", "2015"], size=n)
     scorers = rng.choice(["A", "B", "C", "D"], size=n)
     parks = rng.choice(["PRK1", "PRK2", "PRK3"], size=n)
@@ -55,6 +91,7 @@ def _synthetic_dataset(tmp_path: Path, *, dimension: str = "trajectory") -> Path
         {
             "event_key": np.arange(n, dtype=np.int64),
             "dimension": [dimension] * n,
+            "game_id": pl.Series("game_id", game_ids, dtype=pl.Utf8),
             "is_observed": is_observed,
             "season": pl.Series("season", [str(s) for s in seasons.tolist()], dtype=pl.Utf8),
             "scorer": pl.Series(
@@ -95,17 +132,20 @@ def _synthetic_dataset(tmp_path: Path, *, dimension: str = "trajectory") -> Path
 
 def test_prepare_indexer_contiguity_and_shapes(tmp_path: Path) -> None:
     parquet_path = _synthetic_dataset(tmp_path)
+    train_keys, held_keys = _expected_split_event_keys(parquet_path)
+    assert train_keys and held_keys
     inputs = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
+    n_train = len(train_keys)
     assert inputs.dimension == "trajectory"
-    assert inputs.y.shape == (200,)
-    assert inputs.event_keys.shape == (200,)
+    assert inputs.y.shape == (n_train,)
+    assert inputs.event_keys.shape == (n_train,)
     for name, idx, key in (
         ("season", inputs.season_idx, "season"),
         ("scorer", inputs.scorer_idx, "scorer"),
         ("park", inputs.park_idx, "park"),
         ("source", inputs.source_idx, "source"),
     ):
-        assert idx.shape == (200,), name
+        assert idx.shape == (n_train,), name
         assert set(np.unique(idx).tolist()) == set(range(len(inputs.coords[key])))
 
 
@@ -145,6 +185,98 @@ def test_saturated_seasons_are_dropped(tmp_path: Path) -> None:
     saturated.write_parquet(parquet_path)
     inputs = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
     assert "2015" not in inputs.coords["season"]
+
+
+def test_holdout_is_game_disjoint_and_deterministic(tmp_path: Path) -> None:
+    parquet_path = _synthetic_dataset(tmp_path)
+    train_keys, held_keys = _expected_split_event_keys(parquet_path)
+    assert train_keys and held_keys
+
+    first = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
+    second = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
+    assert first.held_out is not None and second.held_out is not None
+    assert np.array_equal(first.event_keys, second.event_keys)
+    assert np.array_equal(first.held_out.event_keys, second.held_out.event_keys)
+    assert np.array_equal(first.held_out.y, second.held_out.y)
+
+    assert set(first.event_keys.tolist()) == train_keys
+    assert set(first.held_out.event_keys.tolist()) == held_keys
+    assert set(first.event_keys.tolist()).isdisjoint(
+        first.held_out.event_keys.tolist()
+    )
+
+    key_to_game = dict(
+        pl.read_parquet(parquet_path)
+        .select(["event_key", "game_id"])
+        .iter_rows()
+    )
+    train_games = {key_to_game[k] for k in first.event_keys.tolist()}
+    held_games = {key_to_game[k] for k in first.held_out.event_keys.tolist()}
+    assert train_games.isdisjoint(held_games)
+
+
+def test_holdout_unaffected_by_row_subsample(tmp_path: Path) -> None:
+    parquet_path = _synthetic_dataset(tmp_path)
+    full = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
+    limited = prepare_event_observation_inputs(
+        parquet_path, dimension="trajectory", smoke_limit=50
+    )
+    assert full.held_out is not None and limited.held_out is not None
+    assert limited.n_events <= 50
+    assert np.array_equal(limited.held_out.event_keys, full.held_out.event_keys)
+
+
+def test_unseen_levels_in_held_out_encode_to_minus_one(tmp_path: Path) -> None:
+    parquet_path = _synthetic_dataset(tmp_path)
+    df = pl.read_parquet(parquet_path)
+    held_games = sorted(
+        g
+        for g in df.get_column("game_id").unique().to_list()
+        if game_hash_fold(g, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID
+    )
+    assert held_games
+    target_game = held_games[0]
+    is_target = pl.col("game_id") == target_game
+    df = df.with_columns(
+        pl.when(is_target).then(pl.lit("ZZZZ")).otherwise(pl.col("park_id")).alias("park_id"),
+        pl.when(is_target).then(pl.lit("Exhibition")).otherwise(pl.col("game_type")).alias("game_type"),
+    )
+    df.write_parquet(parquet_path)
+    target_keys = set(
+        df.filter(is_target).get_column("event_key").to_list()
+    )
+
+    inputs = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
+    assert "ZZZZ" not in inputs.coords["park"]
+    assert "Exhibition" not in inputs.fixed_effects["game_type"].levels
+    held = inputs.held_out
+    assert held is not None
+    mask = np.isin(held.event_keys, np.array(sorted(target_keys), dtype=np.int64))
+    assert mask.any()
+    assert np.all(held.park_idx[mask] == -1)
+    assert np.all(held.fixed_effects["game_type"].codes[mask] == -1)
+    assert np.all(held.park_idx[~mask] >= 0)
+
+
+def test_held_out_continuous_standardized_with_training_stats(tmp_path: Path) -> None:
+    parquet_path = _synthetic_dataset(tmp_path)
+    inputs = prepare_event_observation_inputs(parquet_path, dimension="trajectory")
+    held = inputs.held_out
+    assert held is not None and held.n_events > 0
+    raw_by_key = dict(
+        pl.read_parquet(parquet_path)
+        .select(["event_key", "outs_start"])
+        .iter_rows()
+    )
+    train_feat = inputs.continuous["outs_start"]
+    held_feat = held.continuous["outs_start"]
+    assert held_feat.raw_mean == train_feat.raw_mean
+    assert held_feat.raw_std == train_feat.raw_std
+    expected = (
+        np.array([float(raw_by_key[k]) for k in held.event_keys.tolist()])
+        - train_feat.raw_mean
+    ) / train_feat.raw_std
+    np.testing.assert_allclose(held_feat.values, expected)
 
 
 def test_fixed_effect_design_shape_and_levels(tmp_path: Path) -> None:

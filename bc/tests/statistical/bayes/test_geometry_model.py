@@ -105,14 +105,16 @@ def test_builds_valid_graph_with_expected_rvs() -> None:
     observed_names = {rv.name for rv in model.observed_RVs}
     data_names = {d.name for d in model.data_vars}
 
+    assert "alpha_class" in rv_names
     assert {
-        "alpha_class",
         "sigma_season_league",
         "sigma_scorer",
         "z_season_league",
         "z_scorer",
-    }.issubset(rv_names)
-    assert {"beta_season_league", "beta_scorer"}.issubset(det_names)
+    }.isdisjoint(rv_names), (
+        "scalar-per-event REs cancel in the softmax and must not be in the model"
+    )
+    assert {"beta_season_league", "beta_scorer"}.isdisjoint(det_names)
     for column in FIXED_EFFECT_COLUMNS:
         assert f"delta_{column}" in rv_names
     assert "G_observed" in observed_names

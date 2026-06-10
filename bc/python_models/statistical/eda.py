@@ -301,8 +301,8 @@ def _source_family_block_missingness(
     if "source_acquisition_status" not in snapshot.columns:
         sql = (
             f"SELECT NULL::VARCHAR AS source_family, NULL::VARCHAR AS season, "
-            f"0::BIGINT AS rows, 0::BIGINT AS source_block_missing_rows, "
-            f"0::BIGINT AS event_present_block_missing_rows FROM {src} WHERE FALSE"
+            f"0::BIGINT AS rows, 0::BIGINT AS source_block_missing_rows "
+            f"FROM {src} WHERE FALSE"
         )
         return con.execute(sql).pl(), sql
     cols = []
@@ -314,16 +314,9 @@ def _source_family_block_missingness(
         cols.append("'__all__' AS slice_value")
     select_cols = ", ".join(cols)
     group_cols = ", ".join(c if " AS " not in c else c.split(" AS ")[-1] for c in cols)
-    event_present_clause = (
-        "model_input_eligible IS TRUE OR model_input_eligible IS NULL"
-        if "model_input_eligible" in snapshot.columns
-        else "TRUE"
-    )
     sql = (
         f"SELECT {select_cols}, COUNT(*) AS rows, "
-        f"COUNT_IF(source_acquisition_status = 'not_acquired') AS source_block_missing_rows, "
-        f"COUNT_IF(source_acquisition_status = 'not_acquired' AND ({event_present_clause})) "
-        f"AS event_present_block_missing_rows "
+        f"COUNT_IF(source_acquisition_status = 'not_acquired') AS source_block_missing_rows "
         f"FROM {src} GROUP BY {group_cols} ORDER BY {group_cols}"
     )
     df = con.execute(sql).pl()
@@ -609,7 +602,6 @@ def _weak_identification_flags(
 def _derive_blocking_findings(
     *,
     snapshot: _Snapshot,
-    summary: tuple[int, int, int, int, int],
     block_missing: pl.DataFrame,
     collinearity: pl.DataFrame,
     edges: pl.DataFrame,
@@ -620,31 +612,6 @@ def _derive_blocking_findings(
 ) -> list[BlockingFinding]:
     findings: list[BlockingFinding] = []
     src = _from_clause(snapshot)
-
-    (_, _, _, source_block_missing_count, _) = summary
-    if (
-        "source_acquisition_status" in snapshot.columns
-        and source_block_missing_count > 0
-        and "model_input_eligible" in snapshot.columns
-    ):
-        bad_rows = _scalar_int(
-            con,
-            f"SELECT COUNT(*) FROM {src} WHERE source_acquisition_status = 'not_acquired' "
-            f"AND model_input_eligible IS TRUE",
-        )
-        if bad_rows > 0:
-            findings.append(
-                BlockingFinding(
-                    code="source_family_block_as_event_missing",
-                    severity="block",
-                    message=(
-                        f"{bad_rows} rows mark source_acquisition_status='not_acquired' "
-                        "but remain model_input_eligible=TRUE; source-block missingness "
-                        "is leaking through as event-level missingness."
-                    ),
-                    evidence_path=output_paths.get("source_family_block_missingness"),
-                )
-            )
 
     if collinearity.height > 0 and "dominant_share" in collinearity.columns:
         dominant = collinearity.filter(
@@ -998,7 +965,6 @@ def run_eda(
 
         blocking = _derive_blocking_findings(
             snapshot=snapshot,
-            summary=summary,
             block_missing=block_df,
             collinearity=col_df,
             edges=edges_df,

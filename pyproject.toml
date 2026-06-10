@@ -81,3 +81,6 @@ markers = [
 
 [tool.pyright]
 extraPaths = ["bc"]
+
+[tool.ruff.lint.per-file-ignores]
+"bc/tests/statistical/**" = ["E402"]

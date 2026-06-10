@@ -50,7 +50,7 @@ def compute_dl_logits(
     return out
 
 
-def compute_dl_logits_per_class(
+def compute_dl_log_probs_per_class(
     df: pl.DataFrame,
     *,
     dl_p_class_column: str = "dl_p_class",
@@ -63,6 +63,11 @@ def compute_dl_logits_per_class(
     for row_idx, row in enumerate(probs):
         if row is None or len(row) == 0:
             continue
+        if len(row) != n_classes:
+            raise ValueError(
+                f"{dl_p_class_column} row {row_idx} has {len(row)} entries; "
+                f"expected n_classes={n_classes}"
+            )
         for class_idx in range(n_classes):
             p = float(row[class_idx])
             p_clipped = min(max(p, clip), 1.0 - clip)
