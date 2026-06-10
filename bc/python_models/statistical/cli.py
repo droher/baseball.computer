@@ -706,16 +706,32 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
         raise ValueError(
             f"manifest.json at {found} reports artifact_id={manifest.artifact_id!r}, expected {artifact_id!r}"
         )
+    pointer_name = model_name
+    if manifest.kind == "deep":
+        import importlib
+
+        from python_models.statistical.deep import registry as deep_registry
+
+        importlib.import_module("python_models.statistical.deep.targets")
+        try:
+            spec = deep_registry.get_target(model_name)
+        except KeyError as exc:
+            raise ValueError(
+                f"deep artifact {artifact_id!r} has model {model_name!r}, which is not "
+                "a registered deep target; cannot resolve its published pointer name"
+            ) from exc
+        pointer_name = spec.published_manifest_name()
     pointer = PublishedPointer(
-        model_name=model_name,
+        model_name=pointer_name,
         artifact_id=artifact_id,
         published_at=datetime.now(tz=timezone.utc),
         manifest_path=found,
     )
     target = write_published_pointer(pointer)
     _log.info(
-        "publish-manifest wrote pointer model=%s artifact_id=%s path=%s",
+        "publish-manifest wrote pointer model=%s pointer_name=%s artifact_id=%s path=%s",
         model_name,
+        pointer_name,
         artifact_id,
         target,
     )

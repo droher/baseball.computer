@@ -397,8 +397,17 @@ eval to the obs prep and the bernoulli branch.
 #### P3.1 — Trajectory DL proposal is in-sample, contaminating a published posterior [empirical]
 
 **Status: fixed (wave 1).** Refit as `phase3-trajectory-v9-cv` with 5-fold CV; `fold_id`
-provenance verified (8,434,463 OOF rows, 5 folds, 0 nulls). Bayes `e-cut2-trajectory-shrunk`
-refit on the unleaked covariate.
+provenance verified (8,434,463 OOF rows, 5 folds, 0 nulls). The shipped Bayes posterior is
+`e-cut2b-trajectory-shrunk` (pointer `geometry_trajectory.json`, gathered into
+`imputed_batted_ball_geometry`). The first refit attempt (`e-cut2-trajectory-shrunk`) silently
+consumed the v8 leaked covariate because `publish-manifest` wrote the deep pointer under the
+raw model name instead of `dl_proposal_trajectory.json` (deep and Bayes targets share the name
+`geometry_trajectory`) — fixed in the CLI; deep artifacts now publish under the spec's
+`published_manifest_name()`. The leak was real: on the identical game-hash holdout (n=616,454),
+unleaked e-cut2b lands held-out top-1 0.4916 / log-loss 1.1393 / macro PR-AUC 0.4615 vs the
+leak-inflated 0.5031 / 1.1174 / 0.4864 — a ~1.2pt top-1 inflation now removed. Convergence is
+unchanged vs e-cut2 (rhat 1.0038, ess_bulk_min 2394, 0 divergences; the gain vs e-cut1's
+ess 139 comes from the T1.2 RE removal). These e-cut2b numbers are the honest gamma_dl baseline.
 
 `deep/targets/geometry.py:137` sets `fold_count=1` for `geometry_trajectory`. With `fold_count<=1`,
 `training.run_target` skips the OOF loop and the fallback at `training.py:820-831` predicts the
