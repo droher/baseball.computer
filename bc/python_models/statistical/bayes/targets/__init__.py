@@ -10,6 +10,5 @@ from python_models.statistical.bayes.targets import (
     observation as _observation,  # noqa: F401
     park_factor as _park_factor,  # noqa: F401
     pitch_summary as _pitch_summary,  # noqa: F401
-    responsibility as _responsibility,  # noqa: F401
     run_values as _run_values,  # noqa: F401
 )

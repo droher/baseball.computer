@@ -71,14 +71,6 @@ ADVANCEMENT_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
-RESPONSIBILITY_SCHEMA: dict[str, pl.DataType] = {
-    "event_key": pl.UInt32(),
-    "fielding_position": pl.UInt8(),
-    "expected_share": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
-}
-
-
 PARK_FACTOR_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
     "park_id": pl.Utf8(),
     "season": pl.Int16(),
@@ -146,10 +138,6 @@ def empty_geometry_frame() -> pl.DataFrame:
 
 def empty_advancement_frame() -> pl.DataFrame:
     return pl.DataFrame(schema=ADVANCEMENT_SCHEMA)
-
-
-def empty_responsibility_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=RESPONSIBILITY_SCHEMA)
 
 
 def empty_park_factor_frame() -> pl.DataFrame:
@@ -538,75 +526,6 @@ def aggregate_advancement_frames() -> Iterator[pl.DataFrame]:
             "bayes.manifest_ingest: no advancement targets published; yielding empty frame"
         )
         yield empty_advancement_frame()
-
-
-def iterate_published_responsibility_frames() -> Iterator[pl.DataFrame]:
-    """Yield one frame per published Bayes responsibility (multinomial) target."""
-    for spec in _iter_specs_by_kind("multinomial"):
-        if spec.multinomial_export != "responsibility":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        share_path = (
-            pointer.manifest_path.parent
-            / "exports"
-            / "responsibility_probabilities.parquet"
-        )
-        if not share_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing responsibility_probabilities.parquet for %s at %s",
-                spec.published_manifest_name(),
-                share_path,
-            )
-            continue
-        df = pl.read_parquet(str(share_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: responsibility_probabilities empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        df = df.with_columns(
-            pl.col("event_key").cast(pl.UInt32),
-            pl.col("fielding_position").cast(pl.UInt8),
-            pl.col("expected_share").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        ).select(list(RESPONSIBILITY_SCHEMA.keys()))
-        _log.info(
-            "bayes.manifest_ingest: %d responsibility rows from %s",
-            df.height,
-            spec.published_manifest_name(),
-        )
-        yield df
-
-
-def aggregate_responsibility_frames() -> Iterator[pl.DataFrame]:
-    """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_responsibility_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("event_key").cast(pl.UInt32),
-                pl.col("fielding_position").cast(pl.UInt8),
-                pl.col("expected_share").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no responsibility targets published; yielding empty frame"
-        )
-        yield empty_responsibility_frame()
 
 
 def iterate_published_park_factor_frames() -> Iterator[pl.DataFrame]:

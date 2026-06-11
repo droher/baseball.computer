@@ -1,4 +1,4 @@
-"""Per-dataset metadata for the seven ``main_models.model_input_*`` views.
+"""Per-dataset metadata for the eight ``main_models.model_input_*`` views.
 
 The registry tells the dataset exporter which SQLMesh model to read,
 which columns to materialize as stable category maps, what the natural
@@ -77,7 +77,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
     "model_input_observation_batted_ball": DatasetSpec(
         name="model_input_observation_batted_ball",
         sqlmesh_table="model_input_observation_batted_ball",
-        dataset_version="0.2.0",
+        dataset_version="0.3.0",
         grain=("event_key", "dimension"),
         categorical_columns=_merge(
             ("dimension", "observed_status", "sentinel_type", "data_error_risk"),
@@ -100,7 +100,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
     "model_input_geometry": DatasetSpec(
         name="model_input_geometry",
         sqlmesh_table="model_input_geometry",
-        dataset_version="0.3.0",
+        dataset_version="0.4.0",
         grain=("event_key", "geometry_dimension", "class"),
         categorical_columns=_merge(
             (
@@ -209,34 +209,6 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
             "has_count",
             "has_pitch_sequence",
         ),
-    ),
-    "model_input_responsibility": DatasetSpec(
-        name="model_input_responsibility",
-        sqlmesh_table="model_input_responsibility",
-        dataset_version="0.1.0",
-        grain=("event_key",),
-        categorical_columns=_merge(
-            (
-                "ball_handler_position",
-                "trajectory_class",
-                "location_side_class",
-                "location_depth_class",
-                "location_edge_class",
-                "base_state_start",
-                "result_family",
-                "alignment_regime",
-                "alignment_normal_prior",
-                "batter_hand",
-            ),
-            _COMMON_CATEGORICAL,
-        ),
-        slice_columns=(
-            "season",
-            "league",
-            "source_family",
-            "alignment_regime",
-        ),
-        target_columns=("ball_handler_position",),
     ),
     "model_input_park_factors": DatasetSpec(
         name="model_input_park_factors",

@@ -37,11 +37,17 @@ from python_models.statistical.models._credit_data import (
     HeldOutSet,
     ProductionScoringFrame,
 )
+from python_models.statistical.models._geometry_data import (
+    PROPENSITY_COLUMN,
+    _propensity_z_with_frozen_stats,
+    _standardized_propensity_logit,
+)
 from python_models.statistical.splits import game_hash_fold
 
 _log = logging.getLogger(__name__)
 
 IntArray = npt.NDArray[np.int64]
+FloatArray = npt.NDArray[np.float64]
 
 DEFAULT_SEED: int = 20260513
 MIN_EVENTS_PER_SEASON: int = 50
@@ -85,6 +91,12 @@ class BallHandlerInputs(BaseModel):
     coords: dict[str, list[str]]
 
     held_out: HeldOutSet
+
+    propensity_z: FloatArray | None = None
+    held_out_propensity_z: FloatArray | None = None
+    propensity_logit_mean: float = 0.0
+    propensity_logit_std: float = 1.0
+    propensity_active: bool = False
 
     @property
     def n_events(self) -> int:
@@ -236,21 +248,31 @@ def build_ball_handler_production_frame(
     *,
     dimension: str,
     fixed_effects: dict[str, FixedEffectDesign],
+    propensity_logit_mean: float = 0.0,
+    propensity_logit_std: float = 1.0,
+    propensity_active: bool = False,
 ) -> ProductionScoringFrame:
     """One row per handler-unobserved event with FE codes in the training vocab.
 
     The production slice is ``dimension=<dim> AND observed_status !=
     'observed'``. Every FE is encoded against its training ``levels``
     vocabulary; unseen levels encode to ``-1`` and are dropped by the
-    softmax reconstruction's validity mask.
+    softmax reconstruction's validity mask. The scalar propensity z rides
+    along (computed with the FROZEN training mean/std) so the export can
+    apply γ_propensity.
     """
+    schema_names = set(pl.scan_parquet(parquet_path).collect_schema().names())
+    select_columns = ["event_key", *FIXED_EFFECT_COLUMNS]
+    has_propensity_column = PROPENSITY_COLUMN in schema_names
+    if has_propensity_column:
+        select_columns.append(PROPENSITY_COLUMN)
     per_event = (
         pl.scan_parquet(parquet_path)
         .filter(
             (pl.col("dimension") == dimension)
             & (pl.col("observed_status") != OBSERVED_STATUS)
         )
-        .select(["event_key", *FIXED_EFFECT_COLUMNS])
+        .select(select_columns)
         .unique(subset=["event_key"])
         .sort("event_key")
         .collect()
@@ -259,6 +281,7 @@ def build_ball_handler_production_frame(
         return ProductionScoringFrame(
             event_keys=np.zeros(0, dtype=np.int64),
             fixed_effects={},
+            propensity_z=np.zeros(0, dtype=np.float64),
         )
 
     event_keys = (
@@ -271,7 +294,21 @@ def build_ball_handler_production_frame(
         )
         for column, design in fixed_effects.items()
     }
-    return ProductionScoringFrame(event_keys=event_keys, fixed_effects=scoring_fe)
+    if propensity_active and has_propensity_column:
+        propensity_z = _propensity_z_with_frozen_stats(
+            per_event,
+            mean=propensity_logit_mean,
+            std=propensity_logit_std,
+            dimension=dimension,
+            context="production",
+        )
+    else:
+        propensity_z = np.zeros(per_event.height, dtype=np.float64)
+    return ProductionScoringFrame(
+        event_keys=event_keys,
+        fixed_effects=scoring_fe,
+        propensity_z=propensity_z,
+    )
 
 
 def prepare_ball_handler_inputs(
@@ -394,6 +431,24 @@ def prepare_ball_handler_inputs(
         per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
     )
 
+    if PROPENSITY_COLUMN in per_event.columns:
+        propensity_active = True
+        propensity_z, propensity_logit_mean, propensity_logit_std = (
+            _standardized_propensity_logit(per_event, dimension=dimension)
+        )
+    else:
+        propensity_active = False
+        propensity_z = np.zeros(per_event.height, dtype=np.float64)
+        propensity_logit_mean = 0.0
+        propensity_logit_std = 1.0
+        _log.warning(
+            "dataset at %s carries no %s column; the propensity MNAR covariate "
+            "is inactive for dimension=%s",
+            parquet_path,
+            PROPENSITY_COLUMN,
+            dimension,
+        )
+
     season_league_idx, season_league_labels = _category_index(
         per_event, "season_league"
     )
@@ -430,11 +485,24 @@ def prepare_ball_handler_inputs(
         source_labels=source_labels,
         fixed_effects=fixed_effects,
     )
+    if held_out_df.height == 0:
+        held_out_propensity_z = np.zeros(0, dtype=np.float64)
+    elif propensity_active:
+        held_out_propensity_z = _propensity_z_with_frozen_stats(
+            held_out_df.sort("event_key"),
+            mean=propensity_logit_mean,
+            std=propensity_logit_std,
+            dimension=dimension,
+            context="held-out",
+        )
+    else:
+        held_out_propensity_z = np.zeros(held_out_df.height, dtype=np.float64)
 
     _log.info(
-        "prepare_ball_handler_inputs K=%d train_events=%d held_out_events=%d "
-        "season_leagues=%d scorers=%d parks=%d sources=%d",
+        "prepare_ball_handler_inputs K=%d propensity_active=%s train_events=%d "
+        "held_out_events=%d season_leagues=%d scorers=%d parks=%d sources=%d",
         N_POSITIONS,
+        propensity_active,
         per_event.height,
         held_out.n_events,
         len(season_league_labels),
@@ -453,6 +521,11 @@ def prepare_ball_handler_inputs(
         fixed_effects=fixed_effects,
         coords=coords,
         held_out=held_out,
+        propensity_z=propensity_z,
+        held_out_propensity_z=held_out_propensity_z,
+        propensity_logit_mean=propensity_logit_mean,
+        propensity_logit_std=propensity_logit_std,
+        propensity_active=propensity_active,
     )
 
 

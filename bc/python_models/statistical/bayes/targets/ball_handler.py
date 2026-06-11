@@ -34,6 +34,8 @@ BALL_HANDLER_IMPUTATION = BayesTargetSpec(
     sample_size=SAMPLE_SIZE,
     outcome_kind="multinomial",
     multinomial_export="ball_handler",
+    propensity_dimension="ball_handler_position",
+    default_propensity_flavors=("gamma_propensity_zero", "gamma_propensity_class"),
 )
 
 

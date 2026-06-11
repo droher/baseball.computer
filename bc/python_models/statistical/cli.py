@@ -225,6 +225,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="DL covariate flavor for the geometry model. Ignored by non-geometry targets.",
     )
     _ = fit_bayes.add_argument(
+        "--propensity-flavor",
+        choices=["gamma_propensity_zero", "gamma_propensity_class"],
+        default=None,
+        help=(
+            "Observation-propensity MNAR covariate flavor. Defaults to the "
+            "first entry of the target's default_propensity_flavors. Ignored "
+            "by targets without a propensity_dimension."
+        ),
+    )
+    _ = fit_bayes.add_argument(
         "--source-snapshot-id",
         default=None,
         help=(
@@ -556,7 +566,10 @@ def _run_fit_deep(args: argparse.Namespace) -> int:
 def _run_fit_bayes(args: argparse.Namespace) -> int:
     from python_models.statistical.bayes import targets as _bayes_targets  # noqa: F401
     from python_models.statistical.bayes.registry import get_target
-    from python_models.statistical.bayes.specs import GammaDlFlavor
+    from python_models.statistical.bayes.specs import (
+        GammaDlFlavor,
+        GammaPropensityFlavor,
+    )
     from python_models.statistical.bayes.training import run_bayes_model
     from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
     from python_models.statistical.dataset_registry import get_spec as _get_dataset_spec
@@ -592,6 +605,11 @@ def _run_fit_bayes(args: argparse.Namespace) -> int:
         smoke=bool(args.smoke),
         prior_only=bool(args.prior_only),
         gamma_dl_flavor=cast(GammaDlFlavor, args.flavor),
+        gamma_propensity_flavor=(
+            cast(GammaPropensityFlavor, args.propensity_flavor)
+            if args.propensity_flavor is not None
+            else None
+        ),
         artifact_root=output_root,
         dataset_root=dataset_root,
     )

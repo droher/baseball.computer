@@ -73,6 +73,9 @@ OBSERVED_STATUS: str = "observed"
 DIMENSION_COLUMN: str = "geometry_dimension"
 LABEL_COLUMN: str = "raw_value"
 
+PROPENSITY_COLUMN: str = "propensity_p_observed"
+PROPENSITY_CLIP: float = 1e-6
+
 FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
     "result_family",
     "base_state_start",
@@ -171,6 +174,12 @@ class GeometryInputs(BaseModel):
 
     held_out: HeldOutSet
     held_out_dl_logit_per_class: FloatArray
+
+    propensity_z: FloatArray | None = None
+    held_out_propensity_z: FloatArray | None = None
+    propensity_logit_mean: float = 0.0
+    propensity_logit_std: float = 1.0
+    propensity_active: bool = False
 
     @property
     def n_events(self) -> int:
@@ -412,6 +421,82 @@ def _assert_dl_class_vocab_alignment(
     _compare_dl_vocab(dl_labels, vocab, source_desc=source_desc)
 
 
+def _propensity_logit_with_mask(
+    df: pl.DataFrame, *, column: str = PROPENSITY_COLUMN
+) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
+    raw = df.get_column(column).cast(pl.Float64).to_numpy().astype(np.float64)
+    finite = np.isfinite(raw)
+    safe = np.where(finite, raw, 0.5)
+    clipped = np.clip(safe, PROPENSITY_CLIP, 1.0 - PROPENSITY_CLIP)
+    logit = np.log(clipped / (1.0 - clipped))
+    return logit.astype(np.float64), finite
+
+
+def _standardized_propensity_logit(
+    df: pl.DataFrame, *, dimension: str
+) -> tuple[FloatArray, float, float]:
+    """Standardized logit of ``propensity_p_observed`` over the training slice.
+
+    Clips p to ``[PROPENSITY_CLIP, 1 - PROPENSITY_CLIP]``, takes the logit,
+    and standardizes with mean/std computed on the non-NULL training rows
+    only (std floors to 1.0 when degenerate). NULL rows map to z=0. Raises
+    when the column is present but 100% NULL on a non-empty training slice
+    — the dataset predates the published observation-propensity artifacts
+    and a silent all-zero covariate would be a wrong fit.
+    """
+    logit, finite = _propensity_logit_with_mask(df)
+    n = int(finite.shape[0])
+    n_null = int((~finite).sum())
+    if n > 0 and n_null == n:
+        raise ValueError(
+            f"{PROPENSITY_COLUMN} is 100% NULL on the training slice for "
+            f"dimension={dimension!r}; the dataset was frozen before "
+            f"observation propensities were published — re-freeze the dataset "
+            f"against a snapshot whose {PROPENSITY_COLUMN} join is populated"
+        )
+    _log.info(
+        "propensity covariate null rate on training slice dimension=%s: %d/%d (%.4f)",
+        dimension,
+        n_null,
+        n,
+        (n_null / n) if n else 0.0,
+    )
+    if finite.any():
+        mean = float(np.mean(logit[finite]))
+        std = float(np.std(logit[finite], ddof=0))
+        if std < 1e-12:
+            std = 1.0
+    else:
+        mean = 0.0
+        std = 1.0
+    z = np.where(finite, (logit - mean) / std, 0.0)
+    return z.astype(np.float64), mean, std
+
+
+def _propensity_z_with_frozen_stats(
+    df: pl.DataFrame,
+    *,
+    mean: float,
+    std: float,
+    dimension: str,
+    context: str,
+) -> FloatArray:
+    """z = (logit(clip(p)) - mean) / std with the frozen training stats; NULL -> 0."""
+    logit, finite = _propensity_logit_with_mask(df)
+    n = int(finite.shape[0])
+    n_null = int((~finite).sum())
+    _log.info(
+        "propensity covariate null rate on %s slice dimension=%s: %d/%d (%.4f)",
+        context,
+        dimension,
+        n_null,
+        n,
+        (n_null / n) if n else 0.0,
+    )
+    z = np.where(finite, (logit - mean) / std, 0.0)
+    return z.astype(np.float64)
+
+
 def _one_hot_counts(class_idx: IntArray, n_classes: int) -> IntArray:
     n = int(class_idx.shape[0])
     counts = np.zeros((n, n_classes), dtype=np.int64)
@@ -491,6 +576,9 @@ def build_geometry_production_frame(
     fixed_effects: dict[str, FixedEffectDesign],
     n_classes: int,
     dl_logit_class_means: FloatArray,
+    propensity_logit_mean: float = 0.0,
+    propensity_logit_std: float = 1.0,
+    propensity_active: bool = False,
 ) -> GeometryProductionFrame:
     """One row per geometry-unobserved event with FE codes + per-class DL logits.
 
@@ -498,15 +586,22 @@ def build_geometry_production_frame(
     != 'observed'``. Every FE is encoded against its training ``levels``
     vocabulary; unseen levels encode to ``-1`` and are dropped by the
     softmax reconstruction's validity mask. The per-class DL logit array
-    rides along so the builder can apply γ_dl on the production slice.
+    rides along so the builder can apply γ_dl on the production slice; the
+    scalar propensity z rides along (computed with the FROZEN training
+    mean/std) so the export can apply γ_propensity.
     """
+    schema_names = set(pl.scan_parquet(parquet_path).collect_schema().names())
+    select_columns = ["event_key", "dl_p_class", *FIXED_EFFECT_COLUMNS]
+    has_propensity_column = PROPENSITY_COLUMN in schema_names
+    if has_propensity_column:
+        select_columns.append(PROPENSITY_COLUMN)
     per_event = (
         pl.scan_parquet(parquet_path)
         .filter(
             (pl.col(DIMENSION_COLUMN) == dimension)
             & (pl.col("observed_status") != OBSERVED_STATUS)
         )
-        .select(["event_key", "dl_p_class", *FIXED_EFFECT_COLUMNS])
+        .select(select_columns)
         .unique(subset=["event_key"])
         .sort("event_key")
         .collect()
@@ -516,6 +611,7 @@ def build_geometry_production_frame(
             event_keys=np.zeros(0, dtype=np.int64),
             fixed_effects={},
             dl_logit_per_class=np.zeros((0, n_classes), dtype=np.float64),
+            propensity_z=np.zeros(0, dtype=np.float64),
         )
 
     event_keys = (
@@ -530,10 +626,21 @@ def build_geometry_production_frame(
     }
     dl_logit_per_class = compute_dl_log_probs_per_class(per_event, n_classes=n_classes)
     dl_logit_per_class = dl_logit_per_class - dl_logit_class_means[None, :]
+    if propensity_active and has_propensity_column:
+        propensity_z = _propensity_z_with_frozen_stats(
+            per_event,
+            mean=propensity_logit_mean,
+            std=propensity_logit_std,
+            dimension=dimension,
+            context="production",
+        )
+    else:
+        propensity_z = np.zeros(per_event.height, dtype=np.float64)
     return GeometryProductionFrame(
         event_keys=event_keys,
         fixed_effects=scoring_fe,
         dl_logit_per_class=dl_logit_per_class,
+        propensity_z=propensity_z,
     )
 
 
@@ -708,6 +815,24 @@ def prepare_geometry_inputs(
     dl_logit_class_means = dl_logit_per_class.mean(axis=0).astype(np.float64)
     dl_logit_per_class = dl_logit_per_class - dl_logit_class_means[None, :]
 
+    if PROPENSITY_COLUMN in per_event.columns:
+        propensity_active = True
+        propensity_z, propensity_logit_mean, propensity_logit_std = (
+            _standardized_propensity_logit(per_event, dimension=dimension)
+        )
+    else:
+        propensity_active = False
+        propensity_z = np.zeros(per_event.height, dtype=np.float64)
+        propensity_logit_mean = 0.0
+        propensity_logit_std = 1.0
+        _log.warning(
+            "dataset at %s carries no %s column; the propensity MNAR covariate "
+            "is inactive for dimension=%s",
+            parquet_path,
+            PROPENSITY_COLUMN,
+            dimension,
+        )
+
     season_league_idx, season_league_labels = _category_index(
         per_event, "season_league"
     )
@@ -746,6 +871,7 @@ def prepare_geometry_inputs(
     )
     if held_out_df.height == 0:
         held_out_dl_logit_per_class = np.zeros((0, n_classes), dtype=np.float64)
+        held_out_propensity_z = np.zeros(0, dtype=np.float64)
     else:
         held_out_dl_logit_per_class = compute_dl_log_probs_per_class(
             held_out_df.sort("event_key"), n_classes=n_classes
@@ -753,13 +879,25 @@ def prepare_geometry_inputs(
         held_out_dl_logit_per_class = (
             held_out_dl_logit_per_class - dl_logit_class_means[None, :]
         )
+        if propensity_active:
+            held_out_propensity_z = _propensity_z_with_frozen_stats(
+                held_out_df.sort("event_key"),
+                mean=propensity_logit_mean,
+                std=propensity_logit_std,
+                dimension=dimension,
+                context="held-out",
+            )
+        else:
+            held_out_propensity_z = np.zeros(held_out_df.height, dtype=np.float64)
 
     _log.info(
-        "prepare_geometry_inputs dimension=%s K=%d dl_active=%s train_events=%d "
-        "held_out_events=%d season_leagues=%d scorers=%d parks=%d sources=%d",
+        "prepare_geometry_inputs dimension=%s K=%d dl_active=%s propensity_active=%s "
+        "train_events=%d held_out_events=%d season_leagues=%d scorers=%d parks=%d "
+        "sources=%d",
         dimension,
         n_classes,
         spec.dl_active,
+        propensity_active,
         per_event.height,
         held_out.n_events,
         len(season_league_labels),
@@ -783,6 +921,11 @@ def prepare_geometry_inputs(
         coords=coords,
         held_out=held_out,
         held_out_dl_logit_per_class=held_out_dl_logit_per_class,
+        propensity_z=propensity_z,
+        held_out_propensity_z=held_out_propensity_z,
+        propensity_logit_mean=propensity_logit_mean,
+        propensity_logit_std=propensity_logit_std,
+        propensity_active=propensity_active,
     )
 
 

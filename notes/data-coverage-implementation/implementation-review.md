@@ -29,11 +29,15 @@ reviewers; load-bearing claims verified by hand.
 - **[empirical]** — confirmed by running queries / reading the exact code, not just inferred.
 - **[static]** — confirmed by code read with `file:line`, not yet exercised at runtime.
 
-Progress markers (added 2026-06-10, after wave 1 landed on `data-coverage-fix-wave-1`, 9 commits):
+Progress markers (added 2026-06-10, after wave 1 landed on `data-coverage-fix-wave-1`, 9 commits;
+extended same day after wave 2 landed on `data-coverage-fix-wave-2`):
 
 - **Status: fixed (wave 1)** — landed and verified in wave 1.
+- **Status: fixed (wave 2)** — landed and verified in wave 2.
+- **Status: attempted and refuted (wave 2)** — built in full, then refuted by a controlled
+  experiment; the infrastructure ships, the correction does not.
 - **Status: open (next wave)** — deliberately deferred to the next wave.
-- **Status: open** — not addressed in wave 1.
+- **Status: open** — not addressed yet.
 
 ## Severity tiers
 
@@ -48,7 +52,8 @@ Progress markers (added 2026-06-10, after wave 1 landed on `data-coverage-fix-wa
    prior that does not exist in the pipeline. Joins B and K as "blocked pending a new input."
    Park/remove the current model; ship nothing called `fielder_responsibility`.
 2. **MNAR / label-bias correction** — central must-fix, era-scoped to pre-1988. Per-class
-   propensity covariate, not IPW, not a scalar offset.
+   propensity covariate, not IPW, not a scalar offset. (Outcome: attempted and refuted at full
+   scale in wave 2 — see T1.1.)
 3. **F / G and other cut-1s** — fix to spec in this doc. No publication/relabel hedging; nothing
    is consumed yet.
 4. **Model B (contact confusion)** — confirmed genuinely blocked, with proof and a single
@@ -61,8 +66,93 @@ Progress markers (added 2026-06-10, after wave 1 landed on `data-coverage-fix-wa
 
 ### T1.1 — No MNAR / label-bias correction anywhere downstream [empirical]
 
-**Status: open (next wave).** Central must-fix; deferred to the next wave by design (P2.1's
-validated Model A propensities, a prerequisite, landed in wave 1).
+**Status: ATTEMPTED AND REFUTED (wave 2).** Not "fixed". The fix below was implemented in full,
+and then a controlled experiment refuted the design itself.
+
+**What was built (all of it ships).**
+
+- The six Model A obs propensity targets refit as `10k-v4-fullscore`, each exporting a
+  **full-coverage** `event_propensity.parquet` — every event of the dimension in saturated
+  seasons (trajectory 10,706,330 of 12,038,982; the four location dims 11,163,039;
+  `ball_handler_position` 12,038,982 = 100%). Held-out: trajectory ROC-AUC 0.898 / PR-AUC 0.909
+  (baseline 0.450); location_side 0.973/0.957, location_depth 0.972/0.958, location_edge
+  0.972/0.956 (location baselines 0.374); general_location 0.972/0.958; ball_handler_position
+  0.942/0.992 (baseline 0.892). `scorer_observation_propensities` restated: 67,397,468 rows,
+  per-dim counts equal to the export heights.
+- Datasets frozen with the propensity join: `e-v10-geometry` + `obs-v3-propensity` (84,272,874
+  rows each), `propensity_artifact_id=10k-v4-fullscore` on every Model-A-covered dim, propensity
+  NULL only on unsaturated seasons (trajectory 1,332,652; location dims 875,943) and on
+  `pulled_opposite` (fully NULL — no Model A target).
+- The per-class covariate exactly as specified: `gamma_propensity[class]` (ZeroSumNormal) on the
+  standardized logit of `propensity_p_observed`, mirroring the `gamma_dl` hook, in both the E and
+  D builders, folded into `_posterior_event_softmax` reconstruction, with frozen training-slice
+  standardization stats on held-out/production scoring.
+- The masked-backtest harness: `scripts/mnar_masked_backtest.py` →
+  `statistical/backtests/mnar_masked.py`.
+
+**The refutation (both models, full scale).**
+
+- geometry (`artifacts/statistical/backtests/mnar/geometry-seed20260610-budget10000/metrics.json`):
+  masked-slice GroundBall truth share 0.467; the corrected model recovers **0.3526** vs
+  uncorrected **0.3528** — focal share error 0.1144 vs 0.1142, relative reduction **−0.001**
+  against the required ≥ 0.25. `gamma_propensity[GroundBall]` posterior −0.083 ± 0.026 — the
+  **wrong sign**. Diagnostics clean (0 divergences, rhat/ess pass); held-out non-regression
+  passed. `overall_pass=False`.
+- ball_handler (`artifacts/statistical/backtests/mnar/ball_handler-seed20260610-budget10000/metrics.json`):
+  focal error 0.0372 vs 0.0373 (relative reduction 0.003). `overall_pass=False`.
+
+**Mechanism — why a learned coefficient on the marginal propensity cannot work.** Training is
+observed-only. Under class-dependent masking, P(masked) = w_class × intensity: the focal class is
+preferentially removed exactly in heavily-masked contexts. So among the *surviving* (observed)
+events, low `p_observed` correlates with **less** focal class — a survivor tilt, the mirror image
+of the truth in the masked slice (which is focal-*enriched*). The likelihood faithfully learns
+this tilt and extrapolates it into the masked slice — the wrong direction, hence the wrong-signed
+`gamma_propensity`. This is not a tuning or convergence problem; it is an identification failure.
+A learned coefficient on the **marginal** propensity P(observed | x) cannot identify
+class-dependent selection from observed-only data. The correct construction needs the
+**per-class** selection probability P(observed | class, x) entering `eta` as a fixed Bayes-rule
+offset (`−log P(obs | c, x)`), or a joint selection / pattern-mixture model. The class is unknown
+exactly where the offset is needed, so estimating it is an EM-style joint design. Model A's
+marginal propensity cannot supply it.
+
+**Decision (user, locked).** Publish the `gamma_propensity_zero` ("noprop") fits as the E/D
+operating points; park T1.1 as attempted-and-refuted. The `gamma_propensity` hook stays in code
+with default `gamma_propensity_zero`; the propensity dataset columns and the full-coverage
+Model A exports stay — any future selection-model design needs them. The redesign is tracked in
+`notes/followups.md`.
+
+**What ships instead.** Operating points `e-noprop-trajectory-shrunk`,
+`e-noprop-location_side-shrunk`, `e-noprop-location_depth-shrunk`, `e-noprop-location_edge-shrunk`,
+`e-noprop-general_location-zero`, and `d-noprop-10k` (Model D's first-ever publication; held-out
+top-1 0.2170 vs prior-baseline 0.1709). gamma_dl flavors unchanged (shrunk for the 4 DL dims,
+zero for general_location). Held-out prop-vs-noprop A/B (top-1 / log-loss), 12 fits total on
+`e-v10-geometry` / `obs-v3-propensity`:
+
+| dimension | prop | noprop |
+|---|---|---|
+| trajectory | 0.4915 / 1.1372 | 0.4916 / 1.1393 |
+| location_side | 0.6977 / 0.9834 | 0.6976 / 0.9861 |
+| location_depth | 0.5705 / 1.0704 | 0.5608 / 1.0818 |
+| location_edge | 0.6552 / 0.8959 | 0.6543 / 0.8975 |
+| general_location | 0.1848 / 2.4399 | 0.1868 / 2.4440 |
+| ball_handler | 0.2182 / 1.9462 | 0.2170 / 1.9455 |
+
+Trajectory, location_edge, and ball_handler are inert. `location_side` and `location_depth`
+sit at or just below the majority-class top-1 baseline (side 0.6976 vs baseline 0.6976; depth
+noprop 0.5608 vs baseline 0.5611) — a longstanding property of those dimensions, not a wave
+regression: the noprop fits reproduce the pre-existing `e-cut1-*` fits' held-out metrics exactly,
+and the imputation deliverable is the posterior class distribution (log-loss), not top-1.
+`location_depth` is the one nontrivial prop-vs-noprop gap, and it does
+**not** argue for publishing the prop fit: `z_prop` is a deterministic function of context already
+available to the model, so it can add held-out predictive signal on the observation-rich holdout —
+while its *extrapolation* into the unobserved production slice is exactly what the backtest showed
+to be wrong-signed. Publishing it would trade honest uncertainty for a misdirected point estimate.
+
+**In-sample-propensity note (accepted).** Model A trains on games that overlap the E/D training
+games (the propensity input is not cross-fitted). Accepted because `p_observed` predicts
+*observedness*, not the class label, and E/D train on the observed-only slice — the overlap does
+not leak the label. This was slated as a CLAUDE.md note; it lives here instead since the hook
+ships disabled.
 
 **What's wrong.** Every imputation model (E geometry, H advancement, I responsibility, C credit,
 D ball handler) trains on the observed-only slice (`observed_status='observed'`,
@@ -147,7 +237,10 @@ Files: `models/geometry.py:75-76,97`, `models/credit.py:116-120,134`, `models/ba
 
 ### T1.3 — Model I is not a responsibility model; estimand not identifiable [empirical]
 
-**Status: open (next wave).** Parking/removal deferred to the next wave.
+**Status: fixed (wave 2)** (commit 01a1cdf). Model I parked, name reserved; nothing ships called
+responsibility. The real zone-responsibility design (the locked disposition below) is documented
+in `notes/data-coverage-implementation/responsibility-zone-design.md` for when the
+geometry→zone positioning prior exists.
 
 **What's wrong.** Model I trains on `LABEL_COLUMN = "ball_handler_position"` (the recorded
 handler, 3-9) — it is Model D restricted to range positions, published as
@@ -510,6 +603,15 @@ dimension's Bayes vocab before computing the per-class logit.
   `no_connected_component_for_effect`, 2× `category_absent_in_train_present_in_test`) —
   pre-existing data characteristics (`e-cut1` never ran EDA); wave-1 fits proceeded deliberately,
   but the findings need a disposition decision before any publication-gate use.
+  **Disposition: done (wave 2).** EDA re-run on the frozen `e-v10-geometry` + `obs-v3-propensity`
+  datasets emitted exactly the 4 expected blocking findings (`dominant_single_scorer_park_team`
+  ×1, `no_connected_component_for_effect` ×1, `category_absent_in_train_present_in_test` ×2).
+  All 12 targets now carry a `ModelConfig` under `bc/python_models/statistical/model_configs/`
+  with `expected_blocking_findings` and `addressed_weak_identifications` (`partial_pool` for the
+  obs targets, `drop` for E and D); all 12 pass `check-publication-gate` — the gate's first real
+  exercise. Discovery: `run-eda` stamps the CURRENT registry `dataset_version`, not the artifact
+  manifest's frozen version, so ModelConfig pins must track the registry version — the 6 obs
+  configs were re-pinned 0.2.0→0.3.0 for this reason (commit 4112498).
 - **P2.4 — `primary_fold` / `holdout_flags` / `time_forward_fold` are shipped but unused by the
   Bayes layer.** The preps roll their own BLAKE2s fold-10 (different hash + modulus from the
   dataset's `HASH()%100`). Not leakage (each model is internally disjoint), but the columns are dead
@@ -540,7 +642,9 @@ dimension's Bayes vocab before computing the per-class logit.
 - **P1.7 — the only non-trivial `training_weight` branch never fires.** `model_input_geometry.sql:217`
   downweights `data_error_risk != 'none'`, but the risk join is a no-op for geometry (100% `'none'`),
   so the `>0` filter is vacuous and the downweighting path is dead. Consistent with the MNAR plumbing
-  being inactive (T1.1). **Status: open** (rides with T1.1 next wave).
+  being inactive (T1.1). **Status: open** (T1.1's covariate construction was attempted and refuted
+  in wave 2; the downweighting path stays dead pending the selection-model redesign in
+  `notes/followups.md`).
 - **P3.5 — `calibrators.py` is dead code.** Never invoked; `dl_p_class` is the raw uncalibrated Keras
   softmax while the manifest advertises `calibration_method="temperature"`. Wire it (fit on the OOF
   union, apply to all partitions) or delete it and drop the manifest field. **Status: fixed
@@ -629,3 +733,14 @@ Phase 1-3 foundation subgraph landed (P1.1, P1.2, P1.3, P2.1, P2.2, P2.3, P3.1, 
 P3.4), plus T4.1 dead-code cleanup, T1.2 canceling-RE removal, and the Tier-3 fixes (T3.1, T3.2,
 T3.3, T3.4-as-corrected, T3.5). Next wave: T1.1 (MNAR central correction), T1.3 (Model I
 parking), the T2 spec completions.
+
+**Wave-2 outcome (2026-06-10, branch `data-coverage-fix-wave-2`):** T1.3 fixed (Model I parked,
+name reserved, zone design doc; commit 01a1cdf). T1.1 attempted and refuted — the full
+implementation landed (full-coverage Model A `10k-v4-fullscore`, frozen `e-v10-geometry` /
+`obs-v3-propensity` datasets, per-class `gamma_propensity` hook, masked-backtest harness) and the
+controlled backtest refuted the learned correction on both models; the noprop operating points
+published instead (`e-noprop-*`, `d-noprop-10k` — Model D's first publication). P2.3's EDA
+disposition closed (12 ModelConfigs, publication gate exercised end-to-end, registry
+version-stamping discovery). Operational: `POSTERIOR_CHUNK_DEFAULT` 250k→50k after two concurrent
+full-coverage scoring jobs (8 GB slabs each) swapped the machine. Remaining: the T2 spec
+completions, T4.2, P2.4–P2.6, P1.4–P1.6, and the nits.

@@ -174,3 +174,73 @@ def test_five_geometry_targets_registered() -> None:
         for dimension in (*GEOMETRY_DL_DIMENSIONS, *GEOMETRY_ZERO_FLAVOR_DIMENSIONS)
     }
     assert names == expected
+
+
+def test_no_propensity_dimension_restricts_propensity_flavors() -> None:
+    for spec in all_targets():
+        if spec.propensity_dimension is None:
+            assert spec.default_propensity_flavors == ("gamma_propensity_zero",), (
+                f"{spec.name} has no propensity_dimension but "
+                f"default_propensity_flavors={spec.default_propensity_flavors!r}"
+            )
+
+
+def test_propensity_class_flavor_without_dimension_rejected() -> None:
+    from python_models.statistical.bayes.registry import get_target
+    from python_models.statistical.bayes.specs import BayesTargetSpec
+
+    template = get_target("ball_handler_imputation")
+    with pytest.raises(ValueError, match="gamma_propensity_class"):
+        _ = BayesTargetSpec(
+            name="propensity_validator_probe",
+            dimension=template.dimension,
+            dataset_name=template.dataset_name,
+            dataset_dimension_filter=template.dataset_dimension_filter,
+            prep_fn=template.prep_fn,
+            builder=template.builder,
+            propensity_dimension=None,
+            default_propensity_flavors=(
+                "gamma_propensity_zero",
+                "gamma_propensity_class",
+            ),
+        )
+
+
+def test_imputation_targets_carry_propensity_dimension_and_both_flavors() -> None:
+    imputation = [
+        spec
+        for spec in all_targets()
+        if spec.multinomial_export in ("geometry", "ball_handler")
+    ]
+    assert len(imputation) == 6
+    for spec in imputation:
+        assert spec.propensity_dimension == spec.dataset_dimension_filter, (
+            f"{spec.name} propensity_dimension {spec.propensity_dimension!r} must "
+            f"match dataset_dimension_filter {spec.dataset_dimension_filter!r}"
+        )
+        assert spec.default_propensity_flavors == (
+            "gamma_propensity_zero",
+            "gamma_propensity_class",
+        ), (
+            f"{spec.name} must register both propensity flavors with "
+            f"gamma_propensity_zero first (the run_bayes_model default)"
+        )
+
+
+def test_responsibility_name_is_reserved_not_registered() -> None:
+    from typing import get_args
+
+    from python_models.statistical.bayes.registry import get_target
+    from python_models.statistical.bayes.specs import BayesTargetSpec
+
+    names = {spec.name for spec in all_targets()}
+    assert "responsibility" not in names
+    with pytest.raises(KeyError):
+        _ = get_target("responsibility")
+
+    annotation = BayesTargetSpec.model_fields["multinomial_export"].annotation
+    literal_values = {
+        value for member in get_args(annotation) for value in get_args(member)
+    }
+    assert literal_values, "multinomial_export Literal values not extracted"
+    assert "responsibility" not in literal_values

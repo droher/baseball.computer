@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 OutcomeKind = Literal["bernoulli", "multinomial", "count"]
 GammaDlFlavor = Literal["gamma_dl_zero", "gamma_dl_shrunk"]
+GammaPropensityFlavor = Literal["gamma_propensity_zero", "gamma_propensity_class"]
 
 
 class BayesTargetSpec(BaseModel):
@@ -63,7 +64,6 @@ class BayesTargetSpec(BaseModel):
             "geometry",
             "pitch_summary",
             "advancement",
-            "responsibility",
         ]
         | None
     ) = Field(
@@ -80,9 +80,7 @@ class BayesTargetSpec(BaseModel):
             "pitch_summary_summary.parquet at (result_family, season, league, "
             "final-count class) parameter grain; 'advancement' writes "
             "advancement_probabilities.parquet with a per-(event, baserunner) "
-            "softmax over the 7 advancement classes; 'responsibility' writes "
-            "responsibility_probabilities.parquet with a per-event softmax over "
-            "the range fielder positions 3..9. None for bernoulli targets."
+            "softmax over the 7 advancement classes. None for bernoulli targets."
         ),
     )
     count_export: Literal["park_factor", "run_expectancy"] | None = Field(
@@ -118,6 +116,23 @@ class BayesTargetSpec(BaseModel):
             "must restrict default_flavors to ('gamma_dl_zero',)."
         ),
     )
+    propensity_dimension: str | None = Field(
+        default=None,
+        description=(
+            "Observation-propensity dimension whose standardized logit of "
+            "propensity_p_observed feeds the gamma_propensity_class MNAR "
+            "covariate. None means gamma_propensity_zero-only."
+        ),
+    )
+    default_propensity_flavors: tuple[GammaPropensityFlavor, ...] = Field(
+        default=("gamma_propensity_zero",),
+        description=(
+            "Propensity flavors fit for this target. The first entry is the "
+            "default when run_bayes_model receives no explicit flavor. A "
+            "target with propensity_dimension=None must restrict "
+            "default_propensity_flavors to ('gamma_propensity_zero',)."
+        ),
+    )
 
     @model_validator(mode="after")
     def _shrunk_flavor_requires_dl_source(self) -> "BayesTargetSpec":
@@ -126,6 +141,18 @@ class BayesTargetSpec(BaseModel):
         ):
             raise ValueError(
                 "default_flavors must be ('gamma_dl_zero',) when dl_proposal_dimension is None"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _class_flavor_requires_propensity_dimension(self) -> "BayesTargetSpec":
+        if (
+            self.propensity_dimension is None
+            and "gamma_propensity_class" in self.default_propensity_flavors
+        ):
+            raise ValueError(
+                "default_propensity_flavors must exclude 'gamma_propensity_class' "
+                "when propensity_dimension is None"
             )
         return self
 

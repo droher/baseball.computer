@@ -23,7 +23,7 @@ import logging
 import numpy as np
 import pymc as pm
 
-from python_models.statistical.bayes.specs import GammaDlFlavor
+from python_models.statistical.bayes.specs import GammaDlFlavor, GammaPropensityFlavor
 from python_models.statistical.models._geometry_data import GeometryInputs
 from python_models.statistical.schemas import BayesPriorConfig
 
@@ -35,6 +35,7 @@ def build_geometry_model(
     *,
     priors: BayesPriorConfig | None = None,
     gamma_dl_flavor: GammaDlFlavor = "gamma_dl_zero",
+    gamma_propensity_flavor: GammaPropensityFlavor = "gamma_propensity_zero",
 ) -> pm.Model:
     """Construct the event-grain single-arm geometry PyMC model."""
     cfg = priors if priors is not None else BayesPriorConfig()
@@ -73,6 +74,21 @@ def build_geometry_model(
             dl_term = 0.0 * dl_logit
         eta = eta + dl_term
 
+        propensity_values = (
+            inputs.propensity_z
+            if inputs.propensity_z is not None
+            else np.zeros(inputs.n_events, dtype=np.float64)
+        )
+        z_prop = pm.Data("propensity_z", propensity_values, dims="event")
+        if (
+            gamma_propensity_flavor == "gamma_propensity_class"
+            and inputs.propensity_active
+        ):
+            gamma_propensity = pm.ZeroSumNormal(
+                "gamma_propensity", sigma=cfg.gamma_propensity_scale, dims="class"
+            )
+            eta = eta + z_prop[:, None] * gamma_propensity[None, :]
+
         pi = pm.math.softmax(eta, axis=1)
 
         _ = pm.Multinomial(
@@ -84,12 +100,16 @@ def build_geometry_model(
         )
 
     _log.info(
-        "build_geometry_model dimension=%s events=%d K=%d fixed_effects=%d dl_active=%s gamma_dl_flavor=%s",
+        "build_geometry_model dimension=%s events=%d K=%d fixed_effects=%d "
+        "dl_active=%s gamma_dl_flavor=%s propensity_active=%s "
+        "gamma_propensity_flavor=%s",
         inputs.dimension,
         inputs.n_events,
         K,
         len(inputs.fixed_effects),
         inputs.dl_active,
         gamma_dl_flavor,
+        inputs.propensity_active,
+        gamma_propensity_flavor,
     )
     return model

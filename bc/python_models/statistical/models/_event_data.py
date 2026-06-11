@@ -211,10 +211,10 @@ def _encode_codes_with_vocab(
     series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
     mapping = {c: i for i, c in enumerate(labels)}
     fallback = mapping.get(UNKNOWN_LEVEL, -1)
-    return np.fromiter(
-        (mapping.get(str(v), fallback) for v in series.to_list()),
-        dtype=np.int64,
-        count=series.len(),
+    return (
+        series.replace_strict(mapping, default=fallback, return_dtype=pl.Int64)
+        .to_numpy()
+        .astype(np.int64)
     )
 
 
@@ -297,6 +297,68 @@ def _build_observation_held_out_set(
         fixed_effects=held_fe,
         continuous=held_continuous,
     )
+
+
+def build_observation_scoring_frame(
+    parquet_path: Path,
+    *,
+    dimension: str,
+    inputs: EventObservationInputs,
+) -> ObservationHeldOutSet:
+    """Build the full-coverage production scoring frame for one dimension.
+
+    Selects every row of ``dimension`` from the dataset Parquet —
+    observed and unobserved, with no ``training_weight`` filter —
+    restricted to the seasons present in ``inputs.coords["season"]``
+    (the seasons that survived the saturated-season filter and carry a
+    fitted season random effect). Categoricals encode against the
+    training vocabularies (unseen levels -> ``-1``, the convention
+    ``_posterior_held_out_means_bernoulli`` masks to the prior mean)
+    and continuous covariates standardize with the frozen training
+    ``raw_mean`` / ``raw_std``. Rows come back sorted by ``event_key``.
+    """
+    needed_columns = sorted(
+        {
+            "event_key",
+            "is_observed",
+            "season",
+            "scorer",
+            "park_id",
+            "source_family",
+            *inputs.fixed_effects,
+            *inputs.continuous,
+        }
+    )
+    df = (
+        pl.scan_parquet(parquet_path)
+        .filter(
+            (pl.col("dimension") == dimension)
+            & pl.col("season").cast(pl.Utf8).is_in(inputs.coords["season"])
+        )
+        .select(needed_columns)
+        .collect()
+    )
+    if df.height == 0:
+        raise ValueError(
+            f"no rows for dimension={dimension!r} within fitted seasons in {parquet_path}"
+        )
+
+    frame = _build_observation_held_out_set(
+        df,
+        season_labels=list(inputs.coords["season"]),
+        scorer_labels=list(inputs.coords["scorer"]),
+        park_labels=list(inputs.coords["park"]),
+        source_labels=list(inputs.coords["source"]),
+        fixed_effects=inputs.fixed_effects,
+        continuous=inputs.continuous,
+    )
+    _log.info(
+        "build_observation_scoring_frame dim=%s rows=%d seasons=%d",
+        dimension,
+        frame.n_events,
+        len(inputs.coords["season"]),
+    )
+    return frame
 
 
 def prepare_event_observation_inputs(

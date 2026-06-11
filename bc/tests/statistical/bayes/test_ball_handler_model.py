@@ -20,7 +20,11 @@ DIMENSION = "ball_handler_position"
 
 
 def _synthetic_dataset(
-    tmp_path: Path, *, n_games: int = 8, events_per_game: int = 10
+    tmp_path: Path,
+    *,
+    n_games: int = 8,
+    events_per_game: int = 10,
+    with_propensity: bool = False,
 ) -> Path:
     rng = np.random.default_rng(20260525)
     result_families = ("out_in_play", "hit_in_play")
@@ -30,25 +34,26 @@ def _synthetic_dataset(
         for e in range(events_per_game):
             eid = 200_000 + g * events_per_game + e
             handler = int(rng.integers(1, N_POSITIONS + 1))
-            rows.append(
-                {
-                    "event_key": eid,
-                    "dimension": DIMENSION,
-                    "observed_status": "observed",
-                    "raw_value": str(handler),
-                    "training_weight": 1.0,
-                    "game_id": f"G{g:03d}",
-                    "season": 1925,
-                    "league": "AL",
-                    "source_family": "play_by_play",
-                    "park_id": "ARL01",
-                    "scorer": "scorerA",
-                    "base_state_start": int(rng.integers(0, 4)),
-                    "outs_start": int(rng.integers(0, 3)),
-                    "result_family": result_families[eid % len(result_families)],
-                    "alignment_regime": alignment_regimes[eid % len(alignment_regimes)],
-                }
-            )
+            row: dict[str, object] = {
+                "event_key": eid,
+                "dimension": DIMENSION,
+                "observed_status": "observed",
+                "raw_value": str(handler),
+                "training_weight": 1.0,
+                "game_id": f"G{g:03d}",
+                "season": 1925,
+                "league": "AL",
+                "source_family": "play_by_play",
+                "park_id": "ARL01",
+                "scorer": "scorerA",
+                "base_state_start": int(rng.integers(0, 4)),
+                "outs_start": int(rng.integers(0, 3)),
+                "result_family": result_families[eid % len(result_families)],
+                "alignment_regime": alignment_regimes[eid % len(alignment_regimes)],
+            }
+            if with_propensity:
+                row["propensity_p_observed"] = float(rng.uniform(0.4, 0.95))
+            rows.append(row)
     dataset_path = tmp_path / "dataset.parquet"
     pl.DataFrame(rows).write_parquet(dataset_path)
     return dataset_path
@@ -97,3 +102,61 @@ def test_no_event_sized_deterministic(tmp_path: Path) -> None:
     for det in model.deterministics:
         shape = tuple(model.named_vars_to_dims.get(det.name, ()))
         assert "event" not in shape, f"{det.name} is event-sized"
+
+
+def test_gamma_propensity_absent_under_zero_flavor(tmp_path: Path) -> None:
+    dataset_path = _synthetic_dataset(tmp_path, with_propensity=True)
+    inputs = prepare_ball_handler_inputs(
+        dataset_path,
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    assert inputs.propensity_active is True
+    model = build_ball_handler_model(
+        inputs, gamma_propensity_flavor="gamma_propensity_zero"
+    )
+    assert "gamma_propensity" not in {rv.name for rv in model.unobserved_RVs}
+    assert "propensity_z" in {d.name for d in model.data_vars}
+
+
+def test_gamma_propensity_present_under_class_flavor_when_active(
+    tmp_path: Path,
+) -> None:
+    import pymc as pm
+
+    dataset_path = _synthetic_dataset(tmp_path, with_propensity=True)
+    inputs = prepare_ball_handler_inputs(
+        dataset_path,
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    assert inputs.propensity_active is True
+    model = build_ball_handler_model(
+        inputs, gamma_propensity_flavor="gamma_propensity_class"
+    )
+    assert "gamma_propensity" in {rv.name for rv in model.unobserved_RVs}
+    assert "propensity_z" in {d.name for d in model.data_vars}
+    assert tuple(model.named_vars_to_dims["gamma_propensity"]) == ("position",)
+    draw = pm.draw(model["gamma_propensity"], random_seed=20260610)
+    assert draw.shape == (inputs.n_positions,)
+    assert float(np.abs(draw.sum())) < 1e-8, (
+        "gamma_propensity must be zero-sum over the position dim — a constant "
+        "component cancels in the softmax and is unidentified"
+    )
+
+
+def test_gamma_propensity_absent_under_class_flavor_when_inactive(
+    tmp_path: Path,
+) -> None:
+    dataset_path = _synthetic_dataset(tmp_path, with_propensity=False)
+    inputs = prepare_ball_handler_inputs(
+        dataset_path,
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    assert inputs.propensity_active is False
+    model = build_ball_handler_model(
+        inputs, gamma_propensity_flavor="gamma_propensity_class"
+    )
+    assert "gamma_propensity" not in {rv.name for rv in model.unobserved_RVs}
+    assert "propensity_z" in {d.name for d in model.data_vars}

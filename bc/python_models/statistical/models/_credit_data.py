@@ -143,6 +143,7 @@ class ProductionScoringFrame(BaseModel):
 
     event_keys: IntArray
     fixed_effects: dict[str, FixedEffectDesign]
+    propensity_z: FloatArray | None = None
 
     @property
     def n_events(self) -> int:
@@ -336,7 +337,10 @@ def _resolve_putout_position_per_event(parquet_path: Path) -> pl.DataFrame:
     )
     if putout.height == 0:
         return pl.DataFrame(
-            schema={"event_key": putout.schema.get("event_key", pl.UInt32()), "putout_position": pl.Int64()}
+            schema={
+                "event_key": putout.schema.get("event_key", pl.UInt32()),
+                "putout_position": pl.Int64(),
+            }
         )
     per_event = (
         putout.group_by("event_key", maintain_order=True)
@@ -711,9 +715,7 @@ def _counts_grid_for_assists(a_count: IntArray, a_pos_0based: IntArray) -> IntAr
     sums = out.sum(axis=1)
     if not (sums == 1).all():
         bad = int((sums != 1).sum())
-        raise AssertionError(
-            f"_counts_grid_for_assists: {bad} rows do not sum to 1"
-        )
+        raise AssertionError(f"_counts_grid_for_assists: {bad} rows do not sum to 1")
     return out
 
 
@@ -753,7 +755,12 @@ def _assert_fixed_effects_cover_production_slice(
             & (pl.col("personnel_hard_mask_available") == True)  # noqa: E712
             & (pl.col("eligible_for_allocation") == True)  # noqa: E712
         )
-        .select(["event_key", *[c for c in guarded_columns if c != PUTOUT_POSITION_FE_COLUMN]])
+        .select(
+            [
+                "event_key",
+                *[c for c in guarded_columns if c != PUTOUT_POSITION_FE_COLUMN],
+            ]
+        )
         .collect()
     )
     n_production = production.get_column("event_key").n_unique()
@@ -923,9 +930,7 @@ def prepare_event_credit_inputs(
         .collect()
     )
     if df.height == 0:
-        raise ValueError(
-            f"no rows for credit_type={dimension!r} in {parquet_path}"
-        )
+        raise ValueError(f"no rows for credit_type={dimension!r} in {parquet_path}")
 
     putout_position_lookup_cache: pl.DataFrame | None = None
 
@@ -942,22 +947,18 @@ def prepare_event_credit_inputs(
                 f"no events with known_credit>0 for credit_type={dimension!r}"
             )
     elif dimension == "assist":
-        putout_position_lookup_cache = _resolve_putout_position_per_event(
-            parquet_path
-        )
+        putout_position_lookup_cache = _resolve_putout_position_per_event(parquet_path)
         if putout_position_lookup_cache.height == 0:
             raise ValueError(
                 "no events with a single resolved putout_position; cannot fit assist v3"
             )
         df = df.join(putout_position_lookup_cache, on="event_key", how="inner")
-        a_count_per_event = (
-            df.group_by("event_key")
-            .agg(pl.col("known_credit").sum().alias("_a_count"))
+        a_count_per_event = df.group_by("event_key").agg(
+            pl.col("known_credit").sum().alias("_a_count")
         )
-        single_or_none_keys = (
-            a_count_per_event.filter(pl.col("_a_count") <= 1)
-            .get_column("event_key")
-        )
+        single_or_none_keys = a_count_per_event.filter(
+            pl.col("_a_count") <= 1
+        ).get_column("event_key")
         before = df.get_column("event_key").n_unique()
         df = df.filter(pl.col("event_key").is_in(single_or_none_keys.implode()))
         after = df.get_column("event_key").n_unique()
@@ -981,7 +982,9 @@ def prepare_event_credit_inputs(
     if natural_rate_threshold_env is not None:
         threshold = float(natural_rate_threshold_env)
         rate_lookup = _natural_unknown_rate_lookup()
-        all_seasons = sorted({int(s) for s in df.get_column("season").unique().to_list()})
+        all_seasons = sorted(
+            {int(s) for s in df.get_column("season").unique().to_list()}
+        )
         kept_seasons = [
             s
             for s in all_seasons
@@ -1047,9 +1050,7 @@ def prepare_event_credit_inputs(
         held_out_fold_count,
     )
     if df_train.height == 0:
-        raise ValueError(
-            "every game landed in the held-out fold; nothing to fit"
-        )
+        raise ValueError("every game landed in the held-out fold; nothing to fit")
 
     if smoke_limit is not None:
         events_per_game = (
@@ -1064,9 +1065,9 @@ def prepare_event_credit_inputs(
             shuffled = events_per_game.sample(
                 fraction=1.0, seed=seed, shuffle=True
             ).with_columns(pl.col("n_events").cum_sum().alias("cum_events"))
-            kept_games = shuffled.filter(pl.col("cum_events") <= smoke_limit).get_column(
-                "game_id"
-            )
+            kept_games = shuffled.filter(
+                pl.col("cum_events") <= smoke_limit
+            ).get_column("game_id")
             if kept_games.len() == 0:
                 kept_games = shuffled.head(1).get_column("game_id")
             df_train = df_train.filter(pl.col("game_id").is_in(kept_games.implode()))
@@ -1094,7 +1095,10 @@ def prepare_event_credit_inputs(
 
     if dimension == "putout":
         U_array = np.asarray(
-            [int(round(sum(grid))) for grid in per_event.get_column("known_credit_grid").to_list()],
+            [
+                int(round(sum(grid)))
+                for grid in per_event.get_column("known_credit_grid").to_list()
+            ],
             dtype=np.int64,
         )
         if (U_array <= 0).any():
@@ -1279,13 +1283,10 @@ def _build_held_out_set(
                 source_idx=empty,
                 fixed_effects={},
             )
-        a_count_per = (
-            df.group_by("event_key")
-            .agg(pl.col("known_credit").sum().alias("_a_count"))
+        a_count_per = df.group_by("event_key").agg(
+            pl.col("known_credit").sum().alias("_a_count")
         )
-        keep_keys = (
-            a_count_per.filter(pl.col("_a_count") <= 1).get_column("event_key")
-        )
+        keep_keys = a_count_per.filter(pl.col("_a_count") <= 1).get_column("event_key")
         df = df.filter(pl.col("event_key").is_in(keep_keys.implode()))
 
     per_event = _collapse_event_grain(df)

@@ -14,7 +14,11 @@ general_location has no DL artifact and is gamma_dl_zero-only.
 from __future__ import annotations
 
 from python_models.statistical.bayes.registry import register_target
-from python_models.statistical.bayes.specs import BayesTargetSpec, GammaDlFlavor
+from python_models.statistical.bayes.specs import (
+    BayesTargetSpec,
+    GammaDlFlavor,
+    GammaPropensityFlavor,
+)
 from python_models.statistical.models._geometry_data import prepare_geometry_inputs
 from python_models.statistical.models.geometry import build_geometry_model
 
@@ -31,6 +35,10 @@ ZERO_FLAVOR_DIMENSIONS: tuple[str, ...] = ("general_location",)
 
 _DL_FLAVORS: tuple[GammaDlFlavor, ...] = ("gamma_dl_zero", "gamma_dl_shrunk")
 _ZERO_FLAVORS: tuple[GammaDlFlavor, ...] = ("gamma_dl_zero",)
+_PROPENSITY_FLAVORS: tuple[GammaPropensityFlavor, ...] = (
+    "gamma_propensity_zero",
+    "gamma_propensity_class",
+)
 
 
 def _geometry_spec(
@@ -51,6 +59,8 @@ def _geometry_spec(
         multinomial_export="geometry",
         dl_proposal_dimension=dl_proposal_dimension,
         default_flavors=default_flavors,
+        propensity_dimension=dimension,
+        default_propensity_flavors=_PROPENSITY_FLAVORS,
     )
 
 

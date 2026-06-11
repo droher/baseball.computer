@@ -35,6 +35,7 @@ class BayesPriorConfig(BaseModel):
     sigma_box_aggregate: float = 0.5
     gamma_dl_loc: float = 0.0
     gamma_dl_scale: float = 0.5
+    gamma_propensity_scale: float = 0.5
     sigma_offense_scale: float = 1.0
     sigma_pitching_scale: float = 1.0
     nb_phi_prior_alpha: float = 2.0
@@ -93,6 +94,8 @@ class BayesArtifactExtras(BaseModel):
     source_effect_active: bool = True
     event_row_count: int = 0
     gamma_dl_flavor: str | None = None
+    gamma_propensity_flavor: str | None = None
+    propensity_active: bool = False
 
 
 class ArtifactManifest(BaseModel):

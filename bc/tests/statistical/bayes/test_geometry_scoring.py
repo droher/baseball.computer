@@ -13,8 +13,9 @@ import polars as pl
 from python_models.statistical.bayes.training import (
     _export_geometry_probabilities,
     _posterior_event_softmax,
+    _posterior_held_out_softmax,
 )
-from python_models.statistical.models._credit_data import FixedEffectDesign
+from python_models.statistical.models._credit_data import FixedEffectDesign, HeldOutSet
 from python_models.statistical.models._geometry_data import GeometryProductionFrame
 
 N_CLASSES = 4
@@ -33,7 +34,12 @@ def _geometry_carrier(dl_logit_per_class: np.ndarray) -> GeometryProductionFrame
     )
 
 
-def _posterior(*, with_gamma_dl: bool, gamma_value: float = 1.5) -> az.InferenceData:
+def _posterior(
+    *,
+    with_gamma_dl: bool,
+    gamma_value: float = 1.5,
+    with_gamma_propensity: bool = False,
+) -> az.InferenceData:
     rng = np.random.default_rng(3)
     n_chain, n_draw = 2, 5
     posterior: dict[str, np.ndarray] = {
@@ -42,6 +48,9 @@ def _posterior(*, with_gamma_dl: bool, gamma_value: float = 1.5) -> az.Inference
     }
     if with_gamma_dl:
         posterior["gamma_dl"] = np.full((n_chain, n_draw), gamma_value)
+    if with_gamma_propensity:
+        raw = rng.normal(size=(n_chain, n_draw, N_CLASSES))
+        posterior["gamma_propensity"] = raw - raw.mean(axis=-1, keepdims=True)
     return az.from_dict(posterior=posterior)
 
 
@@ -97,6 +106,169 @@ def test_dl_term_inert_when_gamma_dl_absent() -> None:
         dl_logit_per_class=None,
     )
     np.testing.assert_allclose(passed_dl, no_dl, atol=1e-12)
+
+
+def _posterior_arrays(
+    idata: az.InferenceData,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    posterior = idata.posterior
+    alpha = np.asarray(posterior["alpha_class"].values)
+    delta = np.asarray(posterior["delta_result_family"].values)
+    gamma_propensity = (
+        np.asarray(posterior["gamma_propensity"].values)
+        if "gamma_propensity" in posterior.data_vars
+        else None
+    )
+    return alpha, delta, gamma_propensity
+
+
+def _hand_rolled_expected(
+    idata: az.InferenceData,
+    *,
+    rf_codes: np.ndarray,
+    propensity_z: np.ndarray | None,
+) -> np.ndarray:
+    alpha, delta, gamma_propensity = _posterior_arrays(idata)
+    n_chain, n_draw, k = alpha.shape
+    n = rf_codes.shape[0]
+    eta = np.broadcast_to(alpha[:, :, None, :], (n_chain, n_draw, n, k)).copy()
+    valid = rf_codes >= 0
+    safe = np.where(valid, rf_codes, 0)
+    eta += delta[:, :, safe, :] * valid[None, None, :, None]
+    if gamma_propensity is not None and propensity_z is not None:
+        eta += propensity_z[None, None, :, None] * gamma_propensity[:, :, None, :]
+    return _direct_softmax(eta)
+
+
+def test_propensity_term_matches_hand_rolled_softmax() -> None:
+    rng = np.random.default_rng(13)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    carrier = _geometry_carrier(np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64))
+    idata = _posterior(with_gamma_dl=False, with_gamma_propensity=True)
+
+    got = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=z,
+    )
+    expected = _hand_rolled_expected(
+        idata,
+        rf_codes=carrier.fixed_effects["result_family"].codes,
+        propensity_z=z,
+    )
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+    np.testing.assert_allclose(got.sum(axis=1), 1.0, atol=1e-9)
+
+    without_z = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=None,
+    )
+    assert not np.allclose(got, without_z)
+
+
+def test_propensity_term_inert_when_gamma_propensity_absent() -> None:
+    rng = np.random.default_rng(17)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    carrier = _geometry_carrier(np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64))
+    idata = _posterior(with_gamma_dl=False, with_gamma_propensity=False)
+
+    passed_z = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=z,
+    )
+    no_z = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=None,
+    )
+    np.testing.assert_allclose(passed_z, no_z, atol=1e-12)
+
+
+def test_propensity_term_composes_with_unseen_level_mask() -> None:
+    rng = np.random.default_rng(19)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    rf_codes = rng.integers(0, 3, size=N_EVENTS).astype(np.int64)
+    rf_codes[0] = -1
+    rf_codes[3] = -1
+    carrier = GeometryProductionFrame(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+        dl_logit_per_class=np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64),
+        propensity_z=z,
+    )
+    idata = _posterior(with_gamma_dl=False, with_gamma_propensity=True)
+
+    got = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=z,
+    )
+    expected = _hand_rolled_expected(idata, rf_codes=rf_codes, propensity_z=z)
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+
+    masked_only = _hand_rolled_expected(
+        idata, rf_codes=np.full(N_EVENTS, -1, dtype=np.int64), propensity_z=z
+    )
+    np.testing.assert_allclose(got[[0, 3]], masked_only[[0, 3]], atol=1e-12)
+    no_z_masked = _hand_rolled_expected(
+        idata, rf_codes=np.full(N_EVENTS, -1, dtype=np.int64), propensity_z=None
+    )
+    assert not np.allclose(got[[0, 3]], no_z_masked[[0, 3]]), (
+        "the propensity term must stay active on rows whose FE codes are masked"
+    )
+
+
+def test_held_out_softmax_propensity_parity() -> None:
+    rng = np.random.default_rng(23)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    rf_codes = rng.integers(0, 3, size=N_EVENTS).astype(np.int64)
+    rf_codes[1] = -1
+    held = HeldOutSet(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        true_position=rng.integers(0, N_CLASSES, size=N_EVENTS).astype(np.int64),
+        U=np.ones(N_EVENTS, dtype=np.int64),
+        season_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        scorer_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        park_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        source_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+    )
+    idata = _posterior(with_gamma_dl=False, with_gamma_propensity=True)
+
+    got = _posterior_held_out_softmax(
+        idata,
+        held,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=z,
+    )
+    expected = _hand_rolled_expected(idata, rf_codes=rf_codes, propensity_z=z)
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+
+    without_z = _posterior_held_out_softmax(
+        idata,
+        held,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        propensity_z=None,
+    )
+    assert not np.allclose(got, without_z)
 
 
 def _credit_carrier(rf_codes: np.ndarray) -> GeometryProductionFrame:

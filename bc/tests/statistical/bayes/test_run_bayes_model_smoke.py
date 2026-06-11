@@ -256,7 +256,7 @@ def test_full_smoke_writes_event_propensity_export(tmp_path: Path) -> None:
     event_propensity = pl.read_parquet(
         artifact_dir / "exports" / "event_propensity.parquet"
     )
-    assert event_propensity.height == n_train
+    assert event_propensity.height == n_train + n_held
     assert set(event_propensity.columns) == {
         "event_key",
         "dimension",
@@ -318,7 +318,7 @@ def test_full_smoke_single_source_drops_source_block(tmp_path: Path) -> None:
     _write_dataset_manifest(
         dataset_dir / "manifest.json", artifact_id="ds-single-source"
     )
-    n_train, _n_held = _expected_split_counts(dataset_dir / "dataset.parquet")
+    n_train, n_held = _expected_split_counts(dataset_dir / "dataset.parquet")
 
     _ = run_bayes_model(
         model_name="trajectory_observedness",
@@ -341,7 +341,7 @@ def test_full_smoke_single_source_drops_source_block(tmp_path: Path) -> None:
     event_propensity = pl.read_parquet(
         artifact_dir / "exports" / "event_propensity.parquet"
     )
-    assert event_propensity.height == n_train
+    assert event_propensity.height == n_train + n_held
 
 
 def test_held_out_metrics_bernoulli_separable_labels() -> None:

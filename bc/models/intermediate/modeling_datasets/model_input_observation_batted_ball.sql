@@ -50,6 +50,8 @@ MODEL (
     alignment_regime VARCHAR,
     dl_artifact_id VARCHAR,
     dl_p_class DOUBLE[],
+    propensity_p_observed DOUBLE,
+    propensity_artifact_id VARCHAR,
     holdout_flags STRUCT(
       is_heldout_scorer BOOLEAN,
       is_heldout_park BOOLEAN,
@@ -80,6 +82,8 @@ MODEL (
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until stress_holdout_registry materializes the split policy.',
     dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land.',
     dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
+    propensity_p_observed = 'scorer_observation_propensities.p_observed_mean — posterior mean P(observed) for this (event_key, dimension), NULL until an observation-propensity artifact publishes.',
+    propensity_artifact_id = 'scorer_observation_propensities.bayes_artifact_id, NULL until an observation-propensity artifact publishes.',
     pa_result = 'ml_event_outcomes.outcome_plate_appearance_cat (Single, Double, Triple, HomeRun, InPlayOut, ReachedOnError, SacrificeHit, SacrificeFly, StrikeOut, Walk, HitByPitch, IntentionalWalk, Other). NULL-coalesced to Other.'
   ),
   audits (
@@ -152,6 +156,8 @@ SELECT
     c.alignment_regime,
     p.dl_artifact_id,
     p.dl_p_class,
+    sp.p_observed_mean AS propensity_p_observed,
+    sp.bayes_artifact_id AS propensity_artifact_id,
     STRUCT_PACK(
         is_heldout_scorer := s.is_heldout_scorer,
         is_heldout_park := s.is_heldout_park,
@@ -172,6 +178,8 @@ FROM main_models.event_observation_geometry AS o
 INNER JOIN main_models.event_observation_context AS c USING (event_key)
 LEFT JOIN main_models.dl_proposal_manifest AS p
     ON p.event_key = o.event_key AND p.dimension = o.dimension
+LEFT JOIN main_models.scorer_observation_propensities AS sp
+    ON sp.event_key = o.event_key AND sp.dimension = o.dimension
 LEFT JOIN main_models.ml_event_outcomes AS m USING (event_key)
 LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)
 WHERE c.target_population_status = 'event_level'

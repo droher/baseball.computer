@@ -30,7 +30,7 @@ from python_models.statistical.bayes.artifacts import (
     bayes_validation_dir,
 )
 from python_models.statistical.bayes.registry import get_target
-from python_models.statistical.bayes.specs import GammaDlFlavor
+from python_models.statistical.bayes.specs import GammaDlFlavor, GammaPropensityFlavor
 from python_models.statistical.calibration import (
     expected_calibration_error,
     reliability_curve,
@@ -44,9 +44,6 @@ from python_models.statistical.manifests import (
 )
 from python_models.statistical.models._advancement_data import (
     build_advancement_production_frame,
-)
-from python_models.statistical.models._responsibility_data import (
-    build_responsibility_production_frame,
 )
 from python_models.statistical.models._ball_handler_data import (
     BallHandlerInputs,
@@ -64,6 +61,7 @@ from python_models.statistical.models._event_data import (
     DEFAULT_SMOKE_LIMIT,
     EventObservationInputs,
     ObservationHeldOutSet,
+    build_observation_scoring_frame,
 )
 from python_models.statistical.models._geometry_data import (
     GeometryInputs,
@@ -96,14 +94,13 @@ _log = logging.getLogger(__name__)
 
 MODEL_VERSION: str = "0.3.0"
 
-POSTERIOR_CHUNK_DEFAULT: int = 250_000
+POSTERIOR_CHUNK_DEFAULT: int = 50_000
 POSTERIOR_CREDIT_CHUNK_DEFAULT: int = 5_000
 POSTERIOR_EXPORT_FILENAME: str = "event_propensity.parquet"
 CREDIT_EXPORT_FILENAME: str = "event_credit.parquet"
 BALL_HANDLER_EXPORT_FILENAME: str = "ball_handler_probabilities.parquet"
 GEOMETRY_EXPORT_FILENAME: str = "geometry_probabilities.parquet"
 ADVANCEMENT_EXPORT_FILENAME: str = "advancement_probabilities.parquet"
-RESPONSIBILITY_EXPORT_FILENAME: str = "responsibility_probabilities.parquet"
 PARK_FACTOR_POSTERIOR_FILENAME: str = "park_factor_posterior.parquet"
 PARK_FACTOR_SUMMARY_FILENAME: str = "park_factor_summary.parquet"
 RUN_EXPECTANCY_POSTERIOR_FILENAME: str = "run_expectancy_posterior.parquet"
@@ -724,22 +721,27 @@ def _posterior_summary_dataframe(summary: BayesPosteriorSummary) -> pl.DataFrame
 
 def _export_event_propensities(
     means: np.ndarray,
-    inputs: EventObservationInputs,
+    event_keys: np.ndarray,
+    dimension: str,
     *,
     target_path: Path,
 ) -> pl.DataFrame:
     """Write per-event posterior mean ``p_observed`` to parquet."""
     df = pl.DataFrame(
         {
-            "event_key": inputs.event_keys.astype(np.int64),
-            "dimension": [inputs.dimension] * inputs.n_events,
-            "p_observed_mean": means,
+            "event_key": event_keys.astype(np.int64, copy=False),
+            "p_observed_mean": np.asarray(means, dtype=np.float64),
         }
+    ).select(
+        pl.col("event_key"),
+        pl.lit(dimension, dtype=pl.Utf8).alias("dimension"),
+        pl.col("p_observed_mean"),
     )
     write_parquet_atomic(df, target_path)
     _log.info(
-        "wrote event_propensity export rows=%d path=%s",
-        inputs.n_events,
+        "wrote event_propensity export rows=%d dimension=%s path=%s",
+        df.height,
+        dimension,
         target_path,
     )
     return df
@@ -753,13 +755,18 @@ def _posterior_held_out_softmax(
     chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
     intercept_name: str = "alpha_position",
     dl_logit_per_class: np.ndarray | None = None,
+    propensity_z: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute ``E[softmax(eta_e)] | data`` per held-out event from posterior draws.
 
     The per-class intercept is read from ``intercept_name``. When
     ``dl_logit_per_class`` is supplied (shape ``(n_event, K)``,
     row-aligned with ``held_out``) and the posterior carries ``gamma_dl``,
-    the per-class DL term is added inside the chunk loop.
+    the per-class DL term is added inside the chunk loop. When
+    ``propensity_z`` is supplied (shape ``(n_event,)``) and the posterior
+    carries ``gamma_propensity``, the per-class MNAR term
+    ``z * gamma_propensity`` is added the same way; it is never masked —
+    NULL propensities encode to z=0 upstream.
     """
     posterior = idata.posterior
     K = n_positions
@@ -784,6 +791,11 @@ def _posterior_held_out_softmax(
         if dl_active
         else None
     )
+    gamma_propensity = (
+        np.asarray(posterior["gamma_propensity"].values, dtype=np.float64)
+        if propensity_z is not None and "gamma_propensity" in posterior.data_vars
+        else None
+    )
 
     means = np.empty((n_event, K), dtype=np.float64)
     for start in range(0, n_event, chunk_size):
@@ -804,6 +816,8 @@ def _posterior_held_out_softmax(
                 eta += contrib * valid[None, None, :, None]
         if gamma is not None and dl_logit_per_class is not None:
             eta += gamma[:, :, None, None] * dl_logit_per_class[None, None, sl, :]
+        if gamma_propensity is not None and propensity_z is not None:
+            eta += propensity_z[None, None, sl, None] * gamma_propensity[:, :, None, :]
         eta -= eta.max(axis=-1, keepdims=True)
         exp_eta = np.exp(eta)
         pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
@@ -818,6 +832,7 @@ def _evaluate_held_out(
     putout_idata: az.InferenceData | None = None,
     intercept_name: str = "alpha_position",
     held_dl_logit_per_class: np.ndarray | None = None,
+    held_out_propensity_z: np.ndarray | None = None,
 ) -> dict[str, object]:
     """Compute OOS top-k accuracy, log-loss, and per-position PR-AUC.
 
@@ -860,6 +875,7 @@ def _evaluate_held_out(
             n_positions=inputs.n_positions,
             intercept_name=intercept_name,
             dl_logit_per_class=held_dl_logit_per_class,
+            propensity_z=held_out_propensity_z,
         )
     y_true = held.true_position.astype(np.int64)
     valid = y_true >= 0
@@ -1271,6 +1287,7 @@ def _posterior_event_softmax(
     chunk_size: int = POSTERIOR_CREDIT_CHUNK_DEFAULT,
     intercept_name: str = "alpha_position",
     dl_logit_per_class: np.ndarray | None = None,
+    propensity_z: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute ``E[softmax(eta_e)] | data`` per (event, position) from posterior draws.
 
@@ -1284,7 +1301,11 @@ def _posterior_event_softmax(
     When ``dl_logit_per_class`` is supplied and the posterior carries a
     ``gamma_dl`` scalar, the per-class DL term ``gamma_dl * dl_logit`` is
     added inside the chunk loop. It varies by class so it does not cancel
-    in the softmax.
+    in the softmax. When ``propensity_z`` is supplied (shape
+    ``(n_event,)``) and the posterior carries the per-class
+    ``gamma_propensity``, the MNAR term ``z * gamma_propensity`` is added
+    the same way; it is never masked — NULL propensities encode to z=0
+    upstream.
     """
     posterior = idata.posterior
     K = n_positions
@@ -1306,6 +1327,11 @@ def _posterior_event_softmax(
         if dl_active
         else None
     )
+    gamma_propensity = (
+        np.asarray(posterior["gamma_propensity"].values, dtype=np.float64)
+        if propensity_z is not None and "gamma_propensity" in posterior.data_vars
+        else None
+    )
 
     means = np.empty((n_event, K), dtype=np.float64)
     for start in range(0, n_event, chunk_size):
@@ -1322,6 +1348,8 @@ def _posterior_event_softmax(
             eta += df[:, :, safe, :] * valid[None, None, :, None]
         if gamma is not None and dl_logit_per_class is not None:
             eta += gamma[:, :, None, None] * dl_logit_per_class[None, None, sl, :]
+        if gamma_propensity is not None and propensity_z is not None:
+            eta += propensity_z[None, None, sl, None] * gamma_propensity[:, :, None, :]
         eta -= eta.max(axis=-1, keepdims=True)
         exp_eta = np.exp(eta)
         pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
@@ -1524,50 +1552,6 @@ def _export_advancement_probabilities(
     _log.info(
         "wrote advancement export rows=%d K=%d path=%s",
         n_row * k,
-        k,
-        target_path,
-    )
-    return df
-
-
-def _export_responsibility_probabilities(
-    means: np.ndarray,
-    *,
-    event_keys: np.ndarray,
-    position_labels: list[str],
-    target_path: Path,
-) -> pl.DataFrame:
-    """Write per-(event, fielding position) responsibility probabilities to parquet.
-
-    Schema: ``(event_key int64, fielding_position int8, expected_share
-    float64)``. One row per (event, position); the per-event shares over the
-    range positions sum to 1. ``position_labels`` are the actual fielder
-    positions (``"3".."9"``) aligned with the softmax class axis.
-    """
-    n_event, k = means.shape
-    if k != len(position_labels):
-        raise AssertionError(
-            f"means shape mismatch: K={k}, position_labels={len(position_labels)}"
-        )
-    if n_event != event_keys.shape[0]:
-        raise AssertionError(
-            f"event count mismatch: means={n_event}, event_keys={event_keys.shape[0]}"
-        )
-    positions = np.array([int(p) for p in position_labels], dtype=np.int8)
-    repeated_keys = np.repeat(event_keys, k).astype(np.int64)
-    tiled_positions = np.tile(positions, n_event)
-    shares = means.reshape(-1).astype(np.float64)
-    df = pl.DataFrame(
-        {
-            "event_key": repeated_keys,
-            "fielding_position": tiled_positions,
-            "expected_share": shares,
-        }
-    )
-    write_parquet_atomic(df, target_path)
-    _log.info(
-        "wrote responsibility export rows=%d K=%d path=%s",
-        n_event * k,
         k,
         target_path,
     )
@@ -2034,6 +2018,7 @@ def run_bayes_model(
     smoke_limit: int | None = None,
     seed: int = DEFAULT_SEED,
     gamma_dl_flavor: GammaDlFlavor = "gamma_dl_zero",
+    gamma_propensity_flavor: GammaPropensityFlavor | None = None,
     artifact_root: Path = BAYES_ROOT,
     dataset_root: Path = DATASETS_ROOT,
 ) -> ArtifactManifest:
@@ -2063,11 +2048,20 @@ def run_bayes_model(
         "seed": seed,
     }
 
+    resolved_propensity_flavor: GammaPropensityFlavor = (
+        gamma_propensity_flavor
+        if gamma_propensity_flavor is not None
+        else spec.default_propensity_flavors[0]
+    )
+
     inputs = spec.prep_fn(dataset_parquet, **prep_kwargs)
+    propensity_active = bool(getattr(inputs, "propensity_active", False))
     priors = BayesPriorConfig()
     builder_kwargs: dict[str, object] = {"priors": priors}
     if spec.multinomial_export == "geometry":
         builder_kwargs["gamma_dl_flavor"] = gamma_dl_flavor
+    if spec.propensity_dimension is not None:
+        builder_kwargs["gamma_propensity_flavor"] = resolved_propensity_flavor
     model = spec.builder(inputs, **builder_kwargs)
 
     sampler = _resolve_sampler_config(smoke=smoke, override_seed=seed)
@@ -2084,12 +2078,15 @@ def run_bayes_model(
 
     source_effect_active = len(inputs.coords["source"]) > 1
     _log.info(
-        "bayes model=%s artifact=%s source_effect_active=%s backend=%s gamma_dl_flavor=%s",
+        "bayes model=%s artifact=%s source_effect_active=%s backend=%s "
+        "gamma_dl_flavor=%s gamma_propensity_flavor=%s propensity_active=%s",
         model_name,
         artifact_id,
         source_effect_active,
         sampler.backend,
         gamma_dl_flavor,
+        resolved_propensity_flavor,
+        propensity_active,
     )
 
     artifact_dir = bayes_artifact_dir(model_name, artifact_id, root=artifact_root)
@@ -2145,8 +2142,19 @@ def run_bayes_model(
                 _posterior_summary_dataframe(posterior_summary),
                 exports_dir / "posterior_summary.parquet",
             )
+            scoring_frame = build_observation_scoring_frame(
+                dataset_parquet,
+                dimension=inputs.dimension,
+                inputs=inputs,
+            )
+            scoring_means = _posterior_held_out_means_bernoulli(
+                posterior_idata, scoring_frame
+            )
             _ = _export_event_propensities(
-                p_mean, inputs, target_path=exports_dir / POSTERIOR_EXPORT_FILENAME
+                scoring_means,
+                scoring_frame.event_keys,
+                inputs.dimension,
+                target_path=exports_dir / POSTERIOR_EXPORT_FILENAME,
             )
             if inputs.held_out is not None:
                 held = _subsample_observation_held_out(
@@ -2252,6 +2260,9 @@ def run_bayes_model(
                     fixed_effects=inputs.fixed_effects,
                     n_classes=inputs.n_classes,
                     dl_logit_class_means=inputs.dl_logit_class_means,
+                    propensity_logit_mean=inputs.propensity_logit_mean,
+                    propensity_logit_std=inputs.propensity_logit_std,
+                    propensity_active=inputs.propensity_active,
                 )
                 if production.n_events > 0:
                     shares = _posterior_event_softmax(
@@ -2260,6 +2271,7 @@ def run_bayes_model(
                         n_positions=inputs.n_classes,
                         intercept_name="alpha_class",
                         dl_logit_per_class=production.dl_logit_per_class,
+                        propensity_z=production.propensity_z,
                     )
                     _ = _export_geometry_probabilities(
                         shares,
@@ -2282,6 +2294,7 @@ def run_bayes_model(
                         n_positions=inputs.n_classes,
                         intercept_name="alpha_class",
                         dl_logit_per_class=inputs.dl_logit_per_class,
+                        propensity_z=inputs.propensity_z,
                     )
                     _ = _export_geometry_probabilities(
                         shares,
@@ -2296,6 +2309,7 @@ def run_bayes_model(
                     putout_idata=None,
                     intercept_name="alpha_class",
                     held_dl_logit_per_class=inputs.held_out_dl_logit_per_class,
+                    held_out_propensity_z=inputs.held_out_propensity_z,
                 )
             elif spec.multinomial_export == "ball_handler":
                 ball_handler_export_path = exports_dir / BALL_HANDLER_EXPORT_FILENAME
@@ -2303,10 +2317,16 @@ def run_bayes_model(
                     dataset_parquet,
                     dimension=spec.dataset_dimension_filter,
                     fixed_effects=inputs.fixed_effects,
+                    propensity_logit_mean=inputs.propensity_logit_mean,
+                    propensity_logit_std=inputs.propensity_logit_std,
+                    propensity_active=inputs.propensity_active,
                 )
                 if production.n_events > 0:
                     shares = _posterior_event_softmax(
-                        posterior_idata, production, n_positions=inputs.n_positions
+                        posterior_idata,
+                        production,
+                        n_positions=inputs.n_positions,
+                        propensity_z=production.propensity_z,
                     )
                     _ = _export_ball_handler_probabilities(
                         shares,
@@ -2323,7 +2343,10 @@ def run_bayes_model(
                         "ball_handler production slice empty; exporting training grain instead"
                     )
                     shares = _posterior_event_softmax(
-                        posterior_idata, inputs, n_positions=inputs.n_positions
+                        posterior_idata,
+                        inputs,
+                        n_positions=inputs.n_positions,
+                        propensity_z=inputs.propensity_z,
                     )
                     _ = _export_ball_handler_probabilities(
                         shares,
@@ -2332,7 +2355,10 @@ def run_bayes_model(
                         target_path=ball_handler_export_path,
                     )
                 held_out_metrics = _evaluate_held_out(
-                    inputs, posterior_idata, putout_idata=None
+                    inputs,
+                    posterior_idata,
+                    putout_idata=None,
+                    held_out_propensity_z=inputs.held_out_propensity_z,
                 )
             elif spec.multinomial_export == "advancement":
                 advancement_export_path = exports_dir / ADVANCEMENT_EXPORT_FILENAME
@@ -2362,43 +2388,6 @@ def run_bayes_model(
                 else:
                     _log.warning(
                         "advancement production slice empty; no export written"
-                    )
-                held_out_metrics = _evaluate_held_out(
-                    inputs,
-                    posterior_idata,
-                    putout_idata=None,
-                    intercept_name="alpha_class",
-                    held_dl_logit_per_class=inputs.held_out_dl_logit_per_class,
-                )
-            elif spec.multinomial_export == "responsibility":
-                responsibility_export_path = (
-                    exports_dir / RESPONSIBILITY_EXPORT_FILENAME
-                )
-                production = build_responsibility_production_frame(
-                    dataset_parquet,
-                    fixed_effects=inputs.fixed_effects,
-                    n_classes=inputs.n_classes,
-                )
-                if production.n_events > 0:
-                    shares = _posterior_event_softmax(
-                        posterior_idata,
-                        production,
-                        n_positions=inputs.n_classes,
-                        intercept_name="alpha_class",
-                    )
-                    _ = _export_responsibility_probabilities(
-                        shares,
-                        event_keys=production.event_keys,
-                        position_labels=inputs.class_labels,
-                        target_path=responsibility_export_path,
-                    )
-                    _log.info(
-                        "responsibility export scored production slice rows=%d",
-                        production.n_events,
-                    )
-                else:
-                    _log.warning(
-                        "responsibility production slice empty; no export written"
                     )
                 held_out_metrics = _evaluate_held_out(
                     inputs,
@@ -2544,6 +2533,12 @@ def run_bayes_model(
         gamma_dl_flavor=(
             gamma_dl_flavor if spec.multinomial_export == "geometry" else None
         ),
+        gamma_propensity_flavor=(
+            resolved_propensity_flavor
+            if spec.propensity_dimension is not None
+            else None
+        ),
+        propensity_active=propensity_active,
     )
 
     manifest = ArtifactManifest(

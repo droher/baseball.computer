@@ -71,6 +71,23 @@ Active items the latest pretrain + downstream cascade does not fix:
 
 ### Phase-4 bayes follow-ups
 
+- **MNAR correction redesign — per-class selection model.** The learned per-class
+  `gamma_propensity` covariate on Model A's marginal propensity was attempted and refuted by the
+  masked backtest (implementation-review.md T1.1): training is observed-only, so the coefficient
+  learns the survivor tilt — among surviving events low `p_observed` correlates with *less* focal
+  class — and extrapolates it wrong-signed into the unobserved slice. The real fix needs the
+  per-class selection probability P(observed | class, x) entering `eta` as a fixed Bayes-rule
+  offset (`−log P(obs | c, x)`) or a joint selection / pattern-mixture model — EM-style, since
+  the class is missing exactly where the offset is needed. Validate any candidate with
+  `scripts/mnar_masked_backtest.py`. The infrastructure is in place: propensity dataset columns
+  (`e-v10-geometry` / `obs-v3-propensity`), full-coverage Model A exports (`10k-v4-fullscore`),
+  and the `gamma_propensity` hook (default `gamma_propensity_zero`).
+- **Model H advancement has no Model A observedness target.** The six obs propensity targets
+  cover the geometry dims + ball_handler_position only. Any MNAR work on Model H needs its own
+  observedness target first.
+- **Model C credit is excluded from the propensity-covariate scope.** Its missingness mechanism
+  (attribution availability) differs structurally from the geometry/handler recording mechanism
+  Model A models; a credit-side selection correction would need its own missingness model.
 - **Smoke-gate thresholds are sized for catastrophe detection.** `validate._BAYES_THRESHOLDS_SMOKE` (`rhat ≤ 1.5`, `ess_bulk ≥ 3`, `divergence_fraction ≤ 0.05`, `post_pred_bucket_dev` warn ≤ 0.10) reflect `SMOKE_CONFIG`'s 100 total draws against a model whose minimum per-cell ess is bounded by the per-cell row count (the v1 trajectory model has ~7000 RE cells, so per-cell ess at 100 draws plateaus around 5). The smoke gate detects broken sampling (NaN, divergence storm), not slow mixing. Default thresholds (`rhat ≤ 1.05`, `ess_bulk ≥ 400`, zero divergences) apply at production sample sizes.
 - **Batter / pitcher random effects.** v1 observation propensity model intentionally defers batter and pitcher REs. Add only if residual analysis on v1 shows player-level signal not subsumed by scorer × era × park effects. Cost is potentially huge — ~30k batters × 30k pitchers — and would require a centered + non-centered hybrid.
 - **Smoke-gate ess threshold loosened to 100** (was 400) — rare-class FE blocks slow-mix at any N as a sampler-efficiency artifact, not a model-validity issue. The 1M trajectory sweep would still block at ess=6 under either gate.

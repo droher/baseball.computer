@@ -35,6 +35,7 @@ def _synthetic_inputs(
     n_classes: int = 4,
     n_events: int = 24,
     dl_active: bool = True,
+    propensity_active: bool = False,
     seed: int = 20260525,
 ) -> GeometryInputs:
     rng = np.random.default_rng(seed)
@@ -74,6 +75,12 @@ def _synthetic_inputs(
         fixed_effects[column] = FixedEffectDesign(levels=levels, codes=codes)
         coords[f"{column}_levels"] = list(levels)
 
+    propensity_z = (
+        rng.normal(size=n_events).astype(np.float64)
+        if propensity_active
+        else np.zeros(n_events, dtype=np.float64)
+    )
+
     return GeometryInputs(
         event_keys=np.arange(n_events, dtype=np.int64),
         dimension="trajectory",
@@ -89,6 +96,9 @@ def _synthetic_inputs(
         coords=coords,
         held_out=_empty_held_out(),
         held_out_dl_logit_per_class=np.zeros((0, n_classes), dtype=np.float64),
+        propensity_z=propensity_z,
+        held_out_propensity_z=np.zeros(0, dtype=np.float64),
+        propensity_active=propensity_active,
     )
 
 
@@ -152,3 +162,49 @@ def test_gamma_dl_absent_under_shrunk_when_dl_inactive() -> None:
     model = build_geometry_model(inputs, gamma_dl_flavor="gamma_dl_shrunk")
     assert "gamma_dl" not in _rv_names(model)
     assert "dl_logit_per_class" in {d.name for d in model.data_vars}
+
+
+def test_gamma_propensity_absent_under_zero_flavor() -> None:
+    inputs = _synthetic_inputs(propensity_active=True)
+    model = build_geometry_model(
+        inputs, gamma_propensity_flavor="gamma_propensity_zero"
+    )
+    assert "gamma_propensity" not in _rv_names(model)
+    assert "propensity_z" in {d.name for d in model.data_vars}
+
+
+def test_gamma_propensity_present_under_class_flavor_when_active() -> None:
+    import pymc as pm
+
+    inputs = _synthetic_inputs(propensity_active=True)
+    model = build_geometry_model(
+        inputs, gamma_propensity_flavor="gamma_propensity_class"
+    )
+    assert "gamma_propensity" in _rv_names(model)
+    assert "propensity_z" in {d.name for d in model.data_vars}
+    assert tuple(model.named_vars_to_dims["gamma_propensity"]) == ("class",)
+    draw = pm.draw(model["gamma_propensity"], random_seed=20260610)
+    assert draw.shape == (inputs.n_classes,)
+    assert float(np.abs(draw.sum())) < 1e-8, (
+        "gamma_propensity must be zero-sum over the class dim — a constant "
+        "component cancels in the softmax and is unidentified"
+    )
+
+
+def test_gamma_propensity_absent_under_class_flavor_when_inactive() -> None:
+    inputs = _synthetic_inputs(propensity_active=False)
+    model = build_geometry_model(
+        inputs, gamma_propensity_flavor="gamma_propensity_class"
+    )
+    assert "gamma_propensity" not in _rv_names(model)
+    assert "propensity_z" in {d.name for d in model.data_vars}
+
+
+def test_propensity_z_data_absent_from_inputs_defaults_to_zeros() -> None:
+    inputs = _synthetic_inputs(propensity_active=False).model_copy(
+        update={"propensity_z": None}
+    )
+    model = build_geometry_model(inputs)
+    np.testing.assert_allclose(
+        model["propensity_z"].eval(), np.zeros(inputs.n_events, dtype=np.float64)
+    )
