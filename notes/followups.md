@@ -279,14 +279,32 @@ new arms are a deferred materialization pass. The sub-pieces below were deferred
 genuine data blockers, identifiability impossibilities, or ambiguous estimands. Each names the
 prerequisite to unblock.
 
-### Materialization pass (all five models)
-Wire the new arms to their CLI targets / SQLMesh `@models`, run full-scale fits at `DEFAULT_CONFIG`,
-clear the default gates (rhat ≤ 1.05, ess ≥ 100, 0 divergences), run the validation backtests, and
-advance published pointers. New unwired modules: `models/state_transition.py`,
-`models/linear_weights.py`, `models/assist_count.py`, `models/error_credit.py`,
-`models/pitch_coverage.py`, and the `gamma_handler` covariate in `models/geometry.py`. For
-`gamma_handler` specifically, `bayes/training.py::_posterior_event_softmax` must be taught the term
-before a production geometry fit with the handler covariate active can publish.
+### Materialization pass — done
+- **G `run_expectancy`** — full fit `re-full-eraregime-v1` exercises the era_regime hierarchy at
+  full scale (0 divergences, rhat 1.009, held-out RMSE 8% over the state-only baseline). Per-branch
+  pointer published.
+- **F `park_factor_runs`** — full-history AR(1) fit `pf-full-ar1-v2` (centered intercept + tightened
+  deviation priors fixed an NB prior-predictive overflow; constant lone-park cells surface NaN rhat,
+  now carried as `None`). rhat 1.028, ess 103, 0 divergences, theta_park sum-to-zero within
+  season-league to 1e-15. Per-branch pointer published.
+- **J `has_count` coverage** — registered `pitch_count_observedness` Bernoulli target + export branch
+  + dataset-scoped propensity aggregator + `pitch_count_coverage` @model. Smoke held-out ROC-AUC 0.995.
+- **E `gamma_handler`** — `_posterior_event_softmax` / `_posterior_held_out_softmax` taught the term;
+  inert when absent. A production geometry fit with the handler covariate active can now publish.
+
+### Materialization pass — deferred (each blocked on a real decision)
+- **`linear_weights` (namespace decision).** `compute_marginal_linear_weights` derives Bayesian linear
+  weights from the published `run_expectancy_summary`, but `main_models.linear_weights` already exists
+  as a deterministic surface off `event_transition_values`. Per the separate-namespaces invariant the
+  Bayesian version must be a sibling @model (own namespace), not overwrite the deterministic one. Pin
+  the surface placement before wiring.
+- **`state_transition` (gated on linear_weights).** The Markov base-out transition matrix is built and
+  smoke-clean, but its primary consumer is the context-neutral linear weights, so it inherits the same
+  placement decision. Wire alongside linear_weights once that lands.
+- **`assist_count` / `error_credit` (roadmap-future).** These are the Model C "v3.1 multi-assist count"
+  (Dirichlet-multinomial M∈{1..4}) and "v4 errors" submodels — built code-complete ahead of slot.
+  Production wiring + full fits are genuinely that later-version work; sequence them with the rest of
+  Model C v3.1/v4 rather than now.
 
 ### G — context-neutral P_LW linear weights (estimand decision)
 The spec's headline context-neutral LW integrates `V_end` against the modeled marginal transition
