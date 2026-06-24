@@ -27,6 +27,11 @@ from python_models.statistical.schemas import BayesPriorConfig
 
 _log = logging.getLogger(__name__)
 
+ALPHA_SEASON_LEAGUE_SCALE: float = 0.5
+SIGMA_TEAM_EFFECT_SCALE: float = 0.4
+SIGMA_PARK_INNOV_SCALE: float = 0.15
+SIGMA_PARK_INIT_SCALE: float = 0.3
+
 
 def _ar1_enabled() -> bool:
     return os.environ.get("BC_PARK_FACTOR_DISABLE_AR1", "") not in ("1", "true")
@@ -49,17 +54,13 @@ def _center_within_group(
     return effect - m @ group_means
 
 
-def _ar1_park_effect(
-    inputs: ParkFactorInputs,
-    *,
-    cfg: BayesPriorConfig,
-) -> pt.TensorVariable:
+def _ar1_park_effect(inputs: ParkFactorInputs) -> pt.TensorVariable:
     chain_idx = pt.as_tensor_variable(inputs.ar_chain_idx.astype(np.int64))
     step_idx = pt.as_tensor_variable(inputs.ar_step_idx.astype(np.int64))
 
     rho = pm.Beta("rho_park", alpha=2.0, beta=1.0)
-    sigma_innov = pm.HalfNormal("sigma_park_innov", sigma=cfg.sigma_park_scale)
-    sigma_init = pm.HalfNormal("sigma_park_init", sigma=cfg.sigma_park_scale)
+    sigma_innov = pm.HalfNormal("sigma_park_innov", sigma=SIGMA_PARK_INNOV_SCALE)
+    sigma_init = pm.HalfNormal("sigma_park_init", sigma=SIGMA_PARK_INIT_SCALE)
 
     init_dist = pm.Normal.dist(mu=0.0, sigma=sigma_init)
     ar_grid = pm.AR(
@@ -97,29 +98,33 @@ def build_park_factor_model(
         )
         log_exposure = pm.Data("log_exposure", np.log(inputs.exposure_pa))
 
+        baseline_log_rate = float(
+            np.log(inputs.team_runs.sum() / inputs.exposure_pa.sum())
+        )
+
         alpha_season_league = pm.Normal(
             "alpha_season_league",
-            mu=cfg.alpha_loc,
-            sigma=cfg.alpha_scale,
+            mu=baseline_log_rate,
+            sigma=ALPHA_SEASON_LEAGUE_SCALE,
             dims="season_league",
         )
 
         z_offense = pm.ZeroSumNormal("z_offense", sigma=1.0, dims="offense_team")
-        sigma_offense = pm.HalfNormal("sigma_offense", sigma=cfg.sigma_offense_scale)
+        sigma_offense = pm.HalfNormal("sigma_offense", sigma=SIGMA_TEAM_EFFECT_SCALE)
         offense = pm.Deterministic(
             "offense", z_offense * sigma_offense, dims="offense_team"
         )
 
         z_pitching = pm.ZeroSumNormal("z_pitching", sigma=1.0, dims="pitching_team")
-        sigma_pitching = pm.HalfNormal("sigma_pitching", sigma=cfg.sigma_pitching_scale)
+        sigma_pitching = pm.HalfNormal("sigma_pitching", sigma=SIGMA_TEAM_EFFECT_SCALE)
         pitching = pm.Deterministic(
             "pitching", z_pitching * sigma_pitching, dims="pitching_team"
         )
 
         if ar1_active:
-            theta_raw = _ar1_park_effect(inputs, cfg=cfg)
+            theta_raw = _ar1_park_effect(inputs)
         else:
-            sigma_park = pm.HalfNormal("sigma_park", sigma=cfg.sigma_park_scale)
+            sigma_park = pm.HalfNormal("sigma_park", sigma=SIGMA_PARK_INIT_SCALE)
             z_theta_park = pm.Normal(
                 "z_theta_park", mu=0.0, sigma=1.0, dims="park_season_league"
             )

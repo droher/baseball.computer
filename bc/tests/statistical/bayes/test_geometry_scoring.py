@@ -39,6 +39,7 @@ def _posterior(
     with_gamma_dl: bool,
     gamma_value: float = 1.5,
     with_gamma_propensity: bool = False,
+    with_gamma_handler: bool = False,
 ) -> az.InferenceData:
     rng = np.random.default_rng(3)
     n_chain, n_draw = 2, 5
@@ -51,6 +52,9 @@ def _posterior(
     if with_gamma_propensity:
         raw = rng.normal(size=(n_chain, n_draw, N_CLASSES))
         posterior["gamma_propensity"] = raw - raw.mean(axis=-1, keepdims=True)
+    if with_gamma_handler:
+        raw = rng.normal(size=(n_chain, n_draw, N_CLASSES))
+        posterior["gamma_handler"] = raw - raw.mean(axis=-1, keepdims=True)
     return az.from_dict(posterior=posterior)
 
 
@@ -138,6 +142,190 @@ def _hand_rolled_expected(
     if gamma_propensity is not None and propensity_z is not None:
         eta += propensity_z[None, None, :, None] * gamma_propensity[:, :, None, :]
     return _direct_softmax(eta)
+
+
+def _hand_rolled_expected_handler(
+    idata: az.InferenceData,
+    *,
+    rf_codes: np.ndarray,
+    handler_z: np.ndarray | None,
+) -> np.ndarray:
+    posterior = idata.posterior
+    alpha = np.asarray(posterior["alpha_class"].values)
+    delta = np.asarray(posterior["delta_result_family"].values)
+    gamma_handler = (
+        np.asarray(posterior["gamma_handler"].values)
+        if "gamma_handler" in posterior.data_vars
+        else None
+    )
+    n_chain, n_draw, k = alpha.shape
+    n = rf_codes.shape[0]
+    eta = np.broadcast_to(alpha[:, :, None, :], (n_chain, n_draw, n, k)).copy()
+    valid = rf_codes >= 0
+    safe = np.where(valid, rf_codes, 0)
+    eta += delta[:, :, safe, :] * valid[None, None, :, None]
+    if gamma_handler is not None and handler_z is not None:
+        eta += handler_z[None, None, :, None] * gamma_handler[:, :, None, :]
+    return _direct_softmax(eta)
+
+
+def test_handler_term_matches_hand_rolled_softmax() -> None:
+    rng = np.random.default_rng(29)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    carrier = GeometryProductionFrame(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(
+                levels=("a", "b", "c"),
+                codes=rng.integers(0, 3, size=N_EVENTS).astype(np.int64),
+            )
+        },
+        dl_logit_per_class=np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64),
+        handler_z=z,
+    )
+    idata = _posterior(with_gamma_dl=False, with_gamma_handler=True)
+
+    got = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        handler_z=z,
+    )
+    expected = _hand_rolled_expected_handler(
+        idata,
+        rf_codes=carrier.fixed_effects["result_family"].codes,
+        handler_z=z,
+    )
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+    np.testing.assert_allclose(got.sum(axis=1), 1.0, atol=1e-9)
+
+    without_z = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        handler_z=None,
+    )
+    assert not np.allclose(got, without_z)
+
+
+def test_handler_term_inert_when_gamma_handler_absent() -> None:
+    rng = np.random.default_rng(31)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    carrier = GeometryProductionFrame(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(
+                levels=("a", "b", "c"),
+                codes=rng.integers(0, 3, size=N_EVENTS).astype(np.int64),
+            )
+        },
+        dl_logit_per_class=np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64),
+        handler_z=z,
+    )
+    idata = _posterior(with_gamma_dl=False, with_gamma_handler=False)
+
+    passed_z = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        handler_z=z,
+    )
+    no_z = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        handler_z=None,
+    )
+    np.testing.assert_allclose(passed_z, no_z, atol=1e-12)
+
+
+def test_handler_term_composes_with_dl_and_propensity() -> None:
+    rng = np.random.default_rng(37)
+    handler_z = rng.normal(size=N_EVENTS).astype(np.float64)
+    prop_z = rng.normal(size=N_EVENTS).astype(np.float64)
+    dl = rng.normal(size=(N_EVENTS, N_CLASSES)).astype(np.float64)
+    rf_codes = rng.integers(0, 3, size=N_EVENTS).astype(np.int64)
+    carrier = GeometryProductionFrame(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+        dl_logit_per_class=dl,
+        propensity_z=prop_z,
+        handler_z=handler_z,
+    )
+    n_chain, n_draw = 2, 5
+    base = _posterior(with_gamma_dl=True, gamma_value=1.3, with_gamma_propensity=True)
+    posterior = {k: np.asarray(v.values) for k, v in base.posterior.data_vars.items()}
+    raw = rng.normal(size=(n_chain, n_draw, N_CLASSES))
+    posterior["gamma_handler"] = raw - raw.mean(axis=-1, keepdims=True)
+    idata = az.from_dict(posterior=posterior)
+
+    got = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        dl_logit_per_class=dl,
+        propensity_z=prop_z,
+        handler_z=handler_z,
+    )
+
+    alpha = posterior["alpha_class"]
+    delta = posterior["delta_result_family"]
+    eta = np.broadcast_to(
+        alpha[:, :, None, :], (n_chain, n_draw, N_EVENTS, N_CLASSES)
+    ).copy()
+    eta += delta[:, :, rf_codes, :]
+    eta += posterior["gamma_dl"][:, :, None, None] * dl[None, None, :, :]
+    eta += prop_z[None, None, :, None] * posterior["gamma_propensity"][:, :, None, :]
+    eta += handler_z[None, None, :, None] * posterior["gamma_handler"][:, :, None, :]
+    expected = _direct_softmax(eta)
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+    np.testing.assert_allclose(got.sum(axis=1), 1.0, atol=1e-9)
+
+
+def test_held_out_softmax_handler_parity() -> None:
+    rng = np.random.default_rng(41)
+    z = rng.normal(size=N_EVENTS).astype(np.float64)
+    rf_codes = rng.integers(0, 3, size=N_EVENTS).astype(np.int64)
+    rf_codes[2] = -1
+    held = HeldOutSet(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        true_position=rng.integers(0, N_CLASSES, size=N_EVENTS).astype(np.int64),
+        U=np.ones(N_EVENTS, dtype=np.int64),
+        season_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        scorer_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        park_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        source_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+    )
+    idata = _posterior(with_gamma_dl=False, with_gamma_handler=True)
+
+    got = _posterior_held_out_softmax(
+        idata,
+        held,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        handler_z=z,
+    )
+    expected = _hand_rolled_expected_handler(idata, rf_codes=rf_codes, handler_z=z)
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+
+    without_z = _posterior_held_out_softmax(
+        idata,
+        held,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        handler_z=None,
+    )
+    assert not np.allclose(got, without_z)
 
 
 def test_propensity_term_matches_hand_rolled_softmax() -> None:

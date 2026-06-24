@@ -41,6 +41,8 @@ HOLDOUT_FOLD_ID: int = 0
 
 UNKNOWN_LEVEL: str = "__unknown__"
 
+DIMENSION: str = "has_count"
+
 CONTEXT_FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
     "result_family",
     "alignment_regime",
@@ -62,6 +64,21 @@ class PitchCoverageHeldOutSet(BaseModel):
         return int(self.y.shape[0])
 
 
+class PitchCoverageScoringFrame(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        arbitrary_types_allowed=True, frozen=True
+    )
+
+    event_keys: IntArray
+    cell_idx: IntArray
+    scorer_idx: IntArray
+    fixed_effect_codes: dict[str, IntArray]
+
+    @property
+    def n_events(self) -> int:
+        return int(self.event_keys.shape[0])
+
+
 class PitchCoverageInputs(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(
         arbitrary_types_allowed=True, frozen=True
@@ -76,6 +93,7 @@ class PitchCoverageInputs(BaseModel):
     scorer_labels: list[str]
     coords: dict[str, list[str]]
     outcome: str
+    dimension: str
     held_out: PitchCoverageHeldOutSet
 
     @property
@@ -225,7 +243,80 @@ def prepare_pitch_coverage_inputs(
         scorer_labels=list(scorer_labels),
         coords=coords,
         outcome="has_count",
+        dimension=DIMENSION,
         held_out=held_out,
+    )
+
+
+def build_pitch_coverage_scoring_frame(
+    parquet_path: Path,
+    *,
+    inputs: PitchCoverageInputs,
+) -> PitchCoverageScoringFrame:
+    """Encode the full ``event_level`` population against the training vocab.
+
+    Every event of the corpus (observed and unobserved) is scored for
+    ``P(count observed)``. Cell / scorer / FE codes encode against the
+    training labels carried on ``inputs``; unseen levels map to ``-1``,
+    which the posterior reconstruction masks to the prior mean. Rows come
+    back sorted by ``event_key``.
+    """
+    frame = (
+        pl.scan_parquet(parquet_path)
+        .filter(pl.col("game_id").is_not_null())
+        .with_columns(
+            (
+                pl.col("season").cast(pl.Utf8)
+                + pl.lit("|")
+                + pl.col("league").cast(pl.Utf8).fill_null(UNKNOWN_LEVEL)
+            ).alias("season_league"),
+            pl.col("scorer").fill_null(UNKNOWN_LEVEL).alias("scorer"),
+            pl.col("result_family").fill_null(UNKNOWN_LEVEL).alias("result_family"),
+            pl.col("alignment_regime")
+            .fill_null(UNKNOWN_LEVEL)
+            .alias("alignment_regime"),
+        )
+        .select(
+            [
+                "event_key",
+                "season_league",
+                "scorer",
+                *CONTEXT_FIXED_EFFECT_COLUMNS,
+            ]
+        )
+        .unique(subset=["event_key"])
+        .sort("event_key")
+        .collect()
+    )
+    if frame.height == 0:
+        raise ValueError(f"no event_level rows with a game_id in {parquet_path}")
+
+    cell_vocab = {c: i for i, c in enumerate(inputs.cell_labels)}
+    scorer_vocab = {s: i for i, s in enumerate(inputs.scorer_labels)}
+
+    event_keys = (
+        frame.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
+    )
+    cell_idx = _index_for(frame.get_column("season_league").to_list(), cell_vocab, -1)
+    scorer_idx = _index_for(frame.get_column("scorer").to_list(), scorer_vocab, -1)
+    fixed_effect_codes = {
+        column: _index_for(
+            frame.get_column(column).to_list(),
+            {lvl: i for i, lvl in enumerate(design.levels)},
+            -1,
+        )
+        for column, design in inputs.fixed_effects.items()
+    }
+
+    _log.info(
+        "build_pitch_coverage_scoring_frame events=%d",
+        frame.height,
+    )
+    return PitchCoverageScoringFrame(
+        event_keys=event_keys,
+        cell_idx=cell_idx,
+        scorer_idx=scorer_idx,
+        fixed_effect_codes=fixed_effect_codes,
     )
 
 

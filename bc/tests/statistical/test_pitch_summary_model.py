@@ -180,6 +180,7 @@ def _tiny_coverage_inputs() -> PitchCoverageInputs:
         scorer_labels=list(scorer_labels),
         coords=coords,
         outcome="has_count",
+        dimension="has_count",
         held_out=PitchCoverageHeldOutSet(
             y=empty,
             cell_idx=empty,

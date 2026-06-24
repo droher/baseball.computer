@@ -14,9 +14,29 @@ def test_at_least_one_target_registered() -> None:
 
 
 def test_observation_targets_share_dataset() -> None:
-    targets = [t for t in all_targets() if t.outcome_kind == "bernoulli"]
+    targets = [
+        t
+        for t in all_targets()
+        if t.outcome_kind == "bernoulli"
+        and t.dataset_name == "model_input_observation_batted_ball"
+    ]
+    assert targets, "no observation-propensity bernoulli targets registered"
     datasets = {spec.dataset_name for spec in targets}
     assert datasets == {"model_input_observation_batted_ball"}
+
+
+def test_pitch_count_observedness_registered() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    spec = get_target("pitch_count_observedness")
+    assert spec.outcome_kind == "bernoulli"
+    assert spec.multinomial_export is None
+    assert spec.count_export is None
+    assert spec.dataset_name == "model_input_pitch_summary"
+    assert spec.dataset_dimension_filter == "has_count"
+    assert spec.dimension == "has_count"
+    assert spec.sample_size == 10_000
+    assert spec.published_manifest_name() == "pitch_count_observedness"
 
 
 def test_credit_targets_share_dataset() -> None:

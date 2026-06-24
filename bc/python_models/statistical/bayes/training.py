@@ -69,6 +69,10 @@ from python_models.statistical.models._geometry_data import (
     build_geometry_production_frame,
 )
 from python_models.statistical.models._park_factor_data import ParkFactorInputs
+from python_models.statistical.models._pitch_coverage_data import (
+    PitchCoverageInputs,
+    build_pitch_coverage_scoring_frame,
+)
 from python_models.statistical.models._pitch_summary_data import PitchSummaryInputs
 from python_models.statistical.models._run_values_data import RunExpectancyInputs
 from python_models.statistical.outputs import write_parquet_atomic
@@ -647,6 +651,70 @@ def _held_out_metrics_bernoulli(y: np.ndarray, p_mean: np.ndarray) -> dict[str, 
     return metrics
 
 
+def _posterior_event_means_pitch_coverage(
+    idata: az.InferenceData,
+    *,
+    cell_idx: np.ndarray,
+    scorer_idx: np.ndarray,
+    fixed_effect_codes: dict[str, np.ndarray],
+    chunk_size: int = POSTERIOR_CHUNK_DEFAULT,
+) -> np.ndarray:
+    """Compute ``E[sigmoid(η_e)] | data`` per event for the has_count coverage arm.
+
+    Reconstructs ``η_e = alpha + beta_cell[cell] + beta_scorer[scorer] +
+    Σ delta_<fe>[code]`` from the posterior parameter draws — the
+    pitch-coverage model carries a ``season|league`` cell and a ``scorer``
+    random effect plus sum-to-zero FE deltas, with no continuous slopes.
+    Codes of ``-1`` (levels unseen at training time, which the full-corpus
+    scoring frame can emit) drop their contribution via the validity mask,
+    matching the prior-mean convention used by the obs held-out path.
+    """
+    posterior = idata.posterior
+    n_event = int(cell_idx.shape[0])
+    if n_event == 0:
+        return np.zeros(0, dtype=np.float64)
+
+    alpha = np.asarray(posterior["alpha"].values, dtype=np.float64)
+    n_chain, n_draw = alpha.shape[0], alpha.shape[1]
+
+    random_effects: list[tuple[np.ndarray, np.ndarray]] = []
+    for var, idx in (("beta_cell", cell_idx), ("beta_scorer", scorer_idx)):
+        if var not in posterior:
+            continue
+        random_effects.append(
+            (np.asarray(posterior[var].values, dtype=np.float64), idx)
+        )
+
+    deltas_full: dict[str, np.ndarray] = {}
+    for column in fixed_effect_codes:
+        if f"delta_{column}" not in posterior:
+            continue
+        deltas_full[column] = np.asarray(
+            posterior[f"delta_{column}"].values, dtype=np.float64
+        )
+
+    means = np.empty(n_event, dtype=np.float64)
+    for start in range(0, n_event, chunk_size):
+        stop = min(start + chunk_size, n_event)
+        sl = slice(start, stop)
+        eta = np.broadcast_to(
+            alpha[:, :, None], (n_chain, n_draw, stop - start)
+        ).copy()
+        for values, idx in random_effects:
+            codes = idx[sl]
+            valid = codes >= 0
+            safe = np.where(valid, codes, 0)
+            eta += values[:, :, safe] * valid[None, None, :]
+        for column, df in deltas_full.items():
+            codes = fixed_effect_codes[column][sl]
+            valid = codes >= 0
+            safe = np.where(valid, codes, 0)
+            eta += df[:, :, safe] * valid[None, None, :]
+        p = 1.0 / (1.0 + np.exp(-eta))
+        means[sl] = p.mean(axis=(0, 1))
+    return means
+
+
 def _bucket_dev_from_p_mean(
     p_mean: np.ndarray, y: np.ndarray, *, n_bins: int = 10
 ) -> tuple[float | None, pl.DataFrame]:
@@ -756,6 +824,7 @@ def _posterior_held_out_softmax(
     intercept_name: str = "alpha_position",
     dl_logit_per_class: np.ndarray | None = None,
     propensity_z: np.ndarray | None = None,
+    handler_z: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute ``E[softmax(eta_e)] | data`` per held-out event from posterior draws.
 
@@ -766,7 +835,11 @@ def _posterior_held_out_softmax(
     ``propensity_z`` is supplied (shape ``(n_event,)``) and the posterior
     carries ``gamma_propensity``, the per-class MNAR term
     ``z * gamma_propensity`` is added the same way; it is never masked —
-    NULL propensities encode to z=0 upstream.
+    NULL propensities encode to z=0 upstream. When ``handler_z`` is
+    supplied (shape ``(n_event,)``) and the posterior carries
+    ``gamma_handler``, the per-class handler term ``z * gamma_handler`` is
+    added the same way; events absent from the handler export encode to
+    z=0 upstream.
     """
     posterior = idata.posterior
     K = n_positions
@@ -796,6 +869,11 @@ def _posterior_held_out_softmax(
         if propensity_z is not None and "gamma_propensity" in posterior.data_vars
         else None
     )
+    gamma_handler = (
+        np.asarray(posterior["gamma_handler"].values, dtype=np.float64)
+        if handler_z is not None and "gamma_handler" in posterior.data_vars
+        else None
+    )
 
     means = np.empty((n_event, K), dtype=np.float64)
     for start in range(0, n_event, chunk_size):
@@ -818,6 +896,8 @@ def _posterior_held_out_softmax(
             eta += gamma[:, :, None, None] * dl_logit_per_class[None, None, sl, :]
         if gamma_propensity is not None and propensity_z is not None:
             eta += propensity_z[None, None, sl, None] * gamma_propensity[:, :, None, :]
+        if gamma_handler is not None and handler_z is not None:
+            eta += handler_z[None, None, sl, None] * gamma_handler[:, :, None, :]
         eta -= eta.max(axis=-1, keepdims=True)
         exp_eta = np.exp(eta)
         pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
@@ -833,6 +913,7 @@ def _evaluate_held_out(
     intercept_name: str = "alpha_position",
     held_dl_logit_per_class: np.ndarray | None = None,
     held_out_propensity_z: np.ndarray | None = None,
+    held_out_handler_z: np.ndarray | None = None,
 ) -> dict[str, object]:
     """Compute OOS top-k accuracy, log-loss, and per-position PR-AUC.
 
@@ -876,6 +957,7 @@ def _evaluate_held_out(
             intercept_name=intercept_name,
             dl_logit_per_class=held_dl_logit_per_class,
             propensity_z=held_out_propensity_z,
+            handler_z=held_out_handler_z,
         )
     y_true = held.true_position.astype(np.int64)
     valid = y_true >= 0
@@ -1288,6 +1370,7 @@ def _posterior_event_softmax(
     intercept_name: str = "alpha_position",
     dl_logit_per_class: np.ndarray | None = None,
     propensity_z: np.ndarray | None = None,
+    handler_z: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute ``E[softmax(eta_e)] | data`` per (event, position) from posterior draws.
 
@@ -1305,7 +1388,10 @@ def _posterior_event_softmax(
     ``(n_event,)``) and the posterior carries the per-class
     ``gamma_propensity``, the MNAR term ``z * gamma_propensity`` is added
     the same way; it is never masked — NULL propensities encode to z=0
-    upstream.
+    upstream. When ``handler_z`` is supplied (shape ``(n_event,)``) and the
+    posterior carries the per-class ``gamma_handler``, the handler-posterior
+    term ``z * gamma_handler`` is added the same way; events absent from the
+    handler export encode to z=0 upstream.
     """
     posterior = idata.posterior
     K = n_positions
@@ -1332,6 +1418,11 @@ def _posterior_event_softmax(
         if propensity_z is not None and "gamma_propensity" in posterior.data_vars
         else None
     )
+    gamma_handler = (
+        np.asarray(posterior["gamma_handler"].values, dtype=np.float64)
+        if handler_z is not None and "gamma_handler" in posterior.data_vars
+        else None
+    )
 
     means = np.empty((n_event, K), dtype=np.float64)
     for start in range(0, n_event, chunk_size):
@@ -1350,6 +1441,8 @@ def _posterior_event_softmax(
             eta += gamma[:, :, None, None] * dl_logit_per_class[None, None, sl, :]
         if gamma_propensity is not None and propensity_z is not None:
             eta += propensity_z[None, None, sl, None] * gamma_propensity[:, :, None, :]
+        if gamma_handler is not None and handler_z is not None:
+            eta += handler_z[None, None, sl, None] * gamma_handler[:, :, None, :]
         eta -= eta.max(axis=-1, keepdims=True)
         exp_eta = np.exp(eta)
         pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
@@ -2122,7 +2215,77 @@ def run_bayes_model(
         posterior_summary = _build_posterior_summary(
             posterior_idata, outcome_kind=spec.outcome_kind
         )
-        if spec.outcome_kind == "bernoulli":
+        if spec.outcome_kind == "bernoulli" and isinstance(
+            inputs, PitchCoverageInputs
+        ):
+            p_mean = _posterior_event_means_pitch_coverage(
+                posterior_idata,
+                cell_idx=inputs.cell_idx,
+                scorer_idx=inputs.scorer_idx,
+                fixed_effect_codes={
+                    column: design.codes
+                    for column, design in inputs.fixed_effects.items()
+                },
+            )
+            y_int = inputs.y.astype(np.int64)
+            calibration_ece = expected_calibration_error(p_mean, y_int, n_bins=15)
+            max_bucket_dev, bucket_df = _bucket_dev_from_p_mean(
+                p_mean, y_int, n_bins=10
+            )
+
+            write_parquet_atomic(
+                _reliability_dataframe(p_mean, y_int),
+                exports_dir / "calibration_curve.parquet",
+            )
+            if not bucket_df.is_empty():
+                write_parquet_atomic(
+                    bucket_df, exports_dir / "posterior_predictive_buckets.parquet"
+                )
+            write_parquet_atomic(
+                _posterior_summary_dataframe(posterior_summary),
+                exports_dir / "posterior_summary.parquet",
+            )
+            scoring_frame = build_pitch_coverage_scoring_frame(
+                dataset_parquet,
+                inputs=inputs,
+            )
+            scoring_means = _posterior_event_means_pitch_coverage(
+                posterior_idata,
+                cell_idx=scoring_frame.cell_idx,
+                scorer_idx=scoring_frame.scorer_idx,
+                fixed_effect_codes=scoring_frame.fixed_effect_codes,
+            )
+            _ = _export_event_propensities(
+                scoring_means,
+                scoring_frame.event_keys,
+                inputs.dimension,
+                target_path=exports_dir / POSTERIOR_EXPORT_FILENAME,
+            )
+            held = inputs.held_out
+            if held.n_events > 0:
+                held_p_mean = _posterior_event_means_pitch_coverage(
+                    posterior_idata,
+                    cell_idx=held.cell_idx,
+                    scorer_idx=held.scorer_idx,
+                    fixed_effect_codes=held.fixed_effect_codes,
+                )
+                held_out_metrics = _held_out_metrics_bernoulli(held.y, held_p_mean)
+                _atomic_write_text(
+                    validation_dir / "held_out_metrics.json",
+                    json.dumps(held_out_metrics, indent=2, default=_json_default),
+                )
+                _log.info(
+                    "bayes held-out pitch-coverage metrics model=%s artifact=%s "
+                    "n_events=%s roc_auc=%s pr_auc=%s baseline_pr_auc=%s ece=%s",
+                    model_name,
+                    artifact_id,
+                    held_out_metrics.get("n_events"),
+                    held_out_metrics.get("roc_auc"),
+                    held_out_metrics.get("pr_auc"),
+                    held_out_metrics.get("baseline_pr_auc"),
+                    held_out_metrics.get("ece_held_out"),
+                )
+        elif spec.outcome_kind == "bernoulli":
             p_mean = _posterior_event_means_bernoulli(posterior_idata, inputs)
             y_int = inputs.y.astype(np.int64)
             calibration_ece = expected_calibration_error(p_mean, y_int, n_bins=15)
@@ -2263,6 +2426,9 @@ def run_bayes_model(
                     propensity_logit_mean=inputs.propensity_logit_mean,
                     propensity_logit_std=inputs.propensity_logit_std,
                     propensity_active=inputs.propensity_active,
+                    handler_logit_mean=inputs.handler_logit_mean,
+                    handler_logit_std=inputs.handler_logit_std,
+                    handler_active=inputs.handler_active,
                 )
                 if production.n_events > 0:
                     shares = _posterior_event_softmax(
@@ -2272,6 +2438,7 @@ def run_bayes_model(
                         intercept_name="alpha_class",
                         dl_logit_per_class=production.dl_logit_per_class,
                         propensity_z=production.propensity_z,
+                        handler_z=production.handler_z,
                     )
                     _ = _export_geometry_probabilities(
                         shares,
@@ -2295,6 +2462,7 @@ def run_bayes_model(
                         intercept_name="alpha_class",
                         dl_logit_per_class=inputs.dl_logit_per_class,
                         propensity_z=inputs.propensity_z,
+                        handler_z=inputs.handler_z,
                     )
                     _ = _export_geometry_probabilities(
                         shares,
@@ -2310,6 +2478,7 @@ def run_bayes_model(
                     intercept_name="alpha_class",
                     held_dl_logit_per_class=inputs.held_out_dl_logit_per_class,
                     held_out_propensity_z=inputs.held_out_propensity_z,
+                    held_out_handler_z=inputs.held_out_handler_z,
                 )
             elif spec.multinomial_export == "ball_handler":
                 ball_handler_export_path = exports_dir / BALL_HANDLER_EXPORT_FILENAME

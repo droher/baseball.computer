@@ -161,9 +161,22 @@ def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
             yield spec
 
 
-def iterate_published_observation_frames() -> Iterator[pl.DataFrame]:
-    """Yield one frame per published Bayes observation (Bernoulli) target."""
+OBSERVATION_PROPENSITY_DATASET: str = "model_input_observation_batted_ball"
+PITCH_COVERAGE_DATASET: str = "model_input_pitch_summary"
+
+
+def _iter_published_propensity_frames(dataset_name: str) -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bernoulli target on ``dataset_name``.
+
+    Both the obs-propensity targets and the pitch-coverage target ship the
+    identical ``event_propensity.parquet`` schema, differing only in the
+    dataset they read and the ``dimension`` they stamp. The two SQLMesh
+    ``@model`` gathers separate on the dataset to keep their grains
+    disjoint.
+    """
     for spec in _iter_specs_by_kind("bernoulli"):
+        if spec.dataset_name != dataset_name:
+            continue
         pointer_path = find_published_manifest(spec.published_manifest_name())
         if pointer_path is None:
             _log.info(
@@ -207,10 +220,21 @@ def iterate_published_observation_frames() -> Iterator[pl.DataFrame]:
         yield df
 
 
-def aggregate_observation_propensity_frames() -> Iterator[pl.DataFrame]:
-    """Adapter that always yields at least one typed frame for the @model."""
+def iterate_published_observation_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes observation (Bernoulli) target."""
+    yield from _iter_published_propensity_frames(OBSERVATION_PROPENSITY_DATASET)
+
+
+def iterate_published_pitch_coverage_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes pitch-coverage (Bernoulli) target."""
+    yield from _iter_published_propensity_frames(PITCH_COVERAGE_DATASET)
+
+
+def _aggregate_propensity_frames(
+    frames: Iterator[pl.DataFrame], *, label: str
+) -> Iterator[pl.DataFrame]:
     emitted = False
-    for frame in iterate_published_observation_frames():
+    for frame in frames:
         emitted = True
         yield frame.select(
             [
@@ -222,9 +246,24 @@ def aggregate_observation_propensity_frames() -> Iterator[pl.DataFrame]:
         )
     if not emitted:
         _log.info(
-            "bayes.manifest_ingest: no observation targets published; yielding empty frame"
+            "bayes.manifest_ingest: no %s targets published; yielding empty frame",
+            label,
         )
         yield empty_propensity_frame()
+
+
+def aggregate_observation_propensity_frames() -> Iterator[pl.DataFrame]:
+    """Adapter that always yields at least one typed frame for the @model."""
+    yield from _aggregate_propensity_frames(
+        iterate_published_observation_frames(), label="observation"
+    )
+
+
+def aggregate_pitch_coverage_frames() -> Iterator[pl.DataFrame]:
+    """Adapter that always yields at least one typed frame for the @model."""
+    yield from _aggregate_propensity_frames(
+        iterate_published_pitch_coverage_frames(), label="pitch-coverage"
+    )
 
 
 def iterate_published_credit_frames() -> Iterator[pl.DataFrame]:
