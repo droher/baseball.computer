@@ -78,7 +78,7 @@ players_databank AS (
         CASE
             WHEN retrosheet_player_id IS NULL THEN 'low'
             WHEN debut IS NULL OR final_game IS NULL THEN 'medium'
-            ELSE 'medium'
+            ELSE 'high'
         END AS link_confidence,
         CASE
             WHEN retrosheet_player_id IS NULL THEN 'missing_retrosheet_mapping'
@@ -101,7 +101,8 @@ players_bbref AS (
         END AS link_status,
         CASE
             WHEN retrosheet_player_id IS NULL THEN 'low'
-            ELSE 'medium'
+            WHEN debut IS NULL OR final_game IS NULL THEN 'medium'
+            ELSE 'high'
         END AS link_confidence,
         CASE
             WHEN retrosheet_player_id IS NULL THEN 'missing_retrosheet_mapping'
