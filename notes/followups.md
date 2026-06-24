@@ -270,3 +270,69 @@ Stage-1 / stage-2 pretrain artifacts produced before the v8→canonical rename l
 ## Phase-3 pretrain — embedding LR + regularization
 
 Full-corpus stage-2 best epoch was epoch 1 (out of 8). Embeddings overshoot the residual past the first pass under current schedule (split optimizer, trunk Adam 1e-3, embed Adam 5e-3 with warmup + CosineDecay α=0.1). Try lower embed LR (1.5e-3) and / or modest L2 (1e-5 to 1e-4) on `embed_player` to extend useful training and see if a longer fit lifts hard-head accuracy further. Current pretrained-vs-baseline gates already clear by ~5×, so this is a tightening, not a blocker.
+
+## T2 spec-completion deferrals
+
+The T2 spec completions (branch `data-coverage-t2-spec-completion`) landed code-complete +
+smoke-verified. Full-scale fits, validation backtests, and publication-pointer advancement for the
+new arms are a deferred materialization pass. The sub-pieces below were deferred deliberately —
+genuine data blockers, identifiability impossibilities, or ambiguous estimands. Each names the
+prerequisite to unblock.
+
+### Materialization pass (all five models)
+Wire the new arms to their CLI targets / SQLMesh `@models`, run full-scale fits at `DEFAULT_CONFIG`,
+clear the default gates (rhat ≤ 1.05, ess ≥ 100, 0 divergences), run the validation backtests, and
+advance published pointers. New unwired modules: `models/state_transition.py`,
+`models/linear_weights.py`, `models/assist_count.py`, `models/error_credit.py`,
+`models/pitch_coverage.py`, and the `gamma_handler` covariate in `models/geometry.py`. For
+`gamma_handler` specifically, `bayes/training.py::_posterior_event_softmax` must be taught the term
+before a production geometry fit with the handler covariate active can publish.
+
+### G — context-neutral P_LW linear weights (estimand decision)
+The spec's headline context-neutral LW integrates `V_end` against the modeled marginal transition
+`P_LW(end|start)` rather than the realized end state. That estimand is ambiguous at the per-play-type
+grain: `P_LW` is keyed on the start state alone, so it does not distinguish play types sharing a start
+state. The standard marginal LW is built and well-defined; pin the context-neutral estimand (or
+confirm marginal is the published deliverable) before computing it. The Markov submodel that would
+feed P_LW is built.
+
+### C — double-play submodel (data blocker)
+No DP truth in `model_input_fielding_credit`: the `known` CTE pulls only putouts/assists/errors;
+`double_plays` exists upstream in `event_player_fielding_stats` but is not surfaced, and there is no
+`outs_on_play` event column to gate "two outs recorded on the play." Surface both, then build the
+DP submodel.
+
+### C — real box-residual aggregate constraint (missing materializer)
+There is no `materialize_credit_authority_targets` producing `credit_authority_targets.parquet`
+(residual joined to `official_credit_authority.authority_source` for the per-source `sigma_aggregate`
+map + `withheld` exclusion). The aggregate arm still uses the synthetic mask. Build the materializer,
+then replace `_credit_data.py::_build_aggregate_targets_from_mask` with a box-residual builder emitting
+the same 5-tuple; `models/credit.py`'s `T_observed` Normal arm needs no change.
+
+### E — measurement-error confusion arm (identifiability impossibility)
+UNIDENTIFIABLE in single-source Retrosheet. The spec's `Ω`/`Δ` confusion arm needs `Recorded | G` and
+`Deduced | G` as two conditionally-independent labelings of the latent class. But the deduced layer is
+a deterministic recode of the same scorer's fielding (`calc_batted_ball_type` rules), not an
+independent second observation — so `Ω`/`Δ` cannot be separated from the class prior. Same blocker as
+the Model B contact-label model. Needs a genuinely independent second label source (different scorer /
+tracking system). Stays recorded-only until then.
+
+### F — park_episode_id boundaries (NULL column)
+`model_input_park_factors.park_episode_status` is 100% NULL in both dataset artifacts, so no stable
+`park_episode_id` resets the AR(1) chain at structural park changes (it currently keys on
+`(park, league)`). The upstream park-history dimension must populate a non-null `park_episode_id` and
+`model_input_park_factors.sql` must select it; the prep then builds AR(1) chains on
+`(park_episode_id, league)`.
+
+### F — umpire/weather/surface/day-night/hand covariates (absent columns)
+`model_input_park_factors` has no umpire id, weather (temp/wind), surface (turf/grass), or day_night
+column. `batter_hand`/`pitcher_hand` exist per-event but the model is team-game grain. Each needs an
+SQL change to surface the column (hand additionally needs an event-grain restructure).
+
+### J — summary-model source context (single-source data) + batter/pitcher context (grain)
+`model_input_pitch_summary` is single-source (`source_family`/`source_type` each one distinct value),
+so a source partial-pooling level on the cell-grain summary is degenerate — needs a dataset/SQL change
+surfacing >1 source family. Per-batter/pitcher context is only expressible at event grain; the summary
+model is cell-grain over `(result_family, season, league)` — needs an event-grain restructure (or a
+coarsened batter/pitcher bucketing). The `has_count` coverage Bernoulli arm IS built
+(`models/pitch_coverage.py`); it is a standalone prep+builder not yet wired to a CLI target.

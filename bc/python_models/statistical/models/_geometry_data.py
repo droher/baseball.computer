@@ -41,6 +41,10 @@ from pydantic import BaseModel, ConfigDict
 
 from python_models.statistical import config as cfg
 from python_models.statistical.bayes.dl_covariate import compute_dl_log_probs_per_class
+from python_models.statistical.bayes.handler_covariate import (
+    handler_covariate_enabled,
+    load_handler_outfield_logit,
+)
 from python_models.statistical.deep.targets.geometry import (
     GEOMETRY_SPECS as DEEP_GEOMETRY_SPECS,
 )
@@ -145,9 +149,14 @@ class GeometryProductionFrame(ProductionScoringFrame):
     ``(n_event, n_classes)`` so the builder can apply γ_dl on the
     geometry-unobserved production slice. All-zeros for non-DL dimensions
     (``dl_p_class`` is NULL there).
+
+    ``handler_z`` carries the standardized handler-posterior covariate
+    (frozen training stats; NULL→0) so the export can apply γ_handler on
+    the production slice.
     """
 
     dl_logit_per_class: FloatArray
+    handler_z: FloatArray | None = None
 
 
 class GeometryInputs(BaseModel):
@@ -180,6 +189,12 @@ class GeometryInputs(BaseModel):
     propensity_logit_mean: float = 0.0
     propensity_logit_std: float = 1.0
     propensity_active: bool = False
+
+    handler_z: FloatArray | None = None
+    held_out_handler_z: FloatArray | None = None
+    handler_logit_mean: float = 0.0
+    handler_logit_std: float = 1.0
+    handler_active: bool = False
 
     @property
     def n_events(self) -> int:
@@ -497,6 +512,80 @@ def _propensity_z_with_frozen_stats(
     return z.astype(np.float64)
 
 
+def _handler_logit_with_mask(
+    event_keys: IntArray, logit_by_event: dict[int, float]
+) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
+    n = int(event_keys.shape[0])
+    logit = np.zeros(n, dtype=np.float64)
+    finite = np.zeros(n, dtype=np.bool_)
+    for i, key in enumerate(event_keys.tolist()):
+        value = logit_by_event.get(int(key))
+        if value is not None:
+            logit[i] = value
+            finite[i] = True
+    return logit, finite
+
+
+def _standardized_handler_logit(
+    event_keys: IntArray,
+    logit_by_event: dict[int, float],
+    *,
+    dimension: str,
+) -> tuple[FloatArray, float, float]:
+    """Standardized handler OF-logit over the training slice.
+
+    Joins Model D's per-event ``logit(P(handler is OF))`` by ``event_key``,
+    standardizes with mean/std computed on the events present in Model D's
+    export only (std floors to 1.0 when degenerate), and maps events absent
+    from the export to z=0.
+    """
+    logit, finite = _handler_logit_with_mask(event_keys, logit_by_event)
+    n = int(finite.shape[0])
+    n_null = int((~finite).sum())
+    _log.info(
+        "handler covariate null rate on training slice dimension=%s: %d/%d (%.4f)",
+        dimension,
+        n_null,
+        n,
+        (n_null / n) if n else 0.0,
+    )
+    if finite.any():
+        mean = float(np.mean(logit[finite]))
+        std = float(np.std(logit[finite], ddof=0))
+        if std < 1e-12:
+            std = 1.0
+    else:
+        mean = 0.0
+        std = 1.0
+    z = np.where(finite, (logit - mean) / std, 0.0)
+    return z.astype(np.float64), mean, std
+
+
+def _handler_z_with_frozen_stats(
+    event_keys: IntArray,
+    logit_by_event: dict[int, float],
+    *,
+    mean: float,
+    std: float,
+    dimension: str,
+    context: str,
+) -> FloatArray:
+    """z = (handler_logit - mean) / std with the frozen training stats; NULL -> 0."""
+    logit, finite = _handler_logit_with_mask(event_keys, logit_by_event)
+    n = int(finite.shape[0])
+    n_null = int((~finite).sum())
+    _log.info(
+        "handler covariate null rate on %s slice dimension=%s: %d/%d (%.4f)",
+        context,
+        dimension,
+        n_null,
+        n,
+        (n_null / n) if n else 0.0,
+    )
+    z = np.where(finite, (logit - mean) / std, 0.0)
+    return z.astype(np.float64)
+
+
 def _one_hot_counts(class_idx: IntArray, n_classes: int) -> IntArray:
     n = int(class_idx.shape[0])
     counts = np.zeros((n, n_classes), dtype=np.int64)
@@ -579,6 +668,9 @@ def build_geometry_production_frame(
     propensity_logit_mean: float = 0.0,
     propensity_logit_std: float = 1.0,
     propensity_active: bool = False,
+    handler_logit_mean: float = 0.0,
+    handler_logit_std: float = 1.0,
+    handler_active: bool = False,
 ) -> GeometryProductionFrame:
     """One row per geometry-unobserved event with FE codes + per-class DL logits.
 
@@ -612,6 +704,7 @@ def build_geometry_production_frame(
             fixed_effects={},
             dl_logit_per_class=np.zeros((0, n_classes), dtype=np.float64),
             propensity_z=np.zeros(0, dtype=np.float64),
+            handler_z=np.zeros(0, dtype=np.float64),
         )
 
     event_keys = (
@@ -636,11 +729,27 @@ def build_geometry_production_frame(
         )
     else:
         propensity_z = np.zeros(per_event.height, dtype=np.float64)
+    if handler_active:
+        handler_logit_by_event = load_handler_outfield_logit()
+        if handler_logit_by_event is not None:
+            handler_z = _handler_z_with_frozen_stats(
+                event_keys,
+                handler_logit_by_event,
+                mean=handler_logit_mean,
+                std=handler_logit_std,
+                dimension=dimension,
+                context="production",
+            )
+        else:
+            handler_z = np.zeros(per_event.height, dtype=np.float64)
+    else:
+        handler_z = np.zeros(per_event.height, dtype=np.float64)
     return GeometryProductionFrame(
         event_keys=event_keys,
         fixed_effects=scoring_fe,
         dl_logit_per_class=dl_logit_per_class,
         propensity_z=propensity_z,
+        handler_z=handler_z,
     )
 
 
@@ -833,6 +942,26 @@ def prepare_geometry_inputs(
             dimension,
         )
 
+    handler_logit_by_event: dict[int, float] | None = None
+    if handler_covariate_enabled():
+        handler_logit_by_event = load_handler_outfield_logit()
+    if handler_logit_by_event is not None:
+        handler_active = True
+        handler_z, handler_logit_mean, handler_logit_std = _standardized_handler_logit(
+            event_keys, handler_logit_by_event, dimension=dimension
+        )
+    else:
+        handler_active = False
+        handler_z = np.zeros(per_event.height, dtype=np.float64)
+        handler_logit_mean = 0.0
+        handler_logit_std = 1.0
+        if handler_covariate_enabled():
+            _log.warning(
+                "handler covariate requested but no Model D export resolved; "
+                "the handler covariate is inactive for dimension=%s",
+                dimension,
+            )
+
     season_league_idx, season_league_labels = _category_index(
         per_event, "season_league"
     )
@@ -872,6 +1001,7 @@ def prepare_geometry_inputs(
     if held_out_df.height == 0:
         held_out_dl_logit_per_class = np.zeros((0, n_classes), dtype=np.float64)
         held_out_propensity_z = np.zeros(0, dtype=np.float64)
+        held_out_handler_z = np.zeros(0, dtype=np.float64)
     else:
         held_out_dl_logit_per_class = compute_dl_log_probs_per_class(
             held_out_df.sort("event_key"), n_classes=n_classes
@@ -889,6 +1019,17 @@ def prepare_geometry_inputs(
             )
         else:
             held_out_propensity_z = np.zeros(held_out_df.height, dtype=np.float64)
+        if handler_active and handler_logit_by_event is not None:
+            held_out_handler_z = _handler_z_with_frozen_stats(
+                held_out_df.sort("event_key").get_column("event_key").to_numpy(),
+                handler_logit_by_event,
+                mean=handler_logit_mean,
+                std=handler_logit_std,
+                dimension=dimension,
+                context="held-out",
+            )
+        else:
+            held_out_handler_z = np.zeros(held_out_df.height, dtype=np.float64)
 
     _log.info(
         "prepare_geometry_inputs dimension=%s K=%d dl_active=%s propensity_active=%s "
@@ -926,6 +1067,11 @@ def prepare_geometry_inputs(
         propensity_logit_mean=propensity_logit_mean,
         propensity_logit_std=propensity_logit_std,
         propensity_active=propensity_active,
+        handler_z=handler_z,
+        held_out_handler_z=held_out_handler_z,
+        handler_logit_mean=handler_logit_mean,
+        handler_logit_std=handler_logit_std,
+        handler_active=handler_active,
     )
 
 

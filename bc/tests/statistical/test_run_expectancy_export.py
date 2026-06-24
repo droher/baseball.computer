@@ -17,6 +17,7 @@ from python_models.statistical.bayes.training import (
 from python_models.statistical.models._run_values_data import (
     RunExpectancyHeldOutSet,
     RunExpectancyInputs,
+    _build_era_regime_design,
 )
 
 CELL_LABELS = ["1933_AL_0_0", "1933_NL_1_3", "1934_AL_2_7"]
@@ -32,11 +33,16 @@ N_CELL = len(CELL_LABELS)
 
 
 def _inputs() -> RunExpectancyInputs:
+    cell_era_design, era_labels = _build_era_regime_design(
+        list(SEASONS), list(LEAGUES)
+    )
     return RunExpectancyInputs(
         sum_runs=np.array([10, 4, 2], dtype=np.int64),
         cell_event_count=np.array([40, 30, 35], dtype=np.int64),
         cell_state_idx=np.arange(N_CELL, dtype=np.int64),
+        cell_era_design=cell_era_design,
         cell_labels=list(CELL_LABELS),
+        era_labels=list(era_labels),
         state_by_cell=[0, 11, 23],
         outs_by_cell=list(OUTS),
         base_state_by_cell=list(BASE),
@@ -48,6 +54,7 @@ def _inputs() -> RunExpectancyInputs:
             "source": ["__single__"],
             "state": list(STATE_LABELS),
             "cell": list(CELL_LABELS),
+            "era_regime": list(era_labels),
         },
         held_out=RunExpectancyHeldOutSet(
             sum_runs=np.zeros(0, dtype=np.int64),

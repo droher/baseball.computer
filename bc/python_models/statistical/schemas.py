@@ -42,6 +42,9 @@ class BayesPriorConfig(BaseModel):
     nb_phi_prior_beta: float = 0.1
     sigma_state_scale: float = 1.0
     sigma_cell_scale: float = 0.5
+    sigma_era_scale: float = 0.1
+    park_home_adv_loc: float = 0.0
+    park_home_adv_scale: float = 0.2
 
 
 class BayesSamplerConfig(BaseModel):

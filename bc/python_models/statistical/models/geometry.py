@@ -12,6 +12,12 @@ the softmax, which is the point of carrying it. Scalar-per-event terms
 (season-league / scorer random effects) are omitted: they would enter
 every class logit equally and cancel exactly inside the per-event
 softmax.
+
+An optional per-class handler-posterior covariate (``gamma_handler``)
+times a standardized per-event summary of Model D's ball-handler posterior
+(the logit of P(handler is an outfielder)) enters the same way, gated by
+``inputs.handler_active``. Like the DL term it is per-class and does NOT
+cancel.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportOperatorIssue=false, reportCallIssue=false, reportArgumentType=false, reportPrivateImportUsage=false, reportIndexIssue=false, reportAttributeAccessIssue=false
@@ -28,6 +34,8 @@ from python_models.statistical.models._geometry_data import GeometryInputs
 from python_models.statistical.schemas import BayesPriorConfig
 
 _log = logging.getLogger(__name__)
+
+GAMMA_HANDLER_SCALE: float = 0.5
 
 
 def build_geometry_model(
@@ -89,6 +97,18 @@ def build_geometry_model(
             )
             eta = eta + z_prop[:, None] * gamma_propensity[None, :]
 
+        handler_values = (
+            inputs.handler_z
+            if inputs.handler_z is not None
+            else np.zeros(inputs.n_events, dtype=np.float64)
+        )
+        z_handler = pm.Data("handler_z", handler_values, dims="event")
+        if inputs.handler_active:
+            gamma_handler = pm.ZeroSumNormal(
+                "gamma_handler", sigma=GAMMA_HANDLER_SCALE, dims="class"
+            )
+            eta = eta + z_handler[:, None] * gamma_handler[None, :]
+
         pi = pm.math.softmax(eta, axis=1)
 
         _ = pm.Multinomial(
@@ -102,7 +122,7 @@ def build_geometry_model(
     _log.info(
         "build_geometry_model dimension=%s events=%d K=%d fixed_effects=%d "
         "dl_active=%s gamma_dl_flavor=%s propensity_active=%s "
-        "gamma_propensity_flavor=%s",
+        "gamma_propensity_flavor=%s handler_active=%s",
         inputs.dimension,
         inputs.n_events,
         K,
@@ -111,5 +131,6 @@ def build_geometry_model(
         gamma_dl_flavor,
         inputs.propensity_active,
         gamma_propensity_flavor,
+        inputs.handler_active,
     )
     return model

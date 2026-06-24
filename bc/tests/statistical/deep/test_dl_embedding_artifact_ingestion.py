@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import polars as pl
 import pytest
 
 from python_models.ml.features import FeatureLayout, Vocabulary

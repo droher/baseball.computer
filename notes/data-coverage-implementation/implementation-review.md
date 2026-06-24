@@ -277,7 +277,13 @@ Files: `models/_responsibility_data.py:50`, `bayes/targets/responsibility.py`,
 These ship honest cut-1s (disclosed-deferred in the checklist) but the materialized tables do
 not estimate what their names imply. Per the locked decision, fix to spec; no publication hedging.
 
-**Status (all of T2.1–T2.5): open (next wave).** No spec completions landed in wave 1.
+**Status (T2.1–T2.5): spec completions landed (code-complete + smoke-verified), branch
+`data-coverage-t2-spec-completion`.** Every buildable, well-specified piece is implemented,
+smoke-fit clean (0 divergences on the new arms), unit-tested, and ruff-clean. Full-scale fits +
+publication-pointer advancement are deferred to a materialization pass (the agreed depth was
+code-complete + smoke). The pieces deferred per the "build around blockers" decision are genuine
+data blockers, identifiability impossibilities, or ambiguous estimands — itemized in
+`notes/followups.md` under "T2 spec-completion deferrals" and in each T2.x block below.
 
 ### T2.1 — Model C (credit): assist-count and error/DP submodels absent
 
@@ -291,15 +297,63 @@ clears baseline. The aggregate arm is rebuilt from a synthetic mask, not the spe
 **Fix:** build the assist-count Dirichlet-multinomial, the error/DP submodels, and the real box
 residual constraint.
 
+**Done: assist-count submodel + error submodel.** `models/assist_count.py` fits a cell-grain
+Multinomial (collapsed Dirichlet-multinomial) over `M ∈ {1,2,3,4}` per `(result_family,
+base_state_start, outs_start)` cell, centered reference-class softmax (the pitch_summary
+parameterization); `M` recovered as the per-event sum of `known_credit` over the 9 positions for
+`credit_type='assist'`. `models/error_credit.py` fits a supervised K=9 error-allocation softmax with
+a `delta_scorer` per-(scorer, position) interaction (gated by `BC_ERROR_CREDIT_DISABLE_SCORER`).
+Both smoke-fit with 0 divergences and a valid simplex. **Deferred — double-play submodel:** no DP
+truth in `model_input_fielding_credit` (the `known` CTE pulls only putouts/assists/errors;
+`double_plays` exists upstream in `event_player_fielding_stats` but is not surfaced, and there is no
+`outs_on_play` event column to gate "two outs on the play"). **Deferred — real box-residual
+constraint:** there is no `materialize_credit_authority_targets` materializer producing
+`credit_authority_targets.parquet`; the aggregate arm still uses the synthetic mask. Plug-in point:
+replace `_credit_data.py::_build_aggregate_targets_from_mask` with a box-residual builder emitting the
+same 5-tuple; `models/credit.py`'s `T_observed` Normal arm needs no change.
+
 ### T2.2 — Model E (geometry): no measurement-error arm, no handler covariate, + MNAR (T1.1)
 
 Spec wants a per-class measurement-error confusion arm (`Ω`/`Δ`) over recorded+deduced layers,
-a handler-posterior covariate `P(H)`, and MNAR/propensity correction. Built: per-dim K-class
-softmax on recorded labels only, FEs + a per-class DL covariate. **Fix:** add the
-measurement-error arm (note: the deduced layer is a deterministic function of the same scorer's
-fielding — see Model B appendix — so the "second label" is not independent; the confusion arm
-must be anchored on something real or stay recorded-only), the handler-posterior covariate, and
-the T1.1 propensity term.
+a handler-posterior covariate `P(H)`, and MNAR/propensity correction. Built (original wave): per-dim
+K-class softmax on recorded labels only, FEs + a per-class DL covariate.
+
+**Done (T2.2 spec completion): handler-posterior covariate `P(H)`.** `build_geometry_model` carries
+an optional per-class `gamma_handler` term (`pm.ZeroSumNormal` over the class axis, scale
+`GAMMA_HANDLER_SCALE=0.5`) times a standardized per-event handler feature, mirroring the existing
+`gamma_dl` hook. The feature is the **logit of P(handler is an outfielder)** — `logit(share7 + share8
++ share9)` from Model D's published `ball_handler_probabilities.parquet`, joined by `event_key` in
+`_geometry_data.py`. The in/out-field split is the smallest defensible encoding and the signal most
+relevant to trajectory / location-depth. Same centering/freeze discipline as the DL covariate: the
+handler-logit mean/std are computed on the Model-D-covered training rows and frozen; held-out and
+production reuse the training stats; events absent from Model D's export map to z=0. The term is inert
+unless `inputs.handler_active` is True (set in prep only when `BC_GEOMETRY_HANDLER` is enabled AND a
+Model D export resolves), so the shared `build_geometry_model` stays unaffected for Model H
+(advancement) and any geometry dim without a handler join. Export-path wiring is **deferred**: the
+production reconstruction `_posterior_event_softmax` in `bayes/training.py` does not yet know the
+`gamma_handler` term, so it must be taught it before a production geometry fit with the handler
+covariate active can publish. Model D's published pointer is resolved under the per-branch
+`BC_STATS_PUBLISHED_ROOT`; on a branch lacking the `ball_handler_imputation.json` pointer, source the
+export with `BC_GEOMETRY_HANDLER_ARTIFACT=<artifact dir>`.
+
+**Deferred — measurement-error confusion arm (`Ω`/`Δ`).** UNIDENTIFIABLE in single-source Retrosheet.
+The spec's confusion arm wants `Recorded | G` and `Deduced | G` as two conditionally-independent
+labelings of the latent class `G`. But the deduced layer is a **deterministic function of the same
+scorer's fielding record** (`calc_batted_ball_type` / `event_observation_geometry` rules: HR→Fly,
+OF-putout→AirBall, infielder-assisted-putout→GroundBall, fielder-position-derived
+location_side/depth), not an independent second observation. With recorded ≈ a deterministic recode of
+the same source, `Ω` and `Δ` cannot be separated from the class prior — there is no second labeling
+channel to pin the confusion probabilities. An identified confusion arm needs a genuinely independent
+second labeling source (e.g. a different scorer / a tracking system), which this single-source
+Retrosheet data lacks. Same blocker as the Model B contact-label confusion model (recorded≈deduced, no
+independent second label). Stays recorded-only until a real second label source is available.
+
+**Deferred — MNAR / propensity term.** Already present as the parked `gamma_propensity` hook
+(`pm.ZeroSumNormal` over the class axis on the standardized `propensity_p_observed` logit, flavor
+`gamma_propensity_class`, gated by `inputs.propensity_active`). REFUTED per T1.1: the masked backtest
+showed the learned class coefficient learns the observed-slice survivor tilt and extrapolates it
+wrong-signed into the unobserved slice. Default flavor stays `gamma_propensity_zero`; published
+operating points use it. Left as-is — no change.
 
 ### T2.3 — Model F (park factors): missing structure + identification risk
 
@@ -314,6 +368,23 @@ can inflate the held-out park lift. **Fix:** the AR(1) persistence, `park_episod
 covariates, and a within-season-league identification for `θ_park`; add a road-vs-home contrast
 as a sensitivity check.
 
+**Done: within-season-league `θ_park` identification + AR(1) + home-adv.** `theta_park` is now the
+raw park effect centered to sum to zero **within each (season, league) group** (`_center_within_group`,
+a JAX-safe one-hot membership matmul), not globally — this closes the era-scoring leak (verified:
+max |within-season-league sum| = 1.8e-16 on the smoke posterior). The raw effect optionally follows an
+**AR(1) persistence prior** across consecutive seasons within a `(park, league)` chain (`pm.AR`,
+`rho~Beta(2,1)`, non-centered, stationary init); gated by `BC_PARK_FACTOR_DISABLE_AR1`. A
+home-field-advantage term + the `home_idx` road/home split is the confound sensitivity diagnostic
+(`BC_PARK_FACTOR_DISABLE_HOME_ADV`). The `theta_park` deterministic contract (dims, cell order) is
+preserved, so the existing `_export_park_factor_*` path is untouched. Smoke: 0 divergences, rhat 1.17.
+**Deferred — `park_episode_id`:** `model_input_park_factors.park_episode_status` is 100% NULL in both
+dataset artifacts, so no episode id resets the AR(1) chain at structural park changes (it keys on
+`(park, league)`); needs the upstream park-history dimension to populate a non-null stable
+`park_episode_id`. **Deferred — umpire/weather/surface/day-night/hand covariates:** none of those
+columns exist in `model_input_park_factors` (no umpire id, no temp/wind, no turf/grass, no day_night);
+`batter_hand`/`pitcher_hand` exist per-event but the model is team-game grain. Each needs an SQL change
+to surface the column (and hand needs an event-grain restructure).
+
 ### T2.4 — Model G (run values): no era_regime, no Markov, no linear weights
 
 Spec wants RE **plus** a Markov transition submodel (sum-to-1 hard invariant) **plus**
@@ -324,10 +395,50 @@ shift run expectancy, and a published RE table without them is wrong, not merely
 **Fix (in priority order):** add `era_regime`; build the linear-weights deliverable; add the
 Markov transition submodel.
 
-### T2.5 — Model J (pitch summary): coverage Bernoulli arm deferred
+**Done: era_regime + Markov submodel + marginal linear weights.** `era_regime` is now an intermediate
+pooling level: `theta_cell ~ Normal(mu_state[state] + Σ_r design[cell,r]·a_era[state,r], sigma_cell)`,
+with `a_era` a non-centered `(state, era_regime)` effect (`sigma_era ~ HalfNormal(0.1)`). The per-cell
+regime design is a multi-hot over `{pre_DH, DH_AL_only, full_DH, ghost_runner,
+extra_inning_ghost_plus_expanded_DH}`, pruned to full rank (all-zero + exact-duplicate columns dropped
+— e.g. `full_DH ≡ extra_inning_ghost_plus_expanded_DH` collapse at the season-league cell grain). So
+seasons now pool to their era×state mean, not the 1901-2025 grand mean. Ablation via
+`BC_RUN_VALUES_DISABLE_ERA_REGIME`. Smoke: 0 divergences; on/off paths verified. `models/state_transition.py`
+fits the **Markov transition submodel** — cell-grain Multinomial over 25 end classes (24 base-out +
+inning-end, the `outs==3` / `3_0` suffix) per `(season, league, start_state)`, reference-class centered
+softmax; per-cell `cell_class_prob` sums to 1 by construction (the spec's hard invariant; verified max
+|sum−1| = 1.1e-15). `models/linear_weights.py::compute_marginal_linear_weights` builds the **standard
+marginal linear weight** per `(result_family, season, league)` = mean of `runs_on_play + V_end − V_start`
+(park-neutral trivially — Model G has no park term; inning-end V = 0). **Deferred — context-neutral
+P_LW-integrated LW:** the spec's headline (~line 720) integrates `V_end` against the modeled marginal
+transition `P_LW(end|start)`; that estimand is ambiguous at the per-play-type grain (`P_LW` is keyed on
+the start state alone, so it does not distinguish play types sharing a start state) and needs an
+estimand decision before it can be a published number. The Markov submodel that would feed it is built;
+only the integration is deferred. The new G modules are intentionally NOT yet wired to a CLI target /
+SQLMesh `@model` (publication deferred).
+
+### T2.5 — Model J (pitch summary): coverage Bernoulli arm + context terms
+
+**Status: coverage arm built; source/batter/pitcher context deferred with cause.**
 
 Built: cell-grain Multinomial over 12 final counts. Spec also wants a coverage (`has_count`)
-Bernoulli arm and batter/pitcher/source context. **Fix:** add the coverage arm and context terms.
+Bernoulli arm and batter/pitcher/source context.
+
+- **Coverage arm — BUILT.** `model_input_pitch_summary` carries the full `event_level` population
+  (both `has_count` and not-`has_count`; ~53% of 18.1M rows are not observed), so the arm was NOT
+  blocked. `models/_pitch_coverage_data.py` + `models/pitch_coverage.py` fit
+  `R_i ~ Bernoulli(p_i)` as a hierarchical logistic mirroring `models/observation.py`: `alpha`
+  + ZeroSumNormal `season|league` cell + non-centered `scorer` + ZeroSumNormal FE on
+  `result_family` / `alignment_regime`. Smoke (40K events, 50 draws × 2 chains, numpyro):
+  0 divergences. Not wired through `bayes/training.py` (deferred export wiring per T2 scope);
+  smoke via standalone `pm.sample`.
+- **Source context on summary — BLOCKED (data).** `source_family` and `source_type` are
+  single-valued in this dataset (`play_by_play` / `PlayByPlay` only). A source partial-pooling
+  level on the cell-grain summary hierarchy is degenerate (one level), so it was not added. A real
+  source-context term needs a dataset that surfaces >1 source family at this grain.
+- **Batter/pitcher context on summary — DEFERRED (grain).** 18K batters / 10K pitchers are
+  event-grain high-cardinality; the summary model is cell-grain over `(result_family, season,
+  league)` and structurally cannot carry per-batter/pitcher terms. Requires an event-grain summary
+  restructure.
 
 ---
 

@@ -17,6 +17,7 @@ exp(theta_cell)`` is the published run-expectancy value.
 from __future__ import annotations
 
 import logging
+import os
 
 import numpy as np
 import pymc as pm
@@ -27,6 +28,12 @@ from python_models.statistical.schemas import BayesPriorConfig
 _log = logging.getLogger(__name__)
 
 
+def _era_regime_enabled(n_era_regimes: int) -> bool:
+    if n_era_regimes == 0:
+        return False
+    return os.environ.get("BC_RUN_VALUES_DISABLE_ERA_REGIME", "") not in ("1", "true")
+
+
 def build_run_expectancy_model(
     inputs: RunExpectancyInputs,
     *,
@@ -34,6 +41,9 @@ def build_run_expectancy_model(
 ) -> pm.Model:
     """Construct the cell-grain NegativeBinomial run-expectancy model."""
     cfg = priors or BayesPriorConfig()
+
+    n_era_regimes = len(inputs.coords.get("era_regime", []))
+    era_active = _era_regime_enabled(n_era_regimes)
 
     with pm.Model(coords=inputs.coords) as model:
         cell_state_idx = pm.Data("cell_state_idx", inputs.cell_state_idx)
@@ -45,9 +55,22 @@ def build_run_expectancy_model(
         sigma_state = pm.HalfNormal("sigma_state", sigma=cfg.sigma_state_scale)
         mu_state = pm.Normal("mu_state", mu=global_mu, sigma=sigma_state, dims="state")
 
+        cell_loc = mu_state[cell_state_idx]
+        if era_active:
+            cell_era_design = pm.Data("cell_era_design", inputs.cell_era_design)
+            sigma_era = pm.HalfNormal("sigma_era", sigma=cfg.sigma_era_scale)
+            z_era = pm.Normal("z_era", mu=0.0, sigma=1.0, dims=("state", "era_regime"))
+            a_era = pm.Deterministic(
+                "a_era", z_era * sigma_era, dims=("state", "era_regime")
+            )
+            era_term = pm.math.sum(
+                cell_era_design * a_era[cell_state_idx], axis=1
+            )
+            cell_loc = cell_loc + era_term
+
         sigma_cell = pm.HalfNormal("sigma_cell", sigma=cfg.sigma_cell_scale)
         theta_cell = pm.Normal(
-            "theta_cell", mu=mu_state[cell_state_idx], sigma=sigma_cell, dims="cell"
+            "theta_cell", mu=cell_loc, sigma=sigma_cell, dims="cell"
         )
         re_value = pm.Deterministic("re_value", pm.math.exp(theta_cell), dims="cell")
 
@@ -61,9 +84,12 @@ def build_run_expectancy_model(
         )
 
     _log.info(
-        "build_run_expectancy_model cells=%d states=%d events=%d",
+        "build_run_expectancy_model cells=%d states=%d events=%d era_regimes=%d "
+        "era_active=%s",
         inputs.n_cells,
         len(inputs.coords["state"]),
         inputs.n_events,
+        n_era_regimes,
+        era_active,
     )
     return model

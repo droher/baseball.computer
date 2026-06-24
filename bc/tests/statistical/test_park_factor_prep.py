@@ -27,6 +27,7 @@ def _event_rows(
     batting_team_id: str,
     fielding_team_id: str,
     park_id: str,
+    home_away: str,
     runs: list[int],
     pa: list[int],
 ) -> list[dict[str, object]]:
@@ -38,6 +39,7 @@ def _event_rows(
                 "batting_team_id": batting_team_id,
                 "fielding_team_id": fielding_team_id,
                 "park_id": park_id,
+                "home_away": home_away,
                 "season": SEASON,
                 "league": LEAGUE,
                 "plate_appearances": p,
@@ -57,6 +59,7 @@ def _team_game(
             batting_team_id=home,
             fielding_team_id=away,
             park_id=park_id,
+            home_away="home",
             runs=[1, 0, 2] + [0] * (n_events - 3),
             pa=[1] * n_events,
         )
@@ -67,6 +70,7 @@ def _team_game(
             batting_team_id=away,
             fielding_team_id=home,
             park_id=park_id,
+            home_away="away",
             runs=[0, 1, 0] + [1] * (n_events - 3),
             pa=[1] * n_events,
         )

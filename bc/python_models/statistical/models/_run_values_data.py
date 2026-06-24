@@ -33,9 +33,66 @@ from python_models.statistical.splits import game_hash_fold
 _log = logging.getLogger(__name__)
 
 IntArray = npt.NDArray[np.int64]
+FloatArray = npt.NDArray[np.float64]
 
 DEFAULT_SEED: int = 20260513
 OUTCOME: str = "runs_to_end"
+
+ERA_REGIME_LABELS: tuple[str, ...] = (
+    "pre_DH",
+    "DH_AL_only",
+    "full_DH",
+    "ghost_runner",
+    "extra_inning_ghost_plus_expanded_DH",
+)
+
+
+def _era_regime_row(season: int, league: str) -> list[float]:
+    """Multi-hot regime indicators for one (season, league) cell.
+
+    Regimes overlap; the vector is a set of indicators, not a categorical.
+    At the (season, league) cell grain the model cannot resolve extra-innings
+    or game-type, so ghost-runner regimes are encoded as their season proxy
+    and collinear columns are pruned downstream by ``_build_era_regime_design``.
+    """
+    return [
+        1.0 if season < 1973 else 0.0,
+        1.0 if 1973 <= season <= 2021 and league == "AL" else 0.0,
+        1.0 if season >= 2022 else 0.0,
+        1.0 if season >= 2020 else 0.0,
+        1.0 if season >= 2022 else 0.0,
+    ]
+
+
+def _build_era_regime_design(
+    season_by_cell: list[int], league_by_cell: list[str]
+) -> tuple[FloatArray, list[str]]:
+    """Per-cell regime design, pruned to full rank.
+
+    Drops all-zero columns (a regime absent from the corpus) and exact
+    duplicates (regimes that collapse to the same indicator at this grain,
+    e.g. ``full_DH`` and ``extra_inning_ghost_plus_expanded_DH`` both reduce
+    to ``season >= 2022``). The first occurrence is kept.
+    """
+    full = np.array(
+        [_era_regime_row(s, lg) for s, lg in zip(season_by_cell, league_by_cell)],
+        dtype=np.float64,
+    )
+    if full.shape[0] == 0:
+        return full.reshape(0, 0), []
+    kept_idx: list[int] = []
+    kept_labels: list[str] = []
+    for j, label in enumerate(ERA_REGIME_LABELS):
+        col = full[:, j]
+        if not col.any():
+            _log.info("era_regime dropped all-zero column %s", label)
+            continue
+        if any(np.array_equal(col, full[:, k]) for k in kept_idx):
+            _log.info("era_regime dropped duplicate column %s", label)
+            continue
+        kept_idx.append(j)
+        kept_labels.append(label)
+    return full[:, kept_idx], kept_labels
 
 HOLDOUT_FOLD_COUNT: int = 10
 HOLDOUT_FOLD_ID: int = 0
@@ -71,8 +128,10 @@ class RunExpectancyInputs(BaseModel):
     sum_runs: IntArray
     cell_event_count: IntArray
     cell_state_idx: IntArray
+    cell_era_design: FloatArray
 
     cell_labels: list[str]
+    era_labels: list[str]
     state_by_cell: list[int]
     outs_by_cell: list[int]
     base_state_by_cell: list[int]
@@ -287,6 +346,10 @@ def prepare_run_expectancy_inputs(
     )
     _assert_contiguous(cell_state_idx, state_labels, "cell_state_idx")
 
+    cell_era_design, era_labels = _build_era_regime_design(
+        season_by_cell, league_by_cell
+    )
+
     held_out = _build_held_out_set(
         held_cells,
         cell_labels=cell_labels,
@@ -298,21 +361,26 @@ def prepare_run_expectancy_inputs(
         "source": [SINGLE_SOURCE_LABEL],
         "state": list(state_labels),
         "cell": list(cell_labels),
+        "era_regime": list(era_labels),
     }
 
     _log.info(
-        "prepare_run_expectancy_inputs train_cells=%d held_out_cells=%d states=%d events=%d",
+        "prepare_run_expectancy_inputs train_cells=%d held_out_cells=%d states=%d "
+        "events=%d era_regimes=%d",
         train_cells.height,
         held_out.n_cells,
         len(state_labels),
         int(cell_event_count.sum()),
+        len(era_labels),
     )
 
     return RunExpectancyInputs(
         sum_runs=sum_runs,
         cell_event_count=cell_event_count,
         cell_state_idx=cell_state_idx,
+        cell_era_design=cell_era_design,
         cell_labels=list(cell_labels),
+        era_labels=list(era_labels),
         state_by_cell=state_by_cell,
         outs_by_cell=outs_by_cell,
         base_state_by_cell=base_state_by_cell,

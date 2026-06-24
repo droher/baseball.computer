@@ -8,6 +8,14 @@ cell is a published park-effect coord; cells below ``MIN_GAMES_PER_PARK_CELL``
 training team-games are dropped as unidentified. A deterministic 10% game
 holdout (``game_hash_fold``, fold 0) ships alongside training for OOS
 scoring, with levels unseen in training encoded to ``-1``.
+
+``cell_season_league_idx`` maps each park cell to its ``(season, league)``
+group so the builder can center the park effect within season-league.
+``ar_chain_idx`` / ``ar_step_idx`` map each park cell onto a padded
+``(n_ar_chains, n_ar_steps)`` grid keyed by (park, league) chain and the
+cell's season rank within that chain, for an AR(1) persistence prior across
+seasons; ``home_idx`` flags whether the batting team is the home team for a
+home-field-advantage term.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportAttributeAccessIssue=false
@@ -70,11 +78,18 @@ class ParkFactorInputs(BaseModel):
     offense_idx: IntArray
     pitching_idx: IntArray
     park_season_league_idx: IntArray
+    home_idx: IntArray
 
     park_season_league_labels: list[str]
     park_id_by_cell: list[str]
     season_by_cell: list[int]
     league_by_cell: list[str]
+
+    cell_season_league_idx: IntArray
+    ar_chain_idx: IntArray
+    ar_step_idx: IntArray
+    n_ar_chains: int
+    n_ar_steps: int
 
     outcome: str
     coords: dict[str, list[str]]
@@ -83,6 +98,10 @@ class ParkFactorInputs(BaseModel):
     @property
     def n_events(self) -> int:
         return int(self.team_runs.shape[0])
+
+    @property
+    def n_cells(self) -> int:
+        return len(self.park_season_league_labels)
 
 
 def _assert_contiguous(idx: IntArray, labels: list[str], column: str) -> None:
@@ -119,6 +138,33 @@ def _encode_codes_with_vocab(
     )
 
 
+def _build_ar_chain_grid(
+    park_id_by_cell: list[str],
+    season_by_cell: list[int],
+    league_by_cell: list[str],
+) -> tuple[IntArray, IntArray, int, int]:
+    chain_keys = [
+        f"{park}|{league}"
+        for park, league in zip(park_id_by_cell, league_by_cell, strict=True)
+    ]
+    chain_labels = sorted(set(chain_keys))
+    chain_label_to_id = {label: i for i, label in enumerate(chain_labels)}
+    chain_idx = np.fromiter(
+        (chain_label_to_id[k] for k in chain_keys),
+        dtype=np.int64,
+        count=len(chain_keys),
+    )
+    season = np.asarray(season_by_cell, dtype=np.int64)
+    step_idx = np.zeros(len(chain_keys), dtype=np.int64)
+    for cid in range(len(chain_labels)):
+        members = np.flatnonzero(chain_idx == cid)
+        order = members[np.argsort(season[members], kind="stable")]
+        step_idx[order] = np.arange(order.shape[0], dtype=np.int64)
+    n_chains = len(chain_labels)
+    n_steps = int(step_idx.max()) + 1 if step_idx.shape[0] else 1
+    return chain_idx, step_idx, n_chains, n_steps
+
+
 def _aggregate_team_games(parquet_path: Path) -> pl.DataFrame:
     return (
         pl.scan_parquet(parquet_path)
@@ -136,6 +182,7 @@ def _aggregate_team_games(parquet_path: Path) -> pl.DataFrame:
             pl.col("season").first().alias("season"),
             pl.col("league").first().alias("league"),
             pl.col("fielding_team_id").first().alias("fielding_team_id"),
+            pl.col("home_away").first().alias("home_away"),
         )
         .filter(pl.col("exposure_pa") >= 1)
         .with_columns(
@@ -259,6 +306,12 @@ def prepare_park_factor_inputs(
 
     team_runs = train.get_column("team_runs").to_numpy().astype(np.int64)
     exposure_pa = train.get_column("exposure_pa").to_numpy().astype(np.float64)
+    home_idx = (
+        (train.get_column("home_away").cast(pl.Utf8) == "home")
+        .cast(pl.Int64)
+        .to_numpy()
+        .astype(np.int64)
+    )
 
     season_league_idx, season_league_labels = _category_index(train, "season_league")
     offense_idx, offense_labels = _category_index(train, "offense_team_season")
@@ -283,6 +336,20 @@ def prepare_park_factor_inputs(
     park_id_by_cell = [decomp_map[label][0] for label in park_season_league_labels]
     season_by_cell = [decomp_map[label][1] for label in park_season_league_labels]
     league_by_cell = [decomp_map[label][2] for label in park_season_league_labels]
+
+    season_league_pos = {label: i for i, label in enumerate(season_league_labels)}
+    cell_season_league_idx = np.fromiter(
+        (
+            season_league_pos[f"{season}|{league}"]
+            for season, league in zip(season_by_cell, league_by_cell, strict=True)
+        ),
+        dtype=np.int64,
+        count=len(park_season_league_labels),
+    )
+
+    ar_chain_idx, ar_step_idx, n_ar_chains, n_ar_steps = _build_ar_chain_grid(
+        park_id_by_cell, season_by_cell, league_by_cell
+    )
 
     held_out = _build_held_out_set(
         held_out_df,
@@ -318,10 +385,16 @@ def prepare_park_factor_inputs(
         offense_idx=offense_idx,
         pitching_idx=pitching_idx,
         park_season_league_idx=park_season_league_idx,
+        home_idx=home_idx,
         park_season_league_labels=list(park_season_league_labels),
         park_id_by_cell=park_id_by_cell,
         season_by_cell=season_by_cell,
         league_by_cell=league_by_cell,
+        cell_season_league_idx=cell_season_league_idx,
+        ar_chain_idx=ar_chain_idx,
+        ar_step_idx=ar_step_idx,
+        n_ar_chains=n_ar_chains,
+        n_ar_steps=n_ar_steps,
         outcome=OUTCOME,
         coords=coords,
         held_out=held_out,

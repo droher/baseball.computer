@@ -24,6 +24,8 @@ from python_models.statistical.models._geometry_data import (
     GEOMETRY_DIMENSIONS,
     HOLDOUT_FOLD_COUNT,
     HOLDOUT_FOLD_ID,
+    _handler_z_with_frozen_stats,
+    _standardized_handler_logit,
     build_geometry_production_frame,
     prepare_geometry_inputs,
 )
@@ -868,3 +870,33 @@ def test_multiple_distinct_dl_artifact_ids_raise(tmp_path: Path) -> None:
             min_events_per_season=1,
             held_out_fold_count=999,
         )
+
+
+def test_handler_logit_standardization_freezes_and_maps_null_to_zero() -> None:
+    event_keys = np.array([10, 20, 30, 40], dtype=np.int64)
+    logit_by_event = {10: 1.0, 20: 3.0}
+    z, mean, std = _standardized_handler_logit(
+        event_keys, logit_by_event, dimension="trajectory"
+    )
+    np.testing.assert_allclose(mean, 2.0)
+    np.testing.assert_allclose(std, 1.0)
+    np.testing.assert_allclose(z, np.array([-1.0, 1.0, 0.0, 0.0]))
+
+
+def test_handler_logit_frozen_stats_applied_to_other_slice() -> None:
+    train_keys = np.array([1, 2], dtype=np.int64)
+    logit_by_event = {1: 0.0, 2: 4.0, 5: 8.0, 6: 12.0}
+    _, mean, std = _standardized_handler_logit(
+        train_keys, logit_by_event, dimension="trajectory"
+    )
+    other_keys = np.array([5, 6, 7], dtype=np.int64)
+    z = _handler_z_with_frozen_stats(
+        other_keys,
+        logit_by_event,
+        mean=mean,
+        std=std,
+        dimension="trajectory",
+        context="held-out",
+    )
+    np.testing.assert_allclose(z, (np.array([8.0, 12.0, mean]) - mean) / std)
+    assert z[2] == 0.0

@@ -36,6 +36,7 @@ def _synthetic_inputs(
     n_events: int = 24,
     dl_active: bool = True,
     propensity_active: bool = False,
+    handler_active: bool = False,
     seed: int = 20260525,
 ) -> GeometryInputs:
     rng = np.random.default_rng(seed)
@@ -80,6 +81,11 @@ def _synthetic_inputs(
         if propensity_active
         else np.zeros(n_events, dtype=np.float64)
     )
+    handler_z = (
+        rng.normal(size=n_events).astype(np.float64)
+        if handler_active
+        else np.zeros(n_events, dtype=np.float64)
+    )
 
     return GeometryInputs(
         event_keys=np.arange(n_events, dtype=np.int64),
@@ -99,6 +105,9 @@ def _synthetic_inputs(
         propensity_z=propensity_z,
         held_out_propensity_z=np.zeros(0, dtype=np.float64),
         propensity_active=propensity_active,
+        handler_z=handler_z,
+        held_out_handler_z=np.zeros(0, dtype=np.float64),
+        handler_active=handler_active,
     )
 
 
@@ -208,3 +217,43 @@ def test_propensity_z_data_absent_from_inputs_defaults_to_zeros() -> None:
     np.testing.assert_allclose(
         model["propensity_z"].eval(), np.zeros(inputs.n_events, dtype=np.float64)
     )
+
+
+def test_gamma_handler_present_when_handler_active() -> None:
+    import pymc as pm
+
+    inputs = _synthetic_inputs(handler_active=True)
+    model = build_geometry_model(inputs)
+    assert "gamma_handler" in _rv_names(model)
+    assert "handler_z" in {d.name for d in model.data_vars}
+    assert tuple(model.named_vars_to_dims["gamma_handler"]) == ("class",)
+    draw = pm.draw(model["gamma_handler"], random_seed=20260624)
+    assert draw.shape == (inputs.n_classes,)
+    assert float(np.abs(draw.sum())) < 1e-8, (
+        "gamma_handler must be zero-sum over the class dim — a constant "
+        "component cancels in the softmax and is unidentified"
+    )
+
+
+def test_gamma_handler_absent_when_handler_inactive() -> None:
+    inputs = _synthetic_inputs(handler_active=False)
+    model = build_geometry_model(inputs)
+    assert "gamma_handler" not in _rv_names(model)
+    assert "handler_z" in {d.name for d in model.data_vars}
+
+
+def test_handler_z_data_absent_from_inputs_defaults_to_zeros() -> None:
+    inputs = _synthetic_inputs(handler_active=False).model_copy(
+        update={"handler_z": None}
+    )
+    model = build_geometry_model(inputs)
+    np.testing.assert_allclose(
+        model["handler_z"].eval(), np.zeros(inputs.n_events, dtype=np.float64)
+    )
+
+
+def test_handler_inert_for_advancement_style_inputs_without_handler() -> None:
+    inputs = _synthetic_inputs(handler_active=False, dl_active=False)
+    model = build_geometry_model(inputs)
+    assert "gamma_handler" not in _rv_names(model)
+    assert "G_observed" in {rv.name for rv in model.observed_RVs}
