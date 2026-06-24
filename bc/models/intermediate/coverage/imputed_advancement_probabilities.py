@@ -69,6 +69,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
 
     from python_models.statistical.bayes import targets as _targets  # noqa: F401
     from python_models.statistical.bayes.manifest_ingest import (
+        ADVANCEMENT_SCHEMA,
         aggregate_advancement_frames,
     )
 
@@ -95,11 +96,4 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
             "imputed_advancement_probabilities: no advancement targets published; "
             "yielding empty frame"
         )
-        empty_schema: dict[str, pl.DataType] = {
-            "event_key": pl.UInt32(),
-            "baserunner": pl.Utf8(),
-            "advancement_class": pl.Utf8(),
-            "expected_share": pl.Float64(),
-            "bayes_artifact_id": pl.Utf8(),
-        }
-        yield pl.DataFrame(schema=empty_schema)
+        yield pl.DataFrame(schema=ADVANCEMENT_SCHEMA)

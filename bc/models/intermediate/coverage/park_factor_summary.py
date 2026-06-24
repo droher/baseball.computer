@@ -78,6 +78,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
 
     from python_models.statistical.bayes import targets as _targets  # noqa: F401
     from python_models.statistical.bayes.manifest_ingest import (
+        PARK_FACTOR_SUMMARY_SCHEMA,
         aggregate_park_factor_frames,
     )
 
@@ -109,16 +110,4 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
             "park_factor_summary: no park-factor targets published; "
             "yielding empty frame"
         )
-        empty_schema: dict[str, pl.DataType] = {
-            "park_id": pl.Utf8(),
-            "season": pl.Int16(),
-            "league": pl.Utf8(),
-            "outcome": pl.Utf8(),
-            "theta_mean": pl.Float64(),
-            "theta_sd": pl.Float64(),
-            "theta_hdi_lower": pl.Float64(),
-            "theta_hdi_upper": pl.Float64(),
-            "park_factor_mean": pl.Float64(),
-            "bayes_artifact_id": pl.Utf8(),
-        }
-        yield pl.DataFrame(schema=empty_schema)
+        yield pl.DataFrame(schema=PARK_FACTOR_SUMMARY_SCHEMA)

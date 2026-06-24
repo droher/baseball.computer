@@ -495,6 +495,83 @@ def test_backward_compat_default_intercept_no_dl() -> None:
     np.testing.assert_allclose(got, expected, atol=1e-12)
 
 
+def test_held_out_and_event_softmax_identical_on_shared_posterior() -> None:
+    rng = np.random.default_rng(101)
+    handler_z = rng.normal(size=N_EVENTS).astype(np.float64)
+    prop_z = rng.normal(size=N_EVENTS).astype(np.float64)
+    dl = rng.normal(size=(N_EVENTS, N_CLASSES)).astype(np.float64)
+    rf_codes = rng.integers(0, 3, size=N_EVENTS).astype(np.int64)
+    rf_codes[1] = -1
+    rf_codes[4] = -1
+
+    n_chain, n_draw = 2, 5
+    base = _posterior(with_gamma_dl=True, gamma_value=1.1, with_gamma_propensity=True)
+    posterior = {k: np.asarray(v.values) for k, v in base.posterior.data_vars.items()}
+    raw = rng.normal(size=(n_chain, n_draw, N_CLASSES))
+    posterior["gamma_handler"] = raw - raw.mean(axis=-1, keepdims=True)
+    idata = az.from_dict(posterior=posterior)
+
+    carrier = GeometryProductionFrame(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+        dl_logit_per_class=dl,
+        propensity_z=prop_z,
+        handler_z=handler_z,
+    )
+    held = HeldOutSet(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        true_position=rng.integers(0, N_CLASSES, size=N_EVENTS).astype(np.int64),
+        U=np.ones(N_EVENTS, dtype=np.int64),
+        season_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        scorer_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        park_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        source_idx=np.zeros(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+    )
+
+    via_event = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        dl_logit_per_class=dl,
+        propensity_z=prop_z,
+        handler_z=handler_z,
+    )
+    via_held_out = _posterior_held_out_softmax(
+        idata,
+        held,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        dl_logit_per_class=dl,
+        propensity_z=prop_z,
+        handler_z=handler_z,
+    )
+    np.testing.assert_array_equal(via_event, via_held_out)
+
+
+def test_softmax_empty_event_set_returns_zero_rows() -> None:
+    idata = _posterior(with_gamma_dl=False)
+    empty = GeometryProductionFrame(
+        event_keys=np.empty(0, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(
+                levels=("a", "b", "c"), codes=np.empty(0, dtype=np.int64)
+            )
+        },
+        dl_logit_per_class=np.empty((0, N_CLASSES), dtype=np.float64),
+    )
+    out = _posterior_event_softmax(
+        idata, empty, n_positions=N_CLASSES, intercept_name="alpha_class"
+    )
+    assert out.shape == (0, N_CLASSES)
+    assert out.dtype == np.float64
+
+
 def test_export_geometry_probabilities_schema_and_sum(tmp_path: Path) -> None:
     rng = np.random.default_rng(5)
     raw = rng.random(size=(N_EVENTS, N_CLASSES))

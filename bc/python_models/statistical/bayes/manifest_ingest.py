@@ -11,7 +11,7 @@ schema persists when no targets have been published yet.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 
 import polars as pl
 
@@ -21,7 +21,7 @@ from python_models.statistical.manifests import (
     find_published_manifest,
     read_manifest,
 )
-from python_models.statistical.schemas import PublishedPointer
+from python_models.statistical.schemas import ArtifactManifest, PublishedPointer
 
 _log = logging.getLogger(__name__)
 
@@ -120,36 +120,40 @@ PITCH_SUMMARY_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
+def _empty_frame(schema: dict[str, pl.DataType]) -> pl.DataFrame:
+    return pl.DataFrame(schema=schema)
+
+
 def empty_propensity_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=PROPENSITY_SCHEMA)
+    return _empty_frame(PROPENSITY_SCHEMA)
 
 
 def empty_credit_share_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=CREDIT_SHARE_SCHEMA)
+    return _empty_frame(CREDIT_SHARE_SCHEMA)
 
 
 def empty_ball_handler_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=BALL_HANDLER_SCHEMA)
+    return _empty_frame(BALL_HANDLER_SCHEMA)
 
 
 def empty_geometry_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=GEOMETRY_SCHEMA)
+    return _empty_frame(GEOMETRY_SCHEMA)
 
 
 def empty_advancement_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=ADVANCEMENT_SCHEMA)
+    return _empty_frame(ADVANCEMENT_SCHEMA)
 
 
 def empty_park_factor_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=PARK_FACTOR_SUMMARY_SCHEMA)
+    return _empty_frame(PARK_FACTOR_SUMMARY_SCHEMA)
 
 
 def empty_run_expectancy_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=RUN_EXPECTANCY_SUMMARY_SCHEMA)
+    return _empty_frame(RUN_EXPECTANCY_SUMMARY_SCHEMA)
 
 
 def empty_pitch_summary_frame() -> pl.DataFrame:
-    return pl.DataFrame(schema=PITCH_SUMMARY_SUMMARY_SCHEMA)
+    return _empty_frame(PITCH_SUMMARY_SUMMARY_SCHEMA)
 
 
 def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
@@ -161,22 +165,47 @@ def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
             yield spec
 
 
+def _specs_for_multinomial_export(export: str) -> Iterator[BayesTargetSpec]:
+    for spec in _iter_specs_by_kind("multinomial"):
+        if spec.multinomial_export == export:
+            yield spec
+
+
+def _specs_for_count_export(export: str) -> Iterator[BayesTargetSpec]:
+    for spec in _iter_specs_by_kind("count"):
+        if spec.count_export == export:
+            yield spec
+
+
+def _specs_for_bernoulli_dataset(dataset_name: str) -> Iterator[BayesTargetSpec]:
+    for spec in _iter_specs_by_kind("bernoulli"):
+        if spec.dataset_name == dataset_name:
+            yield spec
+
+
 OBSERVATION_PROPENSITY_DATASET: str = "model_input_observation_batted_ball"
 PITCH_COVERAGE_DATASET: str = "model_input_pitch_summary"
 
 
-def _iter_published_propensity_frames(dataset_name: str) -> Iterator[pl.DataFrame]:
-    """Yield one frame per published Bernoulli target on ``dataset_name``.
+FrameBuilder = Callable[
+    [pl.DataFrame, ArtifactManifest, BayesTargetSpec], pl.DataFrame
+]
 
-    Both the obs-propensity targets and the pitch-coverage target ship the
-    identical ``event_propensity.parquet`` schema, differing only in the
-    dataset they read and the ``dimension`` they stamp. The two SQLMesh
-    ``@model`` gathers separate on the dataset to keep their grains
-    disjoint.
+
+def _iterate_published_export_frames(
+    specs: Iterable[BayesTargetSpec],
+    *,
+    export_filename: str,
+    build_frame: FrameBuilder,
+) -> Iterator[pl.DataFrame]:
+    """Yield one transformed frame per published target whose export exists.
+
+    Resolves each spec's published pointer, reads the artifact's
+    ``exports/<export_filename>``, and delegates the per-family column
+    transform to ``build_frame(df, manifest, spec)``. Skips targets with
+    no pointer, a missing export file, or an empty export.
     """
-    for spec in _iter_specs_by_kind("bernoulli"):
-        if spec.dataset_name != dataset_name:
-            continue
+    for spec in specs:
         pointer_path = find_published_manifest(spec.published_manifest_name())
         if pointer_path is None:
             _log.info(
@@ -188,634 +217,408 @@ def _iter_published_propensity_frames(dataset_name: str) -> Iterator[pl.DataFram
             pointer_path.read_text(encoding="utf-8")
         )
         manifest = read_manifest(pointer.manifest_path)
-        event_propensity_path = (
-            pointer.manifest_path.parent / "exports" / "event_propensity.parquet"
-        )
-        if not event_propensity_path.exists():
+        export_path = pointer.manifest_path.parent / "exports" / export_filename
+        if not export_path.exists():
             _log.warning(
-                "bayes.manifest_ingest: missing event_propensity.parquet for %s at %s",
+                "bayes.manifest_ingest: missing %s for %s at %s",
+                export_filename,
                 spec.published_manifest_name(),
-                event_propensity_path,
+                export_path,
             )
             continue
-        df = pl.read_parquet(str(event_propensity_path))
+        df = pl.read_parquet(str(export_path))
         if df.height == 0:
             _log.info(
-                "bayes.manifest_ingest: event_propensity empty for %s",
+                "bayes.manifest_ingest: %s empty for %s",
+                export_filename,
                 spec.published_manifest_name(),
             )
             continue
-        df = df.with_columns(
-            pl.col("event_key").cast(pl.UInt32),
-            pl.col("dimension").cast(pl.Utf8),
-            pl.col("p_observed_mean").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        )
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+        yield build_frame(df, manifest, spec)
 
 
-def iterate_published_observation_frames() -> Iterator[pl.DataFrame]:
-    """Yield one frame per published Bayes observation (Bernoulli) target."""
-    yield from _iter_published_propensity_frames(OBSERVATION_PROPENSITY_DATASET)
-
-
-def iterate_published_pitch_coverage_frames() -> Iterator[pl.DataFrame]:
-    """Yield one frame per published Bayes pitch-coverage (Bernoulli) target."""
-    yield from _iter_published_propensity_frames(PITCH_COVERAGE_DATASET)
-
-
-def _aggregate_propensity_frames(
-    frames: Iterator[pl.DataFrame], *, label: str
+def _aggregate_frames(
+    frames: Iterator[pl.DataFrame],
+    *,
+    schema: dict[str, pl.DataType],
+    empty_factory: Callable[[], pl.DataFrame],
+    label: str,
 ) -> Iterator[pl.DataFrame]:
+    """Project each frame onto ``schema`` and guarantee one typed frame.
+
+    ``@model`` callers want a non-empty iterator so SQLMesh can persist the
+    typed schema even when no targets have published yet.
+    """
     emitted = False
+    select_exprs = [pl.col(name).cast(dtype) for name, dtype in schema.items()]
     for frame in frames:
         emitted = True
-        yield frame.select(
-            [
-                pl.col("event_key").cast(pl.UInt32),
-                pl.col("dimension").cast(pl.Utf8),
-                pl.col("p_observed_mean").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
+        yield frame.select(select_exprs)
     if not emitted:
         _log.info(
             "bayes.manifest_ingest: no %s targets published; yielding empty frame",
             label,
         )
-        yield empty_propensity_frame()
+        yield empty_factory()
+
+
+def _build_propensity_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.with_columns(
+        pl.col("event_key").cast(pl.UInt32),
+        pl.col("dimension").cast(pl.Utf8),
+        pl.col("p_observed_mean").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
+
+
+def iterate_published_observation_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes observation (Bernoulli) target."""
+    yield from _iterate_published_export_frames(
+        _specs_for_bernoulli_dataset(OBSERVATION_PROPENSITY_DATASET),
+        export_filename="event_propensity.parquet",
+        build_frame=_build_propensity_frame,
+    )
+
+
+def iterate_published_pitch_coverage_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes pitch-coverage (Bernoulli) target."""
+    yield from _iterate_published_export_frames(
+        _specs_for_bernoulli_dataset(PITCH_COVERAGE_DATASET),
+        export_filename="event_propensity.parquet",
+        build_frame=_build_propensity_frame,
+    )
 
 
 def aggregate_observation_propensity_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    yield from _aggregate_propensity_frames(
-        iterate_published_observation_frames(), label="observation"
+    yield from _aggregate_frames(
+        iterate_published_observation_frames(),
+        schema=PROPENSITY_SCHEMA,
+        empty_factory=empty_propensity_frame,
+        label="observation",
     )
 
 
 def aggregate_pitch_coverage_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    yield from _aggregate_propensity_frames(
-        iterate_published_pitch_coverage_frames(), label="pitch-coverage"
+    yield from _aggregate_frames(
+        iterate_published_pitch_coverage_frames(),
+        schema=PROPENSITY_SCHEMA,
+        empty_factory=empty_propensity_frame,
+        label="pitch-coverage",
     )
+
+
+def _build_credit_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    if "none_share" not in df.columns:
+        df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("none_share"))
+    out = df.with_columns(
+        pl.col("event_key").cast(pl.UInt32),
+        pl.col("fielding_position").cast(pl.UInt8),
+        pl.col("credit_type").cast(pl.Utf8),
+        pl.col("expected_share").cast(pl.Float64),
+        pl.col("none_share").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (credit_type=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
 
 
 def iterate_published_credit_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes fielding-credit (multinomial) target."""
-    for spec in _iter_specs_by_kind("multinomial"):
-        if spec.multinomial_export != "credit":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        share_path = pointer.manifest_path.parent / "exports" / "event_credit.parquet"
-        if not share_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing event_credit.parquet for %s at %s",
-                spec.published_manifest_name(),
-                share_path,
-            )
-            continue
-        df = pl.read_parquet(str(share_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: event_credit empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        if "none_share" not in df.columns:
-            df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias("none_share"))
-        df = df.with_columns(
-            pl.col("event_key").cast(pl.UInt32),
-            pl.col("fielding_position").cast(pl.UInt8),
-            pl.col("credit_type").cast(pl.Utf8),
-            pl.col("expected_share").cast(pl.Float64),
-            pl.col("none_share").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        )
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (credit_type=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("credit"),
+        export_filename="event_credit.parquet",
+        build_frame=_build_credit_frame,
+    )
 
 
 def aggregate_fielding_credit_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_credit_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("event_key").cast(pl.UInt32),
-                pl.col("fielding_position").cast(pl.UInt8),
-                pl.col("credit_type").cast(pl.Utf8),
-                pl.col("expected_share").cast(pl.Float64),
-                pl.col("none_share").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no fielding-credit targets published; yielding empty frame"
-        )
-        yield empty_credit_share_frame()
+    yield from _aggregate_frames(
+        iterate_published_credit_frames(),
+        schema=CREDIT_SHARE_SCHEMA,
+        empty_factory=empty_credit_share_frame,
+        label="fielding-credit",
+    )
+
+
+def _build_ball_handler_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.with_columns(
+        pl.col("event_key").cast(pl.UInt32),
+        pl.col("fielding_position").cast(pl.UInt8),
+        pl.col("expected_share").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
 
 
 def iterate_published_ball_handler_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes ball-handler (multinomial) target."""
-    for spec in _iter_specs_by_kind("multinomial"):
-        if spec.multinomial_export != "ball_handler":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        share_path = (
-            pointer.manifest_path.parent
-            / "exports"
-            / "ball_handler_probabilities.parquet"
-        )
-        if not share_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing ball_handler_probabilities.parquet for %s at %s",
-                spec.published_manifest_name(),
-                share_path,
-            )
-            continue
-        df = pl.read_parquet(str(share_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: ball_handler_probabilities empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        df = df.with_columns(
-            pl.col("event_key").cast(pl.UInt32),
-            pl.col("fielding_position").cast(pl.UInt8),
-            pl.col("expected_share").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        )
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("ball_handler"),
+        export_filename="ball_handler_probabilities.parquet",
+        build_frame=_build_ball_handler_frame,
+    )
 
 
 def aggregate_ball_handler_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_ball_handler_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("event_key").cast(pl.UInt32),
-                pl.col("fielding_position").cast(pl.UInt8),
-                pl.col("expected_share").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
+    yield from _aggregate_frames(
+        iterate_published_ball_handler_frames(),
+        schema=BALL_HANDLER_SCHEMA,
+        empty_factory=empty_ball_handler_frame,
+        label="ball-handler",
+    )
+
+
+def _build_geometry_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    if "geometry_dimension" in df.columns:
+        exported_dimensions = (
+            df.get_column("geometry_dimension").cast(pl.Utf8).unique().to_list()
         )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no ball-handler targets published; yielding empty frame"
+        if exported_dimensions != [spec.dimension]:
+            raise ValueError(
+                f"geometry_probabilities.parquet for "
+                f"{spec.published_manifest_name()} carries "
+                f"geometry_dimension={exported_dimensions!r}; expected "
+                f"{spec.dimension!r}"
+            )
+        dimension_expr = pl.col("geometry_dimension").cast(pl.Utf8)
+    else:
+        dimension_expr = pl.lit(spec.dimension, dtype=pl.Utf8).alias(
+            "geometry_dimension"
         )
-        yield empty_ball_handler_frame()
+    out = df.with_columns(
+        pl.col("event_key").cast(pl.UInt32),
+        dimension_expr,
+        pl.col("class_index").cast(pl.UInt8),
+        pl.col("class_label").cast(pl.Utf8),
+        pl.col("expected_share").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    ).select(list(GEOMETRY_SCHEMA.keys()))
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
 
 
 def iterate_published_geometry_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes geometry (multinomial) target."""
-    for spec in _iter_specs_by_kind("multinomial"):
-        if spec.multinomial_export != "geometry":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        share_path = (
-            pointer.manifest_path.parent / "exports" / "geometry_probabilities.parquet"
-        )
-        if not share_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing geometry_probabilities.parquet for %s at %s",
-                spec.published_manifest_name(),
-                share_path,
-            )
-            continue
-        df = pl.read_parquet(str(share_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: geometry_probabilities empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        if "geometry_dimension" in df.columns:
-            exported_dimensions = (
-                df.get_column("geometry_dimension").cast(pl.Utf8).unique().to_list()
-            )
-            if exported_dimensions != [spec.dimension]:
-                raise ValueError(
-                    f"geometry_probabilities.parquet for "
-                    f"{spec.published_manifest_name()} carries "
-                    f"geometry_dimension={exported_dimensions!r}; expected "
-                    f"{spec.dimension!r}"
-                )
-            dimension_expr = pl.col("geometry_dimension").cast(pl.Utf8)
-        else:
-            dimension_expr = pl.lit(spec.dimension, dtype=pl.Utf8).alias(
-                "geometry_dimension"
-            )
-        df = df.with_columns(
-            pl.col("event_key").cast(pl.UInt32),
-            dimension_expr,
-            pl.col("class_index").cast(pl.UInt8),
-            pl.col("class_label").cast(pl.Utf8),
-            pl.col("expected_share").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        ).select(list(GEOMETRY_SCHEMA.keys()))
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("geometry"),
+        export_filename="geometry_probabilities.parquet",
+        build_frame=_build_geometry_frame,
+    )
 
 
 def aggregate_geometry_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_geometry_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("event_key").cast(pl.UInt32),
-                pl.col("geometry_dimension").cast(pl.Utf8),
-                pl.col("class_index").cast(pl.UInt8),
-                pl.col("class_label").cast(pl.Utf8),
-                pl.col("expected_share").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no geometry targets published; yielding empty frame"
-        )
-        yield empty_geometry_frame()
+    yield from _aggregate_frames(
+        iterate_published_geometry_frames(),
+        schema=GEOMETRY_SCHEMA,
+        empty_factory=empty_geometry_frame,
+        label="geometry",
+    )
+
+
+def _build_advancement_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.with_columns(
+        pl.col("event_key").cast(pl.UInt32),
+        pl.col("baserunner").cast(pl.Utf8),
+        pl.col("advancement_class").cast(pl.Utf8),
+        pl.col("expected_share").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    ).select(list(ADVANCEMENT_SCHEMA.keys()))
+    _log.info(
+        "bayes.manifest_ingest: %d advancement rows from %s",
+        out.height,
+        spec.published_manifest_name(),
+    )
+    return out
 
 
 def iterate_published_advancement_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes advancement (multinomial) target."""
-    for spec in _iter_specs_by_kind("multinomial"):
-        if spec.multinomial_export != "advancement":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        share_path = (
-            pointer.manifest_path.parent
-            / "exports"
-            / "advancement_probabilities.parquet"
-        )
-        if not share_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing advancement_probabilities.parquet for %s at %s",
-                spec.published_manifest_name(),
-                share_path,
-            )
-            continue
-        df = pl.read_parquet(str(share_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: advancement_probabilities empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        df = df.with_columns(
-            pl.col("event_key").cast(pl.UInt32),
-            pl.col("baserunner").cast(pl.Utf8),
-            pl.col("advancement_class").cast(pl.Utf8),
-            pl.col("expected_share").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        ).select(list(ADVANCEMENT_SCHEMA.keys()))
-        _log.info(
-            "bayes.manifest_ingest: %d advancement rows from %s",
-            df.height,
-            spec.published_manifest_name(),
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("advancement"),
+        export_filename="advancement_probabilities.parquet",
+        build_frame=_build_advancement_frame,
+    )
 
 
 def aggregate_advancement_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_advancement_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("event_key").cast(pl.UInt32),
-                pl.col("baserunner").cast(pl.Utf8),
-                pl.col("advancement_class").cast(pl.Utf8),
-                pl.col("expected_share").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no advancement targets published; yielding empty frame"
-        )
-        yield empty_advancement_frame()
+    yield from _aggregate_frames(
+        iterate_published_advancement_frames(),
+        schema=ADVANCEMENT_SCHEMA,
+        empty_factory=empty_advancement_frame,
+        label="advancement",
+    )
+
+
+def _build_park_factor_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.select(
+        pl.col("park_id").cast(pl.Utf8),
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("outcome").cast(pl.Utf8),
+        pl.col("theta_mean").cast(pl.Float64),
+        pl.col("theta_sd").cast(pl.Float64),
+        pl.col("theta_hdi_lower").cast(pl.Float64),
+        pl.col("theta_hdi_upper").cast(pl.Float64),
+        pl.col("park_factor_mean").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
 
 
 def iterate_published_park_factor_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes park-factor (count) target."""
-    for spec in _iter_specs_by_kind("count"):
-        if spec.count_export != "park_factor":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        summary_path = (
-            pointer.manifest_path.parent / "exports" / "park_factor_summary.parquet"
-        )
-        if not summary_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing park_factor_summary.parquet for %s at %s",
-                spec.published_manifest_name(),
-                summary_path,
-            )
-            continue
-        df = pl.read_parquet(str(summary_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: park_factor_summary empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        df = df.select(
-            pl.col("park_id").cast(pl.Utf8),
-            pl.col("season").cast(pl.Int16),
-            pl.col("league").cast(pl.Utf8),
-            pl.col("outcome").cast(pl.Utf8),
-            pl.col("theta_mean").cast(pl.Float64),
-            pl.col("theta_sd").cast(pl.Float64),
-            pl.col("theta_hdi_lower").cast(pl.Float64),
-            pl.col("theta_hdi_upper").cast(pl.Float64),
-            pl.col("park_factor_mean").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        )
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_count_export("park_factor"),
+        export_filename="park_factor_summary.parquet",
+        build_frame=_build_park_factor_frame,
+    )
 
 
 def aggregate_park_factor_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_park_factor_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("park_id").cast(pl.Utf8),
-                pl.col("season").cast(pl.Int16),
-                pl.col("league").cast(pl.Utf8),
-                pl.col("outcome").cast(pl.Utf8),
-                pl.col("theta_mean").cast(pl.Float64),
-                pl.col("theta_sd").cast(pl.Float64),
-                pl.col("theta_hdi_lower").cast(pl.Float64),
-                pl.col("theta_hdi_upper").cast(pl.Float64),
-                pl.col("park_factor_mean").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no park-factor targets published; yielding empty frame"
-        )
-        yield empty_park_factor_frame()
+    yield from _aggregate_frames(
+        iterate_published_park_factor_frames(),
+        schema=PARK_FACTOR_SUMMARY_SCHEMA,
+        empty_factory=empty_park_factor_frame,
+        label="park-factor",
+    )
+
+
+def _build_run_expectancy_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.select(
+        pl.col("state").cast(pl.Utf8),
+        pl.col("base_state").cast(pl.Int8),
+        pl.col("outs").cast(pl.Int8),
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("outcome").cast(pl.Utf8),
+        pl.col("re_value_mean").cast(pl.Float64),
+        pl.col("re_value_sd").cast(pl.Float64),
+        pl.col("re_value_hdi_lower").cast(pl.Float64),
+        pl.col("re_value_hdi_upper").cast(pl.Float64),
+        pl.col("ess_bulk").cast(pl.Float64),
+        pl.col("rhat").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
 
 
 def iterate_published_run_expectancy_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes run-expectancy (count) target."""
-    for spec in _iter_specs_by_kind("count"):
-        if spec.count_export != "run_expectancy":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        summary_path = (
-            pointer.manifest_path.parent / "exports" / "run_expectancy_summary.parquet"
-        )
-        if not summary_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing run_expectancy_summary.parquet for %s at %s",
-                spec.published_manifest_name(),
-                summary_path,
-            )
-            continue
-        df = pl.read_parquet(str(summary_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: run_expectancy_summary empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        df = df.select(
-            pl.col("state").cast(pl.Utf8),
-            pl.col("base_state").cast(pl.Int8),
-            pl.col("outs").cast(pl.Int8),
-            pl.col("season").cast(pl.Int16),
-            pl.col("league").cast(pl.Utf8),
-            pl.col("outcome").cast(pl.Utf8),
-            pl.col("re_value_mean").cast(pl.Float64),
-            pl.col("re_value_sd").cast(pl.Float64),
-            pl.col("re_value_hdi_lower").cast(pl.Float64),
-            pl.col("re_value_hdi_upper").cast(pl.Float64),
-            pl.col("ess_bulk").cast(pl.Float64),
-            pl.col("rhat").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        )
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_count_export("run_expectancy"),
+        export_filename="run_expectancy_summary.parquet",
+        build_frame=_build_run_expectancy_frame,
+    )
 
 
 def aggregate_run_expectancy_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_run_expectancy_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("state").cast(pl.Utf8),
-                pl.col("base_state").cast(pl.Int8),
-                pl.col("outs").cast(pl.Int8),
-                pl.col("season").cast(pl.Int16),
-                pl.col("league").cast(pl.Utf8),
-                pl.col("outcome").cast(pl.Utf8),
-                pl.col("re_value_mean").cast(pl.Float64),
-                pl.col("re_value_sd").cast(pl.Float64),
-                pl.col("re_value_hdi_lower").cast(pl.Float64),
-                pl.col("re_value_hdi_upper").cast(pl.Float64),
-                pl.col("ess_bulk").cast(pl.Float64),
-                pl.col("rhat").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no run-expectancy targets published; yielding empty frame"
-        )
-        yield empty_run_expectancy_frame()
+    yield from _aggregate_frames(
+        iterate_published_run_expectancy_frames(),
+        schema=RUN_EXPECTANCY_SUMMARY_SCHEMA,
+        empty_factory=empty_run_expectancy_frame,
+        label="run-expectancy",
+    )
+
+
+def _build_pitch_summary_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.select(
+        pl.col("result_family").cast(pl.Utf8),
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("final_count_class").cast(pl.Utf8),
+        pl.col("balls").cast(pl.Int8),
+        pl.col("strikes").cast(pl.Int8),
+        pl.col("outcome").cast(pl.Utf8),
+        pl.col("prob_mean").cast(pl.Float64),
+        pl.col("prob_sd").cast(pl.Float64),
+        pl.col("prob_hdi_lower").cast(pl.Float64),
+        pl.col("prob_hdi_upper").cast(pl.Float64),
+        pl.col("ess_bulk").cast(pl.Float64),
+        pl.col("rhat").cast(pl.Float64),
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
 
 
 def iterate_published_pitch_summary_frames() -> Iterator[pl.DataFrame]:
     """Yield one frame per published Bayes pitch-summary (multinomial) target."""
-    for spec in _iter_specs_by_kind("multinomial"):
-        if spec.multinomial_export != "pitch_summary":
-            continue
-        pointer_path = find_published_manifest(spec.published_manifest_name())
-        if pointer_path is None:
-            _log.info(
-                "bayes.manifest_ingest: no pointer for %s; skipping",
-                spec.published_manifest_name(),
-            )
-            continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
-        manifest = read_manifest(pointer.manifest_path)
-        summary_path = (
-            pointer.manifest_path.parent / "exports" / "pitch_summary_summary.parquet"
-        )
-        if not summary_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing pitch_summary_summary.parquet for %s at %s",
-                spec.published_manifest_name(),
-                summary_path,
-            )
-            continue
-        df = pl.read_parquet(str(summary_path))
-        if df.height == 0:
-            _log.info(
-                "bayes.manifest_ingest: pitch_summary_summary empty for %s",
-                spec.published_manifest_name(),
-            )
-            continue
-        df = df.select(
-            pl.col("result_family").cast(pl.Utf8),
-            pl.col("season").cast(pl.Int16),
-            pl.col("league").cast(pl.Utf8),
-            pl.col("final_count_class").cast(pl.Utf8),
-            pl.col("balls").cast(pl.Int8),
-            pl.col("strikes").cast(pl.Int8),
-            pl.col("outcome").cast(pl.Utf8),
-            pl.col("prob_mean").cast(pl.Float64),
-            pl.col("prob_sd").cast(pl.Float64),
-            pl.col("prob_hdi_lower").cast(pl.Float64),
-            pl.col("prob_hdi_upper").cast(pl.Float64),
-            pl.col("ess_bulk").cast(pl.Float64),
-            pl.col("rhat").cast(pl.Float64),
-            pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
-        )
-        _log.info(
-            "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
-            df.height,
-            spec.published_manifest_name(),
-            spec.dimension,
-        )
-        yield df
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("pitch_summary"),
+        export_filename="pitch_summary_summary.parquet",
+        build_frame=_build_pitch_summary_frame,
+    )
 
 
 def aggregate_pitch_summary_frames() -> Iterator[pl.DataFrame]:
     """Adapter that always yields at least one typed frame for the @model."""
-    emitted = False
-    for frame in iterate_published_pitch_summary_frames():
-        emitted = True
-        yield frame.select(
-            [
-                pl.col("result_family").cast(pl.Utf8),
-                pl.col("season").cast(pl.Int16),
-                pl.col("league").cast(pl.Utf8),
-                pl.col("final_count_class").cast(pl.Utf8),
-                pl.col("balls").cast(pl.Int8),
-                pl.col("strikes").cast(pl.Int8),
-                pl.col("outcome").cast(pl.Utf8),
-                pl.col("prob_mean").cast(pl.Float64),
-                pl.col("prob_sd").cast(pl.Float64),
-                pl.col("prob_hdi_lower").cast(pl.Float64),
-                pl.col("prob_hdi_upper").cast(pl.Float64),
-                pl.col("ess_bulk").cast(pl.Float64),
-                pl.col("rhat").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
-            ]
-        )
-    if not emitted:
-        _log.info(
-            "bayes.manifest_ingest: no pitch-summary targets published; yielding empty frame"
-        )
-        yield empty_pitch_summary_frame()
+    yield from _aggregate_frames(
+        iterate_published_pitch_summary_frames(),
+        schema=PITCH_SUMMARY_SUMMARY_SCHEMA,
+        empty_factory=empty_pitch_summary_frame,
+        label="pitch-summary",
+    )

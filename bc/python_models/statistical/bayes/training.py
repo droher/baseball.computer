@@ -847,68 +847,16 @@ def _posterior_held_out_softmax(
     added the same way; events absent from the handler export encode to
     z=0 upstream.
     """
-    posterior = idata.posterior
-    K = n_positions
-    n_event = held_out.n_events
-    if n_event == 0:
-        return np.zeros((0, K), dtype=np.float64)
-    intercept = np.asarray(posterior[intercept_name].values, dtype=np.float64)
-    n_chain, n_draw = intercept.shape[0], intercept.shape[1]
-    deltas_fe: dict[str, np.ndarray] = {}
-    for column, design in held_out.fixed_effects.items():
-        if len(design.levels) <= 1:
-            continue
-        if f"delta_{column}" not in posterior:
-            continue
-        deltas_fe[column] = np.asarray(
-            posterior[f"delta_{column}"].values, dtype=np.float64
-        )
-
-    dl_active = dl_logit_per_class is not None and "gamma_dl" in posterior.data_vars
-    gamma = (
-        np.asarray(posterior["gamma_dl"].values, dtype=np.float64)
-        if dl_active
-        else None
+    return _posterior_event_softmax(
+        idata,
+        held_out,
+        n_positions=n_positions,
+        chunk_size=chunk_size,
+        intercept_name=intercept_name,
+        dl_logit_per_class=dl_logit_per_class,
+        propensity_z=propensity_z,
+        handler_z=handler_z,
     )
-    gamma_propensity = (
-        np.asarray(posterior["gamma_propensity"].values, dtype=np.float64)
-        if propensity_z is not None and "gamma_propensity" in posterior.data_vars
-        else None
-    )
-    gamma_handler = (
-        np.asarray(posterior["gamma_handler"].values, dtype=np.float64)
-        if handler_z is not None and "gamma_handler" in posterior.data_vars
-        else None
-    )
-
-    means = np.empty((n_event, K), dtype=np.float64)
-    for start in range(0, n_event, chunk_size):
-        stop = min(start + chunk_size, n_event)
-        sl = slice(start, stop)
-        n_chunk = stop - start
-        eta = np.broadcast_to(
-            intercept[:, :, None, :], (n_chain, n_draw, n_chunk, K)
-        ).copy()
-        for column, df in deltas_fe.items():
-            codes = held_out.fixed_effects[column].codes[sl]
-            valid = codes >= 0
-            if valid.all():
-                eta += df[:, :, codes, :]
-            else:
-                safe_codes = np.where(valid, codes, 0)
-                contrib = df[:, :, safe_codes, :]
-                eta += contrib * valid[None, None, :, None]
-        if gamma is not None and dl_logit_per_class is not None:
-            eta += gamma[:, :, None, None] * dl_logit_per_class[None, None, sl, :]
-        if gamma_propensity is not None and propensity_z is not None:
-            eta += propensity_z[None, None, sl, None] * gamma_propensity[:, :, None, :]
-        if gamma_handler is not None and handler_z is not None:
-            eta += handler_z[None, None, sl, None] * gamma_handler[:, :, None, :]
-        eta -= eta.max(axis=-1, keepdims=True)
-        exp_eta = np.exp(eta)
-        pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
-        means[sl, :] = pi.mean(axis=(0, 1))
-    return means
 
 
 def _evaluate_held_out(
@@ -1402,12 +1350,16 @@ def _posterior_event_softmax(
     posterior = idata.posterior
     K = n_positions
     n_event = inputs.n_events
+    if n_event == 0:
+        return np.zeros((0, K), dtype=np.float64)
 
     intercept = np.asarray(posterior[intercept_name].values, dtype=np.float64)
     n_chain, n_draw = intercept.shape[0], intercept.shape[1]
     deltas_fe: dict[str, np.ndarray] = {}
     for column, design in inputs.fixed_effects.items():
         if len(design.levels) <= 1:
+            continue
+        if f"delta_{column}" not in posterior:
             continue
         deltas_fe[column] = np.asarray(
             posterior[f"delta_{column}"].values, dtype=np.float64

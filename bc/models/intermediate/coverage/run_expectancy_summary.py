@@ -81,6 +81,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
 
     from python_models.statistical.bayes import targets as _targets  # noqa: F401
     from python_models.statistical.bayes.manifest_ingest import (
+        RUN_EXPECTANCY_SUMMARY_SCHEMA,
         aggregate_run_expectancy_frames,
     )
 
@@ -115,19 +116,4 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
             "run_expectancy_summary: no run-expectancy targets published; "
             "yielding empty frame"
         )
-        empty_schema: dict[str, pl.DataType] = {
-            "state": pl.Utf8(),
-            "base_state": pl.Int8(),
-            "outs": pl.Int8(),
-            "season": pl.Int16(),
-            "league": pl.Utf8(),
-            "outcome": pl.Utf8(),
-            "re_value_mean": pl.Float64(),
-            "re_value_sd": pl.Float64(),
-            "re_value_hdi_lower": pl.Float64(),
-            "re_value_hdi_upper": pl.Float64(),
-            "ess_bulk": pl.Float64(),
-            "rhat": pl.Float64(),
-            "bayes_artifact_id": pl.Utf8(),
-        }
-        yield pl.DataFrame(schema=empty_schema)
+        yield pl.DataFrame(schema=RUN_EXPECTANCY_SUMMARY_SCHEMA)

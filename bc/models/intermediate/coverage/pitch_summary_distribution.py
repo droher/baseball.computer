@@ -82,6 +82,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
 
     from python_models.statistical.bayes import targets as _targets  # noqa: F401
     from python_models.statistical.bayes.manifest_ingest import (
+        PITCH_SUMMARY_SUMMARY_SCHEMA,
         aggregate_pitch_summary_frames,
     )
 
@@ -117,20 +118,4 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
             "pitch_summary_distribution: no pitch-summary targets published; "
             "yielding empty frame"
         )
-        empty_schema: dict[str, pl.DataType] = {
-            "result_family": pl.Utf8(),
-            "season": pl.Int16(),
-            "league": pl.Utf8(),
-            "final_count_class": pl.Utf8(),
-            "balls": pl.Int8(),
-            "strikes": pl.Int8(),
-            "outcome": pl.Utf8(),
-            "prob_mean": pl.Float64(),
-            "prob_sd": pl.Float64(),
-            "prob_hdi_lower": pl.Float64(),
-            "prob_hdi_upper": pl.Float64(),
-            "ess_bulk": pl.Float64(),
-            "rhat": pl.Float64(),
-            "bayes_artifact_id": pl.Utf8(),
-        }
-        yield pl.DataFrame(schema=empty_schema)
+        yield pl.DataFrame(schema=PITCH_SUMMARY_SUMMARY_SCHEMA)
