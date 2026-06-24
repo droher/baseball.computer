@@ -65,9 +65,9 @@ class BayesPosteriorRow(BaseModel):
     sd: float
     hdi_lower: float
     hdi_upper: float
-    ess_bulk: float
-    ess_tail: float
-    rhat: float
+    ess_bulk: float | None
+    ess_tail: float | None
+    rhat: float | None
 
 
 class BayesPosteriorSummary(BaseModel):

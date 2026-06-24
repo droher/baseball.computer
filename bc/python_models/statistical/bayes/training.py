@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -355,12 +356,17 @@ def _build_posterior_summary(
                 sd=float(row["sd"]),
                 hdi_lower=float(row["hdi_3%"]),
                 hdi_upper=float(row["hdi_97%"]),
-                ess_bulk=float(row["ess_bulk"]),
-                ess_tail=float(row["ess_tail"]),
-                rhat=float(row["r_hat"]),
+                ess_bulk=_finite_or_none(row["ess_bulk"]),
+                ess_tail=_finite_or_none(row["ess_tail"]),
+                rhat=_finite_or_none(row["r_hat"]),
             )
         )
     return BayesPosteriorSummary(rows=tuple(rows))
+
+
+def _finite_or_none(value: object) -> float | None:
+    number = float(value)  # type: ignore[arg-type]
+    return number if math.isfinite(number) else None
 
 
 def _diagnostics_from_idata(
