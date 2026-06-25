@@ -518,7 +518,12 @@ Zero importers (grep-confirmed): `models/park_factors.py` (plural — footgun ne
 
 ### T4.2 — Deduplicate the fit/ingest helpers [static]
 
-**Status: open.** Not addressed in wave 1.
+**Status: fixed.** `_posterior_held_out_softmax` is now a thin wrapper over the parameterized
+`_posterior_event_softmax` core (putout-marginalized variant left separate); the 9
+`iterate_published_*`/`aggregate_*` loops collapsed onto `_iterate_published_export_frames` +
+`_aggregate_frames`; 5 thin-gather `@model` files reuse the `*_SCHEMA` constants (the 2 credit /
+ball-handler `@models` keep inline schemas — they add a joined `player_id` column). Pinned by a
+characterization test asserting the two softmax paths are identical on a shared posterior.
 
 - `_posterior_held_out_softmax` and `_posterior_event_softmax` (`training.py:614-677` vs
   `1090-1153`) are ~90% identical; unify behind one parameterized function.
@@ -727,7 +732,11 @@ dimension's Bayes vocab before computing the per-class logit.
   Bayes layer.** The preps roll their own BLAKE2s fold-10 (different hash + modulus from the
   dataset's `HASH()%100`). Not leakage (each model is internally disjoint), but the columns are dead
   weight and a footgun for anyone assuming they govern the split. Fix: document, or have the preps
-  consume `primary_fold` so DL and Bayes share one partition. **Status: open.**
+  consume `primary_fold` so DL and Bayes share one partition. **Status: accepted (won't fix).**
+  The per-prep BLAKE2s fold-10 is internally disjoint and correct; switching the preps to the
+  dataset's `primary_fold` would re-partition every model's holdout and invalidate the held-out
+  metrics on every already-published Bayes fit. Not worth a corpus-wide refit for a cosmetic
+  single-partition alignment. The columns stay as an unused alternative.
 - **P2.5 — the leakage detector is split-assignment-consistency only.** It catches a planted
   cross-fold assignment leak but is structurally blind to feature/post-event leakage, the
   prep↔dataset fold divergence, and P2.1/P3.1. A green leakage check is not "leakage-safe" — that
@@ -741,15 +750,22 @@ dimension's Bayes vocab before computing the per-class logit.
 - **P1.4 — `personnel_state_reliability` is a 1:1 passthrough.** All 146.9M rows are
   `direct_event`/`hard_zero_allowed=TRUE`; the `missing → inferred / low` half is unreachable on
   current upstream data, so `reliability_class`/`hard_zero_allowed` is a constant downstream. Drop
-  the dead scaffolding and document the passthrough, or supply a real gap source. **Status: open.**
+  the dead scaffolding and document the passthrough, or supply a real gap source. **Status: accepted
+  (won't fix).** The `missing → inferred / low` branch is forward-looking scaffolding for a future
+  upstream gap source; deleting it now only means rebuilding it when that source lands. It is inert
+  (constant output), not incorrect — documented as a passthrough until a real gap source exists.
 - **P1.5 — `entity_link_reliability` crosswalk confidence is hardcoded `medium`.** Both arms of the
   CASE (`entity_link_reliability.sql:78-82,102-105`) return `medium`; the documented `high` (clean
-  crosswalk) never fires. Fix: clean crosswalk → `high`. **Status: open.**
+  crosswalk) never fires. Fix: clean crosswalk → `high`. **Status: fixed.** Both arms now resolve a
+  retrosheet mapping with a complete debut/final_game window to `high`, incomplete to `medium`,
+  unresolved to `low` (the bbref arm gained the date-completeness branch it lacked).
 - **P1.6 — `game_context_observation_ledger` is 4 games short.** It sources from `stg_games`, which
   excludes the 4 in-scope GameLog games that every sibling ledger includes — silent NULLs on a
   `game_results`→context join. Latent `retrosheet_box` mislabel if GameLog is ever added to
   `stg_games`. Fix: include them as `structural_absence` context, or document the universe.
-  **Status: open.**
+  **Status: accepted (won't fix).** 4 games out of ~200K; the ledger's universe is `stg_games` by
+  design and reconciling the GameLog delta risks introducing wrong context rows for negligible gain.
+  Documented as a known `stg_games`-scoped universe.
 - **P1.7 — the only non-trivial `training_weight` branch never fires.** `model_input_geometry.sql:217`
   downweights `data_error_risk != 'none'`, but the risk join is a no-op for geometry (100% `'none'`),
   so the `>0` filter is vacuous and the downweighting path is dead. Consistent with the MNAR plumbing
