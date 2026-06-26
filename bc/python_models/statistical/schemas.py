@@ -99,6 +99,7 @@ class BayesArtifactExtras(BaseModel):
     gamma_dl_flavor: str | None = None
     gamma_propensity_flavor: str | None = None
     propensity_active: bool = False
+    weak_identification_flag: bool = False
 
 
 class ArtifactManifest(BaseModel):

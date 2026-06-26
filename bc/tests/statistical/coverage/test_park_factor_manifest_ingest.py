@@ -162,6 +162,17 @@ def test_yields_published_frame_with_artifact_id_and_unique_grain(
     frame = frames[0]
     assert frame.height == len(PARK_IDS) * len(SEASONS)
     assert dict(frame.schema) == PARK_FACTOR_SUMMARY_SCHEMA
-    assert set(frame.get_column("bayes_artifact_id").unique().to_list()) == {"pf-1"}
+    assert set(frame.get_column("artifact_id").unique().to_list()) == {"pf-1"}
+    for _contract_col in (
+        "model_name",
+        "model_version",
+        "source_snapshot_id",
+        "method",
+        "observed_status",
+        "confidence_status",
+        "weak_identification_flag",
+    ):
+        assert frame.get_column(_contract_col).null_count() == 0
+    assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
     grain = frame.select("park_id", "season", "league", "outcome")
     assert grain.n_unique() == frame.height

@@ -3,7 +3,7 @@
 Thin gather over published Bayes pitch-summary artifacts. Reads each
 artifact's ``exports/pitch_summary_summary.parquet`` (grain
 ``result_family x season x league x final_count_class``) and stamps
-``bayes_artifact_id``. Materializes a typed empty frame until at least one
+the estimated-metadata contract. Materializes a typed empty frame until at least one
 pitch-summary Bayes pointer lands.
 """
 
@@ -42,6 +42,7 @@ _AUDITS = [
         "unique_grain",
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
+    ("estimated_contract_complete", {}),
 ]
 
 
@@ -60,9 +61,14 @@ _AUDITS = [
         "prob_sd": "DOUBLE",
         "prob_hdi_lower": "DOUBLE",
         "prob_hdi_upper": "DOUBLE",
-        "ess_bulk": "DOUBLE",
-        "rhat": "DOUBLE",
-        "bayes_artifact_id": "VARCHAR",
+        "artifact_id": "VARCHAR",
+        "model_name": "VARCHAR",
+        "model_version": "VARCHAR",
+        "source_snapshot_id": "VARCHAR",
+        "method": "VARCHAR",
+        "observed_status": "VARCHAR",
+        "confidence_status": "VARCHAR",
+        "weak_identification_flag": "BOOLEAN",
     },
     grain=["result_family", "season", "league", "final_count_class"],
     audits=_AUDITS,
@@ -73,7 +79,7 @@ _AUDITS = [
         "final_count_class). Sourced from each published Bayes pitch-summary "
         "target's exports/pitch_summary_summary.parquet. Carries the "
         "cell-class probability posterior summary plus the count decomposition "
-        "(balls, strikes) and posterior diagnostics (ess_bulk, rhat)."
+        "(balls, strikes) and the estimated-metadata contract columns."
     ),
 )
 def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame]:
@@ -108,9 +114,14 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
                 pl.col("prob_sd").cast(pl.Float64),
                 pl.col("prob_hdi_lower").cast(pl.Float64),
                 pl.col("prob_hdi_upper").cast(pl.Float64),
-                pl.col("ess_bulk").cast(pl.Float64),
-                pl.col("rhat").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
+                pl.col("artifact_id").cast(pl.Utf8),
+                pl.col("model_name").cast(pl.Utf8),
+                pl.col("model_version").cast(pl.Utf8),
+                pl.col("source_snapshot_id").cast(pl.Utf8),
+                pl.col("method").cast(pl.Utf8),
+                pl.col("observed_status").cast(pl.Utf8),
+                pl.col("confidence_status").cast(pl.Utf8),
+                pl.col("weak_identification_flag").cast(pl.Boolean()),
             ]
         )
     if not emitted:

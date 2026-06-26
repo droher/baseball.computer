@@ -3,7 +3,7 @@
 Iterates every registered Bayes observation ``BayesTargetSpec``, resolves
 the published pointer via ``find_published_manifest(spec.published_manifest_name())``,
 reads the winner artifact's ``exports/event_propensity.parquet``, and
-yields one polars frame per dimension stamped with ``bayes_artifact_id``.
+yields one polars frame per dimension stamped with the estimated-metadata contract.
 Always yields at least one (possibly empty) typed frame so the @model
 schema persists when no targets have been published yet.
 """
@@ -26,11 +26,68 @@ from python_models.statistical.schemas import ArtifactManifest, PublishedPointer
 _log = logging.getLogger(__name__)
 
 
+ESTIMATED_CONTRACT_SCHEMA: dict[str, pl.DataType] = {
+    "artifact_id": pl.Utf8(),
+    "model_name": pl.Utf8(),
+    "model_version": pl.Utf8(),
+    "source_snapshot_id": pl.Utf8(),
+    "method": pl.Utf8(),
+    "observed_status": pl.Utf8(),
+    "confidence_status": pl.Utf8(),
+    "weak_identification_flag": pl.Boolean(),
+}
+
+ESTIMATED_CONTRACT_COLUMNS: tuple[str, ...] = tuple(ESTIMATED_CONTRACT_SCHEMA.keys())
+
+METHOD_HIERARCHICAL_BAYES_SOFTMAX = "hierarchical_bayes_softmax"
+METHOD_HIERARCHICAL_BAYES_NB = "hierarchical_bayes_nb"
+METHOD_HIERARCHICAL_LOGISTIC = "hierarchical_logistic"
+
+
+def stamp_estimated_contract(
+    frame: pl.DataFrame,
+    manifest: ArtifactManifest,
+    *,
+    method: str,
+    observed_status: str = "estimated",
+) -> pl.DataFrame:
+    """Stamp the eight estimated-metadata contract columns onto ``frame``.
+
+    The values are constant within an artifact's rows. ``model_name`` /
+    ``model_version`` / ``weak_identification_flag`` come from the bayes
+    extras; ``artifact_id`` / ``source_snapshot_id`` / ``validation_status``
+    come from the top-level manifest; ``method`` / ``observed_status`` are
+    per-family constants supplied by the caller.
+    """
+    extras = manifest.bayes_extras
+    if extras is None:
+        raise ValueError(
+            f"manifest {manifest.artifact_id} has no bayes_extras; "
+            "cannot stamp the estimated contract"
+        )
+    return frame.with_columns(
+        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("artifact_id"),
+        pl.lit(extras.model_name, dtype=pl.Utf8).alias("model_name"),
+        pl.lit(extras.model_version, dtype=pl.Utf8).alias("model_version"),
+        pl.lit(manifest.source_snapshot_id, dtype=pl.Utf8).alias(
+            "source_snapshot_id"
+        ),
+        pl.lit(method, dtype=pl.Utf8).alias("method"),
+        pl.lit(observed_status, dtype=pl.Utf8).alias("observed_status"),
+        pl.lit(str(manifest.validation_status), dtype=pl.Utf8).alias(
+            "confidence_status"
+        ),
+        pl.lit(extras.weak_identification_flag, dtype=pl.Boolean()).alias(
+            "weak_identification_flag"
+        ),
+    )
+
+
 PROPENSITY_SCHEMA: dict[str, pl.DataType] = {
     "event_key": pl.UInt32(),
     "dimension": pl.Utf8(),
     "p_observed_mean": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -40,7 +97,7 @@ CREDIT_SHARE_SCHEMA: dict[str, pl.DataType] = {
     "credit_type": pl.Utf8(),
     "expected_share": pl.Float64(),
     "none_share": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -48,7 +105,7 @@ BALL_HANDLER_SCHEMA: dict[str, pl.DataType] = {
     "event_key": pl.UInt32(),
     "fielding_position": pl.UInt8(),
     "expected_share": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -58,7 +115,7 @@ GEOMETRY_SCHEMA: dict[str, pl.DataType] = {
     "class_index": pl.UInt8(),
     "class_label": pl.Utf8(),
     "expected_share": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -67,7 +124,7 @@ ADVANCEMENT_SCHEMA: dict[str, pl.DataType] = {
     "baserunner": pl.Utf8(),
     "advancement_class": pl.Utf8(),
     "expected_share": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -81,7 +138,7 @@ PARK_FACTOR_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
     "theta_hdi_lower": pl.Float64(),
     "theta_hdi_upper": pl.Float64(),
     "park_factor_mean": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -96,9 +153,7 @@ RUN_EXPECTANCY_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
     "re_value_sd": pl.Float64(),
     "re_value_hdi_lower": pl.Float64(),
     "re_value_hdi_upper": pl.Float64(),
-    "ess_bulk": pl.Float64(),
-    "rhat": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -114,9 +169,7 @@ PITCH_SUMMARY_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
     "prob_sd": pl.Float64(),
     "prob_hdi_lower": pl.Float64(),
     "prob_hdi_upper": pl.Float64(),
-    "ess_bulk": pl.Float64(),
-    "rhat": pl.Float64(),
-    "bayes_artifact_id": pl.Utf8(),
+    **ESTIMATED_CONTRACT_SCHEMA,
 }
 
 
@@ -269,7 +322,9 @@ def _build_propensity_frame(
         pl.col("event_key").cast(pl.UInt32),
         pl.col("dimension").cast(pl.Utf8),
         pl.col("p_observed_mean").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_LOGISTIC
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
@@ -329,7 +384,9 @@ def _build_credit_frame(
         pl.col("credit_type").cast(pl.Utf8),
         pl.col("expected_share").cast(pl.Float64),
         pl.col("none_share").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (credit_type=%s)",
@@ -366,7 +423,9 @@ def _build_ball_handler_frame(
         pl.col("event_key").cast(pl.UInt32),
         pl.col("fielding_position").cast(pl.UInt8),
         pl.col("expected_share").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
@@ -421,7 +480,9 @@ def _build_geometry_frame(
         pl.col("class_index").cast(pl.UInt8),
         pl.col("class_label").cast(pl.Utf8),
         pl.col("expected_share").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     ).select(list(GEOMETRY_SCHEMA.keys()))
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
@@ -459,7 +520,9 @@ def _build_advancement_frame(
         pl.col("baserunner").cast(pl.Utf8),
         pl.col("advancement_class").cast(pl.Utf8),
         pl.col("expected_share").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     ).select(list(ADVANCEMENT_SCHEMA.keys()))
     _log.info(
         "bayes.manifest_ingest: %d advancement rows from %s",
@@ -501,7 +564,9 @@ def _build_park_factor_frame(
         pl.col("theta_hdi_lower").cast(pl.Float64),
         pl.col("theta_hdi_upper").cast(pl.Float64),
         pl.col("park_factor_mean").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
@@ -545,9 +610,9 @@ def _build_run_expectancy_frame(
         pl.col("re_value_sd").cast(pl.Float64),
         pl.col("re_value_hdi_lower").cast(pl.Float64),
         pl.col("re_value_hdi_upper").cast(pl.Float64),
-        pl.col("ess_bulk").cast(pl.Float64),
-        pl.col("rhat").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
@@ -592,9 +657,9 @@ def _build_pitch_summary_frame(
         pl.col("prob_sd").cast(pl.Float64),
         pl.col("prob_hdi_lower").cast(pl.Float64),
         pl.col("prob_hdi_upper").cast(pl.Float64),
-        pl.col("ess_bulk").cast(pl.Float64),
-        pl.col("rhat").cast(pl.Float64),
-        pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("bayes_artifact_id"),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",

@@ -44,6 +44,7 @@ _AUDITS = [
         "unique_grain",
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
+    ("estimated_contract_complete", {}),
 ]
 
 
@@ -55,7 +56,14 @@ _AUDITS = [
         "player_id": "VARCHAR",
         "fielding_position": "UTINYINT",
         "expected_share": "DOUBLE",
-        "bayes_artifact_id": "VARCHAR",
+        "artifact_id": "VARCHAR",
+        "model_name": "VARCHAR",
+        "model_version": "VARCHAR",
+        "source_snapshot_id": "VARCHAR",
+        "method": "VARCHAR",
+        "observed_status": "VARCHAR",
+        "confidence_status": "VARCHAR",
+        "weak_identification_flag": "BOOLEAN",
     },
     grain=["event_key", "player_id", "fielding_position"],
     audits=_AUDITS,
@@ -79,6 +87,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
 
     from python_models.statistical.bayes import targets as _targets  # noqa: F401
     from python_models.statistical.bayes.manifest_ingest import (
+        ESTIMATED_CONTRACT_SCHEMA,
         aggregate_ball_handler_frames,
     )
 
@@ -123,7 +132,14 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
                 pl.col("player_id").cast(pl.Utf8),
                 pl.col("fielding_position").cast(pl.UInt8),
                 pl.col("expected_share").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
+                pl.col("artifact_id").cast(pl.Utf8),
+                pl.col("model_name").cast(pl.Utf8),
+                pl.col("model_version").cast(pl.Utf8),
+                pl.col("source_snapshot_id").cast(pl.Utf8),
+                pl.col("method").cast(pl.Utf8),
+                pl.col("observed_status").cast(pl.Utf8),
+                pl.col("confidence_status").cast(pl.Utf8),
+                pl.col("weak_identification_flag").cast(pl.Boolean()),
             ]
         )
         log.info(
@@ -142,6 +158,6 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
             "player_id": pl.Utf8(),
             "fielding_position": pl.UInt8(),
             "expected_share": pl.Float64(),
-            "bayes_artifact_id": pl.Utf8(),
+            **ESTIMATED_CONTRACT_SCHEMA,
         }
         yield pl.DataFrame(schema=empty_schema)

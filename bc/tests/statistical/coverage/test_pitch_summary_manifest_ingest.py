@@ -176,6 +176,17 @@ def test_yields_published_frame_with_artifact_id_and_unique_grain(
     frame = frames[0]
     assert frame.height == len(RESULT_FAMILIES) * len(SEASONS) * len(CLASS_LABELS)
     assert dict(frame.schema) == PITCH_SUMMARY_SUMMARY_SCHEMA
-    assert set(frame.get_column("bayes_artifact_id").unique().to_list()) == {"ps-1"}
+    assert set(frame.get_column("artifact_id").unique().to_list()) == {"ps-1"}
+    for _contract_col in (
+        "model_name",
+        "model_version",
+        "source_snapshot_id",
+        "method",
+        "observed_status",
+        "confidence_status",
+        "weak_identification_flag",
+    ):
+        assert frame.get_column(_contract_col).null_count() == 0
+    assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
     grain = frame.select("result_family", "season", "league", "final_count_class")
     assert grain.n_unique() == frame.height

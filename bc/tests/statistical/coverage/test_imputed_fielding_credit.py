@@ -142,7 +142,18 @@ def test_credit_yields_per_target_frame_with_artifact_id(
     frame = frames[0]
     assert frame.height == 4 * 9
     assert dict(frame.schema) == CREDIT_SHARE_SCHEMA
-    assert set(frame.get_column("bayes_artifact_id").unique().to_list()) == {
+    assert set(frame.get_column("artifact_id").unique().to_list()) == {
         "credit-po-1"
     }
+    for _contract_col in (
+        "model_name",
+        "model_version",
+        "source_snapshot_id",
+        "method",
+        "observed_status",
+        "confidence_status",
+        "weak_identification_flag",
+    ):
+        assert frame.get_column(_contract_col).null_count() == 0
+    assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
     assert set(frame.get_column("credit_type").unique().to_list()) == {"putout"}

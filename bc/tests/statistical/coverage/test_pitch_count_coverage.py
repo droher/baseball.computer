@@ -136,7 +136,18 @@ def test_yields_published_pitch_coverage_frame(
     frame = frames[0]
     assert frame.height == 9
     assert dict(frame.schema) == PROPENSITY_SCHEMA
-    assert set(frame.get_column("bayes_artifact_id").unique().to_list()) == {"jcov-1"}
+    assert set(frame.get_column("artifact_id").unique().to_list()) == {"jcov-1"}
+    for _contract_col in (
+        "model_name",
+        "model_version",
+        "source_snapshot_id",
+        "method",
+        "observed_status",
+        "confidence_status",
+        "weak_identification_flag",
+    ):
+        assert frame.get_column(_contract_col).null_count() == 0
+    assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
     assert set(frame.get_column("dimension").unique().to_list()) == {"has_count"}
 
 

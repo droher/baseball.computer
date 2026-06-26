@@ -3,7 +3,7 @@
 Thin gather over published Bayes park-factor artifacts. Reads each
 artifact's ``exports/park_factor_summary.parquet`` (grain
 ``park_id x season x league x outcome``), drops the diagnostic columns
-(``ess_bulk`` / ``rhat``), and stamps ``bayes_artifact_id``. Materializes a
+(``ess_bulk`` / ``rhat``), and stamps the estimated-metadata contract. Materializes a
 typed empty frame until at least one park-factor Bayes pointer lands.
 """
 
@@ -42,6 +42,7 @@ _AUDITS = [
         "unique_grain",
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
+    ("estimated_contract_complete", {}),
 ]
 
 
@@ -58,7 +59,14 @@ _AUDITS = [
         "theta_hdi_lower": "DOUBLE",
         "theta_hdi_upper": "DOUBLE",
         "park_factor_mean": "DOUBLE",
-        "bayes_artifact_id": "VARCHAR",
+        "artifact_id": "VARCHAR",
+        "model_name": "VARCHAR",
+        "model_version": "VARCHAR",
+        "source_snapshot_id": "VARCHAR",
+        "method": "VARCHAR",
+        "observed_status": "VARCHAR",
+        "confidence_status": "VARCHAR",
+        "weak_identification_flag": "BOOLEAN",
     },
     grain=["park_id", "season", "league", "outcome"],
     audits=_AUDITS,
@@ -68,8 +76,9 @@ _AUDITS = [
         "Grain (park_id, season, league, outcome). Sourced from each "
         "published Bayes park-factor target's "
         "exports/park_factor_summary.parquet. Carries theta posterior "
-        "summary plus park_factor_mean = exp(theta_mean); diagnostic "
-        "columns (ess_bulk, rhat) are dropped."
+        "summary plus park_factor_mean = exp(theta_mean) and the "
+        "estimated-metadata contract columns; diagnostic columns "
+        "(ess_bulk, rhat) are dropped."
     ),
 )
 def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame]:
@@ -102,7 +111,14 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
                 pl.col("theta_hdi_lower").cast(pl.Float64),
                 pl.col("theta_hdi_upper").cast(pl.Float64),
                 pl.col("park_factor_mean").cast(pl.Float64),
-                pl.col("bayes_artifact_id").cast(pl.Utf8),
+                pl.col("artifact_id").cast(pl.Utf8),
+                pl.col("model_name").cast(pl.Utf8),
+                pl.col("model_version").cast(pl.Utf8),
+                pl.col("source_snapshot_id").cast(pl.Utf8),
+                pl.col("method").cast(pl.Utf8),
+                pl.col("observed_status").cast(pl.Utf8),
+                pl.col("confidence_status").cast(pl.Utf8),
+                pl.col("weak_identification_flag").cast(pl.Boolean()),
             ]
         )
     if not emitted:

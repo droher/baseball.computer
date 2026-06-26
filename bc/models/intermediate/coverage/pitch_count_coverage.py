@@ -2,8 +2,8 @@
 
 Thin gather over the published Bayes pitch-coverage artifact. One row per
 (event_key, dimension) carrying ``p_observed_mean`` — the posterior mean
-P(final ball-strike count observed) — and the ``bayes_artifact_id`` that
-produced it. Streams directly from ``exports/event_propensity.parquet``;
+P(final ball-strike count observed) — plus the estimated-metadata contract
+columns. Streams directly from ``exports/event_propensity.parquet``;
 emits a typed empty frame when the target has not published yet.
 """
 
@@ -38,6 +38,7 @@ _AUDITS = [
         "unique_grain",
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
+    ("estimated_contract_complete", {}),
 ]
 
 
@@ -48,7 +49,14 @@ _AUDITS = [
         "event_key": "UINTEGER",
         "dimension": "VARCHAR",
         "p_observed_mean": "DOUBLE",
-        "bayes_artifact_id": "VARCHAR",
+        "artifact_id": "VARCHAR",
+        "model_name": "VARCHAR",
+        "model_version": "VARCHAR",
+        "source_snapshot_id": "VARCHAR",
+        "method": "VARCHAR",
+        "observed_status": "VARCHAR",
+        "confidence_status": "VARCHAR",
+        "weak_identification_flag": "BOOLEAN",
     },
     grain=["event_key", "dimension"],
     audits=_AUDITS,
