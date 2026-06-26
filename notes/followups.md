@@ -82,6 +82,16 @@ Active items the latest pretrain + downstream cascade does not fix:
   `scripts/mnar_masked_backtest.py`. The infrastructure is in place: propensity dataset columns
   (`e-v10-geometry` / `obs-v3-propensity`), full-coverage Model A exports (`10k-v4-fullscore`),
   and the `gamma_propensity` hook (default `gamma_propensity_zero`).
+  - DONE (mechanism): the fixed per-class offset form `corrected_c = softmax(eta_c + delta_c)`
+    is built as flavor `gamma_propensity_offset` — a scoring-only transform (`selection_offset` in
+    `_posterior_event_softmax`, plumbed via `GeometryInputs.selection_log_odds_offset` /
+    `BC_GEOMETRY_SELECTION_OFFSET`), fit unchanged. The masked backtest's `offset` arm
+    (oracle `delta_c = logit(w_class·mean_intensity)` post-hoc reweight of the noprop arm) is the
+    proof; `gamma_propensity_class` stays as the negative control. Design + numbers:
+    `notes/data-coverage-implementation/mnar-selection-offset-design.md`.
+  - STILL OPEN (production): `delta_c` is not identified from data — it must be supplied (sensitivity
+    ribbon over the canonical grid, or an anchored per-(era, class) point from partial-truth). Per-(era,
+    class) offset, the sensitivity-ribbon export, and the anchored estimate + its holdout are not built.
 - **Model H advancement has no Model A observedness target.** The six obs propensity targets
   cover the geometry dims + ball_handler_position only. Any MNAR work on Model H needs its own
   observedness target first.

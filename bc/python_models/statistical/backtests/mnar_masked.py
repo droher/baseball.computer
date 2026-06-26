@@ -695,6 +695,91 @@ def recovered_class_shares(
     return shares
 
 
+SELECTION_OFFSET_CLIP: float = 1e-6
+
+
+def oracle_selection_offset(
+    *,
+    class_mask_probabilities: dict[str, float],
+    mean_intensity: float,
+    class_labels: tuple[str, ...],
+    max_mask_probability: float,
+) -> dict[str, float]:
+    """Oracle per-class selection log-odds offset from the calibrated mask.
+
+    ``delta_c = logit(clip(w_class[c] * mean_intensity, eps, max))`` — the
+    log-odds of being masked for class ``c`` at average mask intensity.
+    This is the quantity the production scoring offset would supply; here
+    it is known exactly because the harness controls the mask.
+    """
+    offset: dict[str, float] = {}
+    for label in class_labels:
+        w = float(class_mask_probabilities.get(label, 0.0))
+        p = float(
+            np.clip(w * mean_intensity, SELECTION_OFFSET_CLIP, max_mask_probability)
+        )
+        offset[label] = float(math.log(p / (1.0 - p)))
+    return offset
+
+
+def reweight_class_shares_per_event(
+    export_df: pl.DataFrame,
+    *,
+    variant: BacktestVariant,
+    offset: dict[str, float],
+) -> dict[str, float]:
+    """Per-event ``shares_c · exp(delta_c)`` renormalized, then event-averaged.
+
+    Applies the fixed per-class offset as a pure post-hoc reweight of an
+    existing export's per-event class shares — equivalent to scoring a
+    ``gamma_propensity_zero`` fit with ``selection_offset`` in the softmax
+    reconstruction (the Task-1 mechanism). An all-zero offset is the
+    identity.
+    """
+    if variant.export_kind == "geometry":
+        class_column, share_column = "class_label", "expected_share"
+        label_expr = pl.col(class_column).cast(pl.Utf8)
+    else:
+        class_column, share_column = "fielding_position", "expected_share"
+        label_expr = pl.col(class_column).cast(pl.Int64).cast(pl.Utf8)
+
+    weight_by_label = {
+        label: math.exp(offset.get(label, 0.0)) for label in variant.class_labels
+    }
+    reweighted = (
+        export_df.with_columns(label_expr.alias("_label"))
+        .with_columns(
+            pl.col("_label")
+            .replace_strict(weight_by_label, default=1.0, return_dtype=pl.Float64)
+            .alias("_weight")
+        )
+        .with_columns((pl.col(share_column) * pl.col("_weight")).alias("_num"))
+    )
+    per_event = reweighted.group_by("event_key").agg(
+        pl.col("_num").sum().alias("_denom")
+    )
+    reweighted = reweighted.join(per_event, on="event_key", how="left").with_columns(
+        (pl.col("_num") / pl.col("_denom")).alias("_corrected")
+    )
+    grouped = reweighted.group_by("_label").agg(
+        pl.col("_corrected").mean().alias("_share")
+    )
+    raw = {
+        str(label): float(share)
+        for label, share in zip(
+            grouped.get_column("_label").to_list(),
+            grouped.get_column("_share").to_list(),
+        )
+    }
+    shares = {label: float(raw.get(label, 0.0)) for label in variant.class_labels}
+    total = sum(shares.values())
+    if not math.isclose(total, 1.0, abs_tol=1e-6):
+        raise AssertionError(
+            f"reweighted class shares sum to {total:.8f}, expected 1.0"
+        )
+    return shares
+
+
 def assert_export_covers_masked_slice(
     export_df: pl.DataFrame, *, masked_event_keys: set[int]
 ) -> None:
@@ -858,6 +943,84 @@ def evaluate_criteria(
     return payload
 
 
+def evaluate_offset_arm(
+    *,
+    truth_shares: dict[str, float],
+    offset_shares: dict[str, float],
+    uncorrected_shares: dict[str, float],
+    class_labels: tuple[str, ...],
+    focal_class: str,
+    uncorrected_held_out: dict[str, Any],
+    uncorrected_diagnostics: dict[str, Any],
+    selection_offset: dict[str, float],
+    thresholds: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """Score the oracle-offset arm against the same gate as the class arm.
+
+    The offset is a pure post-hoc reweight of the uncorrected (``noprop``)
+    arm's exported shares, so there is no separate fit: held-out metrics
+    and sampler diagnostics are the uncorrected fit's (the reweight only
+    touches the masked-slice imputation, never the held-out top-1 /
+    log-loss). Focal-share relative reduction, total variation, and the
+    diagnostics gate are evaluated exactly as in ``evaluate_criteria``.
+    """
+    thresholds = dict(THRESHOLDS if thresholds is None else thresholds)
+
+    focal_error_offset = abs(offset_shares[focal_class] - truth_shares[focal_class])
+    focal_error_uncorrected = abs(
+        uncorrected_shares[focal_class] - truth_shares[focal_class]
+    )
+    if focal_error_uncorrected > 0.0:
+        relative_reduction = (
+            focal_error_uncorrected - focal_error_offset
+        ) / focal_error_uncorrected
+    else:
+        relative_reduction = None
+    focal_share_error_reduced = (
+        relative_reduction is not None
+        and focal_error_offset < focal_error_uncorrected
+        and relative_reduction >= thresholds["focal_relative_reduction_min"]
+    )
+
+    tv_offset = _total_variation(offset_shares, truth_shares, class_labels)
+    tv_uncorrected = _total_variation(uncorrected_shares, truth_shares, class_labels)
+    total_variation_reduced = tv_offset < tv_uncorrected
+
+    sampler_diagnostics_clean = _diagnostics_clean(uncorrected_diagnostics, thresholds)
+
+    criteria = {
+        "focal_share_error_reduced": bool(focal_share_error_reduced),
+        "total_variation_reduced": bool(total_variation_reduced),
+        "held_out_non_regression": True,
+        "sampler_diagnostics_clean": bool(sampler_diagnostics_clean),
+    }
+    arm_pass = all(criteria.values())
+    payload: dict[str, Any] = {
+        "selection_offset": dict(selection_offset),
+        "shares": offset_shares,
+        "focal_share_error": {
+            "offset": focal_error_offset,
+            "uncorrected": focal_error_uncorrected,
+            "relative_reduction": relative_reduction,
+        },
+        "tv": {"offset": tv_offset, "uncorrected": tv_uncorrected},
+        "held_out": dict(uncorrected_held_out),
+        "criteria": criteria,
+        "pass": arm_pass,
+    }
+    _log.info(
+        "offset arm evaluated: focal_err offset=%.4f uncorrected=%.4f "
+        "relative_reduction=%s tv offset=%.4f uncorrected=%.4f pass=%s",
+        focal_error_offset,
+        focal_error_uncorrected,
+        relative_reduction,
+        tv_offset,
+        tv_uncorrected,
+        arm_pass,
+    )
+    return payload
+
+
 def run_backtest(
     *,
     model: BacktestModelName,
@@ -1017,14 +1180,38 @@ def run_backtest(
     shares: dict[str, dict[str, float]] = {}
     held_out: dict[str, dict[str, Any]] = {}
     diagnostics: dict[str, dict[str, Any]] = {}
+    exports: dict[str, pl.DataFrame] = {}
     for arm in ("corrected", "uncorrected"):
         fit_dir = bayes_root / variant.imputation_target / fit_artifacts[arm]
         export_df = pl.read_parquet(fit_dir / "exports" / variant.export_filename)
         assert_export_covers_masked_slice(export_df, masked_event_keys=masked_keys)
+        exports[arm] = export_df
         shares[arm] = recovered_class_shares(export_df, variant=variant)
         held_out[arm] = _read_json(fit_dir / "validation" / "held_out_metrics.json")
         diagnostics[arm] = _read_json(fit_dir / "validation" / "diagnostics.json")
         _log.debug("%s arm recovered shares: %s", arm, shares[arm])
+
+    resolved_mask_config = mask_config if mask_config is not None else MaskConfig()
+    mean_intensity = float(np.mean(resolved_mask_config.intensity_tiers))
+    selection_offset = oracle_selection_offset(
+        class_mask_probabilities=mask.summary["class_mask_probabilities"],
+        mean_intensity=mean_intensity,
+        class_labels=variant.class_labels,
+        max_mask_probability=resolved_mask_config.max_mask_probability,
+    )
+    offset_shares = reweight_class_shares_per_event(
+        exports["uncorrected"], variant=variant, offset=selection_offset
+    )
+    offset_metrics = evaluate_offset_arm(
+        truth_shares=truth_shares,
+        offset_shares=offset_shares,
+        uncorrected_shares=shares["uncorrected"],
+        class_labels=variant.class_labels,
+        focal_class=variant.focal_class,
+        uncorrected_held_out=held_out["uncorrected"],
+        uncorrected_diagnostics=diagnostics["uncorrected"],
+        selection_offset=selection_offset,
+    )
 
     metrics = evaluate_criteria(
         truth_shares=truth_shares,
@@ -1064,6 +1251,7 @@ def run_backtest(
                 },
             },
             "propensity_diagnostics": propensity_diagnostics,
+            "offset": offset_metrics,
         }
     )
     metrics_path = run_dir / "metrics.json"

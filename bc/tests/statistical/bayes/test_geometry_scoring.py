@@ -9,6 +9,7 @@ from pathlib import Path
 import arviz as az
 import numpy as np
 import polars as pl
+import pytest
 
 from python_models.statistical.bayes.training import (
     _export_geometry_probabilities,
@@ -552,6 +553,86 @@ def test_held_out_and_event_softmax_identical_on_shared_posterior() -> None:
         handler_z=handler_z,
     )
     np.testing.assert_array_equal(via_event, via_held_out)
+
+
+def test_selection_offset_inert_at_zero() -> None:
+    carrier = _geometry_carrier(np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64))
+    idata = _posterior(with_gamma_dl=False)
+
+    without_offset = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        selection_offset=None,
+    )
+    zero_offset = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        selection_offset=np.zeros(N_CLASSES, dtype=np.float64),
+    )
+    np.testing.assert_array_equal(without_offset, zero_offset)
+
+
+def test_selection_offset_matches_hand_rolled_softmax() -> None:
+    rng = np.random.default_rng(67)
+    offset = rng.normal(size=N_CLASSES).astype(np.float64)
+    rf_codes = rng.integers(0, 3, size=N_EVENTS).astype(np.int64)
+    rf_codes[2] = -1
+    carrier = GeometryProductionFrame(
+        event_keys=np.arange(N_EVENTS, dtype=np.int64),
+        fixed_effects={
+            "result_family": FixedEffectDesign(levels=("a", "b", "c"), codes=rf_codes)
+        },
+        dl_logit_per_class=np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64),
+    )
+    idata = _posterior(with_gamma_dl=False)
+
+    got = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        selection_offset=offset,
+    )
+
+    alpha = np.asarray(idata.posterior["alpha_class"].values)
+    delta = np.asarray(idata.posterior["delta_result_family"].values)
+    n_chain, n_draw, k = alpha.shape
+    eta = np.broadcast_to(alpha[:, :, None, :], (n_chain, n_draw, N_EVENTS, k)).copy()
+    valid = rf_codes >= 0
+    safe = np.where(valid, rf_codes, 0)
+    eta += delta[:, :, safe, :] * valid[None, None, :, None]
+    eta += offset[None, None, None, :]
+    expected = _direct_softmax(eta)
+
+    np.testing.assert_allclose(got, expected, atol=1e-12)
+    np.testing.assert_allclose(got.sum(axis=1), 1.0, atol=1e-9)
+
+    without_offset = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        selection_offset=None,
+    )
+    assert not np.allclose(got, without_offset)
+
+
+def test_selection_offset_wrong_length_raises() -> None:
+    carrier = _geometry_carrier(np.zeros((N_EVENTS, N_CLASSES), dtype=np.float64))
+    idata = _posterior(with_gamma_dl=False)
+
+    with pytest.raises(AssertionError):
+        _ = _posterior_event_softmax(
+            idata,
+            carrier,
+            n_positions=N_CLASSES,
+            intercept_name="alpha_class",
+            selection_offset=np.zeros(N_CLASSES + 1, dtype=np.float64),
+        )
 
 
 def test_softmax_empty_event_set_returns_zero_rows() -> None:

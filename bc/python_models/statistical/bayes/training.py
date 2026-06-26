@@ -703,9 +703,7 @@ def _posterior_event_means_pitch_coverage(
     for start in range(0, n_event, chunk_size):
         stop = min(start + chunk_size, n_event)
         sl = slice(start, stop)
-        eta = np.broadcast_to(
-            alpha[:, :, None], (n_chain, n_draw, stop - start)
-        ).copy()
+        eta = np.broadcast_to(alpha[:, :, None], (n_chain, n_draw, stop - start)).copy()
         for values, idx in random_effects:
             codes = idx[sl]
             valid = codes >= 0
@@ -1325,6 +1323,7 @@ def _posterior_event_softmax(
     dl_logit_per_class: np.ndarray | None = None,
     propensity_z: np.ndarray | None = None,
     handler_z: np.ndarray | None = None,
+    selection_offset: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute ``E[softmax(eta_e)] | data`` per (event, position) from posterior draws.
 
@@ -1345,7 +1344,11 @@ def _posterior_event_softmax(
     upstream. When ``handler_z`` is supplied (shape ``(n_event,)``) and the
     posterior carries the per-class ``gamma_handler``, the handler-posterior
     term ``z * gamma_handler`` is added the same way; events absent from the
-    handler export encode to z=0 upstream.
+    handler export encode to z=0 upstream. When ``selection_offset`` is
+    supplied (shape ``(K,)``) the fixed per-class MNAR selection log-odds
+    offset ``delta_k`` is added to ``eta[:, :, :, k]`` before the softmax,
+    broadcast over events; an all-zero offset is the identity and reproduces
+    the offset-free export exactly.
     """
     posterior = idata.posterior
     K = n_positions
@@ -1382,6 +1385,14 @@ def _posterior_event_softmax(
         else None
     )
 
+    offset_vec: np.ndarray | None = None
+    if selection_offset is not None:
+        offset_vec = np.asarray(selection_offset, dtype=np.float64)
+        if offset_vec.shape != (K,):
+            raise AssertionError(
+                f"selection_offset shape {offset_vec.shape} does not match K={K}"
+            )
+
     means = np.empty((n_event, K), dtype=np.float64)
     for start in range(0, n_event, chunk_size):
         stop = min(start + chunk_size, n_event)
@@ -1401,6 +1412,8 @@ def _posterior_event_softmax(
             eta += propensity_z[None, None, sl, None] * gamma_propensity[:, :, None, :]
         if gamma_handler is not None and handler_z is not None:
             eta += handler_z[None, None, sl, None] * gamma_handler[:, :, None, :]
+        if offset_vec is not None:
+            eta += offset_vec[None, None, None, :]
         eta -= eta.max(axis=-1, keepdims=True)
         exp_eta = np.exp(eta)
         pi = exp_eta / exp_eta.sum(axis=-1, keepdims=True)
@@ -2173,9 +2186,7 @@ def run_bayes_model(
         posterior_summary = _build_posterior_summary(
             posterior_idata, outcome_kind=spec.outcome_kind
         )
-        if spec.outcome_kind == "bernoulli" and isinstance(
-            inputs, PitchCoverageInputs
-        ):
+        if spec.outcome_kind == "bernoulli" and isinstance(inputs, PitchCoverageInputs):
             p_mean = _posterior_event_means_pitch_coverage(
                 posterior_idata,
                 cell_idx=inputs.cell_idx,
@@ -2375,6 +2386,15 @@ def run_bayes_model(
                 )
             elif spec.multinomial_export == "geometry":
                 geometry_export_path = exports_dir / GEOMETRY_EXPORT_FILENAME
+                selection_offset_active = (
+                    resolved_propensity_flavor == "gamma_propensity_offset"
+                )
+                geometry_selection_offset = (
+                    np.asarray(inputs.selection_log_odds_offset, dtype=np.float64)
+                    if selection_offset_active
+                    and inputs.selection_log_odds_offset is not None
+                    else None
+                )
                 production = build_geometry_production_frame(
                     dataset_parquet,
                     dimension=spec.dataset_dimension_filter,
@@ -2387,6 +2407,7 @@ def run_bayes_model(
                     handler_logit_mean=inputs.handler_logit_mean,
                     handler_logit_std=inputs.handler_logit_std,
                     handler_active=inputs.handler_active,
+                    selection_log_odds_offset=inputs.selection_log_odds_offset,
                 )
                 if production.n_events > 0:
                     shares = _posterior_event_softmax(
@@ -2397,6 +2418,7 @@ def run_bayes_model(
                         dl_logit_per_class=production.dl_logit_per_class,
                         propensity_z=production.propensity_z,
                         handler_z=production.handler_z,
+                        selection_offset=geometry_selection_offset,
                     )
                     _ = _export_geometry_probabilities(
                         shares,
@@ -2421,6 +2443,7 @@ def run_bayes_model(
                         dl_logit_per_class=inputs.dl_logit_per_class,
                         propensity_z=inputs.propensity_z,
                         handler_z=inputs.handler_z,
+                        selection_offset=geometry_selection_offset,
                     )
                     _ = _export_geometry_probabilities(
                         shares,

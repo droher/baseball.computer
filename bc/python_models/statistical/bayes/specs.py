@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 OutcomeKind = Literal["bernoulli", "multinomial", "count"]
 GammaDlFlavor = Literal["gamma_dl_zero", "gamma_dl_shrunk"]
-GammaPropensityFlavor = Literal["gamma_propensity_zero", "gamma_propensity_class"]
+GammaPropensityFlavor = Literal[
+    "gamma_propensity_zero", "gamma_propensity_class", "gamma_propensity_offset"
+]
 
 
 class BayesTargetSpec(BaseModel):

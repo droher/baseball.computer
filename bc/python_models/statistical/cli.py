@@ -226,12 +226,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _ = fit_bayes.add_argument(
         "--propensity-flavor",
-        choices=["gamma_propensity_zero", "gamma_propensity_class"],
+        choices=[
+            "gamma_propensity_zero",
+            "gamma_propensity_class",
+            "gamma_propensity_offset",
+        ],
         default=None,
         help=(
             "Observation-propensity MNAR covariate flavor. Defaults to the "
-            "first entry of the target's default_propensity_flavors. Ignored "
-            "by targets without a propensity_dimension."
+            "first entry of the target's default_propensity_flavors. "
+            "'gamma_propensity_offset' applies a fixed per-class selection "
+            "log-odds offset (BC_GEOMETRY_SELECTION_OFFSET) at scoring time, "
+            "leaving the observed-only fit unchanged. Ignored by targets "
+            "without a geometry export."
         ),
     )
     _ = fit_bayes.add_argument(

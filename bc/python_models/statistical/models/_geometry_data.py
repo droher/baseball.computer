@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
@@ -79,6 +80,42 @@ LABEL_COLUMN: str = "raw_value"
 
 PROPENSITY_COLUMN: str = "propensity_p_observed"
 PROPENSITY_CLIP: float = 1e-6
+
+SELECTION_OFFSET_ENV: str = "BC_GEOMETRY_SELECTION_OFFSET"
+
+
+def resolve_selection_log_odds_offset(
+    class_labels: Sequence[str],
+) -> tuple[float, ...] | None:
+    """Per-class selection log-odds offset aligned to ``class_labels``.
+
+    Read from ``BC_GEOMETRY_SELECTION_OFFSET`` as ``label=delta`` pairs
+    (comma-separated). Labels absent from the spec map to delta 0. Returns
+    None when the env var is unset, so the offset stays inert.
+    """
+    raw = os.environ.get(SELECTION_OFFSET_ENV, "").strip()
+    if not raw:
+        return None
+    by_label: dict[str, float] = {}
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        key, _, value = token.partition("=")
+        key = key.strip()
+        if not value:
+            raise ValueError(
+                f"{SELECTION_OFFSET_ENV} entry {token!r} is not a label=delta pair"
+            )
+        by_label[key] = float(value)
+    unknown = set(by_label) - set(class_labels)
+    if unknown:
+        raise ValueError(
+            f"{SELECTION_OFFSET_ENV} references labels outside the class vocab: "
+            f"{sorted(unknown)} (vocab={list(class_labels)})"
+        )
+    return tuple(float(by_label.get(label, 0.0)) for label in class_labels)
+
 
 FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
     "result_family",
@@ -157,6 +194,7 @@ class GeometryProductionFrame(ProductionScoringFrame):
 
     dl_logit_per_class: FloatArray
     handler_z: FloatArray | None = None
+    selection_log_odds_offset: tuple[float, ...] | None = None
 
 
 class GeometryInputs(BaseModel):
@@ -195,6 +233,8 @@ class GeometryInputs(BaseModel):
     handler_logit_mean: float = 0.0
     handler_logit_std: float = 1.0
     handler_active: bool = False
+
+    selection_log_odds_offset: tuple[float, ...] | None = None
 
     @property
     def n_events(self) -> int:
@@ -671,6 +711,7 @@ def build_geometry_production_frame(
     handler_logit_mean: float = 0.0,
     handler_logit_std: float = 1.0,
     handler_active: bool = False,
+    selection_log_odds_offset: tuple[float, ...] | None = None,
 ) -> GeometryProductionFrame:
     """One row per geometry-unobserved event with FE codes + per-class DL logits.
 
@@ -705,6 +746,7 @@ def build_geometry_production_frame(
             dl_logit_per_class=np.zeros((0, n_classes), dtype=np.float64),
             propensity_z=np.zeros(0, dtype=np.float64),
             handler_z=np.zeros(0, dtype=np.float64),
+            selection_log_odds_offset=selection_log_odds_offset,
         )
 
     event_keys = (
@@ -750,6 +792,7 @@ def build_geometry_production_frame(
         dl_logit_per_class=dl_logit_per_class,
         propensity_z=propensity_z,
         handler_z=handler_z,
+        selection_log_odds_offset=selection_log_odds_offset,
     )
 
 
@@ -1072,6 +1115,7 @@ def prepare_geometry_inputs(
         handler_logit_mean=handler_logit_mean,
         handler_logit_std=handler_logit_std,
         handler_active=handler_active,
+        selection_log_odds_offset=resolve_selection_log_odds_offset(vocab),
     )
 
 

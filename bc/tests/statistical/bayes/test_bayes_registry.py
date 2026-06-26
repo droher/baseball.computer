@@ -226,6 +226,27 @@ def test_propensity_class_flavor_without_dimension_rejected() -> None:
         )
 
 
+def test_propensity_offset_flavor_allowed_without_dimension() -> None:
+    from python_models.statistical.bayes.registry import get_target
+    from python_models.statistical.bayes.specs import BayesTargetSpec
+
+    template = get_target("ball_handler_imputation")
+    spec = BayesTargetSpec(
+        name="propensity_offset_probe",
+        dimension=template.dimension,
+        dataset_name=template.dataset_name,
+        dataset_dimension_filter=template.dataset_dimension_filter,
+        prep_fn=template.prep_fn,
+        builder=template.builder,
+        propensity_dimension=None,
+        default_propensity_flavors=(
+            "gamma_propensity_zero",
+            "gamma_propensity_offset",
+        ),
+    )
+    assert "gamma_propensity_offset" in spec.default_propensity_flavors
+
+
 def test_imputation_targets_carry_propensity_dimension_and_both_flavors() -> None:
     imputation = [
         spec

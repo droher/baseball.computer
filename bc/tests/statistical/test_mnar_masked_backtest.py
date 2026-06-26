@@ -28,8 +28,11 @@ from python_models.statistical.backtests.mnar_masked import (
     assert_export_covers_masked_slice,
     calibrate_class_mask_probabilities,
     evaluate_criteria,
+    evaluate_offset_arm,
     generate_mask,
+    oracle_selection_offset,
     recovered_class_shares,
+    reweight_class_shares_per_event,
     run_backtest,
 )
 from python_models.statistical.models._geometry_data import (
@@ -319,6 +322,98 @@ def test_recovered_class_shares_geometry_and_ball_handler() -> None:
     bh_shares = recovered_class_shares(bh_export, variant=bh_variant)
     assert bh_shares["6"] == pytest.approx(1.0 / 9)
     assert sum(bh_shares.values()) == pytest.approx(1.0)
+
+
+def test_oracle_selection_offset_is_logit_of_class_mask_prob() -> None:
+    config = MaskConfig()
+    w_class = {label: 0.0 for label in TRAJECTORY_LABELS}
+    w_class["GroundBall"] = 0.9
+    w_class["Fly"] = 0.5
+    mean_intensity = float(np.mean(config.intensity_tiers))
+    offset = oracle_selection_offset(
+        class_mask_probabilities=w_class,
+        mean_intensity=mean_intensity,
+        class_labels=TRAJECTORY_LABELS,
+        max_mask_probability=config.max_mask_probability,
+    )
+    for label, w in w_class.items():
+        p = float(np.clip(w * mean_intensity, 1e-6, config.max_mask_probability))
+        assert offset[label] == pytest.approx(float(np.log(p / (1.0 - p))))
+    assert offset["GroundBall"] > offset["Fly"]
+
+
+def test_reweight_zero_offset_matches_recovered_shares() -> None:
+    geometry_export = pl.DataFrame(
+        {
+            "event_key": [1] * 5 + [2] * 5,
+            "class_label": list(TRAJECTORY_LABELS) * 2,
+            "expected_share": [0.1, 0.5, 0.2, 0.1, 0.1, 0.3, 0.3, 0.2, 0.1, 0.1],
+        }
+    )
+    zero_offset = {label: 0.0 for label in TRAJECTORY_LABELS}
+    reweighted = reweight_class_shares_per_event(
+        geometry_export, variant=GEOMETRY_VARIANT, offset=zero_offset
+    )
+    baseline = recovered_class_shares(geometry_export, variant=GEOMETRY_VARIANT)
+    for label in TRAJECTORY_LABELS:
+        assert reweighted[label] == pytest.approx(baseline[label])
+
+
+def test_reweight_matches_hand_rolled_per_event_softmax_reweight() -> None:
+    shares_e1 = [0.1, 0.5, 0.2, 0.1, 0.1]
+    shares_e2 = [0.3, 0.3, 0.2, 0.1, 0.1]
+    geometry_export = pl.DataFrame(
+        {
+            "event_key": [1] * 5 + [2] * 5,
+            "class_label": list(TRAJECTORY_LABELS) * 2,
+            "expected_share": shares_e1 + shares_e2,
+        }
+    )
+    offset = {label: float(0.5 * (i - 2)) for i, label in enumerate(TRAJECTORY_LABELS)}
+    weight = np.exp(np.array([offset[label] for label in TRAJECTORY_LABELS]))
+
+    def corrected(shares: list[float]) -> np.ndarray:
+        num = np.array(shares) * weight
+        return num / num.sum()
+
+    expected_per_event = np.vstack([corrected(shares_e1), corrected(shares_e2)]).mean(
+        axis=0
+    )
+
+    got = reweight_class_shares_per_event(
+        geometry_export, variant=GEOMETRY_VARIANT, offset=offset
+    )
+    for i, label in enumerate(TRAJECTORY_LABELS):
+        assert got[label] == pytest.approx(float(expected_per_event[i]))
+    assert sum(got.values()) == pytest.approx(1.0)
+
+
+def test_evaluate_offset_arm_gates_on_focal_reduction() -> None:
+    truth = {label: 0.0 for label in TRAJECTORY_LABELS}
+    truth["GroundBall"] = 0.68
+    truth["Fly"] = 0.32
+    uncorrected = {label: 0.0 for label in TRAJECTORY_LABELS}
+    uncorrected["GroundBall"] = 0.34
+    uncorrected["Fly"] = 0.66
+    offset_shares = {label: 0.0 for label in TRAJECTORY_LABELS}
+    offset_shares["GroundBall"] = 0.66
+    offset_shares["Fly"] = 0.34
+    clean = {"divergences": 0, "rhat_max": 1.0, "ess_bulk_min": 500.0}
+    result = evaluate_offset_arm(
+        truth_shares=truth,
+        offset_shares=offset_shares,
+        uncorrected_shares=uncorrected,
+        class_labels=TRAJECTORY_LABELS,
+        focal_class="GroundBall",
+        uncorrected_held_out={"top1_accuracy": 0.5, "log_loss": 1.0},
+        uncorrected_diagnostics=clean,
+        selection_offset={label: 0.0 for label in TRAJECTORY_LABELS},
+    )
+    assert result["pass"] is True
+    assert result["criteria"]["focal_share_error_reduced"] is True
+    assert result["focal_share_error"]["relative_reduction"] == pytest.approx(
+        (0.34 - 0.02) / 0.34
+    )
 
 
 def test_assert_export_covers_masked_slice() -> None:
