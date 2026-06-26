@@ -119,6 +119,33 @@ Active items the latest pretrain + downstream cascade does not fix:
 - **Model C v4 — errors + double plays.** Errors lean on scorer-discretion priors (separate `η^E` with heavy scorer / scorer-team / park / era weighting per the doc). DPs need state-locked gating — they can only occur from base/out states that admit two outs on the play.
 - **Model C v5 — team-level box-residual fallback.** Per-player aggregate (v1) is the strong form. v5 adds a Normal likelihood at the team-credit-type grain for games where `official_credit_authority` returns `withheld` (v1 excludes those rows entirely). Weaker constraint than the per-player target but recovers coverage on games with negative-residual or otherwise invalid per-player totals.
 
+### Phase 5 — runtime artifacts, tiers, rollout
+
+**Done (non-gated scaffold).** Publication-tier registry (`publication_tiers.py`:
+official/deterministic/estimated/synthetic/withheld + `tier_for`); the full estimated-metadata
+contract (`artifact_id`, `model_name`, `model_version`, `source_snapshot_id`, `method`,
+`observed_status`, `confidence_status`, `weak_identification_flag`) stamped on all nine coverage
+tables via `stamp_estimated_contract`, sourced from the artifact manifest; `ess_bulk`/`rhat`
+diagnostics dropped from the published summaries; a registry-driven `estimated_contract_complete`
+audit on every estimated `@model` (typed-empty passes; populated rows must carry all eight columns).
+Compat is structural — the deterministic surfaces (`park_factors`, `run_expectancy_matrix`,
+`linear_weights`) are unchanged and tier-registered, the estimated siblings (`park_factor_summary`,
+`run_expectancy_summary`) exist and are tier-stamped, grains kept separate (don't join). LLM
+supplement carries the official-vs-estimated tier vocabulary. Conventions in
+`notes/data-coverage-implementation/phase5-conventions.md`.
+
+**Promotion-coupled remainder (run at/near `promote-prod`).**
+- Regenerate `docs/llm/baseball.lsf` (`just gen-llm-context`) once the estimated tables are populated
+  in prod — it reads the live SQLMesh schema; the supplement edits flow in automatically.
+- Enrich the nine coverage `@model` `column_descriptions` so the LSF entries are not sparse.
+- Populate `weak_identification_flag` at fit time from the publication gate (`publication.py`
+  weak-identification check / the ModelConfig `addressed_weak_identifications`); defaults `false` now.
+- A 7th+ BSL `SemanticTable` for estimated outputs IF they become BSL-queryable — note the `bsl` dep
+  group pins `sqlglot < 28`, mutually exclusive with the SQLMesh env (conditional per the checklist).
+- Rollback path: the legacy deterministic sources are untouched, so rollback is "stop reading the
+  estimated siblings" — formalize the documented restore step at promotion.
+- The gated `promote-prod` that writes `bc.db` itself (the user's call).
+
 ### Artifact backfill
 
 Six third-wave targets shipped code + tests but their `predictions_*` `@model`s gate on `python_models.ml.artifact_exists(target)`. `enabled=False` until the pin JSON lands. Run the matching `scripts/train_<name>.py --epochs 1 --rows-per-batch 100000` once each to land the artifact JSONs:
