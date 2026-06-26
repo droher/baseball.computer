@@ -196,6 +196,22 @@ def test_five_geometry_targets_registered() -> None:
     assert names == expected
 
 
+def test_state_transition_registered() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    spec = get_target("state_transition")
+    assert spec.outcome_kind == "multinomial"
+    assert spec.multinomial_export == "state_transition"
+    assert spec.count_export is None
+    assert spec.dataset_name == "model_input_run_values"
+    assert spec.dataset_dimension_filter == "state_transition"
+    assert spec.dimension == "state_transition"
+    assert spec.dl_proposal_dimension is None
+    assert spec.default_flavors == ("gamma_dl_zero",)
+    assert spec.sample_size is not None and spec.sample_size > 0
+    assert spec.published_manifest_name() == "state_transition"
+
+
 def test_no_propensity_dimension_restricts_propensity_flavors() -> None:
     for spec in all_targets():
         if spec.propensity_dimension is None:

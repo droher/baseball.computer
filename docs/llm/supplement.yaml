@@ -19,6 +19,7 @@ table_synonyms:
   main_models.park_factor_summary: [estimated park factor, modeled park factor, park factor uncertainty]
   main_models.run_expectancy_summary: [estimated run expectancy, modeled run expectancy, run value uncertainty]
   main_models.imputed_batted_ball_geometry: [imputed trajectory, imputed batted-ball location, estimated hit type]
+  main_models.state_transition_summary: [base-out transition matrix, base-out transition probabilities, estimated state transition]
 
 ambiguities:
   - term: HR
@@ -92,7 +93,8 @@ rules:
       imputed_batted_ball_geometry, imputed_fielding_credit,
       imputed_ball_handler_probabilities, imputed_advancement_probabilities,
       scorer_observation_propensities, pitch_count_coverage, park_factor_summary,
-      run_expectancy_summary, pitch_summary_distribution) are MODEL ESTIMATES, not
+      run_expectancy_summary, pitch_summary_distribution,
+      state_transition_summary) are MODEL ESTIMATES, not
       official facts. Do not present them as recorded values; they are posterior
       expectations or probabilities for data that was not directly recorded.
   - severity: should

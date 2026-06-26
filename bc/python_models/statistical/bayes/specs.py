@@ -66,6 +66,7 @@ class BayesTargetSpec(BaseModel):
             "geometry",
             "pitch_summary",
             "advancement",
+            "state_transition",
         ]
         | None
     ) = Field(
@@ -82,7 +83,10 @@ class BayesTargetSpec(BaseModel):
             "pitch_summary_summary.parquet at (result_family, season, league, "
             "final-count class) parameter grain; 'advancement' writes "
             "advancement_probabilities.parquet with a per-(event, baserunner) "
-            "softmax over the 7 advancement classes. None for bernoulli targets."
+            "softmax over the 7 advancement classes; 'state_transition' fits a "
+            "cell-grain count-vector Multinomial and writes "
+            "state_transition_summary.parquet at (start_state, season, league, "
+            "end_class) parameter grain. None for bernoulli targets."
         ),
     )
     count_export: Literal["park_factor", "run_expectancy"] | None = Field(

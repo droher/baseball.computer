@@ -173,6 +173,20 @@ PITCH_SUMMARY_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
+STATE_TRANSITION_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
+    "start_state": pl.Utf8(),
+    "season": pl.Int16(),
+    "league": pl.Utf8(),
+    "end_class": pl.Utf8(),
+    "outcome": pl.Utf8(),
+    "prob_mean": pl.Float64(),
+    "prob_sd": pl.Float64(),
+    "prob_hdi_lower": pl.Float64(),
+    "prob_hdi_upper": pl.Float64(),
+    **ESTIMATED_CONTRACT_SCHEMA,
+}
+
+
 def _empty_frame(schema: dict[str, pl.DataType]) -> pl.DataFrame:
     return pl.DataFrame(schema=schema)
 
@@ -207,6 +221,10 @@ def empty_run_expectancy_frame() -> pl.DataFrame:
 
 def empty_pitch_summary_frame() -> pl.DataFrame:
     return _empty_frame(PITCH_SUMMARY_SUMMARY_SCHEMA)
+
+
+def empty_state_transition_frame() -> pl.DataFrame:
+    return _empty_frame(STATE_TRANSITION_SUMMARY_SCHEMA)
 
 
 def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
@@ -686,4 +704,49 @@ def aggregate_pitch_summary_frames() -> Iterator[pl.DataFrame]:
         schema=PITCH_SUMMARY_SUMMARY_SCHEMA,
         empty_factory=empty_pitch_summary_frame,
         label="pitch-summary",
+    )
+
+
+def _build_state_transition_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.select(
+        pl.col("start_state").cast(pl.Utf8),
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("end_class").cast(pl.Utf8),
+        pl.col("outcome").cast(pl.Utf8),
+        pl.col("prob_mean").cast(pl.Float64),
+        pl.col("prob_sd").cast(pl.Float64),
+        pl.col("prob_hdi_lower").cast(pl.Float64),
+        pl.col("prob_hdi_upper").cast(pl.Float64),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
+
+
+def iterate_published_state_transition_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes state-transition (multinomial) target."""
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("state_transition"),
+        export_filename="state_transition_summary.parquet",
+        build_frame=_build_state_transition_frame,
+    )
+
+
+def aggregate_state_transition_frames() -> Iterator[pl.DataFrame]:
+    """Adapter that always yields at least one typed frame for the @model."""
+    yield from _aggregate_frames(
+        iterate_published_state_transition_frames(),
+        schema=STATE_TRANSITION_SUMMARY_SCHEMA,
+        empty_factory=empty_state_transition_frame,
+        label="state-transition",
     )

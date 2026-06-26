@@ -12,4 +12,5 @@ from python_models.statistical.bayes.targets import (
     pitch_coverage as _pitch_coverage,  # noqa: F401
     pitch_summary as _pitch_summary,  # noqa: F401
     run_values as _run_values,  # noqa: F401
+    state_transition as _state_transition,  # noqa: F401
 )

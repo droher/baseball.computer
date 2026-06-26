@@ -156,11 +156,12 @@ def test_tier_for_legacy_surface_is_deterministic() -> None:
         assert tier_for(name) is PublicationTier.DETERMINISTIC
 
 
-def test_estimated_registry_covers_the_nine_coverage_tables() -> None:
+def test_estimated_registry_matches_helper() -> None:
     estimated = {
         name
         for name, tier in PUBLICATION_TIERS.items()
         if tier is PublicationTier.ESTIMATED
     }
-    assert estimated == set(estimated_model_names())
-    assert len(estimated) == 9
+    names = estimated_model_names()
+    assert estimated == set(names)
+    assert len(names) == len(set(names))

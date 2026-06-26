@@ -76,6 +76,9 @@ from python_models.statistical.models._pitch_coverage_data import (
 )
 from python_models.statistical.models._pitch_summary_data import PitchSummaryInputs
 from python_models.statistical.models._run_values_data import RunExpectancyInputs
+from python_models.statistical.models._state_transition_data import (
+    StateTransitionInputs,
+)
 from python_models.statistical.outputs import write_parquet_atomic
 from python_models.statistical.pymc_utils import (
     DEFAULT_CONFIG,
@@ -111,6 +114,7 @@ PARK_FACTOR_SUMMARY_FILENAME: str = "park_factor_summary.parquet"
 RUN_EXPECTANCY_POSTERIOR_FILENAME: str = "run_expectancy_posterior.parquet"
 RUN_EXPECTANCY_SUMMARY_FILENAME: str = "run_expectancy_summary.parquet"
 PITCH_SUMMARY_SUMMARY_FILENAME: str = "pitch_summary_summary.parquet"
+STATE_TRANSITION_SUMMARY_FILENAME: str = "state_transition_summary.parquet"
 
 N_POSITIONS_EXPORT: int = 9
 
@@ -2071,6 +2075,132 @@ def _evaluate_pitch_summary_held_out(
     }
 
 
+def _export_state_transition_summary(
+    idata: az.InferenceData,
+    inputs: StateTransitionInputs,
+    *,
+    target_path: Path,
+) -> None:
+    """Write one-row-per-(cell, class) ``cell_class_prob`` posterior summary."""
+    prob = np.asarray(idata.posterior["cell_class_prob"].values, dtype=np.float64)
+    n_cell, n_class = prob.shape[-2], prob.shape[-1]
+    if n_cell != inputs.n_cells or n_class != len(inputs.end_class_labels):
+        raise AssertionError(
+            f"cell_class_prob shape ({n_cell}, {n_class}) != "
+            f"({inputs.n_cells}, {len(inputs.end_class_labels)})"
+        )
+    prob_mean = prob.mean(axis=(0, 1)).reshape(-1)
+    prob_sd = prob.std(axis=(0, 1)).reshape(-1)
+    hdi = np.asarray(
+        az.hdi(idata, var_names=["cell_class_prob"], hdi_prob=0.94)[
+            "cell_class_prob"
+        ].values,
+        dtype=np.float64,
+    )
+    ess = np.asarray(
+        az.ess(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
+        dtype=np.float64,
+    ).reshape(-1)
+    rhat = np.asarray(
+        az.rhat(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
+        dtype=np.float64,
+    ).reshape(-1)
+
+    cell_pos = np.repeat(np.arange(n_cell), n_class)
+    class_pos = np.tile(np.arange(n_class), n_cell)
+    df = pl.DataFrame(
+        {
+            "start_state": pl.Series(
+                "start_state",
+                [
+                    inputs.start_state_labels[inputs.start_state_by_cell[i]]
+                    for i in cell_pos
+                ],
+                dtype=pl.Utf8,
+            ),
+            "season": pl.Series(
+                "season",
+                np.asarray([inputs.season_by_cell[i] for i in cell_pos]),
+                dtype=pl.Int16,
+            ),
+            "league": pl.Series(
+                "league", [inputs.league_by_cell[i] for i in cell_pos], dtype=pl.Utf8
+            ),
+            "end_class": pl.Series(
+                "end_class",
+                [inputs.end_class_labels[j] for j in class_pos],
+                dtype=pl.Utf8,
+            ),
+            "outcome": pl.Series(
+                "outcome", [inputs.outcome] * (n_cell * n_class), dtype=pl.Utf8
+            ),
+            "prob_mean": pl.Series("prob_mean", prob_mean, dtype=pl.Float64),
+            "prob_sd": pl.Series("prob_sd", prob_sd, dtype=pl.Float64),
+            "prob_hdi_lower": pl.Series(
+                "prob_hdi_lower", hdi[..., 0].reshape(-1), dtype=pl.Float64
+            ),
+            "prob_hdi_upper": pl.Series(
+                "prob_hdi_upper", hdi[..., 1].reshape(-1), dtype=pl.Float64
+            ),
+            "ess_bulk": pl.Series("ess_bulk", ess, dtype=pl.Float64),
+            "rhat": pl.Series("rhat", rhat, dtype=pl.Float64),
+        }
+    )
+    write_parquet_atomic(df, target_path)
+    _log.info(
+        "wrote state_transition summary export rows=%d cells=%d path=%s",
+        df.height,
+        n_cell,
+        target_path,
+    )
+
+
+def _evaluate_state_transition_held_out(
+    inputs: StateTransitionInputs, idata: az.InferenceData
+) -> dict[str, object]:
+    """Per-event multinomial log-lik lift + total-variation vs start-state baseline."""
+    from scipy.special import softmax
+
+    held = inputs.held_out
+    if held.n_cells == 0:
+        return {"n_cells": 0}
+
+    posterior = idata.posterior
+    full_prob = np.asarray(posterior["cell_class_prob"].values, dtype=np.float64).mean(
+        axis=(0, 1)
+    )
+    alpha_trans = np.asarray(posterior["alpha_trans"].values, dtype=np.float64).mean(
+        axis=(0, 1)
+    )
+    ref = np.zeros((alpha_trans.shape[0], 1))
+    base_prob = softmax(np.concatenate([ref, alpha_trans], axis=1), axis=1)
+
+    counts = held.counts.astype(np.float64)
+    cell_n = counts.sum(axis=1)
+    total = float(cell_n.sum())
+    full = full_prob[held.cell_idx]
+    base = base_prob[held.cell_start_idx]
+
+    eps = 1e-12
+    loglik_full = float(np.sum(counts * np.log(full + eps)))
+    loglik_base = float(np.sum(counts * np.log(base + eps)))
+    obs = counts / cell_n[:, None]
+    tv_full = 0.5 * np.abs(obs - full).sum(axis=1)
+    tv_base = 0.5 * np.abs(obs - base).sum(axis=1)
+    tv_full_w = float(np.sum(cell_n * tv_full) / total)
+    tv_base_w = float(np.sum(cell_n * tv_base) / total)
+    return {
+        "n_cells": int(held.n_cells),
+        "n_events": int(total),
+        "loglik_per_event": loglik_full / total,
+        "loglik_per_event_baseline": loglik_base / total,
+        "loglik_lift": (loglik_full - loglik_base) / total,
+        "tv_distance": tv_full_w,
+        "tv_distance_baseline": tv_base_w,
+        "tv_improvement": tv_base_w - tv_full_w,
+    }
+
+
 def run_bayes_model(
     *,
     model_name: str,
@@ -2382,6 +2512,15 @@ def run_bayes_model(
                     target_path=exports_dir / PITCH_SUMMARY_SUMMARY_FILENAME,
                 )
                 held_out_metrics = _evaluate_pitch_summary_held_out(
+                    inputs, posterior_idata
+                )
+            elif spec.multinomial_export == "state_transition":
+                _export_state_transition_summary(
+                    posterior_idata,
+                    inputs,
+                    target_path=exports_dir / STATE_TRANSITION_SUMMARY_FILENAME,
+                )
+                held_out_metrics = _evaluate_state_transition_held_out(
                     inputs, posterior_idata
                 )
             elif spec.multinomial_export == "geometry":
