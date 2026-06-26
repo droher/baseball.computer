@@ -33,6 +33,7 @@ _ESTIMATED_MODELS: tuple[str, ...] = (
     "run_expectancy_summary",
     "pitch_summary_distribution",
     "state_transition_summary",
+    "linear_weights_estimated",
 )
 
 

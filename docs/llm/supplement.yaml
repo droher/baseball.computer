@@ -20,6 +20,7 @@ table_synonyms:
   main_models.run_expectancy_summary: [estimated run expectancy, modeled run expectancy, run value uncertainty]
   main_models.imputed_batted_ball_geometry: [imputed trajectory, imputed batted-ball location, estimated hit type]
   main_models.state_transition_summary: [base-out transition matrix, base-out transition probabilities, estimated state transition]
+  main_models.linear_weights_estimated: [estimated linear weights, linear weights uncertainty, run value uncertainty]
 
 ambiguities:
   - term: HR
@@ -63,6 +64,12 @@ ambiguities:
       - table.main_models_run_expectancy_summary
     default: table.main_models_run_expectancy_matrix
     clarify_when: question wants modeled uncertainty per season/league → the estimated run_expectancy_summary; the deterministic run_expectancy_matrix is the default.
+  - term: linear weights
+    meanings:
+      - table.main_models_linear_weights
+      - table.main_models_linear_weights_estimated
+    default: table.main_models_linear_weights
+    clarify_when: question wants modeled uncertainty (HDI / posterior sd on the run value) → the estimated linear_weights_estimated; the deterministic linear_weights is the default point surface.
 
 rules:
   - severity: must
@@ -94,7 +101,7 @@ rules:
       imputed_ball_handler_probabilities, imputed_advancement_probabilities,
       scorer_observation_propensities, pitch_count_coverage, park_factor_summary,
       run_expectancy_summary, pitch_summary_distribution,
-      state_transition_summary) are MODEL ESTIMATES, not
+      state_transition_summary, linear_weights_estimated) are MODEL ESTIMATES, not
       official facts. Do not present them as recorded values; they are posterior
       expectations or probabilities for data that was not directly recorded.
   - severity: should
