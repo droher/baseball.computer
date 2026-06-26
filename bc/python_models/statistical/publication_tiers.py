@@ -1,9 +1,12 @@
 """Publication-tier registry for the data-coverage published surfaces.
 
-The registry is the single source the prod health-check audit and the
-per-row estimated-metadata stamp both read. Model names are stored
-unqualified (no ``main_models.`` prefix); ``tier_for`` strips a leading
-``main_models.`` so callers may pass either form.
+The declared tier of each published ``main_models.*`` surface. The estimated
+contract is currently stamped in ``bayes/manifest_ingest`` and enforced by the
+``estimated_contract_complete`` audit directly; wiring those to derive their
+target set from this registry is the follow-up that makes it the mechanical
+source of truth. Model names are stored unqualified (no ``main_models.``
+prefix); ``tier_for`` strips a leading ``main_models.`` so callers may pass
+either form.
 """
 
 from __future__ import annotations

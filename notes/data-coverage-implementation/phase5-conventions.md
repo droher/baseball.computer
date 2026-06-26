@@ -11,7 +11,9 @@ made for the build.
 dict[str, PublicationTier]` maps each published `main_models.*` model name to its tier. The nine
 data-coverage coverage tables are `estimated`; the three legacy point surfaces
 (`linear_weights`, `park_factors`, `run_expectancy_matrix`) are `deterministic`. The registry is the
-single source the prod health-check audit and the per-row tier stamp both read.
+declared tier source; the estimated contract is currently stamped in `manifest_ingest` and enforced
+by the `estimated_contract_complete` audit directly. Deriving those target sets from the registry
+(so it becomes the mechanical source of truth) is a tracked follow-up.
 
 ## Estimated metadata contract
 
