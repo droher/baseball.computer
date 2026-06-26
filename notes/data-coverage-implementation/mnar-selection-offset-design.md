@@ -104,8 +104,28 @@ per-`(era_cell, class)`, with `delta ≡ 0` outside the under-recorded eras.
    `eta += offset[class]` in the softmax reconstruction (purely an export transform; the fit stays
    observed-only and unchanged). Flavor name `gamma_propensity_offset` to sit beside `_zero` / `_class`.
 2. Masked-backtest variant: corrected = `noprop` + oracle offset; assert it clears the gate.
-3. Sensitivity-ribbon export over the delta grid (post-hoc reweight; no refit).
+3. Sensitivity-ribbon export over the delta grid (post-hoc reweight; no refit). **Built.**
 4. (Deferred) anchored per-`(era, class)` delta from partial-truth + its holdout validation.
+
+## Status — ribbon built (steps 1–3 done)
+
+`python_models/statistical/sensitivity.py` reweights a published per-event class-share export over
+the selection-log-odds grid (`DEFAULT_GRID = ±{0.25, 0.5, 1.0}` nats, sweeping each class's offset
+alone) and returns the per-class marginal band. `scripts/sensitivity_ribbon.py` (no args) writes
+`exports/sensitivity_ribbon.parquet` beside each published `geometry_*` fit (grain
+`(geometry_dimension, class_label, delta_logodds)` plus `marginal_share` / `baseline_share`);
+`delta=0` reproduces the published MAR marginal exactly.
+
+The grid scale is validated against the masked backtest (`--validate-backtest <run>`): the *real*
+correction the mask induced (oracle per-class offset = centered `logit(class_mask_prob)`) lands
+inside `±1.0` — GroundBall `+0.37`, others `−0.09` — reduces TV-to-truth (`0.073 → 0.033`), and the
+focal-class band `[0.18, 0.59]` brackets the true `0.43` share. So the published band is wide enough
+to contain a realistic MNAR shift without being uninformatively wide. A `±2`-SD-of-logit scale was
+rejected: it produced absurd `[0.09, 0.72]` bands because the one-vs-rest logit SD is large.
+
+The ribbon is the honest deliverable for the unidentified `delta_c`: an as-published band, not a
+point claim. The anchored per-`(era, class)` point estimate (step 4) is still deferred; MAR
+(`delta=0` = the `e-noprop-*` operating points) stays the published default.
 
 ## What this does not claim
 
