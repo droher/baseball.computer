@@ -116,6 +116,15 @@ def sample_model(
             nuts_sampler=config.backend,
             nuts_sampler_kwargs=nuts_sampler_kwargs or None,
         )
+    warmup_groups = [g for g in idata.groups() if str(g).startswith("warmup_")]
+    if warmup_groups:
+        idata = az.InferenceData(
+            **{
+                str(g): getattr(idata, str(g))
+                for g in idata.groups()
+                if not str(g).startswith("warmup_")
+            }
+        )
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         idata.to_netcdf(str(output_path))

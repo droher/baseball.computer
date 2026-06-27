@@ -70,6 +70,15 @@ def build_assist_count_model(
             dims=("cell", "assist_count_nonref"),
         )
 
+        n_event_classes = len(inputs.coords["event_class"])
+        ref_ec = pt.zeros((n_event_classes, 1))
+        eta_ec = pt.concatenate([ref_ec, event_class_logodds], axis=1)
+        pm.Deterministic(
+            "event_class_count_prob",
+            pm.math.softmax(eta_ec, axis=1),
+            dims=("event_class", "assist_count_class"),
+        )
+
         ref_col = pt.zeros((n_cells, 1))
         eta = pt.concatenate([ref_col, cell_logodds], axis=1)
         cell_class_prob = pm.Deterministic(

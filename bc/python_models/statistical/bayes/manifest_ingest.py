@@ -187,6 +187,19 @@ STATE_TRANSITION_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
+ASSIST_COUNT_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
+    "result_family": pl.Utf8(),
+    "base_state_start": pl.Int8(),
+    "outs_start": pl.Int8(),
+    "assist_count_class": pl.Utf8(),
+    "prob_mean": pl.Float64(),
+    "prob_sd": pl.Float64(),
+    "prob_hdi_lower": pl.Float64(),
+    "prob_hdi_upper": pl.Float64(),
+    **ESTIMATED_CONTRACT_SCHEMA,
+}
+
+
 def _empty_frame(schema: dict[str, pl.DataType]) -> pl.DataFrame:
     return pl.DataFrame(schema=schema)
 
@@ -225,6 +238,10 @@ def empty_pitch_summary_frame() -> pl.DataFrame:
 
 def empty_state_transition_frame() -> pl.DataFrame:
     return _empty_frame(STATE_TRANSITION_SUMMARY_SCHEMA)
+
+
+def empty_assist_count_frame() -> pl.DataFrame:
+    return _empty_frame(ASSIST_COUNT_SUMMARY_SCHEMA)
 
 
 def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
@@ -749,4 +766,48 @@ def aggregate_state_transition_frames() -> Iterator[pl.DataFrame]:
         schema=STATE_TRANSITION_SUMMARY_SCHEMA,
         empty_factory=empty_state_transition_frame,
         label="state-transition",
+    )
+
+
+def _build_assist_count_frame(
+    df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
+) -> pl.DataFrame:
+    out = df.select(
+        pl.col("result_family").cast(pl.Utf8),
+        pl.col("base_state_start").cast(pl.Int8),
+        pl.col("outs_start").cast(pl.Int8),
+        pl.col("assist_count_class").cast(pl.Utf8),
+        pl.col("prob_mean").cast(pl.Float64),
+        pl.col("prob_sd").cast(pl.Float64),
+        pl.col("prob_hdi_lower").cast(pl.Float64),
+        pl.col("prob_hdi_upper").cast(pl.Float64),
+    )
+    out = stamp_estimated_contract(
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
+    )
+    _log.info(
+        "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
+        out.height,
+        spec.published_manifest_name(),
+        spec.dimension,
+    )
+    return out
+
+
+def iterate_published_assist_count_frames() -> Iterator[pl.DataFrame]:
+    """Yield one frame per published Bayes assist-count (multinomial) target."""
+    yield from _iterate_published_export_frames(
+        _specs_for_multinomial_export("assist_count"),
+        export_filename="assist_count_summary.parquet",
+        build_frame=_build_assist_count_frame,
+    )
+
+
+def aggregate_assist_count_frames() -> Iterator[pl.DataFrame]:
+    """Adapter that always yields at least one typed frame for the @model."""
+    yield from _aggregate_frames(
+        iterate_published_assist_count_frames(),
+        schema=ASSIST_COUNT_SUMMARY_SCHEMA,
+        empty_factory=empty_assist_count_frame,
+        label="assist-count",
     )

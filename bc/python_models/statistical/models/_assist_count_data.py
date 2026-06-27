@@ -56,6 +56,22 @@ BASE_OUT_COLUMNS: tuple[str, ...] = ("base_state_start", "outs_start")
 
 MIN_EVENTS_PER_CELL: int = 25
 
+SINGLE_SOURCE_LABEL: str = "__single__"
+
+
+class AssistCountHeldOutSet(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        arbitrary_types_allowed=True, frozen=True
+    )
+
+    counts: IntArray
+    cell_idx: IntArray
+    cell_event_class_idx: IntArray
+
+    @property
+    def n_cells(self) -> int:
+        return int(self.counts.shape[0])
+
 
 class AssistCountInputs(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(
@@ -65,6 +81,7 @@ class AssistCountInputs(BaseModel):
     counts: IntArray
     cell_event_class_idx: IntArray
     coords: dict[str, list[str]]
+    held_out: AssistCountHeldOutSet
 
     @property
     def n_cells(self) -> int:
@@ -85,9 +102,87 @@ def _bucket_assist_count(total: int) -> int:
     return min(total, ASSIST_COUNT_MAX) - 1
 
 
+def _event_cell_frame(per_event: pl.DataFrame) -> pl.DataFrame:
+    class_idx = np.fromiter(
+        (
+            _bucket_assist_count(int(t))
+            for t in per_event.get_column("assist_total").to_list()
+        ),
+        dtype=np.int64,
+        count=per_event.height,
+    )
+    event_class = (
+        per_event.get_column(EVENT_CLASS_COLUMN)
+        .fill_null(UNKNOWN_LEVEL)
+        .cast(pl.Utf8)
+        .to_list()
+    )
+    base_out = [
+        f"{b}|{o}"
+        for b, o in zip(
+            per_event.get_column("base_state_start").fill_null(-1).to_list(),
+            per_event.get_column("outs_start").fill_null(-1).to_list(),
+            strict=True,
+        )
+    ]
+    cell_keys = [f"{ec}||{bo}" for ec, bo in zip(event_class, base_out, strict=True)]
+    return pl.DataFrame(
+        {
+            "cell_key": cell_keys,
+            "event_class": event_class,
+            "class_idx": class_idx,
+        }
+    )
+
+
+def _held_out_count_set(
+    held_cell_df: pl.DataFrame,
+    *,
+    cell_to_idx: dict[str, int],
+    event_class_to_idx: dict[str, int],
+    n_classes: int,
+) -> AssistCountHeldOutSet:
+    empty = np.zeros(0, dtype=np.int64)
+    if held_cell_df.height == 0:
+        return AssistCountHeldOutSet(
+            counts=np.zeros((0, n_classes), dtype=np.int64),
+            cell_idx=empty,
+            cell_event_class_idx=empty,
+        )
+    known = held_cell_df.filter(
+        pl.col("cell_key").is_in(pl.Series(list(cell_to_idx.keys())).implode())
+    )
+    if known.height == 0:
+        return AssistCountHeldOutSet(
+            counts=np.zeros((0, n_classes), dtype=np.int64),
+            cell_idx=empty,
+            cell_event_class_idx=empty,
+        )
+    held_labels = sorted(known.get_column("cell_key").unique().to_list())
+    held_to_row = {c: i for i, c in enumerate(held_labels)}
+    counts = np.zeros((len(held_labels), n_classes), dtype=np.int64)
+    cell_idx = np.array([cell_to_idx[c] for c in held_labels], dtype=np.int64)
+    cell_event_class_idx = np.zeros(len(held_labels), dtype=np.int64)
+    grouped = known.group_by("cell_key").agg(
+        pl.col("class_idx"),
+        pl.first("event_class").alias("event_class"),
+    )
+    for row in grouped.iter_rows(named=True):
+        r = held_to_row[row["cell_key"]]
+        cell_event_class_idx[r] = event_class_to_idx[row["event_class"]]
+        for k in row["class_idx"]:
+            counts[r, int(k)] += 1
+    return AssistCountHeldOutSet(
+        counts=counts,
+        cell_idx=cell_idx,
+        cell_event_class_idx=cell_event_class_idx,
+    )
+
+
 def prepare_assist_count_inputs(
     parquet_path: Path,
     *,
+    dimension: str | None = None,
     smoke_limit: int | None = None,
     seed: int = DEFAULT_SEED,
     min_events_per_season: int = MIN_EVENTS_PER_SEASON,
@@ -95,7 +190,12 @@ def prepare_assist_count_inputs(
     held_out_fold_id: int = HOLDOUT_FOLD_ID,
     held_out_fold_count: int = HOLDOUT_FOLD_COUNT,
 ) -> AssistCountInputs:
-    """Aggregate per-event assist counts to ``(event_class, base_out)`` cells."""
+    """Aggregate per-event assist counts to ``(event_class, base_out)`` cells.
+
+    The ``dimension`` kwarg is accepted for interface parity with other prep
+    entrypoints and ignored (this dataset has no dimension column).
+    """
+    _ = dimension
     per_event = (
         pl.scan_parquet(parquet_path)
         .filter(
@@ -142,6 +242,7 @@ def prepare_assist_count_inputs(
         for g in distinct_game_ids
         if game_hash_fold(g, fold_count=held_out_fold_count) == held_out_fold_id
     ]
+    held_event = per_event.filter(pl.col("game_id").is_in(holdout_game_ids))
     per_event = per_event.filter(~pl.col("game_id").is_in(holdout_game_ids))
     _log.info(
         "prepare_assist_count_inputs held-out %d/%d games via fold %d/%d",
@@ -162,38 +263,7 @@ def prepare_assist_count_inputs(
             seed,
         )
 
-    class_idx = np.fromiter(
-        (
-            _bucket_assist_count(int(t))
-            for t in per_event.get_column("assist_total").to_list()
-        ),
-        dtype=np.int64,
-        count=per_event.height,
-    )
-
-    event_class = (
-        per_event.get_column(EVENT_CLASS_COLUMN)
-        .fill_null(UNKNOWN_LEVEL)
-        .cast(pl.Utf8)
-        .to_list()
-    )
-    base_out = [
-        f"{b}|{o}"
-        for b, o in zip(
-            per_event.get_column("base_state_start").fill_null(-1).to_list(),
-            per_event.get_column("outs_start").fill_null(-1).to_list(),
-            strict=True,
-        )
-    ]
-    cell_keys = [f"{ec}||{bo}" for ec, bo in zip(event_class, base_out, strict=True)]
-
-    cell_df = pl.DataFrame(
-        {
-            "cell_key": cell_keys,
-            "event_class": event_class,
-            "class_idx": class_idx,
-        }
-    )
+    cell_df = _event_cell_frame(per_event)
     cell_sizes = cell_df.group_by("cell_key").agg(pl.len().alias("_n"))
     kept_cells = cell_sizes.filter(
         pl.col("_n") >= min_events_per_cell
@@ -231,7 +301,15 @@ def prepare_assist_count_inputs(
         for k in row["class_idx"]:
             counts[ci, int(k)] += 1
 
+    held_out = _held_out_count_set(
+        _event_cell_frame(held_event),
+        cell_to_idx=cell_to_idx,
+        event_class_to_idx=event_class_to_idx,
+        n_classes=n_classes,
+    )
+
     coords: dict[str, list[str]] = {
+        "source": [SINGLE_SOURCE_LABEL],
         "cell": cell_labels,
         "event_class": event_class_labels,
         "assist_count_class": list(ASSIST_COUNT_CLASSES),
@@ -250,4 +328,5 @@ def prepare_assist_count_inputs(
         counts=counts,
         cell_event_class_idx=cell_event_class_idx,
         coords=coords,
+        held_out=held_out,
     )

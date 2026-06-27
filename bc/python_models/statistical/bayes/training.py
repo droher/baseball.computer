@@ -74,6 +74,7 @@ from python_models.statistical.models._pitch_coverage_data import (
     PitchCoverageInputs,
     build_pitch_coverage_scoring_frame,
 )
+from python_models.statistical.models._assist_count_data import AssistCountInputs
 from python_models.statistical.models._pitch_summary_data import PitchSummaryInputs
 from python_models.statistical.models._run_values_data import RunExpectancyInputs
 from python_models.statistical.models._state_transition_data import (
@@ -115,6 +116,7 @@ RUN_EXPECTANCY_POSTERIOR_FILENAME: str = "run_expectancy_posterior.parquet"
 RUN_EXPECTANCY_SUMMARY_FILENAME: str = "run_expectancy_summary.parquet"
 PITCH_SUMMARY_SUMMARY_FILENAME: str = "pitch_summary_summary.parquet"
 STATE_TRANSITION_SUMMARY_FILENAME: str = "state_transition_summary.parquet"
+ASSIST_COUNT_SUMMARY_FILENAME: str = "assist_count_summary.parquet"
 
 N_POSITIONS_EXPORT: int = 9
 
@@ -297,6 +299,11 @@ def _build_posterior_summary(
             "alpha_position",
             "alpha_class",
             "beta0",
+            "alpha_trans",
+            "beta0_count",
+            "event_class_logodds",
+            "sigma_event_class",
+            "cell_logodds",
             "result_logodds",
             "sigma_result",
             "gamma_dl",
@@ -386,6 +393,11 @@ def _diagnostics_from_idata(
             "alpha_position",
             "alpha_class",
             "beta0",
+            "alpha_trans",
+            "beta0_count",
+            "event_class_logodds",
+            "sigma_event_class",
+            "cell_logodds",
             "result_logodds",
             "sigma_result",
             "gamma_dl",
@@ -2149,8 +2161,6 @@ def _evaluate_state_transition_held_out(
     inputs: StateTransitionInputs, idata: az.InferenceData
 ) -> dict[str, object]:
     """Per-event multinomial log-lik lift + total-variation vs start-state baseline."""
-    from scipy.special import softmax
-
     held = inputs.held_out
     if held.n_cells == 0:
         return {"n_cells": 0}
@@ -2159,17 +2169,135 @@ def _evaluate_state_transition_held_out(
     full_prob = np.asarray(posterior["cell_class_prob"].values, dtype=np.float64).mean(
         axis=(0, 1)
     )
-    alpha_trans = np.asarray(posterior["alpha_trans"].values, dtype=np.float64).mean(
-        axis=(0, 1)
-    )
-    ref = np.zeros((alpha_trans.shape[0], 1))
-    base_prob = softmax(np.concatenate([ref, alpha_trans], axis=1), axis=1)
+    base_prob = np.asarray(
+        posterior["start_state_prob"].values, dtype=np.float64
+    ).mean(axis=(0, 1))
 
     counts = held.counts.astype(np.float64)
     cell_n = counts.sum(axis=1)
     total = float(cell_n.sum())
     full = full_prob[held.cell_idx]
     base = base_prob[held.cell_start_idx]
+
+    eps = 1e-12
+    loglik_full = float(np.sum(counts * np.log(full + eps)))
+    loglik_base = float(np.sum(counts * np.log(base + eps)))
+    obs = counts / cell_n[:, None]
+    tv_full = 0.5 * np.abs(obs - full).sum(axis=1)
+    tv_base = 0.5 * np.abs(obs - base).sum(axis=1)
+    tv_full_w = float(np.sum(cell_n * tv_full) / total)
+    tv_base_w = float(np.sum(cell_n * tv_base) / total)
+    return {
+        "n_cells": int(held.n_cells),
+        "n_events": int(total),
+        "loglik_per_event": loglik_full / total,
+        "loglik_per_event_baseline": loglik_base / total,
+        "loglik_lift": (loglik_full - loglik_base) / total,
+        "tv_distance": tv_full_w,
+        "tv_distance_baseline": tv_base_w,
+        "tv_improvement": tv_base_w - tv_full_w,
+    }
+
+
+def _export_assist_count_summary(
+    idata: az.InferenceData,
+    inputs: AssistCountInputs,
+    *,
+    target_path: Path,
+) -> None:
+    """Write one-row-per-(cell, count class) ``cell_class_prob`` posterior summary."""
+    prob = np.asarray(idata.posterior["cell_class_prob"].values, dtype=np.float64)
+    n_cell, n_class = prob.shape[-2], prob.shape[-1]
+    class_labels = inputs.coords["assist_count_class"]
+    if n_cell != inputs.n_cells or n_class != len(class_labels):
+        raise AssertionError(
+            f"cell_class_prob shape ({n_cell}, {n_class}) != "
+            f"({inputs.n_cells}, {len(class_labels)})"
+        )
+    prob_mean = prob.mean(axis=(0, 1)).reshape(-1)
+    prob_sd = prob.std(axis=(0, 1)).reshape(-1)
+    hdi = np.asarray(
+        az.hdi(idata, var_names=["cell_class_prob"], hdi_prob=0.94)[
+            "cell_class_prob"
+        ].values,
+        dtype=np.float64,
+    )
+
+    cell_labels = inputs.coords["cell"]
+    result_family: list[str] = []
+    base_state: list[int] = []
+    outs: list[int] = []
+    for label in cell_labels:
+        event_class, base_out = label.split("||", 1)
+        base_str, outs_str = base_out.split("|", 1)
+        result_family.append(event_class)
+        base_state.append(int(base_str))
+        outs.append(int(outs_str))
+
+    cell_pos = np.repeat(np.arange(n_cell), n_class)
+    class_pos = np.tile(np.arange(n_class), n_cell)
+    df = pl.DataFrame(
+        {
+            "result_family": pl.Series(
+                "result_family", [result_family[i] for i in cell_pos], dtype=pl.Utf8
+            ),
+            "base_state_start": pl.Series(
+                "base_state_start",
+                np.asarray([base_state[i] for i in cell_pos]),
+                dtype=pl.Int8,
+            ),
+            "outs_start": pl.Series(
+                "outs_start",
+                np.asarray([outs[i] for i in cell_pos]),
+                dtype=pl.Int8,
+            ),
+            "assist_count_class": pl.Series(
+                "assist_count_class",
+                [class_labels[j] for j in class_pos],
+                dtype=pl.Utf8,
+            ),
+            "prob_mean": pl.Series("prob_mean", prob_mean, dtype=pl.Float64),
+            "prob_sd": pl.Series("prob_sd", prob_sd, dtype=pl.Float64),
+            "prob_hdi_lower": pl.Series(
+                "prob_hdi_lower", hdi[..., 0].reshape(-1), dtype=pl.Float64
+            ),
+            "prob_hdi_upper": pl.Series(
+                "prob_hdi_upper", hdi[..., 1].reshape(-1), dtype=pl.Float64
+            ),
+        }
+    )
+    write_parquet_atomic(df, target_path)
+    _log.info(
+        "wrote assist_count summary export rows=%d cells=%d path=%s",
+        df.height,
+        n_cell,
+        target_path,
+    )
+
+
+def _evaluate_assist_count_held_out(
+    inputs: AssistCountInputs, idata: az.InferenceData
+) -> dict[str, object]:
+    """Per-event multinomial log-lik lift + total-variation vs event-class baseline."""
+    held = inputs.held_out
+    if held.n_cells == 0:
+        return {"n_cells": 0}
+
+    posterior = idata.posterior
+    full_prob = np.asarray(posterior["cell_class_prob"].values, dtype=np.float64).mean(
+        axis=(0, 1)
+    )
+    base_prob = np.asarray(
+        posterior["event_class_count_prob"].values, dtype=np.float64
+    ).mean(axis=(0, 1))
+
+    counts = held.counts.astype(np.float64)
+    cell_n = counts.sum(axis=1)
+    total = float(cell_n.sum())
+    if total == 0.0:
+        return {"n_cells": int(held.n_cells), "n_events": 0}
+    full = full_prob[held.cell_idx]
+    base = base_prob[held.cell_event_class_idx]
 
     eps = 1e-12
     loglik_full = float(np.sum(counts * np.log(full + eps)))
@@ -2317,6 +2445,44 @@ def run_bayes_model(
             )
             _log.info(
                 "bayes held-out state-transition metrics model=%s artifact=%s "
+                "n_cells=%s loglik_lift=%.4f tv_improvement=%.4f",
+                model_name,
+                artifact_id,
+                held_out_metrics.get("n_cells", 0),
+                float(held_out_metrics.get("loglik_lift", float("nan"))),
+                float(held_out_metrics.get("tv_improvement", float("nan"))),
+            )
+            posterior_idata.posterior = posterior_idata.posterior.drop_vars(
+                "cell_class_prob"
+            )
+            posterior_predictive = getattr(
+                posterior_idata, "posterior_predictive", None
+            )
+            if (
+                posterior_predictive is not None
+                and "cell_class_prob" in posterior_predictive
+            ):
+                posterior_idata.posterior_predictive = (
+                    posterior_predictive.drop_vars("cell_class_prob")
+                )
+
+        elif spec.multinomial_export == "assist_count" and isinstance(
+            inputs, AssistCountInputs
+        ):
+            _export_assist_count_summary(
+                posterior_idata,
+                inputs,
+                target_path=exports_dir / ASSIST_COUNT_SUMMARY_FILENAME,
+            )
+            held_out_metrics = _evaluate_assist_count_held_out(
+                inputs, posterior_idata
+            )
+            _atomic_write_text(
+                validation_dir / "held_out_metrics.json",
+                json.dumps(held_out_metrics, indent=2, default=_json_default),
+            )
+            _log.info(
+                "bayes held-out assist-count metrics model=%s artifact=%s "
                 "n_cells=%s loglik_lift=%.4f tv_improvement=%.4f",
                 model_name,
                 artifact_id,
@@ -2529,7 +2695,7 @@ def run_bayes_model(
                     float(metrics.get("loglik_lift", float("nan"))),
                     float(metrics.get("rmse_improvement", float("nan"))),
                 )
-        elif spec.multinomial_export == "state_transition":
+        elif spec.multinomial_export in ("state_transition", "assist_count"):
             write_parquet_atomic(
                 _posterior_summary_dataframe(posterior_summary),
                 exports_dir / "posterior_summary.parquet",

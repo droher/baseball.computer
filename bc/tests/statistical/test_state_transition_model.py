@@ -15,6 +15,8 @@ from python_models.statistical.models._state_transition_data import (
     N_START_STATES,
     StateTransitionHeldOutSet,
     StateTransitionInputs,
+    _reachable_mask,
+    _reference_by_start,
 )
 from python_models.statistical.models.state_transition import (
     build_state_transition_model,
@@ -28,10 +30,13 @@ def _tiny_inputs() -> StateTransitionInputs:
     end_class_labels = [*start_state_labels, INNING_END_LABEL]
     cell_labels = ["2019_NL|0_0", "2019_AL|0_0", "2019_NL|2_0"]
     cell_start_idx = np.array([0, 0, 16], dtype=np.int64)
+    reachable = _reachable_mask()
     rng = np.random.default_rng(20260513)
-    counts = rng.integers(0, 30, size=(len(cell_labels), N_END_CLASSES)).astype(
-        np.int64
-    )
+    counts = (
+        rng.integers(1, 30, size=(len(cell_labels), N_END_CLASSES))
+        * reachable[cell_start_idx]
+    ).astype(np.int64)
+    ref_class_by_start = _reference_by_start(counts, cell_start_idx, reachable)
     coords = {
         "source": ["__single__"],
         "start_state": list(start_state_labels),
@@ -42,6 +47,8 @@ def _tiny_inputs() -> StateTransitionInputs:
     return StateTransitionInputs(
         counts=counts,
         cell_start_idx=cell_start_idx,
+        reachable_mask=reachable,
+        ref_class_by_start=ref_class_by_start,
         cell_labels=list(cell_labels),
         season_by_cell=[2019, 2019, 2019],
         league_by_cell=["NL", "AL", "NL"],
@@ -58,13 +65,16 @@ def _tiny_inputs() -> StateTransitionInputs:
     )
 
 
-def test_builds_model_with_cell_class_prob() -> None:
+def test_builds_model_with_expected_vars() -> None:
     inputs = _tiny_inputs()
     model = build_state_transition_model(inputs)
     assert isinstance(model, pm.Model)
     assert "cell_class_prob" in model.named_vars
+    assert "start_state_prob" in model.named_vars
     assert "alpha_trans" in model.named_vars
-    assert "beta0" in model.named_vars
+    assert "z_cell" in model.named_vars
+    assert "sigma_cell" in model.named_vars
+    assert "beta0" not in model.named_vars
     assert "end_state_obs" in {rv.name for rv in model.observed_RVs}
 
 
@@ -80,28 +90,35 @@ def test_vocab_sizes_are_25_end_classes_and_24_start_states() -> None:
     assert inputs.n_start_states == 24
 
 
-def test_cell_class_prob_dims_and_reference_class() -> None:
+def test_cell_class_prob_dims() -> None:
     inputs = _tiny_inputs()
     model = build_state_transition_model(inputs)
     dims = tuple(model.named_vars_to_dims.get("cell_class_prob", ()))
     assert dims == ("cell", "end_class")
-    cell_dims = tuple(model.named_vars_to_dims.get("cell_logodds", ()))
-    assert cell_dims == ("cell", "end_class_nonref")
+    start_dims = tuple(model.named_vars_to_dims.get("start_state_prob", ()))
+    assert start_dims == ("start_state", "end_class")
 
 
-def test_reference_class_softmax_sums_to_one() -> None:
+def test_softmax_sums_to_one_and_masks_unreachable() -> None:
     inputs = _tiny_inputs()
-    n_cells = inputs.n_cells
-    n_nonref = N_END_CLASSES - 1
-    rng = np.random.default_rng(7)
-    cell_logodds = rng.normal(0.0, 1.5, size=(n_cells, n_nonref))
-    eta = np.concatenate([np.zeros((n_cells, 1)), cell_logodds], axis=1)
-    eta = eta - eta.max(axis=1, keepdims=True)
-    probs = np.exp(eta)
-    probs = probs / probs.sum(axis=1, keepdims=True)
-    row_sums = probs.sum(axis=1)
-    assert probs.shape == (n_cells, N_END_CLASSES)
-    assert np.allclose(row_sums, 1.0, atol=1e-6)
+    model = build_state_transition_model(inputs)
+    prob = np.asarray(
+        pm.draw(model["cell_class_prob"], draws=1, random_seed=0), dtype=np.float64
+    )
+    assert prob.shape == (inputs.n_cells, N_END_CLASSES)
+    assert np.allclose(prob.sum(axis=1), 1.0, atol=1e-9)
+    cell_reachable = inputs.reachable_mask[inputs.cell_start_idx]
+    assert float(prob[~cell_reachable].max()) < 1e-10
+    assert float(prob[cell_reachable].min()) > 0.0
+
+
+def test_observed_count_in_unreachable_entry_raises() -> None:
+    inputs = _tiny_inputs()
+    bad_counts = inputs.counts.copy()
+    bad_counts[2, 0] = 5
+    bad = inputs.model_copy(update={"counts": bad_counts})
+    with pytest.raises(AssertionError, match="unreachable"):
+        build_state_transition_model(bad)
 
 
 @pytest.mark.slow

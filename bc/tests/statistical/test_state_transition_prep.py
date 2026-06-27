@@ -6,10 +6,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 
 from python_models.statistical.models._state_transition_data import (
+    BASE_STATES,
     INNING_END_INDEX,
+    INNING_END_OUTS,
     MIN_EVENTS_PER_CELL,
     N_END_CLASSES,
     N_START_STATES,
@@ -142,3 +145,42 @@ def test_min_events_floor_and_holdout(tmp_path: Path) -> None:
     assert "1933|AL|0_1" not in inputs.cell_labels
     for total in inputs.counts.sum(axis=1).tolist():
         assert total >= MIN_EVENTS_PER_CELL
+
+
+def _end_outs(end_class: int) -> int:
+    return INNING_END_OUTS if end_class == INNING_END_INDEX else end_class // BASE_STATES
+
+
+def test_reachable_mask_matches_outs_monotonicity(tmp_path: Path) -> None:
+    path = _write_dataset(tmp_path)
+    inputs = prepare_state_transition_inputs(path)
+
+    mask = inputs.reachable_mask
+    assert mask.shape == (N_START_STATES, N_END_CLASSES)
+    for start in range(N_START_STATES):
+        start_outs = start // BASE_STATES
+        for end in range(N_END_CLASSES):
+            assert bool(mask[start, end]) == (_end_outs(end) >= start_outs)
+
+
+def test_no_observed_count_in_unreachable_entry(tmp_path: Path) -> None:
+    path = _write_dataset(tmp_path)
+    inputs = prepare_state_transition_inputs(path)
+
+    cell_reachable = inputs.reachable_mask[inputs.cell_start_idx]
+    assert int(inputs.counts[~cell_reachable].sum()) == 0
+
+
+def test_reference_is_reachable_and_modal(tmp_path: Path) -> None:
+    path = _write_dataset(tmp_path)
+    inputs = prepare_state_transition_inputs(path)
+
+    ref = inputs.ref_class_by_start
+    assert ref.shape == (N_START_STATES,)
+    agg = np.zeros((N_START_STATES, N_END_CLASSES), dtype=np.int64)
+    for cell, start in enumerate(inputs.cell_start_idx.tolist()):
+        agg[start] += inputs.counts[cell]
+    for start in range(N_START_STATES):
+        assert bool(inputs.reachable_mask[start, ref[start]])
+        if agg[start].sum() > 0:
+            assert int(agg[start, ref[start]]) == int(agg[start].max())

@@ -67,6 +67,7 @@ class BayesTargetSpec(BaseModel):
             "pitch_summary",
             "advancement",
             "state_transition",
+            "assist_count",
         ]
         | None
     ) = Field(

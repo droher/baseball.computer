@@ -153,7 +153,27 @@ def test_builder_declares_count_simplex(tmp_path: Path) -> None:
     observed_names = {rv.name for rv in model.observed_RVs}
     assert {"beta0_count", "event_class_logodds", "cell_logodds"}.issubset(rv_names)
     assert "cell_class_prob" in det_names
+    assert "event_class_count_prob" in det_names
     assert "assist_count_obs" in observed_names
+
+
+def test_held_out_set_populated_and_in_training_vocab(tmp_path: Path) -> None:
+    dataset_path = _synthetic_assist_count_dataset(tmp_path)
+    inputs = prepare_assist_count_inputs(
+        dataset_path,
+        min_events_per_season=1,
+        min_events_per_cell=1,
+        held_out_fold_count=2,
+    )
+    held = inputs.held_out
+    assert held.counts.shape[1] == ASSIST_COUNT_MAX
+    assert held.counts.shape[0] == held.cell_idx.shape[0]
+    assert held.cell_idx.shape[0] == held.cell_event_class_idx.shape[0]
+    if held.n_cells > 0:
+        assert int(held.cell_idx.min()) >= 0
+        assert int(held.cell_idx.max()) < inputs.n_cells
+        n_event_classes = len(inputs.coords["event_class"])
+        assert int(held.cell_event_class_idx.max()) < n_event_classes
 
 
 def test_prior_predictive_count_prob_sums_to_one(tmp_path: Path) -> None:

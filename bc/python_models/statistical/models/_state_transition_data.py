@@ -32,6 +32,7 @@ from python_models.statistical.splits import game_hash_fold
 _log = logging.getLogger(__name__)
 
 IntArray = npt.NDArray[np.int64]
+BoolArray = npt.NDArray[np.bool_]
 
 DEFAULT_SEED: int = 20260513
 OUTCOME: str = "end_state"
@@ -73,6 +74,8 @@ class StateTransitionInputs(BaseModel):
 
     counts: IntArray
     cell_start_idx: IntArray
+    reachable_mask: BoolArray
+    ref_class_by_start: IntArray
 
     cell_labels: list[str]
     season_by_cell: list[int]
@@ -109,6 +112,26 @@ def _start_state_labels() -> list[str]:
 
 def _end_class_labels() -> list[str]:
     return [*_start_state_labels(), INNING_END_LABEL]
+
+
+def _reachable_mask() -> BoolArray:
+    mask = np.zeros((N_START_STATES, N_END_CLASSES), dtype=bool)
+    for start in range(N_START_STATES):
+        start_outs = start // BASE_STATES
+        for end in range(N_END_CLASSES):
+            end_outs = INNING_END_OUTS if end == INNING_END_INDEX else end // BASE_STATES
+            if end_outs >= start_outs:
+                mask[start, end] = True
+    return mask
+
+
+def _reference_by_start(
+    counts: IntArray, cell_start_idx: IntArray, reachable: BoolArray
+) -> IntArray:
+    per_start = np.zeros((N_START_STATES, N_END_CLASSES), dtype=np.int64)
+    np.add.at(per_start, cell_start_idx, counts)
+    masked = np.where(reachable, per_start, -1)
+    return masked.argmax(axis=1).astype(np.int64)
 
 
 def _parse_suffix(key: str) -> tuple[int, int]:
@@ -272,6 +295,9 @@ def prepare_state_transition_inputs(
 
     end_class_labels = _end_class_labels()
 
+    reachable_mask = _reachable_mask()
+    ref_class_by_start = _reference_by_start(counts, cell_start_idx, reachable_mask)
+
     held_out = _build_held_out_set(
         held_games,
         cell_labels=cell_labels,
@@ -300,6 +326,8 @@ def prepare_state_transition_inputs(
     return StateTransitionInputs(
         counts=counts,
         cell_start_idx=cell_start_idx,
+        reachable_mask=reachable_mask,
+        ref_class_by_start=ref_class_by_start,
         cell_labels=list(cell_labels),
         season_by_cell=season_by_cell,
         league_by_cell=league_by_cell,
