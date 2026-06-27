@@ -2097,14 +2097,6 @@ def _export_state_transition_summary(
         ].values,
         dtype=np.float64,
     )
-    ess = np.asarray(
-        az.ess(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
-        dtype=np.float64,
-    ).reshape(-1)
-    rhat = np.asarray(
-        az.rhat(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
-        dtype=np.float64,
-    ).reshape(-1)
 
     cell_pos = np.repeat(np.arange(n_cell), n_class)
     class_pos = np.tile(np.arange(n_class), n_cell)
@@ -2142,8 +2134,6 @@ def _export_state_transition_summary(
             "prob_hdi_upper": pl.Series(
                 "prob_hdi_upper", hdi[..., 1].reshape(-1), dtype=pl.Float64
             ),
-            "ess_bulk": pl.Series("ess_bulk", ess, dtype=pl.Float64),
-            "rhat": pl.Series("rhat", rhat, dtype=pl.Float64),
         }
     )
     write_parquet_atomic(df, target_path)
@@ -2309,6 +2299,45 @@ def run_bayes_model(
             progress_log,
         )
         posterior_idata = sample_model(model, sampler, progress_log_path=progress_log)
+
+        if spec.multinomial_export == "state_transition" and isinstance(
+            inputs, StateTransitionInputs
+        ):
+            _export_state_transition_summary(
+                posterior_idata,
+                inputs,
+                target_path=exports_dir / STATE_TRANSITION_SUMMARY_FILENAME,
+            )
+            held_out_metrics = _evaluate_state_transition_held_out(
+                inputs, posterior_idata
+            )
+            _atomic_write_text(
+                validation_dir / "held_out_metrics.json",
+                json.dumps(held_out_metrics, indent=2, default=_json_default),
+            )
+            _log.info(
+                "bayes held-out state-transition metrics model=%s artifact=%s "
+                "n_cells=%s loglik_lift=%.4f tv_improvement=%.4f",
+                model_name,
+                artifact_id,
+                held_out_metrics.get("n_cells", 0),
+                float(held_out_metrics.get("loglik_lift", float("nan"))),
+                float(held_out_metrics.get("tv_improvement", float("nan"))),
+            )
+            posterior_idata.posterior = posterior_idata.posterior.drop_vars(
+                "cell_class_prob"
+            )
+            posterior_predictive = getattr(
+                posterior_idata, "posterior_predictive", None
+            )
+            if (
+                posterior_predictive is not None
+                and "cell_class_prob" in posterior_predictive
+            ):
+                posterior_idata.posterior_predictive = (
+                    posterior_predictive.drop_vars("cell_class_prob")
+                )
+
         posterior_path = inference_dir / "posterior.nc"
         _atomic_write_netcdf(posterior_idata, posterior_path)
         inference_files["posterior"] = posterior_path
@@ -2500,6 +2529,11 @@ def run_bayes_model(
                     float(metrics.get("loglik_lift", float("nan"))),
                     float(metrics.get("rmse_improvement", float("nan"))),
                 )
+        elif spec.multinomial_export == "state_transition":
+            write_parquet_atomic(
+                _posterior_summary_dataframe(posterior_summary),
+                exports_dir / "posterior_summary.parquet",
+            )
         else:
             write_parquet_atomic(
                 _posterior_summary_dataframe(posterior_summary),
@@ -2512,15 +2546,6 @@ def run_bayes_model(
                     target_path=exports_dir / PITCH_SUMMARY_SUMMARY_FILENAME,
                 )
                 held_out_metrics = _evaluate_pitch_summary_held_out(
-                    inputs, posterior_idata
-                )
-            elif spec.multinomial_export == "state_transition":
-                _export_state_transition_summary(
-                    posterior_idata,
-                    inputs,
-                    target_path=exports_dir / STATE_TRANSITION_SUMMARY_FILENAME,
-                )
-                held_out_metrics = _evaluate_state_transition_held_out(
                     inputs, posterior_idata
                 )
             elif spec.multinomial_export == "geometry":

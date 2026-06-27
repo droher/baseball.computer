@@ -87,12 +87,6 @@ def _write_state_transition_artifact_with_pointer(
             "prob_hdi_upper": pl.Series(
                 "prob_hdi_upper", prob_mean + 2 * prob_sd, dtype=pl.Float64
             ),
-            "ess_bulk": pl.Series(
-                "ess_bulk", rng.uniform(400.0, 900.0, size=n_row), dtype=pl.Float64
-            ),
-            "rhat": pl.Series(
-                "rhat", rng.uniform(1.0, 1.02, size=n_row), dtype=pl.Float64
-            ),
         }
     ).write_parquet(exports_dir / "state_transition_summary.parquet")
 

@@ -109,6 +109,13 @@ Active items the latest pretrain + downstream cascade does not fix:
 - ~~Aggregated Binomial-per-cell formulation~~ — closed 2026-05-19. Attempted in PR3, failed diagnostics under richer covariate set; redesigned as event-grain on numpyro.
 - ~~Roll out 4-dim observation propensity~~ — closed 2026-05-21. Shipped 6 dims (trajectory / location_side / location_depth / location_edge / general_location / ball_handler_position) at 10K each. `broad_contact` dropped, replaced by `general_location`. `pa_result` (13-level plate-appearance outcome) added as FE: load-bearing for ball_handler (+0.186 OOS PR-AUC), neutral on the other 5.
 
+### Buildable-now backlog (run-value chain + MNAR band)
+
+- **MNAR sensitivity ribbon — done.** `python_models/statistical/sensitivity.py` + `scripts/sensitivity_ribbon.py`. Post-hoc reweight of a published per-event class-share export over a selection-log-odds grid (`±{0.25,0.5,1.0}` nats), per-class marginal band; `delta=0` reproduces the published MAR marginal. Grid scale validated against the masked backtest oracle (`--validate-backtest`). Ribbons written beside all 5 `e-noprop-*` geometry fits. The honest band for the unidentified `delta_c`; the anchored per-`(era,class)` point estimate is still deferred. See `mnar-selection-offset-design.md` §Status.
+- **`state_transition` wired — done.** Model G's deferred Markov base-out transition arm (builder/prep already existed) wired end to end as estimated-tier `state_transition_summary`, mirroring Model J pitch_summary. Full fit `state-transition-v1` (default config, 16.3M events → 6,218 cells, 0 divergences). Validate + `publish-manifest` its pointer; then `plan-model main_models.state_transition_summary` at promotion.
+- **`linear_weights_estimated` — done.** Estimated companion to the deterministic `linear_weights`: propagate Model G's RE posterior draws through `runs_on_play + RE_end − RE_start`, average by play, center vs league mean, collapse to mean/sd/HDI per `(season, league, play)`. New `linear_weights_transition_counts` intermediate collapses ~18M events to per-combo counts. CAVEAT: the band is RE-posterior uncertainty ONLY — finite-sample (sparse-cell) uncertainty is NOT captured, so a low-`n_events` cell looks as tight as a dense one. `n_events` rides along to mark sparse cells; a future v2 could add a bootstrap / multinomial-count layer for sampling uncertainty, or carry the deterministic model's <100-occurrence imputation fallback per draw.
+- **NEXT: Model C `assist_count` (v3.1) / `error_credit` (v4)** — see Phase-4 Model C below; the last item in this backlog.
+
 ### Phase-4 Model C
 
 - **Model C v1.5 OOS eval at full scale.** v1.5 ships dual-arm (supervised on unmasked well-attributed events + aggregate on synthetically masked ones) and writes `validation/held_out_metrics.json` per fit. After merge, run the N-sweep (10K / 50K / 100K) and pick the operating point on diminishing-returns of OOS top-1 / PR-AUC / log-loss, not just rhat. Held-out games are the 10% of games at `game_hash_fold(g, fold_count=10) == 0`. **Operating point shipped:** `full-10k-v15-tuned` with `BC_CREDIT_NONCENTER_SEASON=1` (non-centered `beta_season` fixed the funnel that 10K centered hit; the knob and the per-event season RE it parameterized have since been removed from the builder — scalar-per-event terms cancel exactly in the softmax) and `BC_CREDIT_MIN_NATURAL_UNK_RATE=0.01` (drops the ~50 modern-PBP seasons with effectively zero natural unknown rate, cutting noisy `beta_season` cells without losing inference scope). When reporting any held-out metric on Model C, also report it restricted to the production-target slice (events with `unknown_credit_need > 0`) — held-out is composition-skewed toward easy events; see the v1.6 retraction for the failure mode this protects against.
@@ -124,8 +131,9 @@ Active items the latest pretrain + downstream cascade does not fix:
 **Done (non-gated scaffold).** Publication-tier registry (`publication_tiers.py`:
 official/deterministic/estimated/synthetic/withheld + `tier_for`); the full estimated-metadata
 contract (`artifact_id`, `model_name`, `model_version`, `source_snapshot_id`, `method`,
-`observed_status`, `confidence_status`, `weak_identification_flag`) stamped on all nine coverage
-tables via `stamp_estimated_contract`, sourced from the artifact manifest; `ess_bulk`/`rhat`
+`observed_status`, `confidence_status`, `weak_identification_flag`) stamped on all eleven estimated
+tables via `stamp_estimated_contract` (the nine coverage tables plus `state_transition_summary` and
+`linear_weights_estimated`), sourced from the artifact manifest; `ess_bulk`/`rhat`
 diagnostics dropped from the published summaries; a registry-driven `estimated_contract_complete`
 audit on every estimated `@model` (typed-empty passes; populated rows must carry all eight columns).
 Compat is structural — the deterministic surfaces (`park_factors`, `run_expectancy_matrix`,
