@@ -2,6 +2,10 @@
 
 Operational items that don't block deployment but deserve a home.
 
+## rebuild-prod OOM on model_input_fielding_credit
+
+A from-scratch `just rebuild-prod` OOMs on `model_input_fielding_credit`'s audit at the default `BC_DUCKDB_THREADS=14` — the 440M-row view's audit peaks at ~44.7 GiB against the 48GB `memory_limit` (64GB machine). Every other model builds fine. Re-run picks up only the failed view; `BC_DUCKDB_THREADS=4 just rebuild-prod` (or retrying the single model at 4 threads) clears it. Either lower the default rebuild thread count or raise `memory_limit` headroom for that one audit.
+
 ## Publish path (DuckLake)
 
 ### Site cutover
