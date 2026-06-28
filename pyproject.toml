@@ -2,7 +2,7 @@
 name = "baseball-computer"
 version = "0.1.0"
 description = ""
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 authors = [{ name = "David Roher", email = "david.roher@gmail.com" }]
 dependencies = [
     "duckdb~=1.5.2",
@@ -51,6 +51,19 @@ bsl = [
     "ibis-framework[duckdb]>=11.0",
 ]
 
+stats = [
+    {include-group = "build"},
+    "pymc>=5",
+    "arviz>=0.20",
+    "xarray>=2025.1",
+    "zarr>=2.18",
+    "scikit-learn>=1.5",
+    "numpyro>=0.15",
+    "jax>=0.4.30",
+    "jaxlib>=0.4.30",
+    "nutpie>=0.16.10",
+]
+
 [tool.uv]
 package = false
 default-groups = "all"
@@ -62,6 +75,12 @@ override-dependencies = [
 [tool.pytest.ini_options]
 testpaths = ["bc/tests"]
 pythonpath = ["bc"]
+markers = [
+    "slow: tests that import Keras/Torch or hit bc_dev.db; opt in with `pytest -m slow`",
+]
 
 [tool.pyright]
 extraPaths = ["bc"]
+
+[tool.ruff.lint.per-file-ignores]
+"bc/tests/statistical/**" = ["E402"]

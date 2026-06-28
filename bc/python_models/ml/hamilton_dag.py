@@ -23,7 +23,7 @@ import keras
 import mlflow
 
 from python_models.ml.data_loaders import open_bc_db
-from python_models.ml.features import TargetSpec, Vocabulary
+from python_models.ml.features import FeatureLayout, TargetSpec, Vocabulary
 from python_models.ml.model_factory import build_model
 
 _log = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ _log = logging.getLogger(__name__)
 
 def feature_stats(
     target_spec: TargetSpec,
+    layout: FeatureLayout,
     db_path: str,
     schema: str,
     rebuild_vocabs: bool,
@@ -43,6 +44,7 @@ def feature_stats(
             con,
             target_spec,
             schema,
+            layout=layout,
             vocab_dir=vocab_dir,
             rebuild_vocabs=rebuild_vocabs,
         )
@@ -70,12 +72,14 @@ def vocab_sizes(feature_stats: Any) -> dict[str, int]:
 
 def model(
     target_spec: TargetSpec,
+    layout: FeatureLayout,
     feature_stats: Any,
     vocab_sizes: dict[str, int],
     num_classes: int,
 ) -> keras.Model:
     return build_model(
         target_spec=target_spec,
+        layout=layout,
         vocab_sizes=vocab_sizes,
         numeric_means=feature_stats.numeric_means,
         numeric_variances=feature_stats.numeric_variances,
@@ -100,6 +104,7 @@ def mlflow_setup(
 
 def fitted_run(
     target_spec: TargetSpec,
+    layout: FeatureLayout,
     model: keras.Model,
     feature_stats: Any,
     class_index: dict[str, int],
@@ -115,6 +120,7 @@ def fitted_run(
 
     return run_fit_and_log(
         target_spec=target_spec,
+        layout=layout,
         model=model,
         stats=feature_stats,
         class_index=class_index,

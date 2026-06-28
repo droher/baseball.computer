@@ -33,9 +33,8 @@ from numpy.typing import NDArray
 
 from python_models.ml.features import (
     GRAIN_COLUMN,
-    HIGH_CARD_CATEGORICAL,
-    LOW_CARD_CATEGORICAL,
-    NUMERIC,
+    LEGACY_ML_LAYOUT,
+    FeatureLayout,
     TargetKind,
     Vocabulary,
 )
@@ -52,6 +51,7 @@ class Scorer:
     vocabularies: dict[str, Vocabulary]
     class_labels: tuple[str, ...]
     kind: TargetKind = "multiclass"
+    layout: FeatureLayout = LEGACY_ML_LAYOUT
 
     def _empty_frame(self) -> pl.DataFrame:
         if self.kind == "binary":
@@ -82,10 +82,10 @@ class Scorer:
 
     def _encode_features(self, features: pl.DataFrame) -> dict[str, NDArray[np.int64] | NDArray[np.float32]]:
         inputs: dict[str, NDArray[np.int64] | NDArray[np.float32]] = {}
-        for col in (*HIGH_CARD_CATEGORICAL, *LOW_CARD_CATEGORICAL):
+        for col in self.layout.categorical_columns:
             encoded = self.vocabularies[col].encode(features[col]).to_numpy()
             inputs[col] = encoded.astype(np.int64).reshape(-1, 1)
-        for col in NUMERIC:
+        for col in self.layout.numeric_columns:
             inputs[col] = (
                 features[col]
                 .cast(pl.Float32)

@@ -174,19 +174,12 @@ game_source AS (
     GROUP BY 1, 2
 ),
 
-pitch_coverage AS (
+coverage AS (
     SELECT
         game_id,
-        has_pitch_sequence,
-        has_pitch_count_data
-    FROM main_models.game_data_completeness
-),
-
-batted_ball_coverage AS (
-    SELECT
-        game_id,
-        has_offense_batted_ball,
-        has_defense_batted_ball
+        has_pitches,
+        has_count,
+        (has_trajectory OR has_location OR has_batted_to_fielder) AS has_batted_ball
     FROM main_models.game_data_completeness
 ),
 
@@ -239,23 +232,19 @@ game_wide_dims AS (
         gs.source_type,
         CASE
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'event' THEN 'event_level'
-            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(pc.has_pitch_sequence, false) THEN 'event_level'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_pitches, false) THEN 'event_level'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' THEN 'coverage_within_source_sparse'
-            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball'
-                AND (COALESCE(bc.has_offense_batted_ball, false) OR COALESCE(bc.has_defense_batted_ball, false)) THEN 'event_level'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' AND COALESCE(c.has_batted_ball, false) THEN 'event_level'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' THEN 'coverage_within_source_sparse'
-            WHEN gs.source_type = 'GameLog' AND d.dimension = 'gamelog' THEN 'gamelog_only'
-            WHEN gs.source_type = 'BoxScore' AND d.dimension = 'gamelog' THEN 'gamelog_only'
-            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'gamelog' THEN 'gamelog_only'
+            WHEN gs.source_type IN ('PlayByPlay', 'BoxScore', 'GameLog') AND d.dimension = 'gamelog' THEN 'gamelog_only'
             ELSE 'structural_absence'
         END AS target_population_status,
         CASE
             WHEN gs.source_type IS NULL THEN 'block_missing'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'event' THEN 'present_fully_populated'
-            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(pc.has_pitch_sequence, false) THEN 'present_fully_populated'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_pitches, false) THEN 'present_fully_populated'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' THEN 'coverage_within_source_sparse'
-            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball'
-                AND (COALESCE(bc.has_offense_batted_ball, false) OR COALESCE(bc.has_defense_batted_ball, false)) THEN 'present_partial_coverage'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' AND COALESCE(c.has_batted_ball, false) THEN 'present_partial_coverage'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' THEN 'coverage_within_source_sparse'
             WHEN gs.source_type IN ('PlayByPlay', 'BoxScore', 'GameLog') AND d.dimension = 'gamelog' THEN 'present_fully_populated'
             ELSE 'not_applicable'
@@ -267,8 +256,7 @@ game_wide_dims AS (
         END AS source_availability_status
     FROM game_source AS gs
     CROSS JOIN game_wide_dimensions AS d
-    LEFT JOIN pitch_coverage AS pc USING (game_id)
-    LEFT JOIN batted_ball_coverage AS bc USING (game_id)
+    LEFT JOIN coverage AS c USING (game_id)
 ),
 
 classified AS (
@@ -296,7 +284,7 @@ Validation checks:
 - Reconcile the ledger against `season_team_coverage`, `game_start_info.source_type`, `stg_schedule`, `stg_gamelog`, and `stg_games`.
 - Verify that 1910 and 1911 are not accidentally filtered out by stale "complete from 1912" metadata.
 - Separate source availability by dimension instead of assuming `PlayByPlay` means pitch, batted-ball, and official aggregate totals are all available.
-- Confirm `target_population_status = 'event_level'` for `pitch_sequence` and `batted_ball` only when the game-level coverage flags in `game_data_completeness` (or the `event_completeness_pitches` / `event_completeness_batted_balls` rollups) confirm non-sparse coverage.
+- Confirm `target_population_status = 'event_level'` for `pitch_sequence` only when `game_data_completeness.has_pitches` is true (and likewise rely on `has_count` for count-derived dimensions in later observation ledgers), and for `batted_ball` only when at least one of `has_trajectory`, `has_location`, or `has_batted_to_fielder` is true. The corresponding event-grain rollups (`event_completeness_pitches`, `event_completeness_batted_balls`) drive these game-level booleans.
 - Confirm `team_id IS NULL` for game-wide dimensions and non-null for side-dependent dimensions.
 
 ### `source_data_error_risk_ledger`

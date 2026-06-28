@@ -29,22 +29,22 @@ DB_PATH = Path(__file__).resolve().parents[2] / "bc.db"
 def con():
     if not DB_PATH.exists():
         pytest.skip(f"bc.db not built: {DB_PATH}")
-    return connect("dev", DB_PATH)
+    return connect("prod", DB_PATH)
 
 
 @pytest.fixture(scope="module")
 def offense(con):
-    return offense_seasons(con, env="dev")
+    return offense_seasons(con, env="prod")
 
 
 @pytest.fixture(scope="module")
 def offense_event_table(con):
-    return offense_events(con, env="dev")
+    return offense_events(con, env="prod")
 
 
 @pytest.fixture(scope="module")
 def pitching_event_table(con):
-    return pitching_events(con, env="dev")
+    return pitching_events(con, env="prod")
 
 
 def test_dimensions_and_calc_classification(offense):
@@ -107,7 +107,7 @@ def test_row_equivalence_top_50_2024_batters(con, offense):
     ``metrics_player_season_league_offense`` row-for-row to 1e-9.
     """
     pa_threshold_table = con.table(
-        "metrics_player_season_league_offense", database="main_models__dev"
+        "metrics_player_season_league_offense", database="main_models"
     )
     top_50 = (
         pa_threshold_table.filter(pa_threshold_table.season == 2024)

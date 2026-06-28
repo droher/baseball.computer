@@ -132,6 +132,22 @@ _ENUM_DEFS: list[tuple[str, str]] = [
         ),
     ),
     ("fielding_play", "ENUM (SELECT DISTINCT fielding_play FROM event.event_fielding_play ORDER BY 1)"),
+    (
+        "observed_status",
+        (
+            "ENUM ("
+            + "'observed', 'derived', 'aggregate_only', 'missing', "
+            + "'unknown_code', 'default_code', 'not_applicable', "
+            + "'contradicted', 'data_error_prone')"
+        ),
+    ),
+    (
+        "reliability_class",
+        (
+            "ENUM ("
+            + "'direct', 'derived', 'inferred', 'synthetic', 'ambiguous')"
+        ),
+    ),
 ]
 
 

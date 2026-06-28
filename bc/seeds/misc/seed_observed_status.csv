@@ -1,0 +1,10 @@
+observed_status,description,is_observed,is_training_eligible,is_aggregate_only,notes
+observed,Directly recorded in source for the field at the event grain.,true,true,false,Canonical event-level truth.
+derived,Deterministically deduced from other recorded fields with no model.,false,true,false,Deduction is reproducible from rules; usable as labels.
+aggregate_only,Value known only at aggregate grain (box/gamelog/season totals).,false,false,true,Use as aggregate constraint; never as event-level label.
+missing,Field absent or null with no usable replacement.,false,false,false,Distinct from sentinels with semantic meaning.
+unknown_code,Sentinel "unknown" code recorded by source (e.g. ?).,false,false,false,Carries information that source did not know; not the same as missing.
+default_code,Sentinel "default" code recorded by source.,false,false,false,Source emitted the structural default rather than a real value.
+not_applicable,Field is structurally inapplicable for the event.,false,false,false,E.g. assist position on a strikeout with no fielder.
+contradicted,Value contradicted by another evidence source.,false,false,false,Surface in data-error ledger; do not train on as truth.
+data_error_prone,Value flagged by data-error risk ledger as suspect.,false,false,false,Downweight or exclude per training_action.

@@ -4,3 +4,20 @@
 - `upload_ducklake.py` ships catalog + data dir to `s3://timeball/baseball/v<DATA_VERSION>/` with long-lived `Cache-Control` and a Cloudflare cache purge.
 - `create_web_db.py` publishes `bc_remote.db` + per-table parquet under the `dbt/` R2 prefix as the canonical site artifact. DuckLake site cutover is tracked in `notes/followups.md`.
 - `preload_sources.py` is the only ad-hoc script allowed to write `bc.db` directly (only `CREATE TABLE IF NOT EXISTS`). Everything else goes through SQLMesh.
+
+# Pretrain orchestration
+
+- `run_pretrain_residual.sh STAGE1_ID STAGE2_ID` — residual-decomposition pretrain orchestrator. Prep dataset → stage-1 fit on context-only spec → emit per-head logit offsets → stage-2 fit on full spec with `BC_PRETRAIN_OFFSET_ARTIFACT` → publish branch-scoped pointer. Env: `BC_PRETRAIN_DATASET_ARTIFACT`, `BC_PRETRAIN_STAGE1_EPOCHS`, `BC_PRETRAIN_STAGE2_EPOCHS`, `BC_PRETRAIN_SKIP_PUBLISH`, `BC_PRETRAIN_DATASET_LIMIT` (smoke), plus `BC_PRETRAIN_LOSS=focal`, `BC_PRETRAIN_USE_HARD_HEAD_ES=1`, `BC_PRETRAIN_HARD_HEADS=...`. Architecture in [[pretrain-architecture]].
+- `pretrain_emit_offsets.py <stage1_artifact_id> --dataset-artifact <id>` — load a saved stage-1 pretrain model, build an inference submodel exposing per-head `{head}_logits` Dense layers, stream the dataset through `.predict()`, write float16 per-head parquet (`event_key, logit_0..logit_{K-1}`) under `<stage1_artifact_dir>/offsets/`. Respects `BC_PRETRAIN_DATASET_LIMIT` and the spec's `row_filter_predicate`. Loads model with `compile=False` (loss-config deserialization isn't needed for inference; also avoids registration issues with closure-returned focal loss).
+- `run_permimp_compare.sh` / `run_permimp_batted_ball.sh` — perm-imp acceptance-gate runners. The first does baseline-vs-pretrain on `geometry_trajectory`; the second sweeps the 3 geometry location targets (`location_side` / `_depth` / `_edge`). Both invoke `permutation_importance_generic.py` and set the env knobs needed to consume the active pretrain (`BC_DEEP_FORCE_EMBED_DIM=128`, `BC_PRETRAIN_SKIP_DIM_MISMATCH=1`). `PUB_ROOT` is derived from the current git branch so the published-pointer resolution survives merge into other branches.
+
+# Permutation importance
+
+- `permutation_importance_generic.py` — fit a deep target on its FeatureLayout and report per-feature Δ_CE on a held-out slice. Use to derive per-supplement acceptance-gate floors (`BC_DEEP_DISABLE_PRETRAIN=1` for no-pretrain baseline; unset for the pretrained arm). Flags / env:
+  - `--target` / `PERMIMP_TARGET` — deep target name (e.g. `geometry_trajectory`).
+  - `--dataset-parquet` / `PERMIMP_DATASET_PARQUET` — fully qualified parquet path.
+  - `--time-forward` — eval on `time_forward_fold` instead of the spec's default `primary_fold`. Use for Phase-3 gates so the slice matches production temporal eval.
+  - `--val-filter` / `PERMIMP_VAL_FILTER` — extra SQL predicate applied to the VALIDATE rows post-partition.
+  - `--full` / `PERMIMP_FULL=1` — disable train/val subsampling.
+  - `--epochs` / `PERMIMP_EPOCHS` — override fit epochs.
+- `permutation_importance_trajectory.py` — trajectory-only wrapper kept as a smoke-runner. Use the generic script for any new supplement.

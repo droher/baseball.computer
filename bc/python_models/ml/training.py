@@ -29,12 +29,8 @@ from numpy.typing import NDArray
 
 from python_models.ml.data_loaders import open_bc_db, stream_query
 from python_models.ml.features import (
-    ALL_FEATURE_COLUMNS,
-    GRAIN_COLUMN,
-    HIGH_CARD_CATEGORICAL,
-    LOW_CARD_CATEGORICAL,
-    NUMERIC,
-    SPLIT_COLUMN,
+    LEGACY_ML_LAYOUT,
+    FeatureLayout,
     TargetSpec,
     Vocabulary,
     build_vocabulary,
@@ -77,21 +73,23 @@ _VALID_SPLITS: frozenset[str] = frozenset({"TRAIN", "TEST"})
 _VALID_SCHEMAS: frozenset[str] = frozenset({"main_models", "main_models__dev"})
 
 
-def _select(target_spec: TargetSpec, split: str, schema: str) -> str:
+def _select(
+    target_spec: TargetSpec, split: str, schema: str, layout: FeatureLayout
+) -> str:
     if split not in _VALID_SPLITS:
         raise ValueError(f"split {split!r} not in {sorted(_VALID_SPLITS)}")
     if schema not in _VALID_SCHEMAS:
         raise ValueError(f"schema {schema!r} not in {sorted(_VALID_SCHEMAS)}")
     cols = ", ".join(
         (
-            GRAIN_COLUMN,
-            *ALL_FEATURE_COLUMNS,
+            layout.grain_column,
+            *layout.all_feature_columns,
             target_spec.target_column,
             target_spec.weight_column,
         )
     )
     where = [
-        f"{SPLIT_COLUMN} = '{split}'",
+        f"{layout.split_column} = '{split}'",
         f"{target_spec.target_column} IS NOT NULL",
     ]
     # Drop weight-0 rows for binary and regression targets — they carry
@@ -122,6 +120,7 @@ def collect_feature_stats(
     target_spec: TargetSpec,
     schema: str,
     *,
+    layout: FeatureLayout,
     vocab_dir: Path,
     rebuild_vocabs: bool = False,
 ) -> FeatureStats:
@@ -132,11 +131,11 @@ def collect_feature_stats(
     when the upstream changes (or pass `rebuild_vocabs=True`). Numeric
     statistics and class labels are recomputed every run.
     """
-    train_query = _select(target_spec, "TRAIN", schema)
+    train_query = _select(target_spec, "TRAIN", schema, layout)
 
     vocabularies: dict[str, Vocabulary] = {}
     if not rebuild_vocabs:
-        for col in (*HIGH_CARD_CATEGORICAL, *LOW_CARD_CATEGORICAL):
+        for col in layout.categorical_columns:
             cached = _load_cached_vocab(col, vocab_dir)
             if cached is None:
                 _log.info("vocab cache miss for %s; will rebuild all", col)
@@ -151,7 +150,7 @@ def collect_feature_stats(
     if rebuild_vocabs or not vocabularies:
         _log.info("collecting categorical vocabularies")
         vocabularies = {}
-        for col in (*HIGH_CARD_CATEGORICAL, *LOW_CARD_CATEGORICAL):
+        for col in layout.categorical_columns:
             rows = con.execute(
                 f"SELECT DISTINCT {col} AS v FROM ({train_query}) WHERE {col} IS NOT NULL ORDER BY v"
             ).fetchall()
@@ -164,13 +163,13 @@ def collect_feature_stats(
     numeric_variances: dict[str, float] = {}
     agg_select = ", ".join(
         f"AVG({c})::DOUBLE AS {c}_mean, VAR_POP({c})::DOUBLE AS {c}_var"
-        for c in NUMERIC
+        for c in layout.numeric_columns
     )
     row = con.execute(
         f"SELECT {agg_select} FROM ({train_query})"
     ).fetchone()
     assert row is not None
-    for i, c in enumerate(NUMERIC):
+    for i, c in enumerate(layout.numeric_columns):
         numeric_means[c] = float(row[2 * i])
         numeric_variances[c] = max(float(row[2 * i + 1]), 1e-6)
 
@@ -191,7 +190,7 @@ def collect_feature_stats(
 
     train_count = con.execute(f"SELECT COUNT(*) FROM ({train_query})").fetchone()
     test_count = con.execute(
-        f"SELECT COUNT(*) FROM ({_select(target_spec, 'TEST', schema)})"
+        f"SELECT COUNT(*) FROM ({_select(target_spec, 'TEST', schema, layout)})"
     ).fetchone()
     assert train_count is not None and test_count is not None
 
@@ -214,12 +213,13 @@ def _encode_batch(
     target_spec: TargetSpec,
     stats: FeatureStats,
     class_index: dict[str, int],
+    layout: FeatureLayout,
 ) -> _Batch:
     inputs: _BatchInputs = {}
-    for col in (*HIGH_CARD_CATEGORICAL, *LOW_CARD_CATEGORICAL):
+    for col in layout.categorical_columns:
         encoded = stats.vocabularies[col].encode(df[col]).to_numpy()
         inputs[col] = encoded.astype(np.int64).reshape(-1, 1)
-    for col in NUMERIC:
+    for col in layout.numeric_columns:
         inputs[col] = df[col].cast(pl.Float32).fill_null(0.0).to_numpy().reshape(-1, 1)
 
     if target_spec.kind == "multiclass":
@@ -271,6 +271,7 @@ def make_batch_generator(
     class_index: dict[str, int],
     rows_per_fetch: int,
     keras_batch_size: int,
+    layout: FeatureLayout,
 ) -> Iterator[_Batch]:
     """Yield Keras-sized mini-batches.
 
@@ -283,13 +284,13 @@ def make_batch_generator(
         with open_bc_db(db_path, read_only=True) as con:
             for chunk in stream_query(
                 con,
-                _select(target_spec, split, schema),
+                _select(target_spec, split, schema, layout),
                 rows_per_batch=rows_per_fetch,
             ):
                 if chunk.height == 0:
                     continue
                 inputs, targets, weights = _encode_batch(
-                    chunk, target_spec, stats, class_index
+                    chunk, target_spec, stats, class_index, layout
                 )
                 n = targets.shape[0]
                 for start in range(0, n, keras_batch_size):
@@ -342,6 +343,7 @@ def write_pin(
 def run_fit_and_log(
     *,
     target_spec: TargetSpec,
+    layout: FeatureLayout,
     model: Any,
     stats: FeatureStats,
     class_index: dict[str, int],
@@ -360,6 +362,7 @@ def run_fit_and_log(
         class_index,
         rows_per_batch,
         keras_batch_size,
+        layout,
     )
     test_gen = make_batch_generator(
         db_path,
@@ -370,6 +373,7 @@ def run_fit_and_log(
         class_index,
         rows_per_batch,
         keras_batch_size,
+        layout,
     )
 
     steps_per_epoch = max(1, stats.train_row_count // keras_batch_size)
@@ -420,6 +424,7 @@ def run_fit_and_log(
                 class_index,
                 rows_per_batch,
                 keras_batch_size,
+                layout,
             )
         )
         sample_predictions = model.predict(sample_inputs, verbose=0)
@@ -435,6 +440,7 @@ def run_fit_and_log(
 def train(
     *,
     target_spec: TargetSpec,
+    layout: FeatureLayout = LEGACY_ML_LAYOUT,
     db_path: str = DEFAULT_DB,
     schema: str = DEFAULT_SCHEMA,
     epochs: int = DEFAULT_EPOCHS,
@@ -450,6 +456,7 @@ def train(
     dr = driver.Builder().with_modules(hamilton_dag).build()
     inputs: dict[str, object] = {
         "target_spec": target_spec,
+        "layout": layout,
         "db_path": db_path,
         "schema": schema,
         "epochs": epochs,

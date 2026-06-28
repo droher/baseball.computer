@@ -62,12 +62,12 @@ envs:
 # Plan + apply ENV (default: current-branch slug). Writes to bc_dev.db.
 plan env=_branch_slug:
     @test -n "{{ env }}" || { echo "ERROR: empty env (detached HEAD?). Pass an env name explicitly." >&2; exit 1; }
-    cd bc && {{ _dev_env }} uv run --group build sqlmesh plan {{ env }} --auto-apply --no-prompts
+    cd bc && {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ env }}/" uv run --group build sqlmesh plan {{ env }} --auto-apply --no-prompts
 
 # Plan + apply only MODEL into ENV. Writes to bc_dev.db.
 plan-model MODEL env=_branch_slug:
     @test -n "{{ env }}" || { echo "ERROR: empty env (detached HEAD?). Pass an env name explicitly." >&2; exit 1; }
-    cd bc && {{ _dev_env }} uv run --group build sqlmesh plan {{ env }} --select-model {{ MODEL }} --auto-apply --no-prompts
+    cd bc && {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ env }}/" uv run --group build sqlmesh plan {{ env }} --select-model {{ MODEL }} --auto-apply --no-prompts
 
 # Run audits against the dev DB.
 audit *ARGS:
@@ -95,6 +95,122 @@ lineage MODEL:
 # table_diff for MODEL between SRC and TGT envs. Example: just diff main_models.foo main feature_x
 diff MODEL SRC TGT:
     cd bc && {{ _dev_env }} uv run --group build sqlmesh table_diff '{{ SRC }}:{{ TGT }}' --select-model {{ MODEL }}
+
+# --- Data-coverage baseline ---
+
+# Phase 0 baseline: read-only DuckDB snapshot under artifacts/statistical/baseline/.
+baseline-data-coverage *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/baseline_data_coverage.py "$@"
+
+# Diff two data-coverage baseline JSONs (or the latest against the live DB).
+compare-baseline *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/compare_baseline.py "$@"
+
+# Prepare a modeling-dataset Parquet snapshot from the per-branch ledger schema.
+# Usage: just prepare-dataset model_input_observation_batted_ball <artifact-id> [extra args]
+prepare-dataset DATASET ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli prepare-dataset --dataset {{ DATASET }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Run EDA against an existing dataset Parquet snapshot.
+# Usage: just run-eda model_input_observation_batted_ball <dataset-artifact-id> <eda-artifact-id> [extra args]
+run-eda DATASET DATASET_ARTIFACT_ID ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 3
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli run-eda --dataset {{ DATASET }} --dataset-artifact {{ DATASET_ARTIFACT_ID }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Standalone leakage check on a dataset Parquet snapshot. Exits non-zero on any violation.
+# Usage: just check-split-leakage model_input_observation_batted_ball <dataset-artifact-id> [extra args]
+check-split-leakage DATASET DATASET_ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli check-split-leakage --dataset {{ DATASET }} --dataset-artifact {{ DATASET_ARTIFACT_ID }} "$@"
+
+# Compare an EDA report against a ModelConfig JSON. Exits non-zero on any blocking violation.
+# Usage: just check-publication-gate <model-config-json> <eda-report-json>
+check-publication-gate MODEL_CONFIG EDA_REPORT *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    {{ _dev_env }} PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli check-publication-gate --model-config {{ MODEL_CONFIG }} --eda-report {{ EDA_REPORT }} "$@"
+
+# --- Phase 3 deep learning ---
+
+# Fit a deep proposal target on a frozen modeling-dataset snapshot. Writes
+# artifacts/statistical/deep/<TARGET>/<ARTIFACT_ID>/{model,exports,manifest.json}.
+# Usage: just fit-deep <target> <dataset-artifact-id> <fit-artifact-id> [extra args]
+fit-deep TARGET DATASET_ARTIFACT ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 3
+    {{ _dev_env }} KERAS_BACKEND=torch BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli fit-deep --target {{ TARGET }} --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# --- Phase 4 hierarchical Bayes ---
+
+# Fit a hierarchical Bayesian model on a frozen modeling-dataset snapshot. Writes
+# artifacts/statistical/bayes/<MODEL>/<ARTIFACT_ID>/{inference,exports,validation,manifest.json}.
+# Usage: just fit-bayes <model> <dataset-artifact-id> <fit-artifact-id> [extra args, e.g. --smoke, --prior-only]
+fit-bayes MODEL DATASET_ARTIFACT ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group stats python -m python_models.statistical.cli fit-bayes --model {{ MODEL }} --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} {{ ARGS }}
+
+# Pretrain shared entity embeddings on a multi-head pretext dataset
+# (default target: event_universe). Writes artifacts/statistical/deep/<TARGET>/<ARTIFACT_ID>/
+# {exports/{embeddings.parquet,vocab.json},manifest.json}.
+# Usage: just fit-pretrain <dataset-artifact-id> <fit-artifact-id> [extra args, e.g. --pretrain-target event_universe]
+fit-pretrain DATASET_ARTIFACT ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    {{ _dev_env }} KERAS_BACKEND=torch BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli fit-pretrain --dataset-artifact {{ DATASET_ARTIFACT }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Resolve a pretrain artifact_id to the canonical pointer at <root>/pretrain/<name>.json.
+# Usage: just publish-pretrain <artifact-id> [extra args]
+publish-pretrain ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 1
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli publish-pretrain --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Resolve an artifact_id to the canonical "latest" pointer for its model.
+# Usage: just publish-manifest <model> <artifact-id> [extra args]
+publish-manifest MODEL ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 2
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python -m python_models.statistical.cli publish-manifest --model {{ MODEL }} --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Validate a published artifact (dataset / deep / bayes) against its kind-specific gates.
+# Usage: just validate-artifact <artifact-id> [extra args]
+validate-artifact ARTIFACT_ID *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shift 1
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli validate --artifact-id {{ ARTIFACT_ID }} "$@"
+
+# Rollup parity check: existing completeness model vs ledger reproduction.
+# All 7 current models carry an accept-gap disposition (see
+# notes/data-coverage-implementation/rollup-parity-dispositions.md): the
+# heuristic flag rules pre-date the ledgers and the diffs reflect real
+# semantic divergence, not bugs. The defaults below let the recipe exit 0
+# without `--allow-delta`-style escape hatches; pass extra `--allow-mismatch`
+# args to suppress additional models, or override entirely with
+# `just rollup-parity-checks --model <name>`.
+rollup-parity-checks *ARGS:
+    {{ _dev_env }} BC_LEDGER_SCHEMA="main_models__{{ _branch_slug }}" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/rollup_parity_checks.py \
+        --allow-mismatch event_completeness_pitches \
+        --allow-mismatch event_completeness_fielding_credit \
+        --allow-mismatch event_completeness_batted_balls \
+        --allow-mismatch player_game_data_completeness \
+        --allow-mismatch player_completeness \
+        --allow-mismatch game_data_completeness \
+        --allow-mismatch season_team_coverage \
+        "$@"
 
 # --- LLM context ---
 

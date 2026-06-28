@@ -25,7 +25,7 @@ Every model must specify:
 - Likelihood and constraints.
 - Pooling structure and exchangeability assumptions.
 - Priors on interpretable baseball scales.
-- Deep-proposal inputs, if any.
+- Deep-proposal inputs, if any. Per-entity priors (batter / pitcher / park / scorer effects) consumed downstream from Phase-3 are sourced from the shared `event_universe` pretrain artifact rather than per-target re-trains, so the same entity embedding propagates across all consumers and the entity-level signal is borrowed across all 18M events instead of the per-target row subset alone.
 - Validation and sensitivity checks.
 - Artifact outputs and SQL consumers.
 
@@ -69,6 +69,8 @@ Each Bayesian model in {A, B, C, E, F, G, H, I, J, K} is fit twice — once with
 
 ## Model A: Scorer And Source Observation
 
+**Implementation as of 2026-05-21 (v1, six dims).** Event-grain Bernoulli on nutpie/numpyro NUTS, one fit per `event_observation_geometry` dimension that has both observed and unobserved rows: `trajectory`, `location_side`, `location_depth`, `location_edge`, `general_location`, `ball_handler_position`. The seventh dim `pulled_opposite` is purely derived (0% observed) and is excluded. The aggregated `Binomial(n_cell, p_cell)` formulation shipped in PR3 was discarded — once we broadened the covariate set beyond `(season, scorer, source)` the cell product no longer captured the variation we needed, and stock PyMC posterior diagnostics blew up (rhat=3.26, ess=4.47, 1411 divergences) on the resulting 12M-row fit. The redesign drops aggregation, picks up numpyro vectorized chains, and consumes the full pre+post-PA covariate surface directly (post-PA columns are not leakage here — the target is `is_observed`, a separate scoring channel). The sample-size sweep (trajectory, 10K → 1M) fixed the operating budget at 10K rows per dim: OOS AUC plateau hit by 10K, calibration plateau by 100K, mixing collapses past 500K. Each dim fits in ~2.5 min on nutpie.
+
 ### Estimand
 
 For event `i` and dimension `d`:
@@ -79,7 +81,7 @@ For event `i` and dimension `d`:
 
 where `R` is whether the field is observed as source truth, `x_i` is baseball context, `s_i` is scorer/source context, and `q_i` is provenance reliability.
 
-### Likelihood
+### Likelihood (v1, event-grain)
 
 ```latex
 R_{i,d} \sim \operatorname{Bernoulli}(p_{i,d})
@@ -87,52 +89,53 @@ R_{i,d} \sim \operatorname{Bernoulli}(p_{i,d})
 
 ```latex
 \operatorname{logit}(p_{i,d}) =
-\alpha_d
-+ a^{season,league}_{d,t_i,l_i}
-+ a^{source}_{d,u_i}
-+ a^{scorer}_{d,c_i}
-+ a^{park}_{d,p_i}
-+ \beta^{result}_{d,r_i}
-+ \beta^{hitout}_{d,h_i}
-+ \beta^{affil}_{d} A_i
-+ \beta^{lev}_{d} L_i
-+ \gamma^{dl}_{d} \operatorname{logit}(\tilde p^{dl}_{i,d})
+\alpha
++ \beta^{season}_{t_i}
++ \beta^{scorer}_{c_i}
++ \beta^{park}_{p_i}
++ \mathbb{1}[|U|>1]\,\beta^{source}_{u_i}
++ \sum_k X^{(k)}_i \delta^{(k)}
++ \sum_j \gamma_j \tilde x^{(j)}_i + \sum_j \delta^{miss}_j m^{(j)}_i
 ```
+
+where `\beta^{season}` is centered with sum-to-zero identification (`\beta^{season} \sim \mathrm{ZeroSumNormal}(0, \sigma_{season})`, `\sigma_{season} \sim \mathrm{HalfNormal}(s_{season})`); `\beta^{scorer}`, `\beta^{park}`, and (when active) `\beta^{source}` are non-centered random intercepts (`\beta = \sigma_* z_*`, `z_* \sim N(0,1)`, `\sigma_* \sim \mathrm{HalfNormal}(s_*)`). Each `X^{(k)}` is the one-hot design matrix for a low-card categorical covariate; coefficients `\delta^{(k)} \sim \mathrm{ZeroSumNormal}(0, s_{fe})` over the full level coord (sum-to-zero identification — no level is dropped). Each `\tilde x^{(j)}` is a standardized continuous covariate, and `m^{(j)}` is its missing indicator. The source-family random effect is conditionally declared only when more than one `source_family` level is present in the training data — the production population (`target_population_status='event_level'`) is single-source by construction and the term would be unidentified. The DL covariate has been dropped from v1; revisit only if posterior-predictive calibration shows residual gaps.
 
 `\tilde p^{dl}` is optional and must be out-of-fold calibrated before use. The symbol `\tilde p^{dl}` is used globally across all models for DL proposal probabilities; older drafts used `\tilde \pi^{dl}` in some places and have been normalized.
 
-### Pooling
+### Pooling (v1)
 
-- Season/league effects use a random walk or dynamic hierarchy.
-- Scorer, inputter, translator, park, and team-affiliation effects use partial pooling.
-- Source family is a fixed or hierarchical effect depending on support.
-- Park and scorer effects should be merged or strongly regularized when EDA shows collinearity.
+- Season, scorer, and park effects use non-centered partial pooling on the logit scale.
+- Source family is conditional: declared as a non-centered random effect only when the dataset contains multiple `source_family` levels. The v1 training population is single-source.
+- Batter and pitcher random effects are deferred. Only add if residual analysis on v1 shows player-level signal not subsumed by scorer × era effects.
+- Low-card categoricals (game_type, frame_start, exposure_status, league, result_family, pa_result, leverage_bucket, batter_hand, pitcher_hand, personnel_confidence, context_confidence) enter as design-matrix fixed effects with sum-to-zero identification via `pm.ZeroSumNormal` over the full level coord — no reference level dropped. `pa_result` is the 13-level plate-appearance outcome category — load-bearing for `ball_handler_position` (+0.186 OOS PR-AUC vs without) and neutral on the other 5 dims.
 
-### Priors
+### Priors (v1)
 
-- Intercepts centered on observed base rates by dimension.
-- Group standard deviations use half-normal priors on logit scale with prior predictive checks.
-- Dynamic season effects use small step-scale priors to prevent year-to-year noise from becoming signal.
-- Deep-proposal coefficient `gamma_dl` is regularized toward zero so deep models cannot dominate without validation.
+- Intercept `\alpha \sim N(0, 1.5)`.
+- Group scales `\sigma_{season}, \sigma_{scorer} \sim \mathrm{HalfNormal}(1.5)`; `\sigma_{park} \sim \mathrm{HalfNormal}(1.0)`; `\sigma_{source} \sim \mathrm{HalfNormal}(0.7)` when active.
+- Fixed-effect coefficients `\delta^{(k)} \sim \mathrm{ZeroSumNormal}(0, 1)` (`fixed_effect_scale = 1.0`).
+- Continuous slopes `\gamma_j \sim N(0, 0.5)` on standardized inputs; paired missing-indicator slopes `\delta^{miss}_j \sim N(0, 1)`.
+- NUTS settings on `DEFAULT_CONFIG`: numpyro backend, `target_accept=0.95`, `max_treedepth=12`, 4 chains × 1000 draws × 1000 tune.
 
-### Outputs
+### Outputs (v1)
 
 | Table | Grain | Contents |
 | --- | --- | --- |
-| `scorer_observation_propensities` | `event_key, dimension` | Posterior mean and intervals for `P(observed)`, source/scorer effects, and weak-identification flags. |
-| `observation_model_draws` | `draw_id, event_key, dimension` | Draw-level propensities for downstream weighting. |
-| `observation_model_diagnostics` | run/slice | Calibration, posterior predictive rates, and grouped holdout metrics. |
+| `exports/event_propensity.parquet` | `event_key, dimension` | Per-event posterior mean `p_observed_mean`. Computed by chunked sigmoid average over posterior draws. |
+| `main_models.scorer_observation_propensities` | `event_key, dimension` | SQLMesh `@model` thin-gather over published `event_propensity.parquet` artifacts, stamped with `bayes_artifact_id`. |
+| `exports/{posterior_summary,calibration_curve}.parquet` | per-variable / per-bin | Hyperparameter posterior summary + reliability curve. |
+| `validation/diagnostics.json` | per-fit | rhat / ess / divergences / calibration_ece + backend + source_effect_active flag. |
 
-### Validation
+### Validation (v1)
 
-- Prior predictive knownness rates by dimension.
+- Prior predictive knownness rates.
 - Scorer holdouts.
 - Park holdouts.
-- Source-family holdouts.
+- Source-family holdouts (once data contains multiple sources — currently a no-op).
 - Hit/out-specific holdouts.
-- MNAR sensitivity for hit location and detailed contact labels.
+- Calibration by `(season_decade, source_family, result_family)` slice.
 
-Block publication when scorer, park, team, and source cannot be separated in the target slice.
+Block publication when scorer, park, team, and source cannot be separated in the target slice. The DL covariate ablation / per-flavor publication policy from earlier drafts has been retired — there is one flavor.
 
 ## Model B: Contact Label Confusion
 
@@ -193,6 +196,75 @@ An argmax convenience column may be emitted for inspection but is never the cano
 - `contact_expected_counters` for aggregate metrics.
 
 ## Model C: Fielding Credit Allocation
+
+**Implementation as of 2026-05-23 (v1.5, putouts only).** Dual-arm hierarchical multinomial on numpyro NUTS, one fit per credit-type scope (currently `putout` only). v1.5 superseded v1's aggregate-only formulation. v1.6 added `direct_handler_position` as a fixed effect and was retracted (see "v1.6 retraction" below):
+
+- **Training pool** is well-attributed events (`credit_type='putout' AND known_credit > 0 AND personnel_hard_mask_available=TRUE`, ~9.9M candidates) where Y is observed per event. v1's aggregate-only pool was naturally-unknown events where Y is latent — that pool gave the model the marginal distribution but no per-event discriminative signal.
+- **Synthetic-mask layer.** Per-event Bernoulli mask probability `P_e = clip(α_c · w[true_pos(e)], 0, 1)`. Per-position weights `w` come from the empirical natural-unknown distribution in the v1 authority cache (1B 42%, OF 8–13%, etc.; `REAL_UNKNOWN_RATES_BY_POSITION` in `_credit_data.py`). Per-(season, source_family) intensity `α_c` calibrates the cell-mean mask rate to the empirical natural-unknown rate per cell (1944 PBP ~20%, 1972+ PBP ~0%) so synthetic unknowns share the joint distribution real unknowns have at inference time. Per-game floor: at least one event stays unmasked.
+- **Dual likelihood, shared softmax.** Same `π_e = softmax(η_e)` over the personnel-eligible position set with `α_position` + per-FE × position `δ_<fe>` interactions.
+  - Supervised arm on unmasked events: `Y_{e,1:K} ~ Multinomial(U_e, π_e)` with Y the observed `known_credit` count vector. This is the load-bearing per-event signal — without it the per-event REs cancel under softmax.
+  - Aggregate arm on masked events: `T_target[m] ~ Normal(Σ U_e · π_{e,k}, σ_box)` at grain `(game_id, fielding_team_id, player_id, fielding_position)`, with `T_target[m] = Σ known_credit` over the masked subset (deterministic, since we control the mask). Single `sigma_box_aggregate` (no `authority_source` split — we make the unknowns ourselves).
+- **Per-event REs** (season / scorer / park / source) and per-event global FEs are kept. In v1 they cancelled under softmax and NUTS sampled them from the prior; in v1.5 the supervised arm makes them data-informed (one full draw of Y per supervised event identifies how scorers / parks / eras shift the per-position distribution).
+- **Identification.** `alpha_position` and each per-FE `delta_<fe>` are `ZeroSumNormal` over the position axis. Continuous slopes are skipped in v1.5; add only if calibration shows residual signal.
+- **Held-out OOS.** 10% of games via `game_hash_fold(game_id, fold_count=10) == 0`. Held-out events are excluded from both arms and scored after sampling: top-1 / top-3 / log-loss / per-position PR-AUC / macro PR-AUC, written to `validation/held_out_metrics.json`. Real OOS metrics (not aggregate-residual proxies) gate the operating point alongside rhat / ess / divergences.
+- `MIN_EVENTS_PER_SEASON=50` row floor replaces the Model A saturated-season filter.
+- Deferred: v2 player REs (still); v3.1 multi-assist count submodel (Dirichlet-multinomial over `M ∈ {1..4}` event classes); v4 errors + double plays; v5 team-residual fallback for `withheld` rows.
+
+### v3 — assists allocation (single-assist cut)
+
+**Cut 1, K=10 softmax with NONE sentinel.** Lands as a second registered target `assist_credit_allocation` that shares the v1.5 dual-arm builder + prep function. The inference slice is the same events v1.5 scores (events whose putout chain is unrecorded — sources that drop putout attribution drop assist attribution at the same time). One model fits both `P(any assist on this event)` and `P(position | A_count=1)` by adding a NONE class to the per-position softmax: `coords["position"] = ["1".."9", "NONE"]`, `K=10`.
+
+- **Training pool.** Well-attributed events with `personnel_hard_mask_available=TRUE` and `putout_position` resolved (single putout), restricted to events with assist count `A_count ∈ {0, 1}`. Multi-assist events (force-DPs, rundowns, ~few percent) are filtered upstream — they don't fit the single-assist sentinel formulation. Their count submodel is v3.1.
+- **K=10 truth.** Per-event Y is one-hot at the assist position for A_count=1, one-hot at NONE for A_count=0. `Y_observed ~ Multinomial(n=1, π_e)`, equivalent to `Categorical(π_e)`. The aggregate arm naturally sums over positions 1..9 only — the NONE class doesn't appear in box totals, so `Σ_{k=1..9} π_{e,k} = 1 - π_{e,NONE}` is enforced as the per-(game, position) prediction.
+- **PO conditioning via fixed effect.** New per-event covariate `putout_position` (1..9) joined from the same dataset's putout `known_credit` rows. Encoded as a standard FE alongside `result_family`, `base_state_start`, etc. — `delta_putout_position` of shape `(9, 10)` is fit like every other interaction matrix. No hard-zero on the diagonal — the data learns how flexible the PO==A configuration is.
+- **Inference-time marginalization (wired).** `_posterior_event_softmax_putout_marginalized(idata, inputs, putout_posterior)` evaluates the K=10 softmax 9 times per event (one per PO candidate) and weights by the published v1.5 putout posterior `expected_share` (artifact `full-10k-v15-tuned`). It is wired into both the production-slice export and the held-out eval. `putout_position` is observed on held-out events but unknown on the production target — the same source-coupling that forced the v1.6 `direct_handler_position` retraction — so both paths must marginalize to stay production-faithful. The held-out eval records a `putout_marginalized: true` flag and excludes `putout_position` from slice calibration when marginalizing. The artifact also records `observed_putout_upper_bound` (top-1 0.714, any_assist PR-AUC 0.828), which conditions on the true putout — an upper bound only, not the production metric.
+- **Synthetic-mask weights are uniform across the K=10 positions (cut 1).** The v1.5 per-(season, source_family) intensity table is reused verbatim (the "no PBP putout" cell rate is also the "no PBP assist" cell rate at the source-family level). Empirical assist-unknown per-position rates need one v3 cycle's posterior to derive — tightening to v3.1.
+- **Coverage guard.** For `dimension='assist'` the production-target slice is `credit_type='putout' AND unknown_credit_need > 0` (the dataset always emits `unknown_credit_need = 0` on assist rows). Standard FE list checked at the 1% floor on that slice. `putout_position` is excluded from the per-event check (structurally NULL on the production target) and instead checked at the training level — each j ∈ {1..9} must appear on at least 1% of training events so `delta_putout_position[j]` is identifiable at marginalization time.
+- **Export schema.** `exports/event_credit.parquet` now carries an optional `none_share: float64` column. K=10 fits emit 9 rows per event with `expected_share = π_{e,k}^v3` for k=1..9 and `none_share = π_{e,NONE}^v3` replicated across the 9 rows. K=9 fits leave `none_share` NULL. `imputed_fielding_credit` surfaces both columns.
+- **Held-out metrics.** Two new acceptance numbers alongside the K=10 top-1 / log-loss / per-position PR-AUC table: the per-event `any_assist` block with `pr_auc` (binary NONE vs ¬NONE) and `baseline_pr_auc = empirical(¬NONE)`. Both must clear baseline by a meaningful margin; otherwise the model isn't predicting count at all. The held-out set has `putout_position` observed; the production target does not. So the eval composes the held-out fit with the published v1.5 putout posterior and marginalizes, matching what production scoring does — the recorded numbers are the marginalized ones.
+- **Shipped result (operating point `full-10k-v3-cut1-prod`, nutpie, `BC_CREDIT_NONCENTER_SEASON=1`, 10K game-subsample; that knob and the per-event season RE it parameterized have since been removed from the builder — scalar-per-event terms cancel exactly in the softmax).** Geometry clean: rhat_max 1.036, ess_bulk_min 185, ess_tail_min 430, 0 divergences (non-centered season fixed the funnel centered season hit — sigma_season rhat 1.57 / ess 7 under centered). Marginalized held-out (n_eval=100000): top-1 over 10 classes 0.6635 vs most-frequent baseline 0.6523 (≈ baseline); any_assist PR-AUC 0.5155 vs 0.3477 base rate (a real lift); top-3 0.865; log_loss 1.06; marginal calibration TV 0.052 (per-slice weighted 0.052–0.061), NONE under-predicted ~5 pt (0.604 vs 0.652, expected from marginalizing v1.5's diffuse putout posterior whose own top-1 is ~0.53). Key finding: per-fielder identification on the production slice is ≈ baseline — pinpointing the assister needs a sharp putout production lacks. The model's real value is P(any assist) and calibrated expected shares, not naming the specific fielder. This is the inverse of v1.6: the lift that survives marginalization is the part that does not depend on the missing clue.
+- **Production export (wired).** Scores all 463,093 production-target events (`credit_type='putout' AND unknown_credit_need > 0 AND personnel_hard_mask_available AND eligible_for_allocation`) — the production slice, not the training subsample — for 4,167,837 rows (463,093 × 9 positions). Each event's 9 position shares + `none_share` sum to exactly 1; on production `none_share` ranges 0.058–0.58 (mean 0.49), so P(any assist) varies meaningfully by event. Validated against prod personnel tables: the `imputed_fielding_credit` join yields 4,167,837 rows, unique grain, zero nulls (not_null + unique_grain audits pass). The full SQLMesh branch-env plan-model was not run (a fresh branch env requires a full-corpus rebuild — env-setup cost, unrelated to the model); the join logic + audits are validated directly against prod, and SQLMesh materialization happens at promotion.
+
+Out-of-scope for v3 cut 1: multi-assist count submodel (v3.1), errors / DPs (v4), player REs (still deferred), DL covariate. v3.1 is gated on a clean v3 cut-1 fit so the architecture is validated before adding the count head.
+
+### Assist-count and error/DP submodels (T2.1)
+
+The spec wants a separate assist-**count** model (count THEN allocation) plus error and double-play submodels, with the aggregate arm constrained by the real box residual.
+
+**Built — assist-count submodel.** `models/_assist_count_data.py::prepare_assist_count_inputs` + `models/assist_count.py::build_assist_count_model`. The realized assist count `M` per event is recoverable directly from the dataset: it is the sum of `known_credit` over the 9 fielder positions for `credit_type='assist'` on the well-attributed (`personnel_hard_mask_available`) slice. The empirical per-event `M` distribution on that slice is `M=0` 12.45M, `M=1` 3.50M, `M=2` 342K, `M=3` 15K, `M=4` 2.8K, `M≥5` ~470 — so the spec's `M ∈ {1,2,3,4}` cap is well-supported (counts above 4 fold into the top class; `M=0` is the NONE class the K=10 allocation softmax already handles, so the count model conditions on `M≥1`). Events roll up to `(event_class, base_out)` cells with `event_class = result_family` and `base_out = (base_state_start, outs_start)` — the identifiable proxy for the spec's `theta_{event_class, base_out}` indexing (the spec's literal force-out / infield-assist / bunt-DP / rundown taxonomy is not a dataset column). Each cell carries a length-4 count vector; the likelihood is the cell-grain `Multinomial(n=cell_total, p=cell_class_prob)` — the collapsed form of the spec's Dirichlet-multinomial. The hierarchy is a centered reference-class softmax (`M=1` pinned to logit 0; `beta0_count` corpus → per-`event_class` `event_class_logodds` centered on it → per-cell `cell_logodds`), mirroring `pitch_summary` / `run_values`, which mixes far better than a direct Dirichlet concentration while expressing the same partial pooling toward a global mean. `MIN_EVENTS_PER_CELL=25`, `MIN_EVENTS_PER_SEASON=50`, 10% game holdout. Not wired to a CLI/spec target (separate cell-grain model, no event-grain export); smoke via a standalone `pm.sample`.
+
+**Built — error allocation submodel.** `models/_error_credit_data.py::prepare_error_credit_inputs` + `models/error_credit.py::build_error_credit_model`. Per-event error count `U^E_e` and per-position error credit are both observable from `known_credit` for `credit_type='error'`. Structurally a putout-style supervised K=9 softmax — `E_{e,1:9} ~ Multinomial(U^E_e, pi^E_e)` — on well-attributed error events. Errors are scorer-discretion outcomes, so the predictor carries a per-`(scorer, position)` `delta_scorer` interaction on top of the per-position intercept and the `(result_family, base_state_start, alignment_regime)` × position FEs; the scorer-as-scalar term would cancel inside the per-event softmax, so scorer signal only survives as a position interaction. The interaction is gated behind `BC_ERROR_CREDIT_DISABLE_SCORER` (mirrors `run_values::_era_regime_enabled`) and auto-skips when only one scorer is present. Not wired to a CLI/spec target; smoke via standalone `pm.sample`.
+
+**Deferred — double-play submodel.** Blocker: the dataset (`model_input_fielding_credit`) carries no double-play truth. There is no `double_play` indicator, no per-position DP credit (the `known` CTE in `model_input_fielding_credit.sql` only pulls `putouts` / `assists` / `errors` from `event_player_fielding_stats`), and no `outs_on_play` / post-event-state column from which two-out plays could be inferred. The spec's DP submodel conditions on "the state admits DP" and on "two outs recorded on the play" — neither the DP-credit target nor the two-out-on-play indicator is reachable. Surfacing a per-(event, fielding_position) `double_plays` column (from `event_player_fielding_stats.double_plays`) plus an `outs_on_play` event column into `model_input_fielding_credit.sql` is the prerequisite; once present the DP arm is a state-gated K=9 softmax structurally identical to the error arm.
+
+**Deferred — real box-residual aggregate constraint.** The current dual-arm aggregate arm (`models/credit.py` `T_observed` + `_credit_data.py::_build_aggregate_targets_from_mask`) is rebuilt from the SYNTHETIC mask's hidden `known_credit`, not the spec's box residual `B_{g,k,c} ~ Normal(Σ_e Y_{e,k,c}, sigma_aggregate,c)`. The dataset DOES carry `aggregate_residual` (per-credit-type box-vs-PBP residual at the team-game level from `fielding_credit_gaps`), but there is no `materialize_credit_authority_targets` materializer producing the `credit_authority_targets.parquet` cache that would join the residual to its `official_credit_authority.authority_source` (for the per-authority-source `sigma_aggregate` map and the `withheld`-exclusion) at the per-(game, team, player, position, credit_type) grain. Building that cache is upstream of Model C and out of scope for T2.1 (do NOT build the missing materializer here). Where it plugs in: replace `_build_aggregate_targets_from_mask` with a `_build_aggregate_targets_from_box_residual` that reads `credit_authority_targets.parquet`, emits the same `(aggregate_targets, aggregate_sigma, aggregate_event_idx, aggregate_position_idx, aggregate_row_idx)` tuple `prepare_event_credit_inputs` already consumes, and carries a per-authority-source sigma in place of the single `sigma_box_aggregate` — the `models/credit.py` `T_observed` Normal arm then needs no change. The `REAL_UNKNOWN_RATES_BY_POSITION` / `_CACHED_NATURAL_UNKNOWN_RATES` constants are also derived from that same absent authority cache.
+
+### v1.6 retraction (`direct_handler_position` FE)
+
+v1.6 added `direct_handler_position` (`NULLIF(stg_events.batted_to_fielder, 0)`) as a per-event FE. The held-out lift looked dramatic — top-1 0.529 → 0.786 (+25.7pp), per-position max abs dev 0.036 → 0.005, OF PR-AUC ≈0.10 → ≈0.997 — but the held-out gain was a sample-composition artifact, not a generalizable signal.
+
+Coverage breakdown on the held-out set vs the production inference target (events with `unknown_credit_need > 0 AND personnel_hard_mask_available AND eligible_for_allocation`):
+
+| slice | events | `direct_handler_position` recorded | NULL |
+|---|---:|---:|---:|
+| held-out eval | 10,554,569 | 8,131,306 (77.0%) | 2,423,263 (23.0%) |
+| production unknowns | 4,167,837 | 3,663 (**0.09%**) | 4,164,174 (99.91%) |
+
+The two columns are coverage-correlated upstream: sources that record the putout chain (i.e. our training/held-out population) also record `batted_to_fielder`; sources that don't record the putout (i.e. our inference target) typically don't record `batted_to_fielder` either. So the +25.7pp held-out lift came from events that share the handler signal with the model, and the production benefit is `0.0009 × big + 0.9991 × 0 ≈ 0`. The v1.6 deployed model behaved essentially identically to v1.5 on the dominant unknown-handler slice.
+
+We retracted v1.6 by:
+
+1. Removing `direct_handler_position` from `model_input_fielding_credit` and from `FIXED_EFFECT_COLUMNS`.
+2. Adding a 1% production-coverage floor (`PRODUCTION_FE_COVERAGE_FLOOR`) — `_assert_fixed_effects_cover_production_slice` raises if any FE is populated on less than 1% of the production unknown slice. Tested at the unit-test layer (`test_fielding_credit_prep.py`).
+3. Re-promoting `full-10k-v15-tuned` as the published `putout_credit_allocation` pointer.
+
+The retraction does not block a future return to handler evidence — but any reintroduction needs (a) an upstream pipeline that surfaces `batted_to_fielder` on the unknown-putout slice at >1% coverage, or (b) a separate model specifically scoped to the small handler-known production subset (with the rest falling through to the FE-only model), and any held-out metric must be reported restricted to the `direct_handler_position IS NULL` slice as the production-equivalent number.
+
+Artifact paths: per-fit exports under `artifacts/statistical/bayes/<model_name>/<artifact_id>/exports/event_credit.parquet` (grain `(event_key, fielding_position, credit_type)`, value `expected_share`); SQLMesh consumer `main_models.imputed_fielding_credit` at grain `(event_key, player_id, fielding_position, credit_type)`.
+
+### v1 archive (aggregate-only, superseded)
+
+v1 trained only on naturally-occurring unknown putouts and consumed `official_aggregate_availability.residual_value` joined to `official_credit_authority.authority_source` (excluding `withheld`) as targets, with a per-authority-source `sigma_box` map. It survives in git history (`30bb5fe`); v1.5 retains the aggregate-arm scatter structure but rebuilds the target from masked Y rather than from the box residual.
 
 ### Estimand
 

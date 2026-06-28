@@ -1,0 +1,38 @@
+{
+  "model_name": "geometry_trajectory",
+  "model_version": "0.1.0",
+  "dataset_name": "model_input_geometry",
+  "dataset_version": "0.4.0",
+  "addressed_weak_identifications": [
+    {
+      "effect": "scorer_park",
+      "slice": "*",
+      "treatment": "drop",
+      "rationale": "Scalar-per-event scorer/park/source terms enter every class logit equally and cancel exactly inside the per-event softmax, so they are omitted from the model formula and the flagged confounding cannot affect the fit."
+    },
+    {
+      "effect": "scorer_source_family",
+      "slice": "*",
+      "treatment": "drop",
+      "rationale": "Scalar-per-event scorer/park/source terms enter every class logit equally and cancel exactly inside the per-event softmax, so they are omitted from the model formula and the flagged confounding cannot affect the fit."
+    },
+    {
+      "effect": "source_family_era",
+      "slice": "*",
+      "treatment": "drop",
+      "rationale": "Scalar-per-event scorer/park/source terms enter every class logit equally and cancel exactly inside the per-event softmax, so they are omitted from the model formula and the flagged confounding cannot affect the fit."
+    },
+    {
+      "effect": "source_family_season",
+      "slice": "*",
+      "treatment": "drop",
+      "rationale": "Scalar-per-event scorer/park/source terms enter every class logit equally and cancel exactly inside the per-event softmax, so they are omitted from the model formula and the flagged confounding cannot affect the fit."
+    }
+  ],
+  "expected_blocking_findings": [
+    "dominant_single_scorer_park_team",
+    "no_connected_component_for_effect",
+    "category_absent_in_train_present_in_test"
+  ],
+  "notes": "Expected blocking findings are intrinsic corpus characteristics reviewed in the wave-1 P2.3 review. dominant_single_scorer_park_team: whole eras have a single official scorer per park/team, so some scorer-park pairs are fully confounded by construction. no_connected_component_for_effect: each game carries exactly one source family, so no connected component can link source families. category_absent_in_train_present_in_test: game-hash holdout folds are not era-stratified, so categories confined to early eras (parks, scorers) can be absent from train while present in test."
+}
