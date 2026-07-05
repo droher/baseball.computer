@@ -241,16 +241,19 @@ AST,AST,,,Taylor,All Stars,,1940-01-01,1940-12-31,,
 ASW,ASW,,,West,All Stars,,1933-01-01,1961-12-31,,
 ATN,ATN,NAL,,Atlanta,Black Crackers,,1932-01-01,1939-12-31,Atlanta,GA
 BCG,BCG,,,Baltimore,Colored Giants,,1943-01-01,1943-12-31,Baltimore,MD
-BIR,BIR,NNL,,Birmingham,Black Barons,,1923-01-01,1949-12-31,Birmingham,AL
+BIR,BIR,NNL,,Birmingham,Black Barons,,1923-01-01,1948-12-31,Birmingham,AL
+BIR,BIR,NAL,,Birmingham,Black Barons,,1949-01-01,1949-12-31,Birmingham,AL
 BIS,BIS,,,Bismarck,Club,Churchills,1935-01-01,1935-12-31,Bismarck,ND
 BKB,BKB,,,Brooklyn,Bushwicks,,1934-01-01,1934-12-31,Brooklyn,NY
-BLG,BLG,NN2,,Baltimore,Elite Giants,,1938-01-01,1949-12-31,Baltimore,MD
+BLG,BLG,NN2,,Baltimore,Elite Giants,,1938-01-01,1948-12-31,Baltimore,MD
+BLG,BLG,NAL,,Baltimore,Elite Giants,,1949-01-01,1949-12-31,Baltimore,MD
 BLS,BLS,ECL,,Baltimore,Black Sox,,1920-01-01,1934-12-31,Baltimore,MD
 BRG,BRG,ECL,,Brooklyn,Royal Giants,,1904-01-01,1937-12-31,Brooklyn,NY
 BRN,BRN,NN2,,Brooklyn,Eagles,,1935-01-01,1936-12-31,Brooklyn,NY
 BRS,BRS,,,Babe Ruth,All Stars,,1926-01-01,1935-12-31,,
 BXG,BXG,,,Bronx,Giants,,1925-01-01,1925-12-31,Bronx,NY
-CAG,CAG,NN1,,Chicago,American Giants,,1911-01-01,1949-12-31,Chicago,IL
+CAG,CAG,NN1,,Chicago,American Giants,,1911-01-01,1948-12-31,Chicago,IL
+CAG,CAG,NAL,,Chicago,American Giants,,1949-01-01,1949-12-31,Chicago,IL
 CB1,CB1,NN1,,Columbus,Buckeyes,,1921-01-01,1921-12-31,Columbus,OH
 CB2,CB2,NN2,,Columbus,Bluebirds,,1933-01-01,1933-12-31,Columbus,OH 
 CB3,CB3,NN2,,Columbus,Elite Giants,,1935-01-01,1935-12-31,Columbus,OH
@@ -301,7 +304,8 @@ IN7,IN7,NAL,,Indianapolis,ABC's,,1938-01-01,1938-12-31,Indianapolis,IN
 IN8,IN8,NAL,,Indianapolis,Crawfords,,1940-01-01,1940-12-31,Indianapolis,IN
 IN9,IN9,NAL,,Indianapolis,Clowns,,1945-01-01,1949-12-31,Indianapolis,IN
 JAX,JAX,NAL,,Jacksonville,Red Caps,,1937-01-01,1942-12-31,Jacksonville,FL
-KCM,KCM,NN1,,Kansas City,Monarchs,,1920-01-01,1949-12-31,Kansas City,MO
+KCM,KCM,NN1,,Kansas City,Monarchs,,1920-01-01,1948-12-31,Kansas City,MO
+KCM,KCM,NAL,,Kansas City,Monarchs,,1949-01-01,1949-12-31,Kansas City,MO
 KCR,KCR,,,Kansas City,Royals,,1943-01-01,1948-12-31,Kansas City,MO
 KLK,KLK,,,Kelley,Kars,,1930-01-01,1930-12-31,,
 LRS,LRS,NSL,,Little Rock,Black Travelers,,1932-01-01,1932-12-31,Little Rock,AR
@@ -323,9 +327,11 @@ NW2,NW2,NN2,,Newark,Eagles,,1936-01-01,1948-12-31,Newark,NJ
 NWS,NWS,,,Newark,Stars,,1926-01-01,1926-12-31,Newark,NJ
 NWW,NWW,,,Newark,Browns,,1932-01-01,1932-12-31,Newark,NJ
 NY5,NY5,NN2,,New York,Black Yankees,,1932-01-01,1948-12-31,New York,NY
-NY6,NY6,NN2,,New York,Cubans,,1935-01-01,1949-12-31,New York,NY
+NY6,NY6,NN2,,New York,Cubans,,1935-01-01,1948-12-31,New York,NY
+NY6,NY6,NAL,,New York,Cubans,,1949-01-01,1949-12-31,New York,NY
 NYL,NYL,ECL,,New York,Lincoln Giants,,1911-01-01,1930-12-31,New York,NY
-PH5,PH5,NN2,,Philadelphia,Stars,,1934-01-01,1949-12-31,Philadelphia,PA
+PH5,PH5,NN2,,Philadelphia,Stars,,1934-01-01,1948-12-31,Philadelphia,PA
+PH5,PH5,NAL,,Philadelphia,Stars,,1949-01-01,1949-12-31,Philadelphia,PA
 PH6,PH6,,,Philadelphia,Bacharach Giants,,1934-01-01,1934-12-31,Philadelphia,PA
 PHB,PHB,,,Philadelphia-Birmingham,Baron Stars,,1945-01-01,1945-12-31,,
 PHE,PHE,,,Philadelphia,Tigers,,1928-01-01,1928-12-31,Philadelphia,PA
