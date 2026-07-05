@@ -217,8 +217,11 @@ def _make_per_class_reporter(
             logs = logs or {}
             train_loss = logs.get("loss")
             val_loss = logs.get("val_loss")
+            model = self.model
+            if model is None:
+                return
             probs = np.asarray(
-                self.model.predict(
+                model.predict(
                     sample_x,
                     batch_size=DEFAULT_PREDICT_BATCH_SIZE,
                     verbose=0,

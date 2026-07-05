@@ -228,6 +228,10 @@ test *ARGS:
 unit-tests:
     cd bc && {{ _dev_env }} uv run --group build sqlmesh test
 
+# basedpyright type check (scoped in pyproject). Errors block; warnings don't.
+typecheck *ARGS:
+    uv run basedpyright --level error "$@"
+
 # --- Prod (guarded) ---
 
 # Restate one or more models in PROD. Cascades to downstream. Writes to bc.db.

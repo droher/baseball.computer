@@ -24,6 +24,7 @@ dev = [
     "ipykernel>=6.25.2",
     "boto3>=1.34.45",
     "ruamel.yaml>=0.18.5",
+    "basedpyright>=1.39.9",
 ]
 # SQLMesh + Ibis build engine. boring-semantic-layer (in `bsl`) pins an
 # incompatible sqlglot, so the groups are mutually exclusive.
@@ -79,8 +80,14 @@ markers = [
     "slow: tests that import Keras/Torch or hit bc_dev.db; opt in with `pytest -m slow`",
 ]
 
-[tool.pyright]
+[tool.basedpyright]
+include = ["bc/python_models/statistical"]
 extraPaths = ["bc"]
+reportMissingTypeArgument = "warning"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "bc/python_models/statistical/deep/training.py"
+reportArgumentType = "warning"
 
 [tool.ruff.lint.per-file-ignores]
 "bc/tests/statistical/**" = ["E402"]
