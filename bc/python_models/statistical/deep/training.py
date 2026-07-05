@@ -425,6 +425,19 @@ def _maybe_load_pretrained_embeddings(
     model.compile(optimizer=optimizer, loss=loss, weighted_metrics=metrics)
 
 
+def _assert_binary_target_values(
+    fit_df: pl.DataFrame, *, target_column: str
+) -> None:
+    distinct = fit_df.get_column(target_column).drop_nulls().unique().to_list()
+    invalid = sorted(v for v in distinct if v not in (0, 1))
+    if invalid:
+        raise ValueError(
+            f"binary target {target_column!r} carries non-binary label values "
+            f"{invalid}; a binary DeepTargetSpec expects labels in {{0, 1}} — "
+            f"use kind='multiclass' for a multiclass label space"
+        )
+
+
 def _fit_keras(
     *,
     spec: DeepTargetSpec,
@@ -518,6 +531,11 @@ def _fit_keras(
             verbose="0",
         )
     else:
+        _assert_binary_target_values(fit_df, target_column=spec.target_column)
+        if validation_df is not None and validation_df.height > 0:
+            _assert_binary_target_values(
+                validation_df, target_column=spec.target_column
+            )
         y_raw = (
             fit_df[spec.target_column].cast(pl.Float32).fill_null(0.0).to_numpy()
         )
@@ -597,6 +615,66 @@ def _predict_probabilities(
         model.predict(x, batch_size=batch_size, verbose=0)
     ).astype(np.float64)
     return raw
+
+
+def _prep_eval_arrays(
+    df: pl.DataFrame,
+    *,
+    spec: DeepTargetSpec,
+    layout: FeatureLayout,
+    stats: PolarsFeatureStats,
+    class_index: dict[str, int],
+) -> tuple[Any, NDArray[Any], NDArray[np.float32]]:
+    if spec.kind == "multiclass":
+        return _prep_multiclass_arrays(
+            df,
+            layout=layout,
+            stats=stats,
+            target_column=spec.target_column,
+            weight_column=spec.weight_column,
+            class_index=class_index,
+        )
+    x = _encode_inputs(df, layout=layout, stats=stats)
+    y = (
+        df[spec.target_column]
+        .cast(pl.Float32)
+        .fill_null(0.0)
+        .to_numpy()
+        .reshape(-1, 1)
+        .astype(np.float32)
+    )
+    w = (
+        df[spec.weight_column]
+        .cast(pl.Float32)
+        .fill_null(0.0)
+        .to_numpy()
+        .astype(np.float32)
+    )
+    return x, y, w
+
+
+def _evaluate_partition_loss(
+    model: Any,
+    df: pl.DataFrame,
+    *,
+    spec: DeepTargetSpec,
+    layout: FeatureLayout,
+    stats: PolarsFeatureStats,
+    class_index: dict[str, int],
+    batch_size: int = DEFAULT_PREDICT_BATCH_SIZE,
+) -> float:
+    x, y, w = _prep_eval_arrays(
+        df, spec=spec, layout=layout, stats=stats, class_index=class_index
+    )
+    result = model.evaluate(
+        x,
+        y,
+        sample_weight=w,
+        batch_size=batch_size,
+        verbose=0,
+        return_dict=True,
+    )
+    return float(result["loss"])
 
 
 def _partition_label_for_rows(n: int, label: str) -> list[str]:
@@ -856,6 +934,35 @@ def run_target(
         else []
     )
 
+    selection_partition = spec.validate_label if validation_pool is not None else None
+    held_out_test_loss: float | None = None
+    if test_df.height > 0:
+        held_out_test_loss = _evaluate_partition_loss(
+            full_model,
+            test_df,
+            spec=spec,
+            layout=layout,
+            stats=full_stats,
+            class_index=class_index,
+        )
+        _log.info(
+            "held-out %s loss=%.4f rows=%d (never used for model selection or "
+            "early stopping); reported val_loss diagnostics are on the %s "
+            "selection partition and are optimistic",
+            spec.test_label,
+            held_out_test_loss,
+            test_df.height,
+            selection_partition or "training",
+        )
+    else:
+        _log.warning(
+            "no held-out %s partition; all reported val_loss diagnostics are on "
+            "the %s selection partition (used for early stopping) and are "
+            "optimistic, not a held-out estimate",
+            spec.test_label,
+            selection_partition or "training",
+        )
+
     all_frames = [*oof_records, *validate_records, *test_records]
     if not all_frames:
         raise ValueError("no prediction rows produced")
@@ -887,6 +994,8 @@ def run_target(
         test_rows=test_df.height,
         class_labels=class_labels,
         fit_diagnostics=fit_diagnostics,
+        selection_partition=selection_partition,
+        held_out_test_loss=held_out_test_loss,
     )
     write_manifest(manifest, manifest_path)
 
@@ -951,6 +1060,8 @@ def _build_manifest(
     test_rows: int,
     class_labels: tuple[str, ...],
     fit_diagnostics: list[dict[str, float | int | str]] | None = None,
+    selection_partition: str | None = None,
+    held_out_test_loss: float | None = None,
 ) -> ArtifactManifest:
     metadata: dict[str, str | int | float | bool] = {
         "fold_count": spec.fold_count,
@@ -960,7 +1071,11 @@ def _build_manifest(
         "validate_rows": validate_rows,
         "test_rows": test_rows,
         "num_classes": len(class_labels),
+        "reported_val_loss_partition": selection_partition or "none",
+        "held_out_test_available": held_out_test_loss is not None,
     }
+    if held_out_test_loss is not None:
+        metadata["held_out_test_loss"] = held_out_test_loss
     if fit_diagnostics:
         metadata["fit_diagnostics_json"] = json.dumps(fit_diagnostics)
         elapsed_total = sum(

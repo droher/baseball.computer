@@ -49,6 +49,16 @@ Decision (2026-05-03): not pursuing. Motivation was DuckLake snapshot-retention 
 
 ## Data quality
 
+### QA-fix branch residue (2026-07-05)
+
+The `qa-fixes` branch closed the confirmed QA findings (test hermeticity, `weak_identification_flag` wiring, fail-closed convergence gate, seed franchise/pitch-type gaps, dead `high` context-confidence tier, coverage-SQL minors, doc corrections). Left open:
+
+- **Prod restatement.** All coverage-SQL changes and seed edits are validated only in the `qa_fixes` dev env. Seed edits don't move model fingerprints, so promotion needs explicit `--restate-model` on `main_models.game_start_info` (and cascade) in addition to the fingerprint-changed models: `source_data_error_risk_ledger` (stamped), `event_observation_context`, `event_observation_credit`, `event_observation_pitch`, `event_observation_geometry`, `game_exposure_ledger`, `official_aggregate_availability`. Downstream still outstanding after that: the `model_input_*` datasets (geometry is 253M rows — mind the `model_input_fielding_credit` audit OOM at 14 threads), `stress_holdout_registry`, `official_credit_authority`, `fielding_credit_gaps`.
+- **Remaining NULL-league event rows.** The seed fixes cover 17,354 of the 41,738 `league_group='Other'` event rows caused by failed franchise lookups; the remaining 24,384 stem from other franchises/date gaps not in the QA findings. A full uncovered-franchise sweep (join `stg_games` to `seed_franchises` on team_id + date range) is the discovery query.
+- **PH6 and CI1, 1936.** 5 game-sides each fall outside their seed rows (PH6 is 1934-only, CI1 is 1937-only). Plausibly independent-club years; a second row with empty `league` may be the right shape, but 1936 status needs historical evidence before editing.
+- **Roster-observed hands.** `event_observation_context` still stamps batter/pitcher hand `derived` unconditionally; per-roster `observed` hands remain the documented follow-up. The `high` confidence tier is now reachable regardless (rollup fixed).
+- **pyright vs basedpyright.** `[tool.pyright]` is configured but no checker is installed or run anywhere; six files carry inline `# pyright:` directives using basedpyright-only rules (stock pyright: 10 errors, 8 of them unknown-rule; basedpyright: 5 errors + 1,416 warnings). Tooling-direction decision: adopt basedpyright as a dev dependency or rewrite the directives for stock pyright.
+
 ### Partial-coverage SUMs
 
 For pre-1900s + Negro-League seasons the per-game SUMs are biased-low (retrosheet has partial coverage; Lahman fills only when retrosheet returns NULL). Right fix needs per-stat per-row gating: choose Lahman when the per-game data has at least one NULL contributor AND Lahman's value is strictly greater than retrosheet's partial SUM. Sketched but not shipped. Gets fiddly because SQLMesh's `EXCLUDE` / `REPLACE` clauses don't expand `@EACH` macros, so the per-stat block has to be emitted via a Python-side macro returning a string (or every stat enumerated by hand). Defer until a real consumer asks.
@@ -148,11 +158,13 @@ supplement carries the official-vs-estimated tier vocabulary. Conventions in
 `notes/data-coverage-implementation/phase5-conventions.md`.
 
 **Promotion-coupled remainder (run at/near `promote-prod`).**
-- Regenerate `docs/llm/baseball.lsf` (`just gen-llm-context`) once the estimated tables are populated
-  in prod — it reads the live SQLMesh schema; the supplement edits flow in automatically.
+- ~~Regenerate `docs/llm/baseball.lsf`~~ — done 2026-07-05 post prod rebuild (213 tables, all twelve
+  estimated tables present).
 - Enrich the nine coverage `@model` `column_descriptions` so the LSF entries are not sparse.
-- Populate `weak_identification_flag` at fit time from the publication gate (`publication.py`
-  weak-identification check / the ModelConfig `addressed_weak_identifications`); defaults `false` now.
+- ~~Populate `weak_identification_flag` at fit time~~ — done 2026-07-05 (`qa-fixes`): derived from fit
+  diagnostics via `validate.diagnostics_indicate_weak_identification` (ESS below 4× gate floor, rhat
+  above half-margin band, divergences, non-finite). Published artifacts fit before the wiring still
+  carry `false` unconditionally.
 - A 7th+ BSL `SemanticTable` for estimated outputs IF they become BSL-queryable — note the `bsl` dep
   group pins `sqlglot < 28`, mutually exclusive with the SQLMesh env (conditional per the checklist).
 - Rollback path: the legacy deterministic sources are untouched, so rollback is "stop reading the

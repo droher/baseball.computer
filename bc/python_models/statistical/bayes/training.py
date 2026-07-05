@@ -98,6 +98,9 @@ from python_models.statistical.schemas import (
     BayesPriorConfig,
     BayesSamplerConfig,
 )
+from python_models.statistical.validate import (
+    diagnostics_indicate_weak_identification,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -2055,11 +2058,12 @@ def _evaluate_pitch_summary_held_out(
     full_prob = np.asarray(posterior["cell_class_prob"].values, dtype=np.float64).mean(
         axis=(0, 1)
     )
-    result_lo = np.asarray(posterior["result_logodds"].values, dtype=np.float64).mean(
-        axis=(0, 1)
+    result_lo_draws = np.asarray(posterior["result_logodds"].values, dtype=np.float64)
+    ref_draws = np.zeros(result_lo_draws.shape[:-1] + (1,))
+    base_prob_draws = softmax(
+        np.concatenate([ref_draws, result_lo_draws], axis=-1), axis=-1
     )
-    ref = np.zeros((result_lo.shape[0], 1))
-    base_prob = softmax(np.concatenate([ref, result_lo], axis=1), axis=1)
+    base_prob = base_prob_draws.mean(axis=(0, 1))
 
     counts = held.counts.astype(np.float64)
     cell_n = counts.sum(axis=1)
@@ -3019,6 +3023,12 @@ def run_bayes_model(
             else None
         ),
         propensity_active=propensity_active,
+        weak_identification_flag=diagnostics_indicate_weak_identification(
+            rhat_max=diagnostics_summary.rhat_max,
+            ess_bulk_min=diagnostics_summary.ess_bulk_min,
+            divergences=diagnostics_summary.divergences,
+            is_smoke=smoke,
+        ),
     )
 
     manifest = ArtifactManifest(

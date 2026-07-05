@@ -843,14 +843,18 @@ def _run_publish_pretrain(args: argparse.Namespace) -> int:
     from python_models.statistical.schemas import PublishedPointer
 
     artifact_id = str(args.artifact_id)
-    found: Path | None = None
-    for candidate in DEEP_ROOT.rglob(f"{artifact_id}/manifest.json"):
-        found = candidate
-        break
-    if found is None:
+    matches = list(DEEP_ROOT.rglob(f"{artifact_id}/manifest.json"))
+    if not matches:
         raise FileNotFoundError(
             f"no manifest.json for pretrain artifact_id={artifact_id!r} under {DEEP_ROOT}"
         )
+    if len(matches) > 1:
+        models = sorted({p.parent.parent.name for p in matches})
+        raise ValueError(
+            f"pretrain artifact_id={artifact_id!r} is ambiguous under {DEEP_ROOT} "
+            f"(matches under models {models}); artifact ids must be unique per model"
+        )
+    found = matches[0]
     manifest = read_manifest(found)
     if manifest.kind != "pretrain":
         raise ValueError(

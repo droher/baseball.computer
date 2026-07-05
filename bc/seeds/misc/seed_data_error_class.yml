@@ -1,0 +1,25 @@
+version: 2
+seeds:
+  - name: seed_data_error_class
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: data_error_class
+        description: Canonical data-error-class token emitted by source_data_error_risk_ledger and consumed by every event observation ledger.
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: description
+        description: Human-readable description of the risk class.
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: severity_rank
+        description: Severity ordering for collapsing multiple risk rows onto one grain. Lower rank is more severe; the lowest rank wins.
+        data_type: utinyint
+        constraints:
+          - type: not_null
+      - name: notes
+        description: Additional clarifying notes.
+        data_type: varchar

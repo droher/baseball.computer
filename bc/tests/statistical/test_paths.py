@@ -50,7 +50,9 @@ def test_resolve_db_path_honors_env(tmp_path: Path) -> None:
 
 
 def test_resolve_published_roots_defaults_to_global() -> None:
-    with _temporary_env({config.ENV_PUBLISHED_ROOT: None}):
+    with _temporary_env(
+        {config.ENV_PUBLISHED_ROOT: None, config.ENV_GLOBAL_PUBLISHED_ROOT: None}
+    ):
         branch, global_ = config.resolve_published_roots()
     assert branch == config.GLOBAL_PUBLISHED_ROOT
     assert global_ == config.GLOBAL_PUBLISHED_ROOT
@@ -58,7 +60,21 @@ def test_resolve_published_roots_defaults_to_global() -> None:
 
 def test_resolve_published_roots_branch_override(tmp_path: Path) -> None:
     branch_root = tmp_path / "published-branch"
-    with _temporary_env({config.ENV_PUBLISHED_ROOT: str(branch_root)}):
+    with _temporary_env(
+        {
+            config.ENV_PUBLISHED_ROOT: str(branch_root),
+            config.ENV_GLOBAL_PUBLISHED_ROOT: None,
+        }
+    ):
         branch, global_ = config.resolve_published_roots()
     assert branch == branch_root
     assert global_ == config.GLOBAL_PUBLISHED_ROOT
+
+
+def test_resolve_global_published_root_honors_env(tmp_path: Path) -> None:
+    target = tmp_path / "global-elsewhere"
+    with _temporary_env({config.ENV_GLOBAL_PUBLISHED_ROOT: str(target)}):
+        resolved = config.resolve_global_published_root()
+        _, global_ = config.resolve_published_roots()
+    assert resolved == target
+    assert global_ == target

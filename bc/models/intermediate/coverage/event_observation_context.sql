@@ -1,7 +1,7 @@
 MODEL (
   name main_models.event_observation_context,
   kind FULL,
-  description 'Shared modeling-dataset feeder. Wide event-grain (one row per event_key) table denormalizing covariates so every model_input_* dataset INNER JOINs this rather than re-deriving the same joins. source_type/source_family/target_population_status pull from source_acquisition_ledger filtered to dimension=event, team_id IS NULL. park_episode_status is NULL in v1 pending park-renovation enrichment of entity_link_reliability. scorer/inputter/translator come direct from stg_games. affiliated_team rolls game_scorekeeping up to one row per game_id via MAX(game_share), then projects scorer_more_common_team_id. score_margin is event_states_full.batting_team_margin_start. leverage_index is win_leverage_index from leverage_index (joined on win_expectancy_start_key). hit_or_out is BOOLEAN: TRUE = batted-ball hit, FALSE = batted-ball out, NULL = non-batted-ball (walk/HBP/K/no-PA). Derived from event_offense_stats (baserunner=Batter): balls_batted=1 AND hits=1 -> TRUE; balls_batted=1 AND hits=0 -> FALSE; else NULL. personnel_confidence rolls personnel_state_reliability per event_key: low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 collapses to high/medium because the v1 upstream emits only direct + inferred. context_confidence rolls game_context_observation_ledger per game_id across its 23 atomic dimensions: low if any observed_status=missing; medium if any IN (derived, unknown_code); else high. exposure_status is game_exposure_ledger.completion_status joined on (game_id, batting_team_id).',
+  description 'Shared modeling-dataset feeder. Wide event-grain (one row per event_key) table denormalizing covariates so every model_input_* dataset INNER JOINs this rather than re-deriving the same joins. source_type/source_family/target_population_status pull from source_acquisition_ledger filtered to dimension=event, team_id IS NULL. park_episode_status is NULL in v1 pending park-renovation enrichment of entity_link_reliability. scorer/inputter/translator come direct from stg_games. affiliated_team rolls game_scorekeeping up to one row per game_id via MAX(game_share), then projects scorer_more_common_team_id. score_margin is event_states_full.batting_team_margin_start. leverage_index is win_leverage_index from leverage_index (joined on win_expectancy_start_key). hit_or_out is BOOLEAN: TRUE = batted-ball hit, FALSE = batted-ball out, NULL = non-batted-ball (walk/HBP/K/no-PA). Derived from event_offense_stats (baserunner=Batter): balls_batted=1 AND hits=1 -> TRUE; balls_batted=1 AND hits=0 -> FALSE; else NULL. personnel_confidence rolls personnel_state_reliability per event_key: low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 collapses to high/medium because the v1 upstream emits only direct + inferred. context_confidence rolls game_context_observation_ledger per game_id across its 23 atomic dimensions: low if any observed_status=missing; medium if any observed_status=unknown_code; else high (all dimensions observed/derived/not_applicable). Deterministic derived statuses (bio-derived hands, rule_era flags) are high-confidence and do not demote the rollup. exposure_status is game_exposure_ledger.completion_status joined on (game_id, batting_team_id).',
   grain (event_key),
   columns (
     event_key UINTEGER,
@@ -69,7 +69,7 @@ MODEL (
     batting_team_id = 'Batting team for the event (event_states_full.batting_team_id).',
     fielding_team_id = 'Fielding team for the event (event_states_full.fielding_team_id).',
     personnel_confidence = 'Rollup of personnel_state_reliability per event_key. low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 reachable: high (full direct coverage) or medium (any missing slot).',
-    context_confidence = 'Rollup of game_context_observation_ledger per game_id across 23 atomic context dimensions. low if any observed_status=missing; medium if any IN (derived, unknown_code); else high.',
+    context_confidence = 'Rollup of game_context_observation_ledger per game_id across 23 atomic context dimensions. low if any observed_status=missing; medium if any observed_status=unknown_code; else high (all observed/derived/not_applicable). Deterministic derived statuses stay high-confidence.',
     exposure_status = 'game_exposure_ledger.completion_status joined on (game_id, batting_team_id). complete, walk_off, shortened, suspended, forfeit, unknown.',
     result_family = 'Coarse PA result family. hit / out_in_play / strikeout / walk / hbp / sacrifice / reached_on_error / fielders_choice / interference. NULL for no-play and baserunning-only events.',
     alignment_regime = 'Categorical season-era fallback for the shift-propensity model. pre_shift_era <=2009, shift_growth_era 2010-2014, full_shift_era 2015-2022, post_restriction >=2023.',
@@ -150,7 +150,7 @@ sko AS (
         game_id,
         scorer_more_common_team_id AS affiliated_team
     FROM main_models.game_scorekeeping
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY game_id ORDER BY game_share DESC) = 1
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY game_id ORDER BY game_share DESC, cleaned_scorer) = 1
 ),
 
 lev AS (
@@ -186,7 +186,7 @@ gco AS (
         game_id,
         CASE
             WHEN BOOL_OR(observed_status = 'missing') THEN 'low'
-            WHEN BOOL_OR(observed_status IN ('derived', 'unknown_code')) THEN 'medium'
+            WHEN BOOL_OR(observed_status = 'unknown_code') THEN 'medium'
             ELSE 'high'
         END AS context_confidence
     FROM main_models.game_context_observation_ledger

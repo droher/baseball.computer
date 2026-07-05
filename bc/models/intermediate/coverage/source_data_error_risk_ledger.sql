@@ -1,6 +1,7 @@
 MODEL (
   name main_models.source_data_error_risk_ledger,
   kind FULL,
+  stamp '1',
   description 'Per (source_table, game, team, player, field, issue_source) ledger of known data-error risk on source rows. Confirmed arithmetic violations (box_score_data_issues), audit-exempt artifacts (team_game_data_issues), box-vs-event contradictions (box_event_fielding_discrepancies), suspected source/parser issues for missing box rows (unknown_play_no_box), and suspected assists-miscoded-as-putouts scorer/parser pattern (assists_as_putouts_finder). Sibling to source_acquisition_ledger: that ledger says whether a source exists, this one says whether — when it exists — it is trustworthy. Every downstream Phase 1 event-observation ledger joins to both ledgers to compute model_input_eligible. data_error_key is a stable MD5 hex digest over the natural-key columns and is the unique grain. Composite field_name labels (fielding_putouts, fielding_putouts_assists, fielding_putouts_assists_errors) are emitted alongside per-credit-dimension rows (putout_credit, assist_credit, error_credit) so consumers that join on composite labels (official_aggregate_availability) and consumers that join on credit-dimension literals (event_observation_credit) both light up.',
   grain (data_error_key),
   columns (
@@ -34,7 +35,12 @@ MODEL (
     accepted_values(column := training_action, is_in := ('allow', 'downweight', 'exclude', 'constraint_only', 'diagnostic_only')),
     bounded_range(column := training_weight, min_v := 0.0, max_v := 1.0),
     confirmed_issue_not_allowed(),
-    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id)
+    relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
+    relationships(
+      column := data_error_class,
+      to_model := main_seeds.seed_data_error_class,
+      to_column := data_error_class
+    )
   )
 );
 

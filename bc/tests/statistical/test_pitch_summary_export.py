@@ -185,3 +185,73 @@ def test_held_out_eval_empty_returns_zero_cells() -> None:
     )
     metrics = _evaluate_pitch_summary_held_out(empty, _idata())
     assert metrics == {"n_cells": 0}
+
+
+def _jensen_gap_idata() -> az.InferenceData:
+    rng = np.random.default_rng(3)
+    prob = rng.dirichlet(np.ones(N_CLASS), size=(N_CHAIN, N_DRAW, N_CELL))
+    n_result = len(RESULT_FAMILY_LABELS)
+    result_lo = np.empty((N_CHAIN, N_DRAW, n_result, N_CLASS - 1))
+    half = N_DRAW // 2
+    result_lo[:, :half, :, :] = 6.0
+    result_lo[:, half:, :, :] = -6.0
+    posterior = {
+        "cell_class_prob": prob,
+        "beta0": rng.normal(size=(N_CHAIN, N_DRAW, N_CLASS - 1)),
+        "result_logodds": result_lo,
+    }
+    class_labels, _balls, _strikes = _class_axes()
+    coords = {
+        "cell": list(CELL_LABELS),
+        "class": list(class_labels),
+        "class_nonref": list(class_labels[1:]),
+        "result_family": list(RESULT_FAMILY_LABELS),
+    }
+    dims = {
+        "cell_class_prob": ["cell", "class"],
+        "beta0": ["class_nonref"],
+        "result_logodds": ["result_family", "class_nonref"],
+    }
+    return az.from_dict(posterior=posterior, coords=coords, dims=dims)
+
+
+def test_held_out_baseline_is_mean_of_softmax_not_softmax_of_mean() -> None:
+    from scipy.special import softmax
+
+    inputs = _inputs()
+    idata = _jensen_gap_idata()
+    result_lo_draws = np.asarray(
+        idata.posterior["result_logodds"].values, dtype=np.float64
+    )
+
+    ref_draws = np.zeros(result_lo_draws.shape[:-1] + (1,))
+    mean_of_softmax = softmax(
+        np.concatenate([ref_draws, result_lo_draws], axis=-1), axis=-1
+    ).mean(axis=(0, 1))
+
+    logodds_mean = result_lo_draws.mean(axis=(0, 1))
+    softmax_of_mean = softmax(
+        np.concatenate([np.zeros((logodds_mean.shape[0], 1)), logodds_mean], axis=1),
+        axis=1,
+    )
+    assert not np.allclose(mean_of_softmax, softmax_of_mean, atol=1e-3)
+
+    counts = inputs.held_out.counts.astype(np.float64)
+    total = float(counts.sum())
+    eps = 1e-12
+
+    def _baseline_loglik(base_prob: np.ndarray) -> float:
+        base = base_prob[inputs.held_out.cell_result_idx]
+        return float(np.sum(counts * np.log(base + eps))) / total
+
+    loglik_mean_of_softmax = _baseline_loglik(mean_of_softmax)
+    loglik_softmax_of_mean = _baseline_loglik(softmax_of_mean)
+    assert not np.isclose(loglik_mean_of_softmax, loglik_softmax_of_mean, atol=1e-6)
+
+    metrics = _evaluate_pitch_summary_held_out(inputs, idata)
+    assert np.isclose(
+        metrics["loglik_per_event_baseline"], loglik_mean_of_softmax, atol=1e-9
+    )
+    assert not np.isclose(
+        metrics["loglik_per_event_baseline"], loglik_softmax_of_mean, atol=1e-6
+    )

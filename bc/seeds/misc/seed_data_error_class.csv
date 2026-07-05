@@ -1,0 +1,6 @@
+data_error_class,description,severity_rank,notes
+confirmed_issue,Arithmetically confirmed violation in the source (e.g. hits greater than at-bats).,1,Never eligible for training_action allow.
+contradiction,Two evidence sources disagree (e.g. box vs event fielding totals).,2,Both sides present; neither is trusted outright.
+suspected_source_issue,Pattern consistent with a source recording error (e.g. assists miscoded as putouts).,3,Heuristic detection; source suspected.
+suspected_parser_issue,Pattern consistent with a parser artifact rather than the source itself.,4,Heuristic detection; parser suspected.
+audit_exception,Known audit-exempt artifact carried as constraint-only context.,5,Least severe; informational.

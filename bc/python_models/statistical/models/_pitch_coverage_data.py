@@ -41,6 +41,8 @@ HOLDOUT_FOLD_ID: int = 0
 
 UNKNOWN_LEVEL: str = "__unknown__"
 
+UNSEEN_LEVEL_CODE: int = -1
+
 DIMENSION: str = "has_count"
 
 CONTEXT_FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
@@ -297,13 +299,17 @@ def build_pitch_coverage_scoring_frame(
     event_keys = (
         frame.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
     )
-    cell_idx = _index_for(frame.get_column("season_league").to_list(), cell_vocab, -1)
-    scorer_idx = _index_for(frame.get_column("scorer").to_list(), scorer_vocab, -1)
+    cell_idx = _index_for(
+        frame.get_column("season_league").to_list(), cell_vocab, UNSEEN_LEVEL_CODE
+    )
+    scorer_idx = _index_for(
+        frame.get_column("scorer").to_list(), scorer_vocab, UNSEEN_LEVEL_CODE
+    )
     fixed_effect_codes = {
         column: _index_for(
             frame.get_column(column).to_list(),
             {lvl: i for i, lvl in enumerate(design.levels)},
-            -1,
+            UNSEEN_LEVEL_CODE,
         )
         for column, design in inputs.fixed_effects.items()
     }
@@ -336,10 +342,16 @@ def _build_held_out(
             fixed_effect_codes={c: empty for c in CONTEXT_FIXED_EFFECT_COLUMNS},
         )
     y = held.get_column("y").to_numpy().astype(np.int64)
-    cell_idx = _index_for(held.get_column("season_league").to_list(), cell_vocab, -1)
-    scorer_idx = _index_for(held.get_column("scorer").to_list(), scorer_vocab, -1)
+    cell_idx = _index_for(
+        held.get_column("season_league").to_list(), cell_vocab, UNSEEN_LEVEL_CODE
+    )
+    scorer_idx = _index_for(
+        held.get_column("scorer").to_list(), scorer_vocab, UNSEEN_LEVEL_CODE
+    )
     fixed_effect_codes = {
-        column: _index_for(held.get_column(column).to_list(), fe_vocabs[column], 0)
+        column: _index_for(
+            held.get_column(column).to_list(), fe_vocabs[column], UNSEEN_LEVEL_CODE
+        )
         for column in CONTEXT_FIXED_EFFECT_COLUMNS
     }
     return PitchCoverageHeldOutSet(

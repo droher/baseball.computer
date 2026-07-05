@@ -304,7 +304,13 @@ def _multiclass_macro_auc(
                     labels=clf.classes_,
                 )
             )
-    except ValueError:
+    except ValueError as exc:
+        _log.debug(
+            "roc_auc_score failed on %d classes (%d rows); propagating NaN: %s",
+            int(keep_classes.size),
+            int(y_f.size),
+            exc,
+        )
         auc = float("nan")
     return auc, int(keep_classes.size)
 
@@ -374,5 +380,14 @@ def confound_probe(
                 n_entities=int(mask.sum()),
                 n_classes=n_classes,
             )
+        )
+    nan_confounds = [r.confound for r in results if np.isnan(r.macro_auc)]
+    if nan_confounds:
+        _log.warning(
+            "confound_probe: %d/%d confounds returned NaN macro_auc (AUC "
+            "uncomputable): %s",
+            len(nan_confounds),
+            len(results),
+            nan_confounds,
         )
     return tuple(results)

@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+
 from python_models.statistical import config as cfg
 from python_models.statistical.manifests import (
     find_published_manifest,
+    find_published_pretrain,
     new_artifact_id,
     new_run_id,
     package_versions,
@@ -94,7 +96,9 @@ def test_published_pointer_round_trip(tmp_path: Path) -> None:
     assert loaded.artifact_id == pointer.artifact_id
 
 
-def test_find_published_manifest_branch_overrides_global(tmp_path: Path) -> None:
+def test_find_published_manifest_branch_overrides_global(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     branch_root = tmp_path / "branch"
     global_root = tmp_path / "global"
     branch_root.mkdir()
@@ -102,57 +106,53 @@ def test_find_published_manifest_branch_overrides_global(tmp_path: Path) -> None
     (branch_root / "fielding_credit.json").write_text("{}", encoding="utf-8")
     (global_root / "fielding_credit.json").write_text("{}", encoding="utf-8")
 
-    previous_branch = os.environ.get(cfg.ENV_PUBLISHED_ROOT)
-    previous_global = cfg.GLOBAL_PUBLISHED_ROOT
-    os.environ[cfg.ENV_PUBLISHED_ROOT] = str(branch_root)
-    cfg.GLOBAL_PUBLISHED_ROOT = global_root  # type: ignore[misc]
-    try:
-        path = find_published_manifest("fielding_credit")
-    finally:
-        cfg.GLOBAL_PUBLISHED_ROOT = previous_global  # type: ignore[misc]
-        if previous_branch is None:
-            _ = os.environ.pop(cfg.ENV_PUBLISHED_ROOT, None)
-        else:
-            os.environ[cfg.ENV_PUBLISHED_ROOT] = previous_branch
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(branch_root))
+    monkeypatch.setenv(cfg.ENV_GLOBAL_PUBLISHED_ROOT, str(global_root))
+    path = find_published_manifest("fielding_credit")
     assert path == branch_root / "fielding_credit.json"
 
 
-def test_find_published_manifest_falls_back_to_global(tmp_path: Path) -> None:
+def test_find_published_manifest_falls_back_to_global(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     branch_root = tmp_path / "branch"
     global_root = tmp_path / "global"
     branch_root.mkdir()
     global_root.mkdir()
     (global_root / "fielding_credit.json").write_text("{}", encoding="utf-8")
 
-    previous_branch = os.environ.get(cfg.ENV_PUBLISHED_ROOT)
-    previous_global = cfg.GLOBAL_PUBLISHED_ROOT
-    os.environ[cfg.ENV_PUBLISHED_ROOT] = str(branch_root)
-    cfg.GLOBAL_PUBLISHED_ROOT = global_root  # type: ignore[misc]
-    try:
-        path = find_published_manifest("fielding_credit")
-    finally:
-        cfg.GLOBAL_PUBLISHED_ROOT = previous_global  # type: ignore[misc]
-        if previous_branch is None:
-            _ = os.environ.pop(cfg.ENV_PUBLISHED_ROOT, None)
-        else:
-            os.environ[cfg.ENV_PUBLISHED_ROOT] = previous_branch
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(branch_root))
+    monkeypatch.setenv(cfg.ENV_GLOBAL_PUBLISHED_ROOT, str(global_root))
+    path = find_published_manifest("fielding_credit")
     assert path == global_root / "fielding_credit.json"
 
 
-def test_find_published_manifest_missing_returns_none(tmp_path: Path) -> None:
-    previous_branch = os.environ.get(cfg.ENV_PUBLISHED_ROOT)
-    previous_global = cfg.GLOBAL_PUBLISHED_ROOT
-    os.environ[cfg.ENV_PUBLISHED_ROOT] = str(tmp_path / "branch")
-    cfg.GLOBAL_PUBLISHED_ROOT = tmp_path / "global"  # type: ignore[misc]
-    try:
-        path = find_published_manifest("never_published_model")
-    finally:
-        cfg.GLOBAL_PUBLISHED_ROOT = previous_global  # type: ignore[misc]
-        if previous_branch is None:
-            _ = os.environ.pop(cfg.ENV_PUBLISHED_ROOT, None)
-        else:
-            os.environ[cfg.ENV_PUBLISHED_ROOT] = previous_branch
+def test_find_published_manifest_missing_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(tmp_path / "branch"))
+    monkeypatch.setenv(cfg.ENV_GLOBAL_PUBLISHED_ROOT, str(tmp_path / "global"))
+    path = find_published_manifest("never_published_model")
     assert path is None
+
+
+def test_global_published_root_override_is_hermetic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    branch_root = tmp_path / "branch"
+    global_root = tmp_path / "global"
+    branch_root.mkdir()
+    global_root.mkdir()
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(branch_root))
+    monkeypatch.setenv(cfg.ENV_GLOBAL_PUBLISHED_ROOT, str(global_root))
+
+    assert find_published_manifest("only_global_model") is None
+    assert find_published_pretrain("only_global_model") is None
+
+    (global_root / "only_global_model.json").write_text("{}", encoding="utf-8")
+    assert find_published_manifest("only_global_model") == (
+        global_root / "only_global_model.json"
+    )
 
 
 def test_package_versions_subset_includes_pydantic() -> None:

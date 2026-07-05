@@ -4,7 +4,7 @@ title: Estimated Models — Reference
 type: architecture
 status: active
 audience: humans-and-agents
-last-verified: 2026-06-27
+last-verified: 2026-07-05
 ---
 
 # Estimated Models — Reference
@@ -26,7 +26,7 @@ Two shapes:
 
 | Shape | Grain | Payload | Tables |
 | --- | --- | --- | --- |
-| **Event-level imputation** | `event_key` + a sub-key | a posterior-mean probability or share (`*_share` / `p_observed_mean`) | observation propensities, fielding credit, ball handler, geometry, advancement |
+| **Event-level imputation** | `event_key` + a sub-key | a posterior-mean probability or share (`*_share` / `p_observed_mean`) | observation propensities, pitch-count coverage, fielding credit, ball handler, geometry, advancement |
 | **Aggregate summary** | a `(season, league, …)` cell | a posterior mean + sd + 94% HDI | run expectancy, state transition, park factor, pitch summary, assist count, linear weights |
 
 Event-level tables ship the posterior **mean only**. The per-event posterior tensor is too large to persist (geometry alone is 253M rows). Aggregate tables ship mean, sd, and HDI bounds, because uncertainty is the point of a season-league cell.
@@ -42,7 +42,7 @@ Every table carries the same eight provenance columns:
 | `method` | `hierarchical_logistic` (Bernoulli), `hierarchical_bayes_softmax` (multinomial shares), or `hierarchical_bayes_nb` (count/distribution summaries) |
 | `observed_status` | constant `estimated`, the namespace marker |
 | `confidence_status` | the fit's validation status |
-| `weak_identification_flag` | set when the cell sits in a weakly-identified slice (sparse era / scorer / park) |
+| `weak_identification_flag` | `True` when a convergent fit is nonetheless weakly identified (low group-level ESS, high r-hat, any divergences, or non-finite diagnostics); see [weak identification](#weak-identification-the-flag-just-went-live). Every row published so far predates the wiring and carries `False`. |
 
 `event_key` joins to `main_models.event_states_full` for season, league, game, batter, and base-out context.
 
@@ -130,6 +130,7 @@ LIMIT 5;
 | 282541797 | LineDrive | 0.427 |
 | 282541801 | Fly | 0.386 |
 | 282541803 | GroundBall | 0.467 |
+| 282541804 | GroundBall | 0.328 |
 | 282541805 | LineDrive | 0.351 |
 
 Take the full distribution, not the argmax, when you need calibrated probabilities. The top class often sits below 0.5.
@@ -200,6 +201,14 @@ ORDER BY expected_share DESC;
 
 **Status.** The `@model` and grain `(event_key, baserunner, advancement_class)` exist, but **the table is empty**. No advancement Bayes pointer is published, so it materializes a typed zero-row frame. The upstream `model_input_advancement` dataset and the multinomial builder are wired; the fit is the remaining step.
 
+### `pitch_count_coverage` (Model J, coverage arm): deferred
+
+**Estimand.** P(a plate appearance's final ball-strike count was actually observed and recorded). The same missingness-propensity question `scorer_observation_propensities` answers for batted-ball dimensions, asked instead of the population `pitch_summary_distribution` draws its final-count classes from. A single dimension, `dimension = 'has_count'`.
+
+**Table.** Grain `(event_key, dimension)`, the same shape as `scorer_observation_propensities`. Payload `p_observed_mean ∈ (0,1)`.
+
+**Status.** The `pitch_count_observedness` Bayes target is registered end to end — event-grain Bernoulli builder (`alpha` + a `season|league` cell + a `scorer` random effect + sum-to-zero context fixed effects, structurally the observation-propensity arm reused against the pitch-count population), an `event_propensity.parquet` export, a dataset-scoped propensity aggregator, and this `@model` — and it clears its smoke gate (held-out ROC-AUC 0.995). **No full-scale fit has published.** `aggregate_pitch_coverage_frames` finds no published artifact pointer for `pitch_count_observedness`, so the table materializes its typed zero-row frame — the same deferred-publication mechanism `imputed_advancement_probabilities` uses above. This is a bug-free empty table, not a data-blocked one: the remaining step is running and publishing the full-scale fit.
+
 ---
 
 ## Aggregate posterior summaries
@@ -234,7 +243,7 @@ ORDER BY re_value_mean DESC LIMIT 4;
 | 0_7 | 7 (loaded) | 0 | 2.202 |
 | 0_6 | 6 (2B+3B) | 0 | 1.980 |
 | 0_5 | 5 (1B+3B) | 0 | 1.672 |
-| 0_3 | 3 (1B+2B) | 0 | 1.390 |
+| 1_7 | 7 (loaded) | 1 | 1.554 |
 
 Bases loaded, nobody out: 2.20 expected runs, matching standard run-expectancy tables.
 
@@ -285,11 +294,14 @@ Every reachable end has outs ∈ {0, 1}: no 2-out end appears from a 0-out start
 ```
 team_runs_g ~ NB( λ_g, φ )
 log λ_g = log(PA_g) + α_{season,league} + offense[team,season] + pitching[opp,season] + θ_park[park,season,league] + h·is_home
-θ_park centered to sum to zero within each (season, league)
+θ_raw[park,league]:  AR(1) over the season steps of that park-league chain
+    θ_raw_1 ~ Normal(0, σ_init)
+    θ_raw_t = ρ · θ_raw_{t-1} + ε_t,   ε_t ~ Normal(0, σ_innov),   ρ ~ Beta(2,1)
+θ_park = center-within-group( θ_raw, group = (season, league) )
 park_factor_mean = exp(θ_park)
 ```
 
-Centering θ within the season-league group rather than globally stops era-level scoring from leaking into the park effect.
+The raw per-cell effect follows an AR(1) persistence prior across consecutive seasons within a `(park, league)` chain before centering, so a park's factor is pulled toward its own recent history rather than fit independently cell by cell; `BC_PARK_FACTOR_DISABLE_AR1` swaps it for an independent `z · σ_park` raw effect when needed. Centering θ within the season-league group rather than globally stops era-level scoring from leaking into the park effect.
 
 **Example: most hitter-friendly park-seasons.**
 
@@ -420,13 +432,25 @@ Standard linear weights (home run ~1.4 runs, walk ~0.3), now with an HDI per val
 | Risk | Impact | Status |
 | --- | --- | --- |
 | MNAR: shares assume missing-at-random | med | Imputation shares ship under the MAR (`gamma_propensity_zero`) flavor; the per-class selection-offset mechanism and sensitivity ribbon quantify the MNAR band but are not baked into the published shares. |
-| Weak identification in sparse slices | med | `weak_identification_flag` marks rows from sparse era/scorer/park cells; treat flagged rows as low-confidence. |
+| Weak identification in sparse slices | med | `weak_identification_flag` is now set from fit diagnostics at publish time (see below); every artifact published to date predates the wiring and carries `False` regardless of the fit's actual identification strength. |
 | Advancement empty | low | `imputed_advancement_probabilities` ships zero rows until Model H fits. |
+| Pitch-count coverage empty | low | `pitch_count_coverage` ships zero rows until the smoke-verified `pitch_count_observedness` target gets a full-scale fit published. |
 | Full rebuild OOM | low | A from-scratch `rebuild-prod` runs out of memory on `model_input_fielding_credit`'s audit at 14 threads. See `notes/followups.md`. |
 
 ### MNAR: the shares are MAR, not MNAR-corrected
 
 The event-level imputation shares are fit on observed-only data under a missing-at-random assumption. The masked backtest showed the naive learned-propensity correction learns the survivor tilt and extrapolates it wrong-signed, so it is not published. The correct correction is a fixed per-class selection-offset applied at scoring time; `python_models/statistical/sensitivity.py` produces a per-class sensitivity ribbon that bounds how far a class share could move under plausible MNAR. Treat the published share as the MAR point and the ribbon as the uncertainty around the missingness mechanism.
+
+### Weak identification: the flag just went live
+
+`weak_identification_flag` is populated at fit time from the run's own convergence diagnostics, via `weak_identification_thresholds()` / `diagnostics_indicate_weak_identification()` in `python_models/statistical/validate.py`. A fit that clears the convergence gate is nonetheless marked weakly identified (`True`) when any of:
+
+- the minimum group-level bulk ESS across the fit's random effects falls below 4× the convergence gate's ESS floor (400 for a default fit, 12 for a smoke fit)
+- r-hat exceeds a comfort band set at half the convergence gate's margin above 1.0 (1.025 for a default fit, 1.25 for a smoke fit)
+- the fit recorded any divergences
+- any diagnostic is non-finite (fail-safe: treat "can't tell" as weak)
+
+The wiring is new. Every artifact published before it — which is every row currently sitting in the twelve estimated tables — predates the check and carries `weak_identification_flag = False` unconditionally, independent of how weakly identified that fit actually was. The flag becomes a meaningful signal starting with the next round of fits; until then, read `False` on an existing row as "not yet evaluated," not as "confirmed well-identified."
 
 ## Glossary
 

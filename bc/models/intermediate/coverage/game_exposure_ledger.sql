@@ -81,12 +81,12 @@ team_game AS (
             WHEN g.forfeit_flag THEN 'forfeit'
             WHEN g.suspension_flag THEN 'suspended'
             WHEN g.is_shortened_game THEN 'shortened'
-            WHEN g.duration_outs IS NULL THEN 'complete'
             WHEN g.winning_side = 'Home' AND g.is_extra_inning_game THEN 'walk_off'
             WHEN g.winning_side = 'Home'
                 AND g.is_nine_inning_game
                 AND a.outs_recorded IN (25, 26)
                 THEN 'walk_off'
+            WHEN g.duration_outs IS NULL THEN 'complete'
             ELSE 'complete'
         END AS completion_status
     FROM games_in_scope AS g

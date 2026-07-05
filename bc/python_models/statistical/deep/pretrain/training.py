@@ -179,6 +179,13 @@ def _load_offset_artifact(
             f"offset artifact manifest not found for id={offset_artifact_id!r} "
             f"under {artifact_root}"
         )
+    if len(matches) > 1:
+        models = sorted({p.parent.parent.name for p in matches})
+        raise ValueError(
+            f"offset artifact id={offset_artifact_id!r} is ambiguous under "
+            f"{artifact_root} (matches under models {models}); artifact ids must be "
+            f"unique per model"
+        )
     artifact_dir = matches[0].parent
     manifest_payload = json.loads(matches[0].read_text(encoding="utf-8"))
     metadata = manifest_payload.get("metadata", {})

@@ -65,6 +65,7 @@ box_agg AS (
     INNER JOIN games AS g USING (game_id)
     WHERE b.fielder_id IS NOT NULL
         AND b.fielding_position IS NOT NULL
+        AND b.side IS NOT NULL
     GROUP BY 1, 2, 3, 4
 ),
 

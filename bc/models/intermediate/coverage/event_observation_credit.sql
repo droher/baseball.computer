@@ -1,7 +1,7 @@
 MODEL (
   name main_models.event_observation_credit,
   kind FULL,
-  description 'Per (event_key, dimension) observation ledger for fielding-credit covariates. Driven by main_models.event_states_full (every event in 1910-2025). Atomic dimensions: putout_credit, assist_credit, error_credit, double_play_credit, triple_play_credit, passed_ball_credit. Putout/assist/error rows aggregate main_models.calc_fielding_play_agg, splitting known (fielding_position != 0) from unknown (fielding_position = 0) credit-bearer rows; unknown_code fires when any unknown-fielder credit row is present for that dimension. double_play / triple_play join main_models.event_double_plays (event-grain); passed_ball aggregates main_models.stg_event_baserunners filtered to baserunning_play_type = PassedBall. source_acquisition_status joins source_acquisition_ledger on (game_id, fielding_team_id, dimension=box_fielding) — credit data are side-dependent and live in the box_fielding row. data_error_risk joins on (game_id, field_name=dimension) and matches the per-credit-dimension rows emitted by source_data_error_risk_ledger (putout_credit, assist_credit, error_credit) in addition to the composite labels.',
+  description 'Per (event_key, dimension) observation ledger for fielding-credit covariates. Driven by main_models.event_states_full (every event in 1910-2025). Atomic dimensions: putout_credit, assist_credit, error_credit, double_play_credit, triple_play_credit, passed_ball_credit. Putout/assist/error rows aggregate main_models.calc_fielding_play_agg, splitting known (fielding_position != 0) from unknown (fielding_position = 0) credit-bearer rows; unknown_code fires when any unknown-fielder credit row is present for that dimension. double_play / triple_play join main_models.event_double_plays (event-grain); passed_ball aggregates main_models.stg_event_baserunners filtered to baserunning_play_type = PassedBall. source_acquisition_status joins source_acquisition_ledger on (game_id, fielding_team_id, dimension=box_fielding) — credit data are side-dependent and live in the box_fielding row. data_error_risk joins on (game_id, fielding_team_id, field_name=dimension) with NULL team_id in the risk ledger fanning out to both teams, keeps the most severe data_error_class, and matches the per-credit-dimension rows emitted by source_data_error_risk_ledger (putout_credit, assist_credit, error_credit) in addition to the composite labels.',
   grain (event_key, dimension),
   columns (
     event_key UINTEGER,
@@ -22,7 +22,7 @@ MODEL (
     raw_value = 'Source value serialized as text. Credit dims: total credit count (known + unknown). DP/TP dims: boolean cast to text. passed_ball: boolean cast to text.',
     deduced_value = 'Always NULL in v1.',
     source_acquisition_status = 'source_acquisition_ledger.source_availability_status for (game_id, fielding_team_id, dimension=box_fielding).',
-    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. Matches per-credit-dimension rows emitted by the risk ledger (putout_credit/assist_credit/error_credit) — non-credit dimensions remain none in v1.',
+    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, fielding_team_id, field_name=dimension), with NULL team_id fanning out to both teams; COALESCE none. When several risk rows match, the most severe class per seed_data_error_class.severity_rank is kept (confirmed_issue > contradiction > suspected_source_issue > suspected_parser_issue > audit_exception). Matches per-credit-dimension rows emitted by the risk ledger (putout_credit/assist_credit/error_credit) — non-credit dimensions remain none in v1.',
     model_input_eligible = 'TRUE when seed_observed_status.is_training_eligible for the row''s observed_status AND source_acquisition_status != not_acquired.'
   ),
   audits (
@@ -84,13 +84,15 @@ acq_box_fielding AS (
     WHERE dimension = 'box_fielding'
 ),
 
-risk_per_game_field AS (
+risk_ranked AS (
     SELECT
-        game_id,
-        field_name,
-        MIN(data_error_class) AS data_error_class
-    FROM main_models.source_data_error_risk_ledger
-    GROUP BY game_id, field_name
+        r.game_id,
+        r.team_id,
+        r.field_name,
+        r.data_error_class,
+        s.severity_rank
+    FROM main_models.source_data_error_risk_ledger AS r
+    INNER JOIN main_seeds.seed_data_error_class AS s USING (data_error_class)
 ),
 
 events_with_aggs AS (
@@ -222,6 +224,32 @@ all_dims AS (
     UNION ALL BY NAME SELECT * FROM double_play_credit
     UNION ALL BY NAME SELECT * FROM triple_play_credit
     UNION ALL BY NAME SELECT * FROM passed_ball_credit
+),
+
+event_dims AS (
+    SELECT DISTINCT game_id, fielding_team_id, dimension
+    FROM all_dims
+),
+
+risk_per_team_field AS (
+    SELECT game_id, fielding_team_id, dimension, data_error_class
+    FROM (
+        SELECT
+            ed.game_id,
+            ed.fielding_team_id,
+            ed.dimension,
+            rr.data_error_class,
+            ROW_NUMBER() OVER (
+                PARTITION BY ed.game_id, ed.fielding_team_id, ed.dimension
+                ORDER BY rr.severity_rank, rr.data_error_class
+            ) AS severity_row
+        FROM event_dims AS ed
+        JOIN risk_ranked AS rr
+            ON rr.game_id = ed.game_id
+            AND rr.field_name = ed.dimension
+            AND (rr.team_id IS NULL OR rr.team_id = ed.fielding_team_id)
+    )
+    WHERE severity_row = 1
 )
 
 SELECT
@@ -241,4 +269,7 @@ FROM all_dims AS d
 LEFT JOIN main_seeds.seed_observed_status AS st ON st.observed_status = d.observed_status
 LEFT JOIN acq_box_fielding AS acq
     ON acq.game_id = d.game_id AND acq.team_id = d.fielding_team_id
-LEFT JOIN risk_per_game_field AS r ON r.game_id = d.game_id AND r.field_name = d.dimension
+LEFT JOIN risk_per_team_field AS r
+    ON r.game_id = d.game_id
+    AND r.fielding_team_id = d.fielding_team_id
+    AND r.dimension = d.dimension

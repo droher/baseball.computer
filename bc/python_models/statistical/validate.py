@@ -18,6 +18,7 @@ parquet — PR3 wires the real Geometry baseline.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -431,6 +432,37 @@ _BAYES_THRESHOLDS_DEFAULT: dict[str, float] = {
     "post_pred_bucket_dev_warn": 0.05,
 }
 
+_WEAK_IDENTIFICATION_ESS_BULK_MULTIPLIER: float = 4.0
+_WEAK_IDENTIFICATION_RHAT_MARGIN_FRACTION: float = 0.5
+
+
+def weak_identification_thresholds(is_smoke: bool = False) -> dict[str, float]:
+    convergence = _BAYES_THRESHOLDS_SMOKE if is_smoke else _BAYES_THRESHOLDS_DEFAULT
+    return {
+        "ess_bulk_min": (
+            convergence["ess_bulk_min"] * _WEAK_IDENTIFICATION_ESS_BULK_MULTIPLIER
+        ),
+        "rhat_max": 1.0
+        + (convergence["rhat_max"] - 1.0) * _WEAK_IDENTIFICATION_RHAT_MARGIN_FRACTION,
+    }
+
+
+def diagnostics_indicate_weak_identification(
+    *,
+    rhat_max: float,
+    ess_bulk_min: float,
+    divergences: int,
+    is_smoke: bool = False,
+) -> bool:
+    thresholds = weak_identification_thresholds(is_smoke)
+    if not math.isfinite(rhat_max) or not math.isfinite(ess_bulk_min):
+        return True
+    if divergences > 0:
+        return True
+    return (
+        ess_bulk_min < thresholds["ess_bulk_min"] or rhat_max > thresholds["rhat_max"]
+    )
+
 
 def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> ValidationReport:
     findings: list[ValidationFinding] = []
@@ -449,9 +481,33 @@ def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> Validatio
     import json as _json
     from typing import cast
 
-    payload: dict[str, object] = cast(
-        dict[str, object], _json.loads(diagnostics_path.read_text(encoding="utf-8"))
-    )
+    try:
+        loaded = _json.loads(diagnostics_path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="bayes_malformed_diagnostics",
+                message=(
+                    f"diagnostics.json at {diagnostics_path} is not valid JSON: {exc}"
+                ),
+            )
+        )
+        return _finalize(manifest, findings, metrics)
+    if not isinstance(loaded, dict):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="bayes_malformed_diagnostics",
+                message=(
+                    f"diagnostics.json at {diagnostics_path} is not a JSON object "
+                    f"(got {type(loaded).__name__}); cannot verify convergence"
+                ),
+            )
+        )
+        return _finalize(manifest, findings, metrics)
+
+    payload: dict[str, object] = cast(dict[str, object], loaded)
     is_smoke = bool(payload.get("is_smoke", False))
     thresholds = _BAYES_THRESHOLDS_SMOKE if is_smoke else _BAYES_THRESHOLDS_DEFAULT
     metrics["is_smoke"] = 1 if is_smoke else 0
@@ -483,12 +539,15 @@ def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> Validatio
     metrics["total_draws"] = total_draws
 
     rhat_threshold = thresholds["rhat_max"]
-    if not (rhat_max == rhat_max):  # NaN check
+    if not math.isfinite(rhat_max):
         findings.append(
             ValidationFinding(
-                severity="warn",
-                code="bayes_high_rhat",
-                message="rhat_max not available in diagnostics.json",
+                severity="block",
+                code="bayes_missing_rhat",
+                message=(
+                    "rhat_max missing or non-finite in diagnostics.json; "
+                    "cannot verify convergence"
+                ),
             )
         )
     elif rhat_max > rhat_threshold:
@@ -504,12 +563,15 @@ def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> Validatio
         )
 
     ess_threshold = thresholds["ess_bulk_min"]
-    if not (ess_bulk_min == ess_bulk_min):
+    if not math.isfinite(ess_bulk_min):
         findings.append(
             ValidationFinding(
-                severity="warn",
-                code="bayes_low_ess",
-                message="ess_bulk_min not available in diagnostics.json",
+                severity="block",
+                code="bayes_missing_ess",
+                message=(
+                    "ess_bulk_min missing or non-finite in diagnostics.json; "
+                    "cannot verify convergence"
+                ),
             )
         )
     elif ess_bulk_min < ess_threshold:

@@ -22,7 +22,7 @@ MODEL (
     raw_value = 'Source value serialized as text. count dims: stg_events.count_balls / count_strikes cast to VARCHAR. pitch_sequence: STRING_AGG of sequence_item ORDER BY sequence_id. pitch_results: same agg filtered by seed_pitch_types.is_pitch. strike_types: same agg filtered by seed_pitch_types.category = Strike. pitch_count_total: COUNT(*) of pitch_sequences rows.',
     deduced_value = 'Always NULL in v1 — no upstream deduction path.',
     source_acquisition_status = 'source_acquisition_ledger.source_availability_status; count dims use dimension=event, sequence dims use dimension=pitch_sequence (game-wide, team_id IS NULL).',
-    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. No-op in v1.',
+    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension), keeping the most severe class per seed_data_error_class.severity_rank; COALESCE none. No-op in v1.',
     model_input_eligible = 'TRUE when seed_observed_status.is_training_eligible for the row''s observed_status AND source_acquisition_status != not_acquired.'
   ),
   audits (
@@ -82,12 +82,20 @@ acq AS (
 ),
 
 risk_per_game_field AS (
-    SELECT
-        game_id,
-        field_name,
-        MIN(data_error_class) AS data_error_class
-    FROM main_models.source_data_error_risk_ledger
-    GROUP BY game_id, field_name
+    SELECT game_id, field_name, data_error_class
+    FROM (
+        SELECT
+            r.game_id,
+            r.field_name,
+            r.data_error_class,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.game_id, r.field_name
+                ORDER BY s.severity_rank, r.data_error_class
+            ) AS severity_row
+        FROM main_models.source_data_error_risk_ledger AS r
+        INNER JOIN main_seeds.seed_data_error_class AS s USING (data_error_class)
+    )
+    WHERE severity_row = 1
 ),
 
 count_balls_dim AS (

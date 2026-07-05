@@ -118,7 +118,7 @@ def main() -> None:
         else validate_df.sample(n=min(VAL_SUBSAMPLE, validate_df.height), seed=RNG_SEED)
     )
     log.info("subsamples: train=%d val=%d", train_sample.height, val_sample.height)
-    class_index = {l: i for i, l in enumerate(stats.class_labels)}
+    class_index = {label: i for i, label in enumerate(stats.class_labels)}
     log.info("class_labels=%s", stats.class_labels)
 
     log.info("fitting (epochs=%d batch=%d)", EPOCHS, BATCH)

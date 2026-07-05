@@ -84,3 +84,5 @@ extraPaths = ["bc"]
 
 [tool.ruff.lint.per-file-ignores]
 "bc/tests/statistical/**" = ["E402"]
+"scripts/permutation_importance_generic.py" = ["E402"]
+"scripts/permutation_importance_trajectory.py" = ["E402"]

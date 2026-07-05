@@ -22,7 +22,7 @@ MODEL (
     raw_value = 'Source value serialized as text. recorded_* columns from calc_batted_ball_type for the first five dims, stg_events.batted_to_fielder for ball_handler_position (pre-nullification, so HR/GRD events keep the original 0/NULL marker), NULL for pulled_opposite.',
     deduced_value = 'Deterministic inference serialized as text; non-NULL only when observed_status = derived. pulled_opposite domain is exactly pulled / opposite / middle.',
     source_acquisition_status = 'source_acquisition_ledger.source_availability_status for (game_id, dimension=batted_ball, team_id IS NULL). COALESCE not_acquired when no row exists.',
-    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension); COALESCE none. No-op in v1 (no current field_name maps to a geometry dimension).',
+    data_error_risk = 'source_data_error_risk_ledger.data_error_class joined on (game_id, field_name=dimension), keeping the most severe class per seed_data_error_class.severity_rank; COALESCE none. No-op in v1 (no current field_name maps to a geometry dimension).',
     model_input_eligible = 'TRUE when the (event, dimension) row is admissible to a fitted-model training set: seed_observed_status.is_training_eligible for the row''s observed_status AND source_acquisition_status != not_acquired.'
   ),
   audits (
@@ -76,12 +76,20 @@ acq_batted_ball AS (
 ),
 
 risk_per_game_field AS (
-    SELECT
-        game_id,
-        field_name,
-        MIN(data_error_class) AS data_error_class
-    FROM main_models.source_data_error_risk_ledger
-    GROUP BY game_id, field_name
+    SELECT game_id, field_name, data_error_class
+    FROM (
+        SELECT
+            r.game_id,
+            r.field_name,
+            r.data_error_class,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.game_id, r.field_name
+                ORDER BY s.severity_rank, r.data_error_class
+            ) AS severity_row
+        FROM main_models.source_data_error_risk_ledger AS r
+        INNER JOIN main_seeds.seed_data_error_class AS s USING (data_error_class)
+    )
+    WHERE severity_row = 1
 ),
 
 trajectory AS (
