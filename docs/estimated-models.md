@@ -4,7 +4,7 @@ title: Estimated Models — Reference
 type: architecture
 status: active
 audience: humans-and-agents
-last-verified: 2026-07-05
+last-verified: 2026-07-13
 ---
 
 # Estimated Models — Reference
@@ -35,14 +35,14 @@ Every table carries the same eight provenance columns:
 
 | Column | Meaning |
 | --- | --- |
-| `artifact_id` | the fit that produced the row, e.g. `state-transition-v3` |
+| `artifact_id` | the fit that produced the row, e.g. `state-transition-v4` |
 | `model_name` | the registered Bayes target |
 | `model_version` | model code version at fit time |
 | `source_snapshot_id` | source-data snapshot the fit read |
 | `method` | `hierarchical_logistic` (Bernoulli), `hierarchical_bayes_softmax` (multinomial shares), or `hierarchical_bayes_nb` (count/distribution summaries) |
 | `observed_status` | constant `estimated`, the namespace marker |
 | `confidence_status` | the fit's validation status |
-| `weak_identification_flag` | `True` when a convergent fit is nonetheless weakly identified (low group-level ESS, high r-hat, any divergences, or non-finite diagnostics); see [weak identification](#weak-identification-the-flag-just-went-live). Every row published so far predates the wiring and carries `False`. |
+| `weak_identification_flag` | `True` when a convergent fit is nonetheless weakly identified (low group-level ESS, high r-hat, any divergences, or non-finite diagnostics); see [weak identification](#weak-identification). Populated from each fit's own diagnostics; several current tables carry `True`, the rest `False`. |
 
 `event_key` joins to `main_models.event_states_full` for season, league, game, batter, and base-out context.
 
@@ -91,11 +91,11 @@ GROUP BY 1 ORDER BY 1;
 | dimension | avg_p |
 | --- | --- |
 | trajectory | 0.993 |
-| location_depth | 0.985 |
-| location_edge | 0.971 |
-| general_location | 0.957 |
-| location_side | 0.958 |
-| ball_handler_position | 0.959 |
+| location_depth | 0.943 |
+| location_edge | 0.987 |
+| general_location | 0.994 |
+| location_side | 0.993 |
+| ball_handler_position | 0.949 |
 
 Modern scoring records nearly everything. The propensity weight matters most in the sparse early era, where it drops well below these values.
 
@@ -127,11 +127,11 @@ LIMIT 5;
 
 | event_key | class_label | p |
 | --- | --- | --- |
-| 282541797 | LineDrive | 0.427 |
-| 282541801 | Fly | 0.386 |
-| 282541803 | GroundBall | 0.467 |
-| 282541804 | GroundBall | 0.328 |
-| 282541805 | LineDrive | 0.351 |
+| 282541797 | LineDrive | 0.478 |
+| 282541801 | Fly | 0.377 |
+| 282541803 | GroundBall | 0.484 |
+| 282541804 | PopUp | 0.316 |
+| 282541805 | LineDrive | 0.354 |
 
 Take the full distribution, not the argmax, when you need calibrated probabilities. The top class often sits below 0.5.
 
@@ -160,13 +160,13 @@ ORDER BY expected_share DESC;
 
 | fielding_position | p |
 | --- | --- |
-| 6 (SS) | 0.206 |
-| 4 (2B) | 0.157 |
-| 8 (CF) | 0.130 |
-| 5 (3B) | 0.121 |
+| 6 (SS) | 0.191 |
+| 4 (2B) | 0.167 |
+| 5 (3B) | 0.132 |
+| 8 (CF) | 0.123 |
 | … | … |
 
-Held-out top-1 accuracy is 0.217 against a 0.171 position-prior baseline. The handler is hard to pin from pre-event state alone, which is why the full distribution ships rather than a label.
+Held-out top-1 accuracy is 0.220 against a 0.171 position-prior baseline. The handler is hard to pin from pre-event state alone, which is why the full distribution ships rather than a label.
 
 ### `imputed_fielding_credit` (Model C)
 
@@ -262,7 +262,7 @@ reachable(start, end)  ⇔  end_outs ≥ start_outs
 prob_mean = E[ p_cell | data ]
 ```
 
-This masking is what made the fit converge. Treating all 24×25 pairs as reachable left >50% structural zeros and an unreachable global reference, which walled the sampler out at rhat 4. The published `state-transition-v3` clears the strict gate (rhat 1.016, ess 188, 0 divergences).
+This masking is what made the fit converge. Treating all 24×25 pairs as reachable left >50% structural zeros and an unreachable global reference, which walled the sampler out at rhat 4. The published `state-transition-v4` clears the strict gate (rhat 1.048, ess 185, 0 divergences).
 
 **Example: transitions from bases-empty / 0 outs, 2015 NL.**
 
@@ -313,9 +313,9 @@ ORDER BY park_factor_mean DESC LIMIT 3;
 
 | park_id | season | league | pf |
 | --- | --- | --- | --- |
-| DEN02 | 1996 | NL | 1.394 |
-| DEN02 | 1995 | NL | 1.394 |
-| DEN02 | 1997 | NL | 1.384 |
+| DEN02 | 1996 | NL | 1.392 |
+| DEN02 | 1995 | NL | 1.391 |
+| DEN02 | 1997 | NL | 1.383 |
 
 `DEN02` is Coors Field: a ~39% run boost in the mid-90s, from Denver's altitude.
 
@@ -432,7 +432,7 @@ Standard linear weights (home run ~1.4 runs, walk ~0.3), now with an HDI per val
 | Risk | Impact | Status |
 | --- | --- | --- |
 | MNAR: shares assume missing-at-random | med | Imputation shares ship under the MAR (`gamma_propensity_zero`) flavor; the per-class selection-offset mechanism and sensitivity ribbon quantify the MNAR band but are not baked into the published shares. |
-| Weak identification in sparse slices | med | `weak_identification_flag` is now set from fit diagnostics at publish time (see below); every artifact published to date predates the wiring and carries `False` regardless of the fit's actual identification strength. |
+| Weak identification in sparse slices | med | `weak_identification_flag` is set from fit diagnostics at publish time (see below); the retrained fits now carry a real per-fit mix of `True`/`False`. |
 | Advancement empty | low | `imputed_advancement_probabilities` ships zero rows until Model H fits. |
 | Pitch-count coverage empty | low | `pitch_count_coverage` ships zero rows until the smoke-verified `pitch_count_observedness` target gets a full-scale fit published. |
 | Full rebuild OOM | low | A from-scratch `rebuild-prod` runs out of memory on `model_input_fielding_credit`'s audit at 14 threads. See `notes/followups.md`. |
@@ -441,7 +441,7 @@ Standard linear weights (home run ~1.4 runs, walk ~0.3), now with an HDI per val
 
 The event-level imputation shares are fit on observed-only data under a missing-at-random assumption. The masked backtest showed the naive learned-propensity correction learns the survivor tilt and extrapolates it wrong-signed, so it is not published. The correct correction is a fixed per-class selection-offset applied at scoring time; `python_models/statistical/sensitivity.py` produces a per-class sensitivity ribbon that bounds how far a class share could move under plausible MNAR. Treat the published share as the MAR point and the ribbon as the uncertainty around the missingness mechanism.
 
-### Weak identification: the flag just went live
+### Weak identification
 
 `weak_identification_flag` is populated at fit time from the run's own convergence diagnostics, via `weak_identification_thresholds()` / `diagnostics_indicate_weak_identification()` in `python_models/statistical/validate.py`. A fit that clears the convergence gate is nonetheless marked weakly identified (`True`) when any of:
 
@@ -450,7 +450,7 @@ The event-level imputation shares are fit on observed-only data under a missing-
 - the fit recorded any divergences
 - any diagnostic is non-finite (fail-safe: treat "can't tell" as weak)
 
-The wiring is new. Every artifact published before it — which is every row currently sitting in the twelve estimated tables — predates the check and carries `weak_identification_flag = False` unconditionally, independent of how weakly identified that fit actually was. The flag becomes a meaningful signal starting with the next round of fits; until then, read `False` on an existing row as "not yet evaluated," not as "confirmed well-identified."
+The retrained league-dependent fits populate this flag from their own diagnostics, so it is now a live signal on the published rows. Several tables carry `True` — the run-expectancy and state-transition summaries, the pitch-summary distribution, the estimated linear weights (which inherit run-expectancy's flag), and part of the observation-propensity rows — reflecting group-level ESS below the 4× floor or r-hat above the comfort band in those cell-grain fits. The geometry, ball-handler, fielding-credit, park-factor, and assist-count tables carry `False`. Read the flag per row: `True` means the fit converged but is weakly identified in that slice, not that the value is unusable.
 
 ## Glossary
 
