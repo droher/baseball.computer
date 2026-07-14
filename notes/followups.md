@@ -418,3 +418,12 @@ surfacing >1 source family. Per-batter/pitcher context is only expressible at ev
 model is cell-grain over `(result_family, season, league)` — needs an event-grain restructure (or a
 coarsened batter/pitcher bucketing). The `has_count` coverage Bernoulli arm IS built
 (`models/pitch_coverage.py`); it is a standalone prep+builder not yet wired to a CLI target.
+
+### Paper revision — remaining operational items (2026-07-14)
+- `just promote-prod main_models.linear_weights_estimated` — the Dirichlet
+  finite-sample bands are validated in dev but the prod table still carries the
+  old narrow bands (agent prod write denied; run manually).
+- confidence_status re-stamp: `just validate-gates --write` moves published
+  artifacts off `exploratory` where gates pass (18/23 currently).
+- Strip `<!-- src: -->` provenance comments from `notes/paper/` markdown before
+  any external submission (the PDF build already strips them).
