@@ -13,6 +13,8 @@ from python_models.statistical.calibration import (
     fit_isotonic,
     fit_temperature,
     log_loss,
+    multiclass_expected_calibration_error,
+    multiclass_reliability_curve,
     reliability_curve,
 )
 
@@ -84,7 +86,7 @@ def test_apply_temperature_sums_to_one() -> None:
 def test_isotonic_monotone_output() -> None:
     rng = np.random.default_rng(seed=5)
     probs = rng.uniform(0.0, 1.0, size=1_000)
-    labels = (rng.uniform(0.0, 1.0, size=1_000) < probs).astype(np.int64)
+    labels = (rng.uniform(0.0, 1.0, size=1_000) < probs).astype(np.float64)
     knots = fit_isotonic(probs, labels)
     xs = np.linspace(0.0, 1.0, 50)
     ys = apply_isotonic(xs, knots)
@@ -94,3 +96,47 @@ def test_isotonic_monotone_output() -> None:
 def test_brier_shape_mismatch_raises() -> None:
     with pytest.raises(ValueError):
         _ = brier_score([0.1, 0.5], [1])
+
+
+def test_multiclass_ece_confident_and_correct_is_zero() -> None:
+    probs = np.array([[0.99, 0.01, 0.0], [0.0, 0.02, 0.98], [0.05, 0.9, 0.05]])
+    labels = np.array([0, 2, 1], dtype=np.int64)
+    ece = multiclass_expected_calibration_error(probs, labels, n_bins=15)
+    assert ece < 0.1
+
+
+def test_multiclass_ece_hand_computed_single_bin() -> None:
+    probs = np.array([[0.7, 0.3], [0.7, 0.3]])
+    labels = np.array([0, 1], dtype=np.int64)
+    ece = multiclass_expected_calibration_error(probs, labels, n_bins=15)
+    assert ece == pytest.approx(0.2, abs=1e-12)
+
+
+def test_multiclass_ece_overconfident_wrong_is_large() -> None:
+    probs = np.tile(np.array([[0.95, 0.05]]), (200, 1))
+    labels = np.ones(200, dtype=np.int64)
+    ece = multiclass_expected_calibration_error(probs, labels, n_bins=15)
+    assert ece == pytest.approx(0.95, abs=1e-9)
+
+
+def test_multiclass_ece_empty_is_zero() -> None:
+    ece = multiclass_expected_calibration_error(
+        np.zeros((0, 3)), np.zeros(0, dtype=np.int64)
+    )
+    assert ece == 0.0
+
+
+def test_multiclass_ece_rejects_1d_probs() -> None:
+    with pytest.raises(ValueError):
+        _ = multiclass_expected_calibration_error(np.array([0.3, 0.7]), np.array([0, 1]))
+
+
+def test_multiclass_reliability_curve_single_bin_row() -> None:
+    probs = np.array([[0.7, 0.3], [0.7, 0.3]])
+    labels = np.array([0, 1], dtype=np.int64)
+    curve = multiclass_reliability_curve(probs, labels, n_bins=15)
+    assert len(curve) == 1
+    mean_conf, empirical_acc, count = curve[0]
+    assert mean_conf == pytest.approx(0.7)
+    assert empirical_acc == pytest.approx(0.5)
+    assert count == 2

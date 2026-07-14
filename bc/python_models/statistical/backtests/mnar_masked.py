@@ -152,6 +152,14 @@ class MaskConfig(BaseModel):
     holdout_fold_count: int = HOLDOUT_FOLD_COUNT
     holdout_fold_id: int = HOLDOUT_FOLD_ID
     intensity_salt: str = "mnar-intensity"
+    design: Literal[
+        "w_class_intensity", "covariate_joint", "scorer_blocked", "era_graded"
+    ] = "w_class_intensity"
+    covariate_columns: tuple[str, ...] = ("batter_hand", "park_id", "frame_start")
+    covariate_levels: tuple[float, float] = (0.7, 1.3)
+    block_probability: float = 0.95
+    block_salt: str = "mnar-block"
+    block_bucket_count: int = 10_000
 
 
 class MaskResult(BaseModel):
@@ -368,6 +376,86 @@ def _share_by_class(
     return {label: float(np.mean(labels == label)) for label in class_labels}
 
 
+def _hash_bucket_intensity(
+    game_ids: list[str], *, tiers: FloatArray, salt: str
+) -> tuple[FloatArray, npt.NDArray[np.int64]]:
+    """Salted per-game hash bucket into the intensity tiers, plus the bucket index."""
+    n = len(game_ids)
+    tier_idx = np.fromiter(
+        (game_hash_fold(f"{salt}|{g}", fold_count=tiers.shape[0]) for g in game_ids),
+        dtype=np.int64,
+        count=n,
+    )
+    return tiers[tier_idx], tier_idx
+
+
+def _era_graded_intensity(
+    seasons: npt.NDArray[np.int64], *, tiers: FloatArray
+) -> tuple[FloatArray, npt.NDArray[np.int64]]:
+    """Per-row intensity from the season's era tier, oldest seasons at the highest tier."""
+    n_tiers = tiers.shape[0]
+    quantiles = np.linspace(0.0, 1.0, n_tiers + 1)[1:-1]
+    edges = np.quantile(seasons.astype(np.float64), quantiles)
+    tier_idx = np.clip(
+        np.searchsorted(edges, seasons, side="right"), 0, n_tiers - 1
+    ).astype(np.int64)
+    descending = np.sort(tiers)[::-1]
+    return descending[tier_idx], tier_idx
+
+
+def _covariate_bucket(values: npt.NDArray[np.str_]) -> npt.NDArray[np.int64]:
+    """Alternating-rank split of a covariate's distinct values into two buckets.
+
+    A salted hash into 2 buckets is a coin flip per distinct value, so with
+    only a handful of distinct values (``batter_hand`` is typically only
+    ``{"L", "R"}`` plus nulls) it can land every real value in the same
+    bucket by chance, silently degenerating the design to a level shift
+    instead of a class × covariate interaction. Sorting the distinct
+    values and assigning ``rank % 2`` guarantees a genuine split across
+    both buckets whenever at least two distinct values are present.
+    """
+    distinct = sorted(set(values.tolist()))
+    bucket_by_value = {value: rank % 2 for rank, value in enumerate(distinct)}
+    return np.asarray([bucket_by_value[v] for v in values], dtype=np.int64)
+
+
+def _resolve_covariate_column(
+    universe: pl.DataFrame, *, candidates: tuple[str, ...]
+) -> str:
+    """First candidate column present on the universe frame, in preference order."""
+    for column in candidates:
+        if column in universe.columns:
+            return column
+    raise ValueError(
+        f"covariate_joint design requires one of {candidates!r} in the universe "
+        f"frame; available columns: {universe.columns}"
+    )
+
+
+def _blocked_games(game_ids: list[str], *, config: MaskConfig, n: int) -> BoolArray:
+    """Whole-game blocked/not-blocked draw sized so the blocked share hits the overall target."""
+    if config.block_probability <= 0.0:
+        raise ValueError(
+            f"scorer_blocked design requires block_probability > 0, got "
+            f"{config.block_probability}"
+        )
+    block_share = float(
+        np.clip(config.overall_masked_target / config.block_probability, 0.0, 1.0)
+    )
+    threshold = int(round(block_share * config.block_bucket_count))
+    return np.fromiter(
+        (
+            game_hash_fold(
+                f"{config.block_salt}|{g}", fold_count=config.block_bucket_count
+            )
+            < threshold
+            for g in game_ids
+        ),
+        dtype=np.bool_,
+        count=n,
+    )
+
+
 def generate_mask(
     universe: pl.DataFrame,
     *,
@@ -377,12 +465,20 @@ def generate_mask(
 ) -> MaskResult:
     """Draw the seeded synthetic MNAR mask over the truth universe.
 
-    ``P(masked) = clip(w_class[label] * intensity[bucket(game)], 0,
-    max)``, where the bucket is a salted game-id hash into the intensity
-    tiers (simulating scorer-dependent missingness) and the never-masked
-    game-hash holdout fold gets probability zero. Rows must arrive sorted
-    by ``event_key`` (``load_truth_universe`` guarantees it) so the draw
-    is deterministic for a seed.
+    Default design ``config.design == "w_class_intensity"``: ``P(masked)
+    = clip(w_class[label] * intensity[bucket(game)], 0, max)``, where the
+    bucket is a salted game-id hash into the intensity tiers (simulating
+    scorer-dependent missingness) and the never-masked game-hash holdout
+    fold gets probability zero. Three further designs are registered for
+    backtest-robustness checks (referee major 2), selected by
+    ``config.design``: ``"covariate_joint"`` multiplies in a two-level
+    real-covariate effect so the true selection is no longer a pure
+    per-class function; ``"scorer_blocked"`` masks whole games at a high,
+    class-independent rate instead of per-class weighting;
+    ``"era_graded"`` assigns the same intensity tiers by season quantile
+    (oldest seasons highest) instead of a salted game hash. Rows must
+    arrive sorted by ``event_key`` (``load_truth_universe`` guarantees
+    it) so the draw is deterministic for a seed.
     """
     config = config if config is not None else MaskConfig()
     labels = np.asarray(universe.get_column(TRUE_LABEL_COLUMN).to_list(), dtype=np.str_)
@@ -398,30 +494,96 @@ def generate_mask(
         dtype=np.bool_,
         count=n,
     )
-    tiers = np.asarray(config.intensity_tiers, dtype=np.float64)
-    tier_idx = np.fromiter(
-        (
-            game_hash_fold(f"{config.intensity_salt}|{g}", fold_count=tiers.shape[0])
-            for g in game_ids
-        ),
-        dtype=np.int64,
-        count=n,
-    )
-    intensity = tiers[tier_idx]
     maskable = ~holdout
     if not maskable.any():
         raise ValueError("every universe game landed in the never-masked holdout fold")
 
-    class_probabilities = calibrate_class_mask_probabilities(
-        labels[maskable],
-        focal_class=variant.focal_class,
-        class_labels=variant.class_labels,
-        config=config,
-    )
-    base = np.asarray(
-        [class_probabilities[label] for label in labels], dtype=np.float64
-    )
-    p = np.clip(base * intensity, 0.0, config.max_mask_probability)
+    covariate_column: str | None = None
+    covariate_bucket_idx: npt.NDArray[np.int64] | None = None
+    blocked: BoolArray | None = None
+
+    if config.design == "w_class_intensity":
+        tiers = np.asarray(config.intensity_tiers, dtype=np.float64)
+        intensity, tier_idx = _hash_bucket_intensity(
+            game_ids, tiers=tiers, salt=config.intensity_salt
+        )
+        class_probabilities = calibrate_class_mask_probabilities(
+            labels[maskable],
+            focal_class=variant.focal_class,
+            class_labels=variant.class_labels,
+            config=config,
+        )
+        base = np.asarray(
+            [class_probabilities[label] for label in labels], dtype=np.float64
+        )
+        p = np.clip(base * intensity, 0.0, config.max_mask_probability)
+        bucket_tiers_for_summary = tiers
+    elif config.design == "era_graded":
+        if "season" not in universe.columns:
+            raise ValueError(
+                "era_graded design requires a 'season' column in the universe frame"
+            )
+        tiers = np.asarray(config.intensity_tiers, dtype=np.float64)
+        seasons = np.asarray(universe.get_column("season").to_list(), dtype=np.int64)
+        intensity, tier_idx = _era_graded_intensity(seasons, tiers=tiers)
+        class_probabilities = calibrate_class_mask_probabilities(
+            labels[maskable],
+            focal_class=variant.focal_class,
+            class_labels=variant.class_labels,
+            config=config,
+        )
+        base = np.asarray(
+            [class_probabilities[label] for label in labels], dtype=np.float64
+        )
+        p = np.clip(base * intensity, 0.0, config.max_mask_probability)
+        bucket_tiers_for_summary = np.sort(tiers)[::-1]
+    elif config.design == "covariate_joint":
+        tiers = np.asarray(config.intensity_tiers, dtype=np.float64)
+        intensity, tier_idx = _hash_bucket_intensity(
+            game_ids, tiers=tiers, salt=config.intensity_salt
+        )
+        covariate_column = _resolve_covariate_column(
+            universe, candidates=config.covariate_columns
+        )
+        covariate_values = np.asarray(
+            universe.get_column(covariate_column)
+            .cast(pl.Utf8)
+            .fill_null("__null__")
+            .to_list(),
+            dtype=np.str_,
+        )
+        covariate_bucket_idx = _covariate_bucket(covariate_values)
+        covariate_multiplier = np.asarray(config.covariate_levels, dtype=np.float64)[
+            covariate_bucket_idx
+        ]
+        class_probabilities = calibrate_class_mask_probabilities(
+            labels[maskable],
+            focal_class=variant.focal_class,
+            class_labels=variant.class_labels,
+            config=config,
+        )
+        base = np.asarray(
+            [class_probabilities[label] for label in labels], dtype=np.float64
+        )
+        p = np.clip(
+            base * intensity * covariate_multiplier, 0.0, config.max_mask_probability
+        )
+        bucket_tiers_for_summary = tiers
+    elif config.design == "scorer_blocked":
+        blocked = _blocked_games(game_ids, config=config, n=n)
+        p = np.clip(
+            np.where(blocked, config.block_probability, 0.0),
+            0.0,
+            config.max_mask_probability,
+        )
+        tier_idx = blocked.astype(np.int64)
+        bucket_tiers_for_summary = np.asarray([0.0, config.block_probability])
+        class_probabilities = {
+            label: config.block_probability for label in variant.class_labels
+        }
+    else:
+        raise ValueError(f"unknown mask design {config.design!r}")
+
     p[holdout] = 0.0
 
     rng = np.random.default_rng(seed)
@@ -442,12 +604,12 @@ def generate_mask(
         for label in variant.class_labels
     }
     masked_share_by_bucket = {
-        f"tier_{tiers[t]:.2f}": (
+        f"tier_{bucket_tiers_for_summary[t]:.2f}": (
             float(np.mean(masked[maskable & (tier_idx == t)]))
             if int((maskable & (tier_idx == t)).sum())
             else 0.0
         )
-        for t in range(tiers.shape[0])
+        for t in range(bucket_tiers_for_summary.shape[0])
     }
     observed_focal_share = observed_shares[variant.focal_class]
     summary: dict[str, Any] = {
@@ -488,7 +650,40 @@ def generate_mask(
             "fold_count": config.holdout_fold_count,
             "fold_id": config.holdout_fold_id,
         },
+        "design": config.design,
     }
+    if config.design == "covariate_joint":
+        assert covariate_column is not None
+        assert covariate_bucket_idx is not None
+        bucket_maskable = covariate_bucket_idx[maskable]
+        masked_share_by_covariate_level = {
+            f"level_{config.covariate_levels[b]:.2f}": (
+                float(np.mean(masked_maskable[bucket_maskable == b]))
+                if int((bucket_maskable == b).sum())
+                else 0.0
+            )
+            for b in (0, 1)
+        }
+        summary.update(
+            {
+                "covariate_column": covariate_column,
+                "covariate_levels": list(config.covariate_levels),
+                "masked_share_by_covariate_level": masked_share_by_covariate_level,
+            }
+        )
+    elif config.design == "scorer_blocked":
+        assert blocked is not None
+        maskable_game_ids = {game_ids[i] for i in range(n) if maskable[i]}
+        blocked_maskable_game_ids = {
+            game_ids[i] for i in range(n) if maskable[i] and blocked[i]
+        }
+        summary.update(
+            {
+                "block_probability": config.block_probability,
+                "n_blocked_games": len(blocked_maskable_game_ids),
+                "n_total_maskable_games": len(maskable_game_ids),
+            }
+        )
     _log.info(
         "mask generated: masked=%d/%d (%.3f) holdout=%d observed_focal_share=%.3f "
         "truth_focal_share=%.3f",
@@ -718,6 +913,33 @@ def oracle_selection_offset(
         p = float(
             np.clip(w * mean_intensity, SELECTION_OFFSET_CLIP, max_mask_probability)
         )
+        offset[label] = float(math.log(p / (1.0 - p)))
+    return offset
+
+
+def realized_class_selection_offset(
+    masked_share_by_class: dict[str, float],
+    *,
+    class_labels: tuple[str, ...],
+    max_mask_probability: float,
+) -> dict[str, float]:
+    """Empirical per-class selection log-odds offset from the mask's realized rate.
+
+    Unlike ``oracle_selection_offset``, which assumes the ``w_class_intensity``
+    design's closed-form ``w_class[c] * mean_intensity``, this reads the
+    mask's actually-realized empirical per-class masked rate directly, so it
+    is the correct oracle for any design's true selection mechanism —
+    including ``covariate_joint``, where the true process also depends on a
+    covariate the imputation model conditions on, so a pure per-class offset
+    is a deliberately partial correction there; and ``scorer_blocked``, where
+    selection is class-independent by construction, so this offset should
+    come out approximately equal across classes (a near-no-op after the
+    reweight's per-event renormalization).
+    """
+    offset: dict[str, float] = {}
+    for label in class_labels:
+        rate = float(masked_share_by_class.get(label, 0.0))
+        p = float(np.clip(rate, SELECTION_OFFSET_CLIP, max_mask_probability))
         offset[label] = float(math.log(p / (1.0 - p)))
     return offset
 
@@ -1047,8 +1269,14 @@ def run_backtest(
     resolved_budget = (
         budget if budget is not None else (SMOKE_BUDGET if smoke else DEFAULT_BUDGET)
     )
+    resolved_mask_config = mask_config if mask_config is not None else MaskConfig()
+    _base_run_id = f"{model}-seed{seed}-budget{resolved_budget}" + (
+        "-smoke" if smoke else ""
+    )
     resolved_run_id = run_id or (
-        f"{model}-seed{seed}-budget{resolved_budget}" + ("-smoke" if smoke else "")
+        _base_run_id
+        if resolved_mask_config.design == "w_class_intensity"
+        else f"{resolved_mask_config.design}-{_base_run_id}"
     )
     run_dir = output_root / resolved_run_id
     datasets_root = run_dir / "datasets"
@@ -1191,14 +1419,20 @@ def run_backtest(
         diagnostics[arm] = _read_json(fit_dir / "validation" / "diagnostics.json")
         _log.debug("%s arm recovered shares: %s", arm, shares[arm])
 
-    resolved_mask_config = mask_config if mask_config is not None else MaskConfig()
-    mean_intensity = float(np.mean(resolved_mask_config.intensity_tiers))
-    selection_offset = oracle_selection_offset(
-        class_mask_probabilities=mask.summary["class_mask_probabilities"],
-        mean_intensity=mean_intensity,
-        class_labels=variant.class_labels,
-        max_mask_probability=resolved_mask_config.max_mask_probability,
-    )
+    if resolved_mask_config.design == "w_class_intensity":
+        mean_intensity = float(np.mean(resolved_mask_config.intensity_tiers))
+        selection_offset = oracle_selection_offset(
+            class_mask_probabilities=mask.summary["class_mask_probabilities"],
+            mean_intensity=mean_intensity,
+            class_labels=variant.class_labels,
+            max_mask_probability=resolved_mask_config.max_mask_probability,
+        )
+    else:
+        selection_offset = realized_class_selection_offset(
+            mask.summary["masked_share_by_class"],
+            class_labels=variant.class_labels,
+            max_mask_probability=resolved_mask_config.max_mask_probability,
+        )
     offset_shares = reweight_class_shares_per_event(
         exports["uncorrected"], variant=variant, offset=selection_offset
     )

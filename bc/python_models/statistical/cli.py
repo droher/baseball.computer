@@ -634,10 +634,7 @@ def _run_validate(args: argparse.Namespace) -> int:
     import os
     import tempfile
 
-    from python_models.statistical.validate import (
-        _find_manifest,  # type: ignore[reportPrivateUsage]
-        validate_artifact,
-    )
+    from python_models.statistical.validate import find_manifest, validate_artifact
 
     artifact_id = str(args.artifact_id)
     model_name = getattr(args, "model", None)
@@ -645,7 +642,7 @@ def _run_validate(args: argparse.Namespace) -> int:
     report = validate_artifact(
         artifact_id, model_name=model_name, candidate_roots=candidate_roots
     )
-    artifact_dir = _find_manifest(
+    artifact_dir = find_manifest(
         artifact_id, candidate_roots, model_name=model_name
     ).parent
     output_path = (

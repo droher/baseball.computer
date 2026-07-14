@@ -193,6 +193,13 @@ validate-artifact ARTIFACT_ID *ARGS:
     shift 1
     {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group ml python -m python_models.statistical.cli validate --artifact-id {{ ARTIFACT_ID }} "$@"
 
+# Sweep every published pointer, run its calibration gates, and print the
+# status + fired-findings table (referee-7 evidence snapshot). Read-only by
+# default; pass `--write` to persist validation_report.json beside each artifact.
+# Usage: just validate-gates [model ...] [--write]
+validate-gates *ARGS:
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/validate_gates.py {{ ARGS }}
+
 # Rollup parity check: existing completeness model vs ledger reproduction.
 # All 7 current models carry an accept-gap disposition (see
 # notes/data-coverage-implementation/rollup-parity-dispositions.md): the
@@ -211,6 +218,23 @@ rollup-parity-checks *ARGS:
         --allow-mismatch game_data_completeness \
         --allow-mismatch season_team_coverage \
         "$@"
+
+# --- Data-coverage validation reproducibility ---
+
+# MNAR masked backtest: mask, synthetic propensity fit, paired corrected/uncorrected
+# fits, oracle-offset arm. Read-only against published pointers; writes under
+# artifacts/statistical/backtests/mnar/<run-id>/. Dev-safe (no bc.db writes).
+# Usage: just mnar-backtest [--model geometry|ball_handler] [--mask-design w_class_intensity|covariate_joint|scorer_blocked|era_graded] [--smoke] [extra args]
+mnar-backtest *ARGS:
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group stats python scripts/mnar_masked_backtest.py "$@"
+
+# MNAR sensitivity ribbon: publish the selection-log-odds band beside each
+# published geometry_* fit, or validate grid coverage against a masked-backtest
+# run dir. Read-only against published pointers; writes sensitivity_ribbon.parquet
+# beside the fit (--publish, default) or nothing (--validate-backtest).
+# Usage: just sensitivity-ribbon [--validate-backtest <run-dir>]
+sensitivity-ribbon *ARGS:
+    {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group stats python scripts/sensitivity_ribbon.py "$@"
 
 # --- LLM context ---
 

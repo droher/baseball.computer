@@ -34,6 +34,8 @@ from python_models.statistical.bayes.registry import get_target
 from python_models.statistical.bayes.specs import GammaDlFlavor, GammaPropensityFlavor
 from python_models.statistical.calibration import (
     expected_calibration_error,
+    multiclass_expected_calibration_error,
+    multiclass_reliability_curve,
     reliability_curve,
 )
 from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
@@ -113,6 +115,7 @@ CREDIT_EXPORT_FILENAME: str = "event_credit.parquet"
 BALL_HANDLER_EXPORT_FILENAME: str = "ball_handler_probabilities.parquet"
 GEOMETRY_EXPORT_FILENAME: str = "geometry_probabilities.parquet"
 ADVANCEMENT_EXPORT_FILENAME: str = "advancement_probabilities.parquet"
+CALIBRATION_CURVE_TOPK_EXPORT_FILENAME: str = "calibration_curve_topk.parquet"
 PARK_FACTOR_POSTERIOR_FILENAME: str = "park_factor_posterior.parquet"
 PARK_FACTOR_SUMMARY_FILENAME: str = "park_factor_summary.parquet"
 RUN_EXPECTANCY_POSTERIOR_FILENAME: str = "run_expectancy_posterior.parquet"
@@ -792,6 +795,21 @@ def _reliability_dataframe(
     )
 
 
+def _multiclass_reliability_dataframe(
+    shares: np.ndarray, y: np.ndarray, *, n_bins: int = 15
+) -> pl.DataFrame:
+    rows = multiclass_reliability_curve(shares, y.astype(np.int64), n_bins=n_bins)
+    if not rows:
+        return pl.DataFrame()
+    return pl.DataFrame(
+        {
+            "mean_confidence": [r[0] for r in rows],
+            "empirical_accuracy": [r[1] for r in rows],
+            "count": [r[2] for r in rows],
+        }
+    )
+
+
 def _posterior_summary_dataframe(summary: BayesPosteriorSummary) -> pl.DataFrame:
     if not summary.rows:
         return pl.DataFrame()
@@ -885,6 +903,7 @@ def _evaluate_held_out(
     held_dl_logit_per_class: np.ndarray | None = None,
     held_out_propensity_z: np.ndarray | None = None,
     held_out_handler_z: np.ndarray | None = None,
+    calibration_curve_path: Path | None = None,
 ) -> dict[str, object]:
     """Compute OOS top-k accuracy, log-loss, and per-position PR-AUC.
 
@@ -972,6 +991,11 @@ def _evaluate_held_out(
     distribution = _distribution_calibration(
         safe_shares, y, n_positions=inputs.n_positions
     )
+    ece_held_out = multiclass_expected_calibration_error(safe_shares, y, n_bins=15)
+    if calibration_curve_path is not None:
+        reliability = _multiclass_reliability_dataframe(safe_shares, y, n_bins=15)
+        if not reliability.is_empty():
+            write_parquet_atomic(reliability, calibration_curve_path)
     slice_columns: dict[str, np.ndarray] = {
         "season": held.season_idx[valid],
         "source_family": held.source_idx[valid],
@@ -999,6 +1023,7 @@ def _evaluate_held_out(
         "pr_auc_per_position": pr_auc_per_pos,
         "pr_auc_macro": pr_auc_macro,
         "baseline_top1_accuracy": baseline_top1,
+        "ece_held_out": ece_held_out,
         "distribution_calibration": distribution,
         "slice_calibration": slice_calibration,
     }
@@ -2794,6 +2819,8 @@ def run_bayes_model(
                     held_dl_logit_per_class=inputs.held_out_dl_logit_per_class,
                     held_out_propensity_z=inputs.held_out_propensity_z,
                     held_out_handler_z=inputs.held_out_handler_z,
+                    calibration_curve_path=exports_dir
+                    / CALIBRATION_CURVE_TOPK_EXPORT_FILENAME,
                 )
             elif spec.multinomial_export == "ball_handler":
                 ball_handler_export_path = exports_dir / BALL_HANDLER_EXPORT_FILENAME
@@ -2843,6 +2870,8 @@ def run_bayes_model(
                     posterior_idata,
                     putout_idata=None,
                     held_out_propensity_z=inputs.held_out_propensity_z,
+                    calibration_curve_path=exports_dir
+                    / CALIBRATION_CURVE_TOPK_EXPORT_FILENAME,
                 )
             elif spec.multinomial_export == "advancement":
                 advancement_export_path = exports_dir / ADVANCEMENT_EXPORT_FILENAME
@@ -2879,6 +2908,8 @@ def run_bayes_model(
                     putout_idata=None,
                     intercept_name="alpha_class",
                     held_dl_logit_per_class=inputs.held_out_dl_logit_per_class,
+                    calibration_curve_path=exports_dir
+                    / CALIBRATION_CURVE_TOPK_EXPORT_FILENAME,
                 )
             else:
                 putout_idata = (
@@ -2950,7 +2981,11 @@ def run_bayes_model(
                         target_path=credit_export_path,
                     )
                 held_out_metrics = _evaluate_held_out(
-                    inputs, posterior_idata, putout_idata=putout_idata
+                    inputs,
+                    posterior_idata,
+                    putout_idata=putout_idata,
+                    calibration_curve_path=exports_dir
+                    / CALIBRATION_CURVE_TOPK_EXPORT_FILENAME,
                 )
             _atomic_write_text(
                 validation_dir / "held_out_metrics.json",

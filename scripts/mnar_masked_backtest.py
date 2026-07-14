@@ -23,6 +23,7 @@ from python_models.statistical.backtests.mnar_masked import (  # noqa: E402
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_SEED,
     SMOKE_BUDGET,
+    MaskConfig,
     run_backtest,
 )
 
@@ -84,6 +85,17 @@ def _parse_args() -> argparse.Namespace:
         help="earliest season included in the truth universe",
     )
     _ = parser.add_argument(
+        "--mask-design",
+        choices=(
+            "w_class_intensity",
+            "covariate_joint",
+            "scorer_blocked",
+            "era_graded",
+        ),
+        default="w_class_intensity",
+        help="synthetic MNAR mask design to run (see MaskConfig.design)",
+    )
+    _ = parser.add_argument(
         "--verbose",
         action="store_true",
         help="DEBUG-level logging",
@@ -97,6 +109,7 @@ def main() -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
+    mask_config = MaskConfig(design=args.mask_design)
     result = run_backtest(
         model=args.model,
         seed=args.seed,
@@ -106,6 +119,7 @@ def main() -> int:
         dataset_parquet=args.dataset_parquet,
         output_root=args.output_root,
         min_season=args.min_season,
+        mask_config=mask_config,
     )
     criteria = result.metrics["criteria"]
     log.info(

@@ -28,6 +28,7 @@ from python_models.statistical import config as _config
 from python_models.statistical.manifests import read_manifest
 from python_models.statistical.schemas import (
     ArtifactManifest,
+    FindingSeverity,
     ValidationFinding,
     ValidationReport,
 )
@@ -51,7 +52,7 @@ def validate_artifact(
         _config.DATASETS_ROOT,
         _config.EDA_ROOT,
     )
-    manifest_path = _find_manifest(artifact_id, roots, model_name=model_name)
+    manifest_path = find_manifest(artifact_id, roots, model_name=model_name)
     manifest = read_manifest(manifest_path)
     artifact_dir = manifest_path.parent
 
@@ -79,7 +80,7 @@ def validate_artifact(
             )
 
 
-def _find_manifest(
+def find_manifest(
     artifact_id: str, roots: tuple[Path, ...], *, model_name: str | None = None
 ) -> Path:
     for root in roots:
@@ -422,6 +423,7 @@ _BAYES_THRESHOLDS_SMOKE: dict[str, float] = {
     "divergence_fraction": 0.05,
     "calibration_ece_warn": 0.10,
     "post_pred_bucket_dev_warn": 0.10,
+    "held_out_ece_warn": 0.10,
 }
 
 _BAYES_THRESHOLDS_DEFAULT: dict[str, float] = {
@@ -430,6 +432,7 @@ _BAYES_THRESHOLDS_DEFAULT: dict[str, float] = {
     "divergence_fraction": 0.0,
     "calibration_ece_warn": 0.10,
     "post_pred_bucket_dev_warn": 0.05,
+    "held_out_ece_warn": 0.05,
 }
 
 _WEAK_IDENTIFICATION_ESS_BULK_MULTIPLIER: float = 4.0
@@ -462,6 +465,160 @@ def diagnostics_indicate_weak_identification(
     return (
         ess_bulk_min < thresholds["ess_bulk_min"] or rhat_max > thresholds["rhat_max"]
     )
+
+
+def _finite_float(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        return float(value)
+    return None
+
+
+def _grade_held_out_metrics(
+    artifact_dir: Path,
+    *,
+    thresholds: dict[str, float],
+    is_smoke: bool,
+) -> tuple[list[ValidationFinding], dict[str, float | int]]:
+    """Grade ``validation/held_out_metrics.json`` into findings + metrics.
+
+    Held-out ECE above the (smoke/default) warn threshold is a ``warn``.
+    A model whose held-out predictive metric fails to beat its own
+    baseline (ROC over chance, PR / top-1 over the marginal, or a positive
+    log-lik lift) is a ``block`` on a full-scale fit and a ``warn`` on a
+    smoke fit — the baseline-beating check has no numeric threshold to
+    relax, so severity is the smoke/default knob. Absence of the file on a
+    full-scale fit is itself a ``warn``.
+    """
+    import json as _json
+
+    findings: list[ValidationFinding] = []
+    metrics: dict[str, float | int] = {}
+    path = artifact_dir / "validation" / "held_out_metrics.json"
+    if not path.exists():
+        if not is_smoke:
+            findings.append(
+                ValidationFinding(
+                    severity="warn",
+                    code="bayes_held_out_metrics_absent",
+                    message=(
+                        f"no held_out_metrics.json at {path}; full-scale fit "
+                        "ships no out-of-sample calibration evidence"
+                    ),
+                )
+            )
+        return findings, metrics
+
+    try:
+        loaded = _json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        findings.append(
+            ValidationFinding(
+                severity="warn",
+                code="bayes_held_out_metrics_malformed",
+                message=f"held_out_metrics.json at {path} is not valid JSON: {exc}",
+            )
+        )
+        return findings, metrics
+    if not isinstance(loaded, dict):
+        findings.append(
+            ValidationFinding(
+                severity="warn",
+                code="bayes_held_out_metrics_malformed",
+                message=(
+                    f"held_out_metrics.json at {path} is not a JSON object "
+                    f"(got {type(loaded).__name__})"
+                ),
+            )
+        )
+        return findings, metrics
+
+    from typing import cast
+
+    payload: dict[str, object] = cast(dict[str, object], loaded)
+    baseline_severity: FindingSeverity = "warn" if is_smoke else "block"
+
+    ece = _finite_float(payload.get("ece_held_out"))
+    if ece is not None:
+        metrics["held_out_ece"] = ece
+        if ece > thresholds["held_out_ece_warn"]:
+            findings.append(
+                ValidationFinding(
+                    severity="warn",
+                    code="bayes_held_out_ece",
+                    message=(
+                        f"ece_held_out={ece:.4f} exceeds warn threshold "
+                        f"{thresholds['held_out_ece_warn']} (smoke={is_smoke})"
+                    ),
+                )
+            )
+
+    roc_auc = _finite_float(payload.get("roc_auc"))
+    if roc_auc is not None:
+        metrics["held_out_roc_auc"] = roc_auc
+        if roc_auc <= 0.5:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_auc_not_beating_baseline",
+                    message=(
+                        f"held-out roc_auc={roc_auc:.4f} does not beat the 0.5 "
+                        f"chance baseline (smoke={is_smoke})"
+                    ),
+                )
+            )
+
+    pr_auc = _finite_float(payload.get("pr_auc"))
+    baseline_pr_auc = _finite_float(payload.get("baseline_pr_auc"))
+    if pr_auc is not None and baseline_pr_auc is not None:
+        metrics["held_out_pr_auc"] = pr_auc
+        metrics["held_out_baseline_pr_auc"] = baseline_pr_auc
+        if pr_auc <= baseline_pr_auc:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_pr_auc_not_beating_baseline",
+                    message=(
+                        f"held-out pr_auc={pr_auc:.4f} does not beat baseline_pr_auc="
+                        f"{baseline_pr_auc:.4f} (smoke={is_smoke})"
+                    ),
+                )
+            )
+
+    top1 = _finite_float(payload.get("top1_accuracy"))
+    baseline_top1 = _finite_float(payload.get("baseline_top1_accuracy"))
+    if top1 is not None and baseline_top1 is not None:
+        metrics["held_out_top1_accuracy"] = top1
+        metrics["held_out_baseline_top1_accuracy"] = baseline_top1
+        if top1 <= baseline_top1:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_top1_not_beating_baseline",
+                    message=(
+                        f"held-out top1_accuracy={top1:.4f} does not beat "
+                        f"baseline_top1_accuracy={baseline_top1:.4f} (smoke={is_smoke})"
+                    ),
+                )
+            )
+
+    loglik_lift = _finite_float(payload.get("loglik_lift"))
+    if loglik_lift is not None:
+        metrics["held_out_loglik_lift"] = loglik_lift
+        if loglik_lift <= 0.0:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_no_loglik_lift",
+                    message=(
+                        f"held-out loglik_lift={loglik_lift:.4f} is not positive; "
+                        f"the fit does not beat its baseline (smoke={is_smoke})"
+                    ),
+                )
+            )
+
+    return findings, metrics
 
 
 def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> ValidationReport:
@@ -628,6 +785,12 @@ def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> Validatio
                     ),
                 )
             )
+
+    held_out_findings, held_out_metrics = _grade_held_out_metrics(
+        artifact_dir, thresholds=thresholds, is_smoke=is_smoke
+    )
+    findings.extend(held_out_findings)
+    metrics.update(held_out_metrics)
 
     return _finalize(manifest, findings, metrics)
 

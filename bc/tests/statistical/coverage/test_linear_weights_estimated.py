@@ -123,7 +123,9 @@ def test_empty_inputs_yield_typed_empty_frame() -> None:
 
 
 def test_draw_propagation_and_centering_matches_hand_computation() -> None:
-    out = propagate_linear_weights_draws(_transition_counts(), _re_draws())
+    out = propagate_linear_weights_draws(
+        _transition_counts(), _re_draws(), dirichlet_alpha=None
+    )
 
     assert dict(out.schema) == RUN_VALUE_SUMMARY_SCHEMA
     assert out.height == 2
@@ -169,3 +171,189 @@ def test_centering_sums_to_zero_across_plays_per_draw() -> None:
     for d in (0, 1):
         weighted = 3 * ref[("Single", d)] + (2 + 5) * ref[("InPlayOut", d)]
         assert abs(weighted) < 1e-9
+
+
+def _re_draws_many(n_draws: int, *, seed: int) -> pl.DataFrame:
+    rng = np.random.default_rng(seed)
+    means = {"0_0": 0.50, "1_1": 0.90, "2_0": 0.10}
+    rows: list[dict[str, object]] = []
+    for state, m in means.items():
+        values = m + rng.normal(0.0, 0.05, size=n_draws)
+        for draw in range(n_draws):
+            rows.append(
+                {
+                    "state": state,
+                    "season": 2021,
+                    "league": "NL",
+                    "outcome": "runs_to_end",
+                    "value": float(values[draw]),
+                    "chain": 0,
+                    "draw": draw,
+                }
+            )
+    return pl.DataFrame(rows).select(
+        pl.col("state").cast(pl.Utf8),
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("outcome").cast(pl.Utf8),
+        pl.col("value").cast(pl.Float64),
+        pl.col("chain").cast(pl.Int16),
+        pl.col("draw").cast(pl.Int32),
+    )
+
+
+def _transition_counts_scaled(scale: int) -> pl.DataFrame:
+    return _transition_counts().with_columns(
+        (pl.col("n") * scale).cast(pl.Int64).alias("n")
+    )
+
+
+def _band_widths(out: pl.DataFrame) -> dict[str, float]:
+    return {
+        row["play"]: row["run_value_hdi_upper"] - row["run_value_hdi_lower"]
+        for row in out.iter_rows(named=True)
+    }
+
+
+def test_dense_cells_match_fixed_weights_to_first_order() -> None:
+    re_draws = _re_draws_many(600, seed=11)
+    counts = _transition_counts_scaled(1_000_000)
+
+    fixed = propagate_linear_weights_draws(counts, re_draws, dirichlet_alpha=None)
+    dirichlet = propagate_linear_weights_draws(counts, re_draws)
+
+    fixed_w = _band_widths(fixed)
+    dirichlet_w = _band_widths(dirichlet)
+    assert set(fixed_w) == set(dirichlet_w)
+    for play, width in fixed_w.items():
+        assert dirichlet_w[play] == pytest.approx(width, rel=0.02, abs=2e-3)
+
+
+def test_sparse_cells_widen_bands_strictly() -> None:
+    re_draws = _re_draws_many(800, seed=13)
+    counts = _transition_counts()
+
+    fixed = propagate_linear_weights_draws(counts, re_draws, dirichlet_alpha=None)
+    dirichlet = propagate_linear_weights_draws(counts, re_draws)
+
+    fixed_w = _band_widths(fixed)
+    dirichlet_w = _band_widths(dirichlet)
+    for play, width in fixed_w.items():
+        assert dirichlet_w[play] > width
+
+
+def _constant_erc_fixture(n_draws: int) -> tuple[pl.DataFrame, pl.DataFrame]:
+    rng = np.random.default_rng(5)
+    rows: list[dict[str, object]] = []
+    per_draw = rng.normal(0.4, 0.1, size=n_draws)
+    for state in ("0_0", "1_0"):
+        for draw in range(n_draws):
+            rows.append(
+                {
+                    "state": state,
+                    "season": 2021,
+                    "league": "NL",
+                    "outcome": "runs_to_end",
+                    "value": float(per_draw[draw]),
+                    "chain": 0,
+                    "draw": draw,
+                }
+            )
+    re_draws = pl.DataFrame(rows).select(
+        pl.col("state").cast(pl.Utf8),
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("outcome").cast(pl.Utf8),
+        pl.col("value").cast(pl.Float64),
+        pl.col("chain").cast(pl.Int16),
+        pl.col("draw").cast(pl.Int32),
+    )
+    combos = [
+        ("A", "2021_NL_0_0", "2021_NL_1_0"),
+        ("B", "2021_NL_1_0", "2021_NL_0_0"),
+        ("B", "2021_NL_0_0", "2021_NL_1_0"),
+    ]
+    counts = pl.DataFrame(
+        [
+            {
+                "season": 2021,
+                "league": "NL",
+                "play": play,
+                "play_category": "BATTING",
+                "run_expectancy_start_key": start,
+                "run_expectancy_end_key": end,
+                "runs_on_play": 0,
+                "n": n,
+            }
+            for (play, start, end), n in zip(combos, (2, 3, 5))
+        ]
+    ).select(
+        pl.col("season").cast(pl.Int16),
+        pl.col("league").cast(pl.Utf8),
+        pl.col("play").cast(pl.Utf8),
+        pl.col("play_category").cast(pl.Utf8),
+        pl.col("run_expectancy_start_key").cast(pl.Utf8),
+        pl.col("run_expectancy_end_key").cast(pl.Utf8),
+        pl.col("runs_on_play").cast(pl.Int64),
+        pl.col("n").cast(pl.Int64),
+    )
+    return counts, re_draws
+
+
+def test_centering_holds_per_draw_under_dirichlet() -> None:
+    counts, re_draws = _constant_erc_fixture(400)
+    out = propagate_linear_weights_draws(counts, re_draws)
+
+    for row in out.iter_rows(named=True):
+        assert row["run_value_mean"] == pytest.approx(0.0, abs=1e-12)
+        assert row["run_value_sd"] == pytest.approx(0.0, abs=1e-12)
+        assert row["run_value_hdi_lower"] == pytest.approx(0.0, abs=1e-12)
+        assert row["run_value_hdi_upper"] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_dirichlet_draws_are_deterministic() -> None:
+    re_draws = _re_draws_many(300, seed=17)
+    counts = _transition_counts()
+
+    first = propagate_linear_weights_draws(counts, re_draws)
+    second = propagate_linear_weights_draws(counts, re_draws)
+    assert first.equals(second)
+
+
+def test_base_seed_changes_the_draws() -> None:
+    re_draws = _re_draws_many(300, seed=19)
+    counts = _transition_counts()
+
+    default = propagate_linear_weights_draws(counts, re_draws)
+    reseeded = propagate_linear_weights_draws(counts, re_draws, base_seed=99)
+    assert not default.equals(reseeded)
+
+
+def test_row_order_does_not_affect_output() -> None:
+    re_draws = _re_draws_many(300, seed=29)
+    counts = _transition_counts_scaled(50)
+
+    baseline = propagate_linear_weights_draws(counts, re_draws)
+
+    shuffled_counts = counts[
+        np.random.default_rng(7).permutation(counts.height).tolist()
+    ]
+    shuffled = propagate_linear_weights_draws(shuffled_counts, re_draws)
+
+    baseline_sorted = baseline.sort(["season", "league", "play"])
+    shuffled_sorted = shuffled.sort(["season", "league", "play"])
+    assert baseline_sorted.equals(shuffled_sorted)
+
+
+def test_does_not_disturb_global_numpy_state() -> None:
+    re_draws = _re_draws_many(200, seed=23)
+    counts = _transition_counts()
+
+    np.random.seed(1234)
+    expected = np.random.random(5)
+
+    np.random.seed(1234)
+    _ = propagate_linear_weights_draws(counts, re_draws)
+    observed = np.random.random(5)
+
+    assert np.array_equal(expected, observed)

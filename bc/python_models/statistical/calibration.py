@@ -59,6 +59,79 @@ def expected_calibration_error(
     return ece
 
 
+def _confidence_and_correctness(
+    probs: FloatArray, labels: IntArray
+) -> tuple[FloatArray, FloatArray]:
+    if probs.ndim != 2:
+        raise ValueError(f"probs must be 2-D (n, k); got shape {probs.shape}")
+    if labels.shape != (probs.shape[0],):
+        raise ValueError(
+            f"labels shape {labels.shape} != ({probs.shape[0]},)"
+        )
+    confidence = probs.max(axis=1)
+    correct = (probs.argmax(axis=1) == labels).astype(np.float64)
+    return confidence, correct
+
+
+def multiclass_expected_calibration_error(
+    probs: Sequence[Sequence[float]] | FloatArray,
+    labels: Sequence[int] | IntArray,
+    *,
+    n_bins: int = 15,
+) -> float:
+    """Top-label (max-probability) ECE for multiclass probability vectors.
+
+    Bins events by the confidence of the argmax class and accumulates the
+    gap between mean confidence and empirical top-1 accuracy per bin.
+    """
+    p = np.asarray(probs, dtype=np.float64)
+    y = np.asarray(labels, dtype=np.int64)
+    if p.size == 0:
+        return 0.0
+    confidence, correct = _confidence_and_correctness(p, y)
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_ids = np.clip(np.digitize(confidence, bin_edges[1:-1], right=False), 0, n_bins - 1)
+    total = float(confidence.size)
+    ece = 0.0
+    for b in range(n_bins):
+        mask = bin_ids == b
+        if not np.any(mask):
+            continue
+        conf = float(np.mean(confidence[mask]))
+        acc = float(np.mean(correct[mask]))
+        weight = float(np.sum(mask)) / total
+        ece += weight * abs(conf - acc)
+    return ece
+
+
+def multiclass_reliability_curve(
+    probs: Sequence[Sequence[float]] | FloatArray,
+    labels: Sequence[int] | IntArray,
+    *,
+    n_bins: int = 15,
+) -> list[tuple[float, float, int]]:
+    """Return ``(mean_confidence, empirical_accuracy, count)`` per non-empty bin.
+
+    The multiclass analogue of :func:`reliability_curve`, binned on the
+    argmax-class confidence.
+    """
+    p = np.asarray(probs, dtype=np.float64)
+    y = np.asarray(labels, dtype=np.int64)
+    if p.size == 0:
+        return []
+    confidence, correct = _confidence_and_correctness(p, y)
+    bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_ids = np.clip(np.digitize(confidence, bin_edges[1:-1], right=False), 0, n_bins - 1)
+    out: list[tuple[float, float, int]] = []
+    for b in range(n_bins):
+        mask = bin_ids == b
+        n = int(np.sum(mask))
+        if n == 0:
+            continue
+        out.append((float(np.mean(confidence[mask])), float(np.mean(correct[mask])), n))
+    return out
+
+
 def reliability_curve(
     probs: Sequence[float] | FloatArray,
     labels: Sequence[int] | IntArray,
