@@ -11,12 +11,15 @@ coverage (secondary ``hdi_cov_param``) from held-out game folds, and folds
 the predictive finding into the row.
 
 Read-only by default. ``--write`` persists each ``validation_report.json``
-beside its artifact; without it, no manifest or report is mutated.
+beside its artifact and stamps the artifact's ``manifest.json``
+``validation_status`` from the gate result; without it, neither the
+manifest nor the report is mutated.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -39,13 +42,20 @@ from python_models.statistical.manifests import (  # noqa: E402
     read_manifest,
     read_published_pointer,
 )
-from python_models.statistical.schemas import ValidationReport  # noqa: E402
+from python_models.statistical.schemas import (  # noqa: E402
+    ValidationFinding,
+    ValidationReport,
+    ValidationStatus,
+)
 from python_models.statistical.validate import (  # noqa: E402
     find_manifest,
     validate_artifact,
 )
 
 log = logging.getLogger("validate_gates")
+
+NO_DISPATCH_CODE = "validate_no_dispatch"
+STAMP_FAILED_CODE = "gate_write_failed"
 
 _CANDIDATE_ROOTS: tuple[Path, ...] = (
     cfg.DEEP_ROOT,
@@ -81,6 +91,7 @@ class GateRow(BaseModel):
     model: str
     artifact_id: str
     status: str
+    manifest_status: str | None = None
     hdi_coverage: float | None = None
     hdi_coverage_param: float | None = None
     findings: tuple[str, ...] = ()
@@ -92,7 +103,9 @@ def discover_pointers(
     roots: tuple[Path, Path] | None = None,
 ) -> dict[str, Path]:
     """Return ``model_name -> pointer_path`` with branch shadowing global."""
-    branch_root, global_root = roots if roots is not None else cfg.resolve_published_roots()
+    branch_root, global_root = (
+        roots if roots is not None else cfg.resolve_published_roots()
+    )
     resolved: dict[str, Path] = {}
     for root in (global_root, branch_root):
         if not root.exists():
@@ -139,7 +152,9 @@ def _coverage_for(
 def _write_report(artifact_dir: Path, report: ValidationReport) -> None:
     out = artifact_dir / "validation" / "validation_report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(out.parent), prefix=".validation.", suffix=".json")
+    fd, tmp = tempfile.mkstemp(
+        dir=str(out.parent), prefix=".validation.", suffix=".json"
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             _ = fh.write(report.model_dump_json(indent=2))
@@ -150,6 +165,40 @@ def _write_report(artifact_dir: Path, report: ValidationReport) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+def _stamp_manifest_validation_status(
+    manifest_path: Path, status: ValidationStatus
+) -> bool:
+    """Rewrite the manifest's ``validation_status`` key to ``status`` if it changed.
+
+    Operates on the raw JSON rather than a parsed ``ArtifactManifest`` so
+    on-disk keys the schema does not declare survive the rewrite. No-op (and
+    no write) when the manifest already carries ``status``. Returns whether a
+    write happened.
+    """
+    payload: dict[str, object] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if payload.get("validation_status") == status:
+        return False
+    payload["validation_status"] = status
+    fd, tmp = tempfile.mkstemp(
+        dir=str(manifest_path.parent), prefix=".manifest.", suffix=".json"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            _ = fh.write(json.dumps(payload, indent=2))
+        os.replace(tmp, manifest_path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
+    return True
+
+
+def _status_from_findings(findings: tuple[ValidationFinding, ...]) -> ValidationStatus:
+    return "failed" if any(f.severity == "block" for f in findings) else "passed"
 
 
 def evaluate_gate(
@@ -186,36 +235,86 @@ def evaluate_gate(
     if predictive is not None:
         hdi_coverage = predictive.coverage
         if predictive.finding is not None:
+            merged = (*report.findings, predictive.finding)
             report = report.model_copy(
-                update={"findings": (*report.findings, predictive.finding)}
+                update={
+                    "findings": merged,
+                    "status": _status_from_findings(merged),
+                }
             )
     if parameter is not None:
         hdi_coverage_param = parameter.coverage
 
+    manifest_status: str = str(manifest.validation_status)
+    row_status: str = report.status
+    extra_codes: tuple[str, ...] = ()
     if write:
-        _write_report(artifact_dir, report)
+        try:
+            _write_report(artifact_dir, report)
+            if any(f.code == NO_DISPATCH_CODE for f in report.findings):
+                log.info(
+                    "stamp skipped model=%s artifact_id=%s: %s (no validator registered)",
+                    model,
+                    artifact_id,
+                    NO_DISPATCH_CODE,
+                )
+            else:
+                stamped = _stamp_manifest_validation_status(
+                    manifest_path, report.status
+                )
+                if stamped:
+                    log.info(
+                        "stamped manifest validation_status model=%s artifact_id=%s %s -> %s",
+                        model,
+                        artifact_id,
+                        manifest.validation_status,
+                        report.status,
+                    )
+                manifest_status = report.status
+        except Exception:
+            log.exception(
+                "persisting gate result failed model=%s artifact_id=%s",
+                model,
+                artifact_id,
+            )
+            row_status = "error"
+            extra_codes = (f"{STAMP_FAILED_CODE}(block)",)
 
     findings = [f for f in report.findings if f.severity != "info"]
     codes = tuple(f"{f.code}({f.severity})" for f in findings)
     return GateRow(
         model=model,
         artifact_id=artifact_id,
-        status=report.status,
+        status=row_status,
+        manifest_status=manifest_status,
         hdi_coverage=hdi_coverage,
         hdi_coverage_param=hdi_coverage_param,
-        findings=codes,
+        findings=(*codes, *extra_codes),
     )
 
 
 def format_table(rows: list[GateRow]) -> str:
-    header = ("model", "artifact_id", "status", "hdi_cov", "hdi_cov_param", "findings")
-    n_fixed = 5
-    body: list[tuple[str, str, str, str, str, str]] = []
+    header = (
+        "model",
+        "artifact_id",
+        "status",
+        "manifest_status",
+        "hdi_cov",
+        "hdi_cov_param",
+        "findings",
+    )
+    n_fixed = 6
+    body: list[tuple[str, str, str, str, str, str, str]] = []
     for r in rows:
+        manifest_status = r.manifest_status or "-"
         cov = "-" if r.hdi_coverage is None else f"{r.hdi_coverage:.4f}"
-        cov_param = "-" if r.hdi_coverage_param is None else f"{r.hdi_coverage_param:.4f}"
+        cov_param = (
+            "-" if r.hdi_coverage_param is None else f"{r.hdi_coverage_param:.4f}"
+        )
         fired = ", ".join(r.findings) if r.findings else "-"
-        body.append((r.model, r.artifact_id, r.status, cov, cov_param, fired))
+        body.append(
+            (r.model, r.artifact_id, r.status, manifest_status, cov, cov_param, fired)
+        )
     widths = [len(h) for h in header]
     for row in body:
         for i, cell in enumerate(row[:n_fixed]):
@@ -240,7 +339,10 @@ def main(argv: list[str] | None = None) -> int:
     _ = parser.add_argument(
         "--write",
         action="store_true",
-        help="persist validation_report.json beside each artifact (default off)",
+        help=(
+            "persist validation_report.json and stamp manifest.validation_status "
+            "beside each artifact (default off)"
+        ),
     )
     _ = parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -263,7 +365,9 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             log.exception("gate evaluation failed for %s: %s", model, exc)
             rows.append(
-                GateRow(model=model, artifact_id="?", status="error", findings=(str(exc),))
+                GateRow(
+                    model=model, artifact_id="?", status="error", findings=(str(exc),)
+                )
             )
 
     print(format_table(rows))

@@ -195,7 +195,9 @@ validate-artifact ARTIFACT_ID *ARGS:
 
 # Sweep every published pointer, run its calibration gates, and print the
 # status + fired-findings table (referee-7 evidence snapshot). Read-only by
-# default; pass `--write` to persist validation_report.json beside each artifact.
+# default; pass `--write` to persist validation_report.json beside each artifact
+# and stamp that artifact's manifest validation_status, which is where the
+# published estimated tier gets its confidence_status.
 # Usage: just validate-gates [model ...] [--write]
 validate-gates *ARGS:
     {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group build python scripts/validate_gates.py {{ ARGS }}

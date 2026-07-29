@@ -420,10 +420,44 @@ coarsened batter/pitcher bucketing). The `has_count` coverage Bernoulli arm IS b
 (`models/pitch_coverage.py`); it is a standalone prep+builder not yet wired to a CLI target.
 
 ### Paper revision — remaining operational items (2026-07-14)
-- `just promote-prod main_models.linear_weights_estimated` — the Dirichlet
-  finite-sample bands are validated in dev but the prod table still carries the
-  old narrow bands (agent prod write denied; run manually).
-- confidence_status re-stamp: `just validate-gates --write` moves published
-  artifacts off `exploratory` where gates pass (18/23 currently).
+- ~~`just promote-prod main_models.linear_weights_estimated`~~ done 2026-07-14:
+  prod carries `re-full-eraregime-v2` at median HDI width 0.05688.
 - Strip `<!-- src: -->` provenance comments from `notes/paper/` markdown before
   any external submission (the PDF build already strips them).
+
+### confidence_status: re-materialize the estimated tier (2026-07-29)
+
+`validate-gates --write` now stamps each artifact manifest's
+`validation_status`; before this it only wrote `validation_report.json`, and
+nothing else in the repo ever assigned the field, so every published table read
+the `exploratory` default. The 19 resolvable pointers are stamped on disk (18
+`passed`, `geometry_location_depth` `failed`). The published tables still read
+`exploratory` — `confidence_status` is stamped at materialization time, so the
+twelve estimated `@model`s need restating in prod to pick it up.
+`linear_weights_estimated` reads `run_expectancy`'s manifest and inherits
+`passed`.
+
+Two things to settle first:
+
+- `geometry_location_depth` (`e-v12-noprop-location_depth-shrunk`) fails its
+  gate: held-out top-1 0.56091 against a modal-class baseline of 0.56111 over
+  505,921 events. The model adds nothing over predicting the modal depth class,
+  and the check has no tolerance band by design. `geometry_location_side` sits
+  in the same territory (0.6976 vs 0.6976) and passes only on a hair. Decide
+  whether `imputed_batted_ball_geometry` should publish those dimensions with
+  `confidence_status='failed'` or withhold them.
+- `artifacts/statistical/published-data_coverage/` is stale — its pointers are
+  one or two artifact generations behind the global root
+  (`artifacts/statistical/published/`), which is what prod was built from. A
+  branch whose slug matches an existing per-branch root will silently shadow the
+  global pointers and validate the wrong artifacts. Delete the stale roots or
+  re-point them.
+- The four `dl_proposal_*` pointers resolve to `missing` in the sweep, and
+  always will: `find_manifest` looks under `<root>/<model_name>/<artifact_id>/`
+  using the pointer name, but the deep artifacts sit under their target-name
+  directory — `deep/geometry_trajectory/phase3-trajectory-v9-cv/`, not
+  `deep/dl_proposal_trajectory/...`. The `model_name is not None` branch never
+  falls back to the rglob search, so it gives up. Deep outputs never publish as
+  facts and feed no estimated table, so this blocks nothing; fixing it means
+  mapping pointer name → deep target name without weakening the ambiguity guard
+  that the `model_name` argument exists to provide.
