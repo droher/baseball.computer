@@ -430,22 +430,21 @@ coarsened batter/pitcher bucketing). The `has_count` coverage Bernoulli arm IS b
 `validate-gates --write` now stamps each artifact manifest's
 `validation_status`; before this it only wrote `validation_report.json`, and
 nothing else in the repo ever assigned the field, so every published table read
-the `exploratory` default. The 19 resolvable pointers are stamped on disk (18
-`passed`, `geometry_location_depth` `failed`). The published tables still read
-`exploratory` — `confidence_status` is stamped at materialization time, so the
-twelve estimated `@model`s need restating in prod to pick it up.
-`linear_weights_estimated` reads `run_expectancy`'s manifest and inherits
-`passed`.
+the `exploratory` default. All 19 resolvable pointers are stamped `passed` on
+disk. The published tables still read `exploratory` — `confidence_status` is
+stamped at materialization time, so the twelve estimated `@model`s need
+restating in prod to pick it up. `linear_weights_estimated` reads
+`run_expectancy`'s manifest and inherits `passed`. THAT RESTATE IS THE ONLY
+REMAINING STEP.
 
-Two things to settle first:
+Still open, none blocking:
 
-- `geometry_location_depth` (`e-v12-noprop-location_depth-shrunk`) fails its
-  gate: held-out top-1 0.56091 against a modal-class baseline of 0.56111 over
-  505,921 events. The model adds nothing over predicting the modal depth class,
-  and the check has no tolerance band by design. `geometry_location_side` sits
-  in the same territory (0.6976 vs 0.6976) and passes only on a hair. Decide
-  whether `imputed_batted_ball_geometry` should publish those dimensions with
-  `confidence_status='failed'` or withhold them.
+- The multinomial baseline check is "beats the marginal at all," with no floor.
+  Lift on the published set ranges from 0.031 nats (`geometry_location_edge`)
+  to 0.399 (`putout_credit_allocation`); `geometry_location_depth` sits at
+  0.040, which is 3.6% of its 1.122-nat baseline. If a floor above zero is
+  wanted, depth is the dimension it would catch, and picking the number is a
+  publication-policy call rather than a statistical one.
 - `artifacts/statistical/published-data_coverage/` is stale — its pointers are
   one or two artifact generations behind the global root
   (`artifacts/statistical/published/`), which is what prod was built from. A

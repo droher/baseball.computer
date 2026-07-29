@@ -988,6 +988,7 @@ def _evaluate_held_out(
         )
         / max(y.shape[0], 1)
     )
+    baseline_ll = _empirical_class_entropy(y, n_classes=inputs.n_positions)
     distribution = _distribution_calibration(
         safe_shares, y, n_positions=inputs.n_positions
     )
@@ -1023,6 +1024,7 @@ def _evaluate_held_out(
         "pr_auc_per_position": pr_auc_per_pos,
         "pr_auc_macro": pr_auc_macro,
         "baseline_top1_accuracy": baseline_top1,
+        "baseline_log_loss": baseline_ll,
         "ece_held_out": ece_held_out,
         "distribution_calibration": distribution,
         "slice_calibration": slice_calibration,
@@ -1057,6 +1059,26 @@ def _evaluate_held_out(
                 "any_assist_pr_auc": obs_pr_auc_any,
             }
     return result
+
+
+def _empirical_class_entropy(y: np.ndarray, *, n_classes: int) -> float:
+    """Shannon entropy in nats of the empirical class distribution of ``y``.
+
+    This is the log-loss a predictor achieves by emitting that same
+    distribution for every event — the share-space counterpart of the
+    modal-class ``baseline_top1_accuracy``, and like it an oracle
+    baseline computed on the held-out labels themselves.
+
+    A degenerate held-out set (empty, or with all mass on one class)
+    yields zero, which carries no information about a model and which
+    consumers of the emitted value treat as no baseline at all.
+    """
+    n = int(y.shape[0])
+    if n == 0 or n_classes <= 0:
+        return 0.0
+    q = np.bincount(y, minlength=n_classes) / n
+    support = q[q > 0.0]
+    return float(-np.sum(support * np.log(support)))
 
 
 def _distribution_calibration(

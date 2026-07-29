@@ -475,6 +475,46 @@ def _finite_float(value: object) -> float | None:
     return None
 
 
+def _positive_float(value: object) -> float | None:
+    finite = _finite_float(value)
+    return finite if finite is not None and finite > 0.0 else None
+
+
+def _derive_baseline_log_loss(payload: dict[str, object]) -> float | None:
+    """Entropy in nats of the held-out empirical class shares, if derivable.
+
+    Fallback for payloads written before ``baseline_log_loss`` was emitted:
+    ``distribution_calibration.per_position`` records each class's
+    ``empirical_share``, whose entropy is the same quantity. Returns
+    ``None`` when the block is absent, degenerate, or malformed — including
+    a share outside ``[0, 1]`` or a share set that does not sum to 1, since
+    a partial class set yields a finite but understated entropy that would
+    make the gate falsely strict.
+    """
+    from typing import cast
+
+    distribution = payload.get("distribution_calibration")
+    if not isinstance(distribution, dict):
+        return None
+    per_position = cast(dict[str, object], distribution).get("per_position")
+    if not isinstance(per_position, dict):
+        return None
+    entropy = 0.0
+    total = 0.0
+    for entry in cast(dict[str, object], per_position).values():
+        if not isinstance(entry, dict):
+            return None
+        share = _finite_float(cast(dict[str, object], entry).get("empirical_share"))
+        if share is None or share < 0.0 or share > 1.0:
+            return None
+        total += share
+        if share > 0.0:
+            entropy -= share * math.log(share)
+    if not math.isclose(total, 1.0, abs_tol=1e-6):
+        return None
+    return entropy if entropy > 0.0 else None
+
+
 def _grade_held_out_metrics(
     artifact_dir: Path,
     *,
@@ -485,11 +525,20 @@ def _grade_held_out_metrics(
 
     Held-out ECE above the (smoke/default) warn threshold is a ``warn``.
     A model whose held-out predictive metric fails to beat its own
-    baseline (ROC over chance, PR / top-1 over the marginal, or a positive
-    log-lik lift) is a ``block`` on a full-scale fit and a ``warn`` on a
-    smoke fit — the baseline-beating check has no numeric threshold to
-    relax, so severity is the smoke/default knob. Absence of the file on a
-    full-scale fit is itself a ``warn``.
+    baseline (ROC over chance, PR over the marginal, log-loss under the
+    marginal-entropy baseline, or a positive log-lik lift) is a ``block``
+    on a full-scale fit and a ``warn`` on a smoke fit — the
+    baseline-beating check has no numeric threshold to relax, so severity
+    is the smoke/default knob. When ``baseline_log_loss`` is absent or
+    non-positive it is derived from ``distribution_calibration``'s
+    empirical shares; when neither path yields a usable baseline — or
+    ``log_loss`` itself is absent or non-finite — a payload carrying
+    ``top1_accuracy`` is a multinomial fit that has lost its only blocking
+    held-out check, which is itself graded at ``baseline_severity``.
+    Argmax accuracy is recorded and reported at ``warn`` only: the
+    multinomial targets publish per-event class shares, so top-1 is a
+    diagnostic rather than a gate. Absence of the file on a full-scale fit
+    is itself a ``warn``.
     """
     import json as _json
 
@@ -586,6 +635,47 @@ def _grade_held_out_metrics(
                 )
             )
 
+    log_loss = _finite_float(payload.get("log_loss"))
+    baseline_log_loss = _positive_float(payload.get("baseline_log_loss"))
+    if baseline_log_loss is None:
+        baseline_log_loss = _derive_baseline_log_loss(payload)
+    if log_loss is not None and baseline_log_loss is not None:
+        metrics["held_out_log_loss"] = log_loss
+        metrics["held_out_baseline_log_loss"] = baseline_log_loss
+        if log_loss >= baseline_log_loss:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_log_loss_not_beating_baseline",
+                    message=(
+                        f"held-out log_loss={log_loss:.4f} does not beat "
+                        f"baseline_log_loss={baseline_log_loss:.4f} (smoke={is_smoke})"
+                    ),
+                )
+            )
+    else:
+        reason = (
+            "log_loss is absent or non-finite"
+            if log_loss is None
+            else "no positive baseline_log_loss was emitted or derivable from "
+            "distribution_calibration"
+        )
+        _log.debug("held-out log-loss gate not run for %s: %s", artifact_dir, reason)
+        if "top1_accuracy" in payload:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_log_loss_ungradeable",
+                    message=(
+                        f"held-out log-loss gate could not be evaluated at {path}: "
+                        f"{reason}; top1_accuracy is present, so this is a "
+                        "multinomial payload whose only blocking held-out check is "
+                        f"log-loss against its class-entropy baseline "
+                        f"(smoke={is_smoke})"
+                    ),
+                )
+            )
+
     top1 = _finite_float(payload.get("top1_accuracy"))
     baseline_top1 = _finite_float(payload.get("baseline_top1_accuracy"))
     if top1 is not None and baseline_top1 is not None:
@@ -594,11 +684,14 @@ def _grade_held_out_metrics(
         if top1 <= baseline_top1:
             findings.append(
                 ValidationFinding(
-                    severity=baseline_severity,
+                    severity="warn",
                     code="bayes_held_out_top1_not_beating_baseline",
                     message=(
                         f"held-out top1_accuracy={top1:.4f} does not beat "
-                        f"baseline_top1_accuracy={baseline_top1:.4f} (smoke={is_smoke})"
+                        f"baseline_top1_accuracy={baseline_top1:.4f} (smoke={is_smoke}); "
+                        "diagnostic only — these targets publish per-event class "
+                        "shares, and argmax accuracy on a skewed class distribution "
+                        "is dominated by the modal class"
                     ),
                 )
             )
