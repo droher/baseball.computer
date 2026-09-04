@@ -4,10 +4,21 @@ Reads the per-event ``model_input_pitch_summary`` Parquet, restricts to the
 ``has_count`` slice (the era/sources where the plate appearance's final
 ball-strike count is recorded), and aggregates to ``(result_family, season,
 league)`` cells. Each cell carries a length-12 count vector over the final-count
-classes (balls 0-3 x strikes 0-2, ``class = balls*3 + strikes``). Cells below
-``MIN_EVENTS_PER_CELL`` training events are dropped as unidentified. A
-deterministic 10% game holdout (``game_hash_fold``, fold 0) ships alongside
-training for OOS scoring, with cells unseen in training encoded to ``-1``.
+classes (balls 0-3 x strikes 0-2, ``class = balls*3 + strikes``).
+
+Two result families obey a hard structural constraint on the final count: a
+strikeout can only end with two strikes and a walk (intentional walks are folded
+into the same family upstream) can only end with three balls. ``reachable_classes``
+is the single definition of that rule. Events recorded in a structurally
+impossible cell are data errors; they are dropped from both the training and the
+held-out counts with a logged tally per family, and the per-family
+``reachable_mask`` plus the modal reachable ``ref_class_by_result`` ship on the
+inputs so the builder, the export, and the held-out evaluation share one mask.
+
+Cells below ``MIN_EVENTS_PER_CELL`` training events are dropped as
+unidentified. A deterministic 10% game holdout (``game_hash_fold``, fold 0)
+ships alongside training for OOS scoring, with cells unseen in training encoded
+to ``-1``.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportAttributeAccessIssue=false
@@ -29,6 +40,7 @@ from python_models.statistical.splits import game_hash_fold
 _log = logging.getLogger(__name__)
 
 IntArray = npt.NDArray[np.int64]
+BoolArray = npt.NDArray[np.bool_]
 
 DEFAULT_SEED: int = 20260513
 OUTCOME: str = "final_count"
@@ -44,6 +56,9 @@ N_CLASSES: int = (MAX_BALLS + 1) * (MAX_STRIKES + 1)
 
 UNKNOWN_RESULT: str = "__unknown__"
 SINGLE_SOURCE_LABEL: str = "__single__"
+
+STRIKEOUT_FAMILY: str = "strikeout"
+WALK_FAMILY: str = "walk"
 
 
 class PitchSummaryHeldOutSet(BaseModel):
@@ -67,6 +82,8 @@ class PitchSummaryInputs(BaseModel):
 
     counts: IntArray
     cell_result_idx: IntArray
+    reachable_mask: BoolArray
+    ref_class_by_result: IntArray
 
     cell_labels: list[str]
     result_by_cell: list[str]
@@ -93,6 +110,14 @@ class PitchSummaryInputs(BaseModel):
     def n_classes(self) -> int:
         return int(self.counts.shape[1])
 
+    @property
+    def n_result_families(self) -> int:
+        return len(self.result_family_labels)
+
+    @property
+    def cell_reachable_mask(self) -> BoolArray:
+        return self.reachable_mask[self.cell_result_idx]
+
 
 def _class_labels() -> tuple[list[str], list[int], list[int]]:
     labels: list[str] = []
@@ -104,6 +129,29 @@ def _class_labels() -> tuple[list[str], list[int], list[int]]:
             balls.append(b)
             strikes.append(s)
     return labels, balls, strikes
+
+
+def reachable_classes(result_family: str) -> BoolArray:
+    """Structurally reachable final-count classes for one result family."""
+    _, balls, strikes = _class_labels()
+    if result_family == STRIKEOUT_FAMILY:
+        return np.asarray(strikes, dtype=np.int64) == MAX_STRIKES
+    if result_family == WALK_FAMILY:
+        return np.asarray(balls, dtype=np.int64) == MAX_BALLS
+    return np.ones(N_CLASSES, dtype=bool)
+
+
+def _reachable_mask(result_family_labels: Sequence[str]) -> BoolArray:
+    return np.stack([reachable_classes(r) for r in result_family_labels], axis=0)
+
+
+def _reference_by_result(
+    counts: IntArray, cell_result_idx: IntArray, reachable: BoolArray
+) -> IntArray:
+    per_result = np.zeros(reachable.shape, dtype=np.int64)
+    np.add.at(per_result, cell_result_idx, counts)
+    masked = np.where(reachable, per_result, -1)
+    return masked.argmax(axis=1).astype(np.int64)
 
 
 def _aggregate_cells(parquet_path: Path) -> pl.DataFrame:
@@ -131,10 +179,50 @@ def _aggregate_cells(parquet_path: Path) -> pl.DataFrame:
                 "cell"
             )
         )
-        .group_by(["cell", "game_id", "final_class"])
+        .group_by(["cell", "result_family", "game_id", "final_class"])
         .agg(pl.len().alias("n"))
         .collect()
     )
+
+
+def _drop_structurally_impossible(per_game: pl.DataFrame) -> pl.DataFrame:
+    families = sorted(per_game.get_column("result_family").unique().to_list())
+    impossible_rows: list[tuple[str, int]] = [
+        (str(family), int(final_class))
+        for family in families
+        for final_class, reachable in enumerate(reachable_classes(str(family)))
+        if not reachable
+    ]
+    if not impossible_rows:
+        return per_game
+    impossible = pl.DataFrame(
+        {
+            "result_family": [r[0] for r in impossible_rows],
+            "final_class": [r[1] for r in impossible_rows],
+            "_impossible": [True] * len(impossible_rows),
+        },
+        schema={
+            "result_family": pl.Utf8,
+            "final_class": per_game.schema["final_class"],
+            "_impossible": pl.Boolean,
+        },
+    )
+    flagged = per_game.join(impossible, on=["result_family", "final_class"], how="left")
+    dropped = flagged.filter(pl.col("_impossible").is_not_null())
+    if dropped.height:
+        tally = (
+            dropped.group_by("result_family")
+            .agg(pl.col("n").sum().alias("events"))
+            .sort("result_family")
+        )
+        for family, events in tally.iter_rows():
+            _log.info(
+                "prepare_pitch_summary_inputs dropped %d structurally impossible "
+                "events for result_family=%s",
+                int(events),
+                family,
+            )
+    return flagged.filter(pl.col("_impossible").is_null()).drop("_impossible")
 
 
 def _smoke_subsample(
@@ -186,14 +274,16 @@ def prepare_pitch_summary_inputs(
     """Aggregate the ``has_count`` slice to final-count cell-grain counts.
 
     The ``dimension`` kwarg is accepted for interface parity with other prep
-    entrypoints and ignored (this dataset has no dimension column). The
-    ``MIN_EVENTS_PER_CELL`` floor is applied to the full training corpus first;
-    ``smoke_limit`` then subsamples whole games to that event budget (full fits
-    set a budget above the corpus and never subsample).
+    entrypoints and ignored (this dataset has no dimension column). Events in
+    structurally impossible cells are dropped first, so neither the
+    ``MIN_EVENTS_PER_CELL`` floor nor the holdout ever sees them. The floor is
+    applied to the full training corpus; ``smoke_limit`` then subsamples whole
+    games to that event budget (full fits set a budget above the corpus and
+    never subsample).
     """
     _ = dimension
 
-    per_game = _aggregate_cells(parquet_path)
+    per_game = _drop_structurally_impossible(_aggregate_cells(parquet_path))
     if per_game.height == 0:
         raise ValueError(
             f"no has_count rows with a parseable final count in {parquet_path}"
@@ -259,6 +349,9 @@ def prepare_pitch_summary_inputs(
 
     class_labels, balls_by_class, strikes_by_class = _class_labels()
 
+    reachable_mask = _reachable_mask(result_family_labels)
+    ref_class_by_result = _reference_by_result(counts, cell_result_idx, reachable_mask)
+
     held_out = _build_held_out_set(
         held_games,
         cell_labels=cell_labels,
@@ -269,22 +362,25 @@ def prepare_pitch_summary_inputs(
     coords: dict[str, list[str]] = {
         "source": [SINGLE_SOURCE_LABEL],
         "class": list(class_labels),
-        "class_nonref": list(class_labels[1:]),
         "result_family": list(result_family_labels),
         "cell": list(cell_labels),
     }
 
     _log.info(
-        "prepare_pitch_summary_inputs train_cells=%d held_out_cells=%d results=%d events=%d",
+        "prepare_pitch_summary_inputs train_cells=%d held_out_cells=%d results=%d "
+        "reachable_pairs=%d events=%d",
         len(cell_labels),
         held_out.n_cells,
         len(result_family_labels),
+        int(reachable_mask.sum()),
         int(counts.sum()),
     )
 
     return PitchSummaryInputs(
         counts=counts,
         cell_result_idx=cell_result_idx,
+        reachable_mask=reachable_mask,
+        ref_class_by_result=ref_class_by_result,
         cell_labels=list(cell_labels),
         result_by_cell=result_by_cell,
         season_by_cell=season_by_cell,

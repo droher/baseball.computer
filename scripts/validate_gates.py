@@ -10,10 +10,17 @@ folds finite-sample noise into the interval) and the parameter 94%-HDI
 coverage (secondary ``hdi_cov_param``) from held-out game folds, and folds
 the predictive finding into the row.
 
-Read-only by default. ``--write`` persists each ``validation_report.json``
-beside its artifact and stamps the artifact's ``manifest.json``
-``validation_status`` from the gate result; without it, neither the
-manifest nor the report is mutated.
+In both modes each Bayes artifact's convergence diagnostics are recomputed
+from ``inference/posterior.nc`` when that file exists and the gate grades
+the recomputed numbers; when it does not exist the gate grades the stored
+``validation/diagnostics.json``. Read-only by default: a dry run and a
+``--write`` run therefore reach the same verdict. ``--write`` persists the
+recomputed diagnostics (rewriting ``validation/diagnostics.json`` and the
+per-variable ``validation/diagnostics_by_variable.json``), persists
+``validation_report.json`` beside the artifact, and stamps the manifest
+with ``validation_status``, ``validation_gate_version``, ``validated_at``,
+and the re-derived ``bayes_extras.weak_identification_flag``. Without
+``--write`` nothing on disk is mutated.
 """
 
 from __future__ import annotations
@@ -21,11 +28,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
-import tempfile
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from pydantic import BaseModel
 
@@ -43,25 +50,45 @@ from python_models.statistical.manifests import (  # noqa: E402
     read_published_pointer,
 )
 from python_models.statistical.schemas import (  # noqa: E402
+    ArtifactManifest,
     ValidationFinding,
     ValidationReport,
     ValidationStatus,
 )
 from python_models.statistical.validate import (  # noqa: E402
+    VALIDATION_GATE_VERSION,
+    PosteriorDiagnostics,
+    _atomic_write_json,
+    compute_posterior_diagnostics,
+    diagnostics_indicate_weak_identification,
     find_manifest,
+    manifest_is_smoke,
     validate_artifact,
+    write_diagnostics_by_variable,
 )
 
 log = logging.getLogger("validate_gates")
 
 NO_DISPATCH_CODE = "validate_no_dispatch"
 STAMP_FAILED_CODE = "gate_write_failed"
+DIAGNOSTICS_FAILED_CODE = "diagnostics_recompute_failed"
+POSTERIOR_FILENAME = "posterior.nc"
 
 _CANDIDATE_ROOTS: tuple[Path, ...] = (
     cfg.DEEP_ROOT,
     cfg.BAYES_ROOT,
     cfg.DATASETS_ROOT,
     cfg.EDA_ROOT,
+)
+
+_DIAGNOSTICS_JSON_KEYS: tuple[str, ...] = (
+    "rhat_max",
+    "ess_bulk_min",
+    "ess_tail_min",
+    "divergences",
+    "total_draws",
+    "group_level_rhat_max",
+    "group_level_ess_bulk_min",
 )
 
 
@@ -92,8 +119,10 @@ class GateRow(BaseModel):
     artifact_id: str
     status: str
     manifest_status: str | None = None
+    manifest_gate_version: int | None = None
     hdi_coverage: float | None = None
     hdi_coverage_param: float | None = None
+    weak_identification_flag: bool | None = None
     findings: tuple[str, ...] = ()
 
 
@@ -151,49 +180,136 @@ def _coverage_for(
 
 def _write_report(artifact_dir: Path, report: ValidationReport) -> None:
     out = artifact_dir / "validation" / "validation_report.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(
-        dir=str(out.parent), prefix=".validation.", suffix=".json"
+    _atomic_write_json(out, report.model_dump_json(indent=2))
+
+
+def _read_json_object(path: Path) -> dict[str, object]:
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{path} is not a JSON object")
+    return cast(dict[str, object], loaded)
+
+
+def compute_diagnostics_from_posterior(
+    artifact_dir: Path,
+) -> PosteriorDiagnostics | None:
+    """Recompute convergence diagnostics from the saved posterior, if any.
+
+    Returns ``None`` when ``inference/posterior.nc`` is absent. Touches
+    nothing on disk; ``persist_posterior_diagnostics`` writes the result.
+    """
+    posterior_path = artifact_dir / "inference" / POSTERIOR_FILENAME
+    if not posterior_path.exists():
+        log.info(
+            "no %s under %s; diagnostics not recomputed",
+            POSTERIOR_FILENAME,
+            artifact_dir,
+        )
+        return None
+    import arviz as az
+
+    idata = az.from_netcdf(posterior_path)
+    diagnostics = compute_posterior_diagnostics(idata)
+    log.info(
+        "recomputed diagnostics under %s: rhat_max=%.4f ess_bulk_min=%.1f "
+        "group_level_rhat_max=%.4f group_level_ess_bulk_min=%.1f (%d variables, "
+        "%d excluded)",
+        artifact_dir,
+        diagnostics.rhat_max,
+        diagnostics.ess_bulk_min,
+        diagnostics.group_level_rhat_max,
+        diagnostics.group_level_ess_bulk_min,
+        len(diagnostics.by_variable),
+        len(diagnostics.excluded_variables),
     )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            _ = fh.write(report.model_dump_json(indent=2))
-        os.replace(tmp, out)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except FileNotFoundError:
-            pass
-        raise
+    return diagnostics
 
 
-def _stamp_manifest_validation_status(
-    manifest_path: Path, status: ValidationStatus
+def diagnostics_overrides(
+    diagnostics: PosteriorDiagnostics | None,
+) -> dict[str, object] | None:
+    """The convergence keys the gate grades in place of the stored file's."""
+    if diagnostics is None:
+        return None
+    return {key: getattr(diagnostics, key) for key in _DIAGNOSTICS_JSON_KEYS}
+
+
+def persist_posterior_diagnostics(
+    artifact_dir: Path, diagnostics: PosteriorDiagnostics
+) -> None:
+    """Write the per-variable table and the convergence keys of ``diagnostics.json``.
+
+    Rewrites the convergence keys in place; other keys such as ``is_smoke``
+    and ``calibration_ece`` survive.
+    """
+    validation_dir = artifact_dir / "validation"
+    _ = write_diagnostics_by_variable(validation_dir, diagnostics.by_variable)
+    diagnostics_path = validation_dir / "diagnostics.json"
+    payload: dict[str, object] = (
+        _read_json_object(diagnostics_path) if diagnostics_path.exists() else {}
+    )
+    payload.update(diagnostics_overrides(diagnostics) or {})
+    _atomic_write_json(diagnostics_path, json.dumps(payload, indent=2))
+
+
+def derive_weak_identification_flag(
+    manifest: ArtifactManifest,
+    artifact_dir: Path,
+    diagnostics: PosteriorDiagnostics,
 ) -> bool:
-    """Rewrite the manifest's ``validation_status`` key to ``status`` if it changed.
+    return diagnostics_indicate_weak_identification(
+        rhat_max=diagnostics.group_level_rhat_max,
+        ess_bulk_min=diagnostics.group_level_ess_bulk_min,
+        divergences=diagnostics.divergences,
+        is_smoke=manifest_is_smoke(manifest, artifact_dir),
+    )
+
+
+def _stamp_manifest_gate_result(
+    manifest_path: Path,
+    *,
+    status: ValidationStatus,
+    gate_version: int = VALIDATION_GATE_VERSION,
+    validated_at: datetime | None = None,
+    weak_identification_flag: bool | None = None,
+    diagnostics: PosteriorDiagnostics | None = None,
+) -> bool:
+    """Stamp the gate verdict and its provenance into the manifest JSON.
 
     Operates on the raw JSON rather than a parsed ``ArtifactManifest`` so
-    on-disk keys the schema does not declare survive the rewrite. No-op (and
-    no write) when the manifest already carries ``status``. Returns whether a
-    write happened.
+    on-disk keys the schema does not declare survive the rewrite. Writes
+    whenever the status, the gate version, the weak-identification flag,
+    or the diagnostics summary would change; ``validated_at`` alone never
+    forces a write, so a re-run that changes nothing leaves the file
+    untouched. Returns whether a write happened.
     """
-    payload: dict[str, object] = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if payload.get("validation_status") == status:
+    payload = _read_json_object(manifest_path)
+    updated: dict[str, object] = dict(payload)
+    updated["validation_status"] = status
+    updated["validation_gate_version"] = gate_version
+    extras_raw = updated.get("bayes_extras")
+    if isinstance(extras_raw, dict):
+        extras = dict(cast(dict[str, object], extras_raw))
+        if weak_identification_flag is not None:
+            extras["weak_identification_flag"] = weak_identification_flag
+        summary_raw = extras.get("diagnostics_summary")
+        if diagnostics is not None and isinstance(summary_raw, dict):
+            summary = dict(cast(dict[str, object], summary_raw))
+            for key in _DIAGNOSTICS_JSON_KEYS:
+                summary[key] = getattr(diagnostics, key)
+            extras["diagnostics_summary"] = summary
+        updated["bayes_extras"] = extras
+
+    def _without_timestamp(doc: dict[str, object]) -> dict[str, object]:
+        return {k: v for k, v in doc.items() if k != "validated_at"}
+
+    if _without_timestamp(updated) == _without_timestamp(payload):
         return False
-    payload["validation_status"] = status
-    fd, tmp = tempfile.mkstemp(
-        dir=str(manifest_path.parent), prefix=".manifest.", suffix=".json"
+    stamp_time = (
+        validated_at if validated_at is not None else datetime.now(tz=timezone.utc)
     )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            _ = fh.write(json.dumps(payload, indent=2))
-        os.replace(tmp, manifest_path)
-    except BaseException:
-        try:
-            os.unlink(tmp)
-        except FileNotFoundError:
-            pass
-        raise
+    updated["validated_at"] = stamp_time.isoformat()
+    _atomic_write_json(manifest_path, json.dumps(updated, indent=2))
     return True
 
 
@@ -219,9 +335,42 @@ def evaluate_gate(
         return GateRow(model=model, artifact_id=artifact_id, status="missing")
     artifact_dir = manifest_path.parent
     manifest = read_manifest(manifest_path)
+    weak_identification_flag: bool | None = (
+        manifest.bayes_extras.weak_identification_flag
+        if manifest.bayes_extras is not None
+        else None
+    )
+
+    diagnostics: PosteriorDiagnostics | None = None
+    if manifest.kind == "bayes":
+        try:
+            diagnostics = compute_diagnostics_from_posterior(artifact_dir)
+            if write and diagnostics is not None:
+                persist_posterior_diagnostics(artifact_dir, diagnostics)
+        except Exception:
+            log.exception(
+                "recomputing diagnostics failed model=%s artifact_id=%s",
+                model,
+                artifact_id,
+            )
+            return GateRow(
+                model=model,
+                artifact_id=artifact_id,
+                status="error",
+                manifest_status=str(manifest.validation_status),
+                weak_identification_flag=weak_identification_flag,
+                findings=(f"{DIAGNOSTICS_FAILED_CODE}(block)",),
+            )
+        if diagnostics is not None:
+            weak_identification_flag = derive_weak_identification_flag(
+                manifest, artifact_dir, diagnostics
+            )
 
     report = validate_artifact(
-        artifact_id, model_name=model, candidate_roots=candidate_roots
+        artifact_id,
+        model_name=model,
+        candidate_roots=candidate_roots,
+        diagnostics_overrides=diagnostics_overrides(diagnostics),
     )
 
     predictive, parameter = _coverage_for(
@@ -246,6 +395,7 @@ def evaluate_gate(
         hdi_coverage_param = parameter.coverage
 
     manifest_status: str = str(manifest.validation_status)
+    manifest_gate_version: int | None = manifest.validation_gate_version
     row_status: str = report.status
     extra_codes: tuple[str, ...] = ()
     if write:
@@ -259,18 +409,27 @@ def evaluate_gate(
                     NO_DISPATCH_CODE,
                 )
             else:
-                stamped = _stamp_manifest_validation_status(
-                    manifest_path, report.status
+                stamped = _stamp_manifest_gate_result(
+                    manifest_path,
+                    status=report.status,
+                    weak_identification_flag=(
+                        weak_identification_flag if diagnostics is not None else None
+                    ),
+                    diagnostics=diagnostics,
                 )
                 if stamped:
                     log.info(
-                        "stamped manifest validation_status model=%s artifact_id=%s %s -> %s",
+                        "stamped manifest model=%s artifact_id=%s status %s -> %s "
+                        "gate_version=%d weak_identification_flag=%s",
                         model,
                         artifact_id,
                         manifest.validation_status,
                         report.status,
+                        VALIDATION_GATE_VERSION,
+                        weak_identification_flag,
                     )
                 manifest_status = report.status
+                manifest_gate_version = VALIDATION_GATE_VERSION
         except Exception:
             log.exception(
                 "persisting gate result failed model=%s artifact_id=%s",
@@ -287,8 +446,10 @@ def evaluate_gate(
         artifact_id=artifact_id,
         status=row_status,
         manifest_status=manifest_status,
+        manifest_gate_version=manifest_gate_version,
         hdi_coverage=hdi_coverage,
         hdi_coverage_param=hdi_coverage_param,
+        weak_identification_flag=weak_identification_flag,
         findings=(*codes, *extra_codes),
     )
 
@@ -299,21 +460,41 @@ def format_table(rows: list[GateRow]) -> str:
         "artifact_id",
         "status",
         "manifest_status",
+        "gate_v",
         "hdi_cov",
         "hdi_cov_param",
+        "weak_id",
         "findings",
     )
-    n_fixed = 6
-    body: list[tuple[str, str, str, str, str, str, str]] = []
+    n_fixed = 8
+    body: list[tuple[str, ...]] = []
     for r in rows:
         manifest_status = r.manifest_status or "-"
+        gate_version = (
+            "-" if r.manifest_gate_version is None else str(r.manifest_gate_version)
+        )
         cov = "-" if r.hdi_coverage is None else f"{r.hdi_coverage:.4f}"
         cov_param = (
             "-" if r.hdi_coverage_param is None else f"{r.hdi_coverage_param:.4f}"
         )
+        weak = (
+            "-"
+            if r.weak_identification_flag is None
+            else str(r.weak_identification_flag)
+        )
         fired = ", ".join(r.findings) if r.findings else "-"
         body.append(
-            (r.model, r.artifact_id, r.status, manifest_status, cov, cov_param, fired)
+            (
+                r.model,
+                r.artifact_id,
+                r.status,
+                manifest_status,
+                gate_version,
+                cov,
+                cov_param,
+                weak,
+                fired,
+            )
         )
     widths = [len(h) for h in header]
     for row in body:
@@ -340,8 +521,11 @@ def main(argv: list[str] | None = None) -> int:
         "--write",
         action="store_true",
         help=(
-            "persist validation_report.json and stamp manifest.validation_status "
-            "beside each artifact (default off)"
+            "persist the Bayes diagnostics recomputed from inference/posterior.nc, "
+            "persist validation_report.json, and stamp validation_status, "
+            "validation_gate_version, validated_at, and "
+            "weak_identification_flag into each manifest (default off; the "
+            "verdict is the same either way)"
         ),
     )
     _ = parser.add_argument("--log-level", default="INFO")

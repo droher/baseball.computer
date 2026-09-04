@@ -32,6 +32,7 @@ from python_models.statistical.schemas import (
     BayesPriorConfig,
     BayesSamplerConfig,
 )
+from python_models.statistical.validate import VALIDATION_GATE_VERSION
 
 
 def _synthetic_manifest(
@@ -41,6 +42,7 @@ def _synthetic_manifest(
     model_version: str = "0.7.0",
     source_snapshot_id: str = "snap-xyz",
     validation_status: str = "passed",
+    validation_gate_version: int | None = VALIDATION_GATE_VERSION,
     weak_identification_flag: bool = True,
 ) -> ArtifactManifest:
     extras = BayesArtifactExtras(
@@ -74,6 +76,7 @@ def _synthetic_manifest(
         output_paths={},
         package_versions={},
         validation_status=validation_status,  # type: ignore[arg-type]
+        validation_gate_version=validation_gate_version,
         bayes_extras=extras,
     )
 
@@ -127,6 +130,47 @@ def test_stamp_confidence_status_tracks_validation_status() -> None:
             base, manifest, method="hierarchical_logistic"
         )
         assert out.get_column("confidence_status").to_list() == [status]
+
+
+@pytest.mark.parametrize(
+    "gate_version", [None, VALIDATION_GATE_VERSION - 1, VALIDATION_GATE_VERSION + 1]
+)
+def test_stamp_downgrades_passed_from_other_gate_version(
+    gate_version: int | None, caplog: pytest.LogCaptureFixture
+) -> None:
+    base = pl.DataFrame({"x": pl.Series("x", [1], dtype=pl.UInt32)})
+    manifest = _synthetic_manifest(
+        validation_status="passed", validation_gate_version=gate_version
+    )
+    with caplog.at_level("WARNING", logger="python_models.statistical.bayes.manifest_ingest"):
+        out = stamp_estimated_contract(base, manifest, method="hierarchical_logistic")
+    assert out.get_column("confidence_status").to_list() == ["exploratory"]
+    assert any(
+        manifest.artifact_id in record.getMessage() and record.levelname == "WARNING"
+        for record in caplog.records
+    )
+
+
+def test_stamp_keeps_passed_under_current_gate_version() -> None:
+    base = pl.DataFrame({"x": pl.Series("x", [1], dtype=pl.UInt32)})
+    manifest = _synthetic_manifest(
+        validation_status="passed", validation_gate_version=VALIDATION_GATE_VERSION
+    )
+    out = stamp_estimated_contract(base, manifest, method="hierarchical_logistic")
+    assert out.get_column("confidence_status").to_list() == ["passed"]
+
+
+@pytest.mark.parametrize("status", ["failed", "exploratory"])
+@pytest.mark.parametrize("gate_version", [None, VALIDATION_GATE_VERSION - 1])
+def test_stamp_leaves_non_passed_statuses_alone_regardless_of_version(
+    status: str, gate_version: int | None
+) -> None:
+    base = pl.DataFrame({"x": pl.Series("x", [1], dtype=pl.UInt32)})
+    manifest = _synthetic_manifest(
+        validation_status=status, validation_gate_version=gate_version
+    )
+    out = stamp_estimated_contract(base, manifest, method="hierarchical_logistic")
+    assert out.get_column("confidence_status").to_list() == [status]
 
 
 def test_stamp_requires_bayes_extras() -> None:

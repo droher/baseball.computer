@@ -9,6 +9,8 @@ from pathlib import Path
 import arviz as az
 import numpy as np
 import polars as pl
+import pytest
+from scipy.special import softmax
 
 from python_models.statistical.bayes.training import (
     _evaluate_pitch_summary_held_out,
@@ -17,18 +19,27 @@ from python_models.statistical.bayes.training import (
 from python_models.statistical.models._pitch_summary_data import (
     PitchSummaryHeldOutSet,
     PitchSummaryInputs,
+    _reachable_mask,
+    _reference_by_result,
 )
+from python_models.statistical.models.pitch_summary import MASK_LOGIT
 
-CELL_LABELS = ["out_in_play|2023|AL", "strikeout|2023|NL", "strikeout|2024|AL"]
-RESULT_BY_CELL = ["out_in_play", "strikeout", "strikeout"]
-SEASONS = [2023, 2023, 2024]
-LEAGUES = ["AL", "NL", "AL"]
-RESULT_FAMILY_LABELS = ["out_in_play", "strikeout"]
+CELL_LABELS = [
+    "out_in_play|2023|AL",
+    "strikeout|2023|NL",
+    "strikeout|2024|AL",
+    "walk|2023|AL",
+]
+RESULT_BY_CELL = ["out_in_play", "strikeout", "strikeout", "walk"]
+SEASONS = [2023, 2023, 2024, 2023]
+LEAGUES = ["AL", "NL", "AL", "AL"]
+RESULT_FAMILY_LABELS = ["out_in_play", "strikeout", "walk"]
 
 N_CHAIN = 2
 N_DRAW = 7
 N_CELL = len(CELL_LABELS)
 N_CLASS = 12
+N_RESULT = len(RESULT_FAMILY_LABELS)
 
 
 def _class_axes() -> tuple[list[str], list[int], list[int]]:
@@ -43,17 +54,27 @@ def _class_axes() -> tuple[list[str], list[int], list[int]]:
     return labels, balls, strikes
 
 
+def _cell_result_idx() -> np.ndarray:
+    result_to_idx = {r: i for i, r in enumerate(RESULT_FAMILY_LABELS)}
+    return np.array([result_to_idx[r] for r in RESULT_BY_CELL], dtype=np.int64)
+
+
 def _inputs() -> PitchSummaryInputs:
     class_labels, balls_by_class, strikes_by_class = _class_axes()
-    result_to_idx = {r: i for i, r in enumerate(RESULT_FAMILY_LABELS)}
-    cell_result_idx = np.array(
-        [result_to_idx[r] for r in RESULT_BY_CELL], dtype=np.int64
-    )
+    cell_result_idx = _cell_result_idx()
+    reachable = _reachable_mask(RESULT_FAMILY_LABELS)
     rng = np.random.default_rng(11)
-    counts = rng.integers(2, 9, size=(N_CELL, N_CLASS)).astype(np.int64)
+    counts = (
+        rng.integers(2, 9, size=(N_CELL, N_CLASS)) * reachable[cell_result_idx]
+    ).astype(np.int64)
+    held_counts = (
+        rng.integers(1, 6, size=(N_CELL, N_CLASS)) * reachable[cell_result_idx]
+    ).astype(np.int64)
     return PitchSummaryInputs(
         counts=counts,
         cell_result_idx=cell_result_idx,
+        reachable_mask=reachable,
+        ref_class_by_result=_reference_by_result(counts, cell_result_idx, reachable),
         cell_labels=list(CELL_LABELS),
         result_by_cell=list(RESULT_BY_CELL),
         season_by_cell=list(SEASONS),
@@ -66,48 +87,49 @@ def _inputs() -> PitchSummaryInputs:
         coords={
             "source": ["__single__"],
             "class": list(class_labels),
-            "class_nonref": list(class_labels[1:]),
             "result_family": list(RESULT_FAMILY_LABELS),
             "cell": list(CELL_LABELS),
         },
         held_out=PitchSummaryHeldOutSet(
-            counts=rng.integers(1, 6, size=(N_CELL, N_CLASS)).astype(np.int64),
+            counts=held_counts,
             cell_idx=np.arange(N_CELL, dtype=np.int64),
             cell_result_idx=cell_result_idx,
         ),
     )
 
 
-def _idata() -> az.InferenceData:
-    rng = np.random.default_rng(7)
-    logits = rng.normal(size=(N_CHAIN, N_DRAW, N_CELL, N_CLASS))
-    prob = np.exp(logits)
-    prob /= prob.sum(axis=-1, keepdims=True)
+def _masked_softmax_draws(
+    rng: np.random.Generator, reachable_rows: np.ndarray, *, scale: float = 1.0
+) -> np.ndarray:
+    n_rows = reachable_rows.shape[0]
+    logits = rng.normal(scale=scale, size=(N_CHAIN, N_DRAW, n_rows, N_CLASS))
+    logits = np.where(reachable_rows[None, None, :, :], logits, MASK_LOGIT)
+    return softmax(logits, axis=-1)
+
+
+def _idata(inputs: PitchSummaryInputs, *, seed: int = 7) -> az.InferenceData:
+    rng = np.random.default_rng(seed)
+    cell_prob = _masked_softmax_draws(rng, inputs.cell_reachable_mask)
+    result_prob = _masked_softmax_draws(rng, inputs.reachable_mask)
     posterior = {
-        "cell_class_prob": prob,
-        "beta0": rng.normal(size=(N_CHAIN, N_DRAW, N_CLASS - 1)),
-        "result_logodds": rng.normal(
-            size=(N_CHAIN, N_DRAW, len(RESULT_FAMILY_LABELS), N_CLASS - 1)
-        ),
+        "cell_class_prob": cell_prob,
+        "result_class_prob": result_prob,
     }
-    class_labels, _balls, _strikes = _class_axes()
     coords = {
         "cell": list(CELL_LABELS),
-        "class": list(class_labels),
-        "class_nonref": list(class_labels[1:]),
+        "class": list(inputs.class_labels),
         "result_family": list(RESULT_FAMILY_LABELS),
     }
     dims = {
         "cell_class_prob": ["cell", "class"],
-        "beta0": ["class_nonref"],
-        "result_logodds": ["result_family", "class_nonref"],
+        "result_class_prob": ["result_family", "class"],
     }
     return az.from_dict(posterior=posterior, coords=coords, dims=dims)
 
 
 def test_summary_export_schema_and_row_count(tmp_path: Path) -> None:
     inputs = _inputs()
-    idata = _idata()
+    idata = _idata(inputs)
     target = tmp_path / "pitch_summary_summary.parquet"
     _export_pitch_summary_summary(idata, inputs, target_path=target)
 
@@ -136,7 +158,7 @@ def test_summary_export_schema_and_row_count(tmp_path: Path) -> None:
 
 def test_summary_one_row_per_cell_class_and_means_match(tmp_path: Path) -> None:
     inputs = _inputs()
-    idata = _idata()
+    idata = _idata(inputs)
     target = tmp_path / "pitch_summary_summary.parquet"
     _export_pitch_summary_summary(idata, inputs, target_path=target)
 
@@ -145,7 +167,8 @@ def test_summary_one_row_per_cell_class_and_means_match(tmp_path: Path) -> None:
     assert grain.n_unique() == df.height
 
     prob = np.asarray(idata.posterior["cell_class_prob"].values, dtype=np.float64)
-    expected_mean = prob.mean(axis=(0, 1)).reshape(-1)
+    reachable = inputs.cell_reachable_mask.reshape(-1)
+    expected_mean = np.where(reachable, prob.mean(axis=(0, 1)).reshape(-1), 0.0)
     assert np.allclose(df.get_column("prob_mean").to_numpy(), expected_mean, atol=1e-9)
     assert np.all(
         df.get_column("prob_hdi_lower").to_numpy()
@@ -163,13 +186,70 @@ def test_summary_one_row_per_cell_class_and_means_match(tmp_path: Path) -> None:
             assert row["final_count_class"] == f"b{row['balls']}_s{row['strikes']}"
 
 
+def test_summary_export_zeroes_impossible_classes_and_rows_sum_to_one(
+    tmp_path: Path,
+) -> None:
+    inputs = _inputs()
+    idata = _idata(inputs)
+    target = tmp_path / "pitch_summary_summary.parquet"
+    _export_pitch_summary_summary(idata, inputs, target_path=target)
+
+    df = pl.read_parquet(target)
+    class_index = {label: j for j, label in enumerate(inputs.class_labels)}
+    result_index = {r: i for i, r in enumerate(inputs.result_family_labels)}
+    reachable_flags = np.array(
+        [
+            bool(
+                inputs.reachable_mask[
+                    result_index[row["result_family"]],
+                    class_index[row["final_count_class"]],
+                ]
+            )
+            for row in df.iter_rows(named=True)
+        ]
+    )
+    assert (~reachable_flags).any()
+
+    impossible = df.filter(pl.Series(~reachable_flags))
+    for column in ("prob_mean", "prob_sd", "prob_hdi_lower", "prob_hdi_upper"):
+        assert (impossible.get_column(column) == 0.0).all(), column
+    assert impossible.get_column("ess_bulk").is_null().all()
+    assert impossible.get_column("rhat").is_null().all()
+
+    possible = df.filter(pl.Series(reachable_flags))
+    assert (possible.get_column("prob_mean") > 0.0).all()
+    assert possible.get_column("ess_bulk").is_not_null().all()
+
+    sums = df.group_by(["result_family", "season", "league"]).agg(
+        pl.col("prob_mean").sum().alias("total")
+    )
+    assert np.allclose(sums.get_column("total").to_numpy(), 1.0, atol=1e-9)
+
+
 def test_held_out_eval_keys_present() -> None:
     inputs = _inputs()
-    idata = _idata()
+    idata = _idata(inputs)
     metrics = _evaluate_pitch_summary_held_out(inputs, idata)
     assert metrics["n_cells"] == inputs.held_out.n_cells
     assert "loglik_lift" in metrics
     assert "tv_improvement" in metrics
+
+
+def test_held_out_eval_masks_impossible_counts_with_the_builder_mask() -> None:
+    inputs = _inputs()
+    idata = _idata(inputs)
+    clean = _evaluate_pitch_summary_held_out(inputs, idata)
+
+    dirty_counts = inputs.held_out.counts.copy()
+    cell_reachable = inputs.reachable_mask[inputs.held_out.cell_result_idx]
+    dirty_counts[~cell_reachable] = 7
+    dirty = inputs.model_copy(
+        update={
+            "held_out": inputs.held_out.model_copy(update={"counts": dirty_counts})
+        }
+    )
+    assert _evaluate_pitch_summary_held_out(dirty, idata) == clean
+    assert clean["n_events"] == int(inputs.held_out.counts.sum())
 
 
 def test_held_out_eval_empty_returns_zero_cells() -> None:
@@ -183,75 +263,25 @@ def test_held_out_eval_empty_returns_zero_cells() -> None:
             )
         }
     )
-    metrics = _evaluate_pitch_summary_held_out(empty, _idata())
+    metrics = _evaluate_pitch_summary_held_out(empty, _idata(inputs))
     assert metrics == {"n_cells": 0}
 
 
-def _jensen_gap_idata() -> az.InferenceData:
-    rng = np.random.default_rng(3)
-    prob = rng.dirichlet(np.ones(N_CLASS), size=(N_CHAIN, N_DRAW, N_CELL))
-    n_result = len(RESULT_FAMILY_LABELS)
-    result_lo = np.empty((N_CHAIN, N_DRAW, n_result, N_CLASS - 1))
-    half = N_DRAW // 2
-    result_lo[:, :half, :, :] = 6.0
-    result_lo[:, half:, :, :] = -6.0
-    posterior = {
-        "cell_class_prob": prob,
-        "beta0": rng.normal(size=(N_CHAIN, N_DRAW, N_CLASS - 1)),
-        "result_logodds": result_lo,
-    }
-    class_labels, _balls, _strikes = _class_axes()
-    coords = {
-        "cell": list(CELL_LABELS),
-        "class": list(class_labels),
-        "class_nonref": list(class_labels[1:]),
-        "result_family": list(RESULT_FAMILY_LABELS),
-    }
-    dims = {
-        "cell_class_prob": ["cell", "class"],
-        "beta0": ["class_nonref"],
-        "result_logodds": ["result_family", "class_nonref"],
-    }
-    return az.from_dict(posterior=posterior, coords=coords, dims=dims)
-
-
-def test_held_out_baseline_is_mean_of_softmax_not_softmax_of_mean() -> None:
-    from scipy.special import softmax
-
+def test_held_out_baseline_is_posterior_mean_of_result_class_prob() -> None:
     inputs = _inputs()
-    idata = _jensen_gap_idata()
-    result_lo_draws = np.asarray(
-        idata.posterior["result_logodds"].values, dtype=np.float64
+    idata = _idata(inputs, seed=3)
+    result_draws = np.asarray(
+        idata.posterior["result_class_prob"].values, dtype=np.float64
     )
-
-    ref_draws = np.zeros(result_lo_draws.shape[:-1] + (1,))
-    mean_of_softmax = softmax(
-        np.concatenate([ref_draws, result_lo_draws], axis=-1), axis=-1
-    ).mean(axis=(0, 1))
-
-    logodds_mean = result_lo_draws.mean(axis=(0, 1))
-    softmax_of_mean = softmax(
-        np.concatenate([np.zeros((logodds_mean.shape[0], 1)), logodds_mean], axis=1),
-        axis=1,
-    )
-    assert not np.allclose(mean_of_softmax, softmax_of_mean, atol=1e-3)
+    mean_of_prob = result_draws.mean(axis=(0, 1))
 
     counts = inputs.held_out.counts.astype(np.float64)
     total = float(counts.sum())
     eps = 1e-12
-
-    def _baseline_loglik(base_prob: np.ndarray) -> float:
-        base = base_prob[inputs.held_out.cell_result_idx]
-        return float(np.sum(counts * np.log(base + eps))) / total
-
-    loglik_mean_of_softmax = _baseline_loglik(mean_of_softmax)
-    loglik_softmax_of_mean = _baseline_loglik(softmax_of_mean)
-    assert not np.isclose(loglik_mean_of_softmax, loglik_softmax_of_mean, atol=1e-6)
+    base = mean_of_prob[inputs.held_out.cell_result_idx]
+    expected = float(np.sum(counts * np.log(base + eps))) / total
 
     metrics = _evaluate_pitch_summary_held_out(inputs, idata)
-    assert np.isclose(
-        metrics["loglik_per_event_baseline"], loglik_mean_of_softmax, atol=1e-9
-    )
-    assert not np.isclose(
-        metrics["loglik_per_event_baseline"], loglik_softmax_of_mean, atol=1e-6
-    )
+    baseline = metrics["loglik_per_event_baseline"]
+    assert isinstance(baseline, float)
+    assert baseline == pytest.approx(expected, abs=1e-9)

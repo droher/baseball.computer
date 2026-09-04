@@ -18,6 +18,9 @@ from python_models.statistical.models._credit_data import (
     NONE_POSITION_LABEL,
     PUTOUT_POSITION_FE_COLUMN,
     REAL_UNKNOWN_RATES_BY_POSITION,
+    UNKNOWN_LEVEL,
+    FixedEffectDesign,
+    _encode_codes_with_vocab,
     build_production_scoring_frame,
     prepare_event_credit_inputs,
 )
@@ -678,3 +681,93 @@ def test_build_production_scoring_frame_assist(tmp_path: Path) -> None:
     putout_design = frame.fixed_effects[PUTOUT_POSITION_FE_COLUMN]
     assert (putout_design.codes == 0).all(), "putout_position codes must be zeros"
     assert putout_design.levels == inputs.fixed_effects[PUTOUT_POSITION_FE_COLUMN].levels
+
+
+def test_encode_codes_null_and_unseen_values_differ() -> None:
+    frame = pl.DataFrame(
+        {"level": pl.Series("level", ["seen", None, "unseen"], dtype=pl.Utf8)}
+    )
+    with_null_level = ["seen", UNKNOWN_LEVEL]
+    codes = _encode_codes_with_vocab(frame, "level", with_null_level)
+    assert codes.tolist() == [
+        with_null_level.index("seen"),
+        with_null_level.index(UNKNOWN_LEVEL),
+        -1,
+    ]
+
+    without_null_level = ["seen", "other"]
+    codes = _encode_codes_with_vocab(frame, "level", without_null_level)
+    assert codes.tolist() == [without_null_level.index("seen"), -1, -1]
+
+
+def _synthetic_credit_posterior(
+    rng: np.random.Generator, fixed_effects: dict[str, FixedEffectDesign], *, k: int
+):
+    import arviz as az
+
+    n_chain, n_draw = 2, 5
+    posterior: dict[str, np.ndarray] = {
+        "alpha_position": rng.normal(size=(n_chain, n_draw, k))
+    }
+    for column, design in fixed_effects.items():
+        n_levels = len(design.levels)
+        posterior[f"delta_{column}"] = rng.normal(size=(n_chain, n_draw, n_levels, k))
+    return az.from_dict(posterior=posterior)
+
+
+def test_putout_export_covers_production_slice_and_shares_sum_to_one(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("arviz")
+    from python_models.statistical.bayes.training import (
+        _export_credit_shares_for_target,
+    )
+
+    dataset_path = _dataset_with_production_rows(
+        tmp_path, n_production_events=120, sparse_fe_non_null_rate=0.5
+    )
+    inputs = prepare_event_credit_inputs(
+        dataset_path,
+        dimension="putout",
+        min_events_per_season=1,
+        held_out_fold_count=DEFAULT_N_GAMES + 1,
+    )
+    frame = build_production_scoring_frame(
+        dataset_path, dimension="putout", fixed_effects=inputs.fixed_effects
+    )
+    assert frame.n_events > 0
+    assert inputs.n_events > 0
+    assert PUTOUT_POSITION_FE_COLUMN not in inputs.fixed_effects
+
+    idata = _synthetic_credit_posterior(
+        np.random.default_rng(5), dict(inputs.fixed_effects), k=inputs.n_positions
+    )
+    target = tmp_path / "event_credit.parquet"
+    written = _export_credit_shares_for_target(
+        idata,
+        inputs,
+        dataset_parquet=dataset_path,
+        dimension="putout",
+        putout_idata=None,
+        target_path=target,
+    )
+    reloaded = pl.read_parquet(target)
+    assert reloaded.equals(written)
+
+    exported_keys = set(reloaded.get_column("event_key").to_list())
+    assert exported_keys == set(frame.event_keys.tolist())
+    assert exported_keys.isdisjoint(set(inputs.event_keys.tolist()))
+    assert reloaded.get_column("credit_type").unique().to_list() == ["putout"]
+    assert reloaded.get_column("none_share").is_null().all()
+
+    per_event = reloaded.group_by("event_key").agg(
+        pl.col("expected_share").sum().alias("total"),
+        pl.len().alias("rows"),
+        pl.col("fielding_position").sort().alias("positions"),
+    )
+    assert per_event.height == frame.n_events
+    assert (per_event.get_column("rows") == N_POSITIONS).all()
+    np.testing.assert_allclose(per_event.get_column("total").to_numpy(), 1.0, atol=1e-9)
+    for positions in per_event.get_column("positions").to_list():
+        assert positions == list(range(1, N_POSITIONS + 1))
+    assert (reloaded.get_column("expected_share") > 0.0).all()

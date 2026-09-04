@@ -1,12 +1,18 @@
 """Cell-grain prep for the run-expectancy count model.
 
-Reads the per-event ``model_input_run_values`` Parquet and aggregates to
-run-expectancy cell grain — one row per ``run_expectancy_start_key`` (which
-already encodes ``season_league_outs_basestate``) carrying the summed
-``runs_to_end_of_inning`` and the event count. The sum of independent
+Reads the per-event ``model_input_run_values`` Parquet, restricts it to the
+same population the deterministic ``run_expectancy_matrix`` uses (regular
+season, innings before the ninth, untruncated exposure, and rows that are
+real events rather than no-op substitutions), and aggregates to
+run-expectancy cell grain — one row per ``season|league|outs_base`` cell
+carrying the summed ``runs_to_end_of_inning`` and the event count. ``season``
+and ``league`` come from the dataset columns, not from
+``run_expectancy_start_key`` (whose ``season_group`` / ``league_group``
+buckets collapse pre-1914 seasons and non-AL/NL/FL leagues), so the cell
+matches the state-transition prep exactly. The sum of independent
 NegativeBinomial counts that share a cell mean is itself NegativeBinomial
 (``mu = n*lambda``, ``alpha = n*phi``), so the aggregated cell-sum likelihood
-is exact under a per-cell-iid assumption and collapses ~10M events to a few
+is exact under a per-cell-iid assumption and collapses ~14M events to a few
 thousand cells. Each ``(state, season, league)`` cell is a published
 run-expectancy coord nested under its 24-state base-out parent; cells below
 ``MIN_EVENTS_PER_CELL`` training events are dropped as unidentified. A
@@ -45,6 +51,22 @@ ERA_REGIME_LABELS: tuple[str, ...] = (
     "ghost_runner",
     "extra_inning_ghost_plus_expanded_DH",
 )
+
+REGULAR_SEASON_GAME_TYPE: str = "RegularSeason"
+FIRST_EXCLUDED_INNING: int = 9
+INCLUDED_DENOMINATOR_POLICY: str = "include"
+
+POPULATION_FILTER_COLUMNS: tuple[str, ...] = (
+    "game_type",
+    "inning_start",
+    "denominator_policy",
+    "result_family",
+    "run_expectancy_start_key",
+    "run_expectancy_end_key",
+    "runs_on_play",
+)
+
+CELL_SEPARATOR: str = "|"
 
 
 def _era_regime_row(season: int, league: str) -> list[float]:
@@ -93,6 +115,7 @@ def _build_era_regime_design(
         kept_idx.append(j)
         kept_labels.append(label)
     return full[:, kept_idx], kept_labels
+
 
 HOLDOUT_FOLD_COUNT: int = 10
 HOLDOUT_FOLD_ID: int = 0
@@ -152,20 +175,113 @@ class RunExpectancyInputs(BaseModel):
         return int(self.sum_runs.shape[0])
 
 
-def _parse_start_key(key: str) -> tuple[int, str, int, int]:
-    season_str, league, outs_str, base_str = key.rsplit("_", 3)
+def state_suffix_expr(key_column: str) -> pl.Expr:
+    """``outs_base`` suffix of a run-expectancy key column."""
+    return pl.col(key_column).str.split("_").list.tail(2).list.join("_")
+
+
+def cell_label_expr() -> pl.Expr:
+    """``season|league|outs_base`` cell label shared by the Model G preps."""
+    return pl.concat_str(
+        [
+            pl.col("season").cast(pl.Int64).cast(pl.Utf8),
+            pl.col("league").cast(pl.Utf8),
+            state_suffix_expr("run_expectancy_start_key"),
+        ],
+        separator=CELL_SEPARATOR,
+    )
+
+
+def parse_cell_label(label: str) -> tuple[int, str, int, int]:
+    """Split ``season|league|outs_base`` into ``(season, league, outs, base)``."""
+    season_str, league, suffix = label.split(CELL_SEPARATOR)
+    outs_str, base_str = suffix.split("_")
     return int(season_str), league, int(outs_str), int(base_str)
 
 
+def _population_clauses() -> list[tuple[str, pl.Expr]]:
+    state_changed = (
+        pl.col("run_expectancy_start_key") != pl.col("run_expectancy_end_key")
+    ).fill_null(False)
+    scored = (pl.col("runs_on_play") > 0).fill_null(False)
+    return [
+        (
+            f"game_type = {REGULAR_SEASON_GAME_TYPE}",
+            pl.col("game_type").cast(pl.Utf8) == REGULAR_SEASON_GAME_TYPE,
+        ),
+        (
+            f"inning_start < {FIRST_EXCLUDED_INNING}",
+            pl.col("inning_start") < FIRST_EXCLUDED_INNING,
+        ),
+        (
+            f"denominator_policy = {INCLUDED_DENOMINATOR_POLICY}",
+            pl.col("denominator_policy") == INCLUDED_DENOMINATOR_POLICY,
+        ),
+        (
+            "real event (plate appearance, state change, or run scored)",
+            pl.col("result_family").is_not_null() | state_changed | scored,
+        ),
+    ]
+
+
+def filter_event_population(frame: pl.LazyFrame, *, label: str) -> pl.LazyFrame:
+    """Restrict a run-values frame to the population the Model G preps fit on.
+
+    Four clauses in order: ``game_type = 'RegularSeason'``; ``inning_start``
+    before the ninth (walk-off censoring); ``denominator_policy = 'include'``,
+    the dataset's game-level exposure gate (``exposure_status`` is ``complete``
+    or ``walk_off`` for the game); and a real-event clause that drops rows
+    with no plate-appearance result, no base-out state change, and no run
+    scored, such as substitutions, while keeping stolen bases, wild pitches,
+    and pickoffs.
+
+    This is not the population of the deterministic ``run_expectancy_matrix``
+    model. That SQL shares the first two clauses but gates exposure per frame
+    (``QUALIFY NOT BOOL_OR(truncated_frame_flag)`` over the rest of the
+    inning) rather than per game, and carries no real-event clause. The two
+    populations therefore differ on partially truncated games and on non-event
+    rows. Raises when the frame lacks any column the filter needs, so a stale
+    dataset can never skip the filter silently. Logs the row count before and
+    after every clause.
+    """
+    names = frame.collect_schema().names()
+    missing = [c for c in POPULATION_FILTER_COLUMNS if c not in names]
+    if missing:
+        raise ValueError(
+            f"{label}: dataset lacks population-filter columns {missing}; "
+            f"expected all of {list(POPULATION_FILTER_COLUMNS)}"
+        )
+    remaining = frame
+    n_before = int(remaining.select(pl.len()).collect().item())
+    for clause, expr in _population_clauses():
+        remaining = remaining.filter(expr)
+        n_after = int(remaining.select(pl.len()).collect().item())
+        _log.info(
+            "%s population filter [%s]: %d -> %d rows (dropped %d)",
+            label,
+            clause,
+            n_before,
+            n_after,
+            n_before - n_after,
+        )
+        n_before = n_after
+    return remaining
+
+
 def _aggregate_cells(parquet_path: Path) -> pl.DataFrame:
+    frame = filter_event_population(
+        pl.scan_parquet(parquet_path), label="prepare_run_expectancy_inputs"
+    )
     return (
-        pl.scan_parquet(parquet_path)
-        .filter(
+        frame.filter(
             pl.col("game_id").is_not_null()
+            & pl.col("season").is_not_null()
+            & pl.col("league").is_not_null()
             & pl.col("run_expectancy_start_key").is_not_null()
             & pl.col("runs_to_end_of_inning").is_not_null()
         )
-        .group_by(["run_expectancy_start_key", "game_id"])
+        .with_columns(cell_label_expr().alias("cell"))
+        .group_by(["cell", "game_id"])
         .agg(
             pl.col("runs_to_end_of_inning").sum().alias("game_cell_runs"),
             pl.len().alias("game_cell_events"),
@@ -176,12 +292,12 @@ def _aggregate_cells(parquet_path: Path) -> pl.DataFrame:
 
 def _collapse_to_cells(per_game: pl.DataFrame) -> pl.DataFrame:
     return (
-        per_game.group_by("run_expectancy_start_key")
+        per_game.group_by("cell")
         .agg(
             pl.col("game_cell_runs").sum().alias("sum_runs"),
             pl.col("game_cell_events").sum().alias("n_events"),
         )
-        .sort("run_expectancy_start_key")
+        .sort("cell")
     )
 
 
@@ -242,7 +358,7 @@ def _decompose_cells(
     state_by_cell: list[int] = []
     state_label_by_cell: list[str] = []
     for label in cell_labels:
-        season, league, outs, base = _parse_start_key(label)
+        season, league, outs, base = parse_cell_label(label)
         outs_by_cell.append(outs)
         base_by_cell.append(base)
         season_by_cell.append(season)
@@ -301,7 +417,7 @@ def prepare_run_expectancy_inputs(
     cell_counts = _collapse_to_cells(train_games)
     kept_labels = cell_counts.filter(
         pl.col("n_events") >= MIN_EVENTS_PER_CELL
-    ).get_column("run_expectancy_start_key")
+    ).get_column("cell")
     dropped = cell_counts.height - kept_labels.len()
     if dropped:
         _log.info(
@@ -309,9 +425,7 @@ def prepare_run_expectancy_inputs(
             dropped,
             MIN_EVENTS_PER_CELL,
         )
-    train_games = train_games.filter(
-        pl.col("run_expectancy_start_key").is_in(kept_labels.implode())
-    )
+    train_games = train_games.filter(pl.col("cell").is_in(kept_labels.implode()))
     if train_games.height == 0:
         raise ValueError(
             f"every cell fell below MIN_EVENTS_PER_CELL={MIN_EVENTS_PER_CELL}; "
@@ -324,7 +438,7 @@ def prepare_run_expectancy_inputs(
     train_cells = _collapse_to_cells(train_games)
     held_cells = _collapse_to_cells(held_out_games)
 
-    cell_labels = train_cells.get_column("run_expectancy_start_key").to_list()
+    cell_labels = train_cells.get_column("cell").to_list()
     sum_runs = train_cells.get_column("sum_runs").to_numpy().astype(np.int64)
     cell_event_count = train_cells.get_column("n_events").to_numpy().astype(np.int64)
 
@@ -409,7 +523,7 @@ def _build_held_out_set(
             cell_state_idx=empty,
         )
 
-    held_labels = held_cells.get_column("run_expectancy_start_key").to_list()
+    held_labels = held_cells.get_column("cell").to_list()
     cell_idx = _encode_codes_with_vocab(held_labels, cell_labels)
     seen = cell_idx >= 0
     state_label_by_train_cell = dict(zip(cell_labels, state_label_by_cell))

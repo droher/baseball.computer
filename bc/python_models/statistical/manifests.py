@@ -9,7 +9,10 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from python_models.statistical.config import resolve_published_roots
+from python_models.statistical.config import (
+    resolve_artifact_root,
+    resolve_published_roots,
+)
 from python_models.statistical.schemas import (
     ArtifactManifest,
     PublishedPointer,
@@ -34,7 +37,9 @@ def write_manifest(manifest: ArtifactManifest, path: Path) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump_json(indent=2)
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=".manifest.", suffix=".json")
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=".manifest.", suffix=".json"
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(payload)
@@ -81,12 +86,53 @@ def find_published_pretrain(name: str) -> Path | None:
     return None
 
 
-def write_published_pointer(pointer: PublishedPointer, *, root: Path | None = None) -> Path:
+def resolve_pointer_manifest_path(manifest_path: Path) -> Path:
+    """Absolute manifest path for a pointer's stored ``manifest_path``.
+
+    Absolute values are returned unchanged. Relative values resolve
+    against the artifacts root so a pointer written on one machine or
+    checkout keeps working on another.
+    """
+    if manifest_path.is_absolute():
+        return manifest_path
+    return resolve_artifact_root() / manifest_path
+
+
+def relative_pointer_manifest_path(manifest_path: Path) -> Path:
+    """``manifest_path`` relative to the artifacts root.
+
+    Raises ``ValueError`` when the manifest lives outside the root, since
+    such a pointer could not be resolved back.
+    """
+    root = resolve_artifact_root().resolve()
+    try:
+        return manifest_path.resolve().relative_to(root)
+    except ValueError as exc:
+        raise ValueError(
+            f"manifest {manifest_path} is outside the artifacts root {root};"
+            + " cannot write a relative pointer"
+        ) from exc
+
+
+def write_published_pointer(
+    pointer: PublishedPointer,
+    *,
+    root: Path | None = None,
+    relative: bool = False,
+) -> Path:
+    if relative:
+        pointer = pointer.model_copy(
+            update={
+                "manifest_path": relative_pointer_manifest_path(pointer.manifest_path)
+            }
+        )
     branch_root, _ = resolve_published_roots()
     target_root = root if root is not None else branch_root
     target_root.mkdir(parents=True, exist_ok=True)
     target = target_root / f"{pointer.model_name}.json"
-    fd, tmp_name = tempfile.mkstemp(dir=str(target_root), prefix=".pointer.", suffix=".json")
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(target_root), prefix=".pointer.", suffix=".json"
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(pointer.model_dump_json(indent=2))
@@ -101,7 +147,10 @@ def write_published_pointer(pointer: PublishedPointer, *, root: Path | None = No
 
 
 def read_published_pointer(path: Path) -> PublishedPointer:
-    return PublishedPointer.model_validate_json(path.read_text(encoding="utf-8"))
+    pointer = PublishedPointer.model_validate_json(path.read_text(encoding="utf-8"))
+    return pointer.model_copy(
+        update={"manifest_path": resolve_pointer_manifest_path(pointer.manifest_path)}
+    )
 
 
 def package_versions() -> dict[str, str]:

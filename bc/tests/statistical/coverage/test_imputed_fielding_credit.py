@@ -20,6 +20,7 @@ import pytest
 from python_models.statistical import config as cfg
 from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from python_models.statistical.bayes.manifest_ingest import (
+    METHOD_HIERARCHICAL_BAYES_SOFTMAX,
     CREDIT_SHARE_SCHEMA,
     aggregate_fielding_credit_frames,
 )
@@ -33,6 +34,8 @@ def _write_credit_artifact_with_pointer(
     n_positions: int = 9,
     credit_type: str = "putout",
     model_name: str = "putout_credit_allocation",
+    share_scale: float = 1.0,
+    none_share: float | None = None,
 ) -> tuple[Path, Path]:
     from python_models.statistical.bayes.artifacts import bayes_artifact_dir
     from python_models.statistical.manifests import (
@@ -59,16 +62,22 @@ def _write_credit_artifact_with_pointer(
     positions = np.tile(np.arange(1, n_positions + 1, dtype=np.int8), events)
     rng = np.random.default_rng(0)
     raw = rng.uniform(0.0, 1.0, size=(events, n_positions))
-    shares = (raw / raw.sum(axis=1, keepdims=True)).reshape(-1).astype(np.float64)
-
-    df = pl.DataFrame(
-        {
-            "event_key": event_keys,
-            "fielding_position": positions,
-            "credit_type": [credit_type] * n_rows,
-            "expected_share": shares,
-        }
+    position_mass = share_scale * (1.0 - (none_share or 0.0))
+    shares = (
+        (position_mass * raw / raw.sum(axis=1, keepdims=True))
+        .reshape(-1)
+        .astype(np.float64)
     )
+
+    columns: dict[str, object] = {
+        "event_key": event_keys,
+        "fielding_position": positions,
+        "credit_type": [credit_type] * n_rows,
+        "expected_share": shares,
+    }
+    if none_share is not None:
+        columns["none_share"] = np.full(n_rows, none_share, dtype=np.float64)
+    df = pl.DataFrame(columns)
     df.write_parquet(exports_dir / "event_credit.parquet")
 
     extras = BayesArtifactExtras(
@@ -156,4 +165,65 @@ def test_credit_yields_per_target_frame_with_artifact_id(
     ):
         assert frame.get_column(_contract_col).null_count() == 0
     assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
+    assert set(frame.get_column("method").unique().to_list()) == {METHOD_HIERARCHICAL_BAYES_SOFTMAX}
     assert set(frame.get_column("credit_type").unique().to_list()) == {"putout"}
+    assert frame.get_column("none_share").null_count() == frame.height
+    per_event = frame.group_by("event_key", "credit_type").agg(
+        pl.col("expected_share").sum().alias("total")
+    )
+    np.testing.assert_allclose(per_event.get_column("total").to_numpy(), 1.0, atol=1e-9)
+
+
+def test_assist_shares_plus_none_share_sum_to_one_per_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, published_root = _write_credit_artifact_with_pointer(
+        tmp_path=tmp_path,
+        artifact_id="credit-as-1",
+        events=4,
+        credit_type="assist",
+        model_name="assist_credit_allocation",
+        none_share=0.35,
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    frames = list(aggregate_fielding_credit_frames())
+    assert len(frames) == 1
+    frame = frames[0]
+    assert frame.height == 4 * 9
+    assert frame.get_column("none_share").null_count() == 0
+    per_event = frame.group_by("event_key", "credit_type").agg(
+        pl.col("expected_share").sum().alias("positions"),
+        pl.col("none_share").first().alias("none"),
+        pl.col("none_share").n_unique().alias("none_n_unique"),
+    )
+    assert per_event.get_column("none_n_unique").max() == 1
+    total = per_event.get_column("positions") + per_event.get_column("none")
+    np.testing.assert_allclose(total.to_numpy(), 1.0, atol=1e-9)
+
+
+@pytest.mark.parametrize(
+    ("credit_type", "model_name", "none_share"),
+    [
+        ("putout", "putout_credit_allocation", None),
+        ("assist", "assist_credit_allocation", 0.35),
+    ],
+)
+def test_export_whose_events_do_not_sum_to_one_raises(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    credit_type: str,
+    model_name: str,
+    none_share: float | None,
+) -> None:
+    _, published_root = _write_credit_artifact_with_pointer(
+        tmp_path=tmp_path,
+        artifact_id="credit-bad",
+        events=3,
+        credit_type=credit_type,
+        model_name=model_name,
+        share_scale=0.8,
+        none_share=none_share,
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    with pytest.raises(ValueError, match="do not sum to 1"):
+        _ = list(aggregate_fielding_credit_frames())

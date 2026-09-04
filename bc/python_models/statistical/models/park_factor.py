@@ -5,10 +5,14 @@ Models team runs scored in a game as ``NB(mu=lambda, alpha=phi)`` with
 + theta_park + home_adv``. ``theta_park`` is the published park factor:
 a per-(park, season, league) effect centered to sum to zero *within* each
 season-league group so era scoring cannot leak into it. The underlying
-per-cell effect optionally follows an AR(1) persistence prior across
-consecutive seasons within a (park, league) chain. Offense and pitching
-team effects are non-centered random effects; no team-game-sized
-Deterministic (e.g. lambda) is registered.
+per-cell effect optionally follows a non-centered, gap-aware AR(1)
+persistence prior along each (park, league) chain of observed cells:
+``theta_t = rho**d * theta_{t-1} + eps_t * sqrt((1 - rho**(2d)) / (1 - rho**2))``
+where ``d`` is the season distance to the previous observed cell, so the
+prior is the stationary AR(1) bridge over unobserved seasons and no latent
+cells exist for them. Offense and pitching team effects are non-centered
+random effects; no team-game-sized Deterministic (e.g. lambda) is
+registered.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportOperatorIssue=false, reportCallIssue=false, reportArgumentType=false, reportPrivateImportUsage=false, reportIndexIssue=false, reportAttributeAccessIssue=false
@@ -17,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import cast
 
 import numpy as np
 import pymc as pm
@@ -54,24 +59,86 @@ def _center_within_group(
     return effect - m @ group_means
 
 
-def _ar1_park_effect(inputs: ParkFactorInputs) -> pt.TensorVariable:
-    chain_idx = pt.as_tensor_variable(inputs.ar_chain_idx.astype(np.int64))
-    step_idx = pt.as_tensor_variable(inputs.ar_step_idx.astype(np.int64))
+def _stationary_bridge_variance_ratio(
+    rho: pt.TensorVariable, season_gap: np.ndarray
+) -> pt.TensorVariable:
+    gap = season_gap.astype(np.int64)
+    max_gap = int(gap.max()) if gap.shape[0] else 0
+    powers = 2 * np.arange(max_gap, dtype=np.float64)
+    included = (np.arange(max_gap)[None, :] < gap[:, None]).astype(np.float64)
+    rho_powers = pt.power(rho, pt.as_tensor_variable(powers))
+    return pt.as_tensor_variable(included) @ rho_powers
 
+
+def _chain_blocks(
+    chain_idx: np.ndarray, step_idx: np.ndarray, season_gap: np.ndarray
+) -> tuple[np.ndarray, list[tuple[int, int, np.ndarray]]]:
+    order = np.lexsort((step_idx, chain_idx))
+    sorted_chain = chain_idx[order]
+    sorted_gap = season_gap[order]
+    blocks: list[tuple[int, int, np.ndarray]] = []
+    start = 0
+    n = order.shape[0]
+    while start < n:
+        end = start + 1
+        while end < n and sorted_chain[end] == sorted_chain[start]:
+            end += 1
+        offsets = np.cumsum(sorted_gap[start:end]).astype(np.float64)
+        exponent = offsets[:, None] - offsets[None, :]
+        exponent[exponent < 0.0] = 0.0
+        blocks.append((start, end, exponent))
+        start = end
+    return order, blocks
+
+
+def _propagate_ar1(
+    rho: pt.TensorVariable,
+    innovations: pt.TensorVariable,
+    chain_idx: np.ndarray,
+    step_idx: np.ndarray,
+    season_gap: np.ndarray,
+) -> pt.TensorVariable:
+    order, blocks = _chain_blocks(chain_idx, step_idx, season_gap)
+    sorted_innovations = innovations[pt.as_tensor_variable(order)]
+    pieces: list[pt.TensorVariable] = []
+    for start, end, exponent in blocks:
+        segment = sorted_innovations[start:end]
+        if end - start == 1:
+            pieces.append(segment)
+            continue
+        lower = np.tril(np.ones_like(exponent))
+        weights = pt.power(
+            rho, pt.as_tensor_variable(exponent)
+        ) * pt.as_tensor_variable(lower)
+        pieces.append(weights @ segment)
+    inverse = np.empty_like(order)
+    inverse[order] = np.arange(order.shape[0], dtype=np.int64)
+    return cast(
+        pt.TensorVariable, pt.concatenate(pieces)[pt.as_tensor_variable(inverse)]
+    )
+
+
+def _ar1_park_effect(inputs: ParkFactorInputs) -> pt.TensorVariable:
     rho = pm.Beta("rho_park", alpha=2.0, beta=1.0)
     sigma_innov = pm.HalfNormal("sigma_park_innov", sigma=SIGMA_PARK_INNOV_SCALE)
     sigma_init = pm.HalfNormal("sigma_park_init", sigma=SIGMA_PARK_INIT_SCALE)
+    eps_raw = pm.Normal("eps_park_raw", mu=0.0, sigma=1.0, dims="park_season_league")
 
-    init_dist = pm.Normal.dist(mu=0.0, sigma=sigma_init)
-    ar_grid = pm.AR(
-        "ar_park",
-        rho=pt.stack([pt.zeros_like(rho), rho]),
-        sigma=sigma_innov,
-        init_dist=init_dist,
-        constant=True,
-        dims=("ar_chain", "ar_step"),
+    season_gap = inputs.ar_season_gap.astype(np.int64)
+    is_head = pt.as_tensor_variable((season_gap == 0).astype(np.float64))
+    bridge_scale = pt.sqrt(
+        _stationary_bridge_variance_ratio(rho, np.maximum(season_gap, 1))
     )
-    return ar_grid[chain_idx, step_idx]
+    innovation_scale = (
+        is_head * sigma_init + (1.0 - is_head) * sigma_innov * bridge_scale
+    )
+    return _propagate_ar1(
+        rho,
+        eps_raw * innovation_scale,
+        inputs.ar_chain_idx.astype(np.int64),
+        inputs.ar_step_idx.astype(np.int64),
+        season_gap,
+    )
 
 
 def build_park_factor_model(
@@ -84,12 +151,7 @@ def build_park_factor_model(
     ar1_active = _ar1_enabled()
     home_adv_active = _home_adv_enabled()
 
-    coords = dict(inputs.coords)
-    if ar1_active:
-        coords["ar_chain"] = [str(i) for i in range(inputs.n_ar_chains)]
-        coords["ar_step"] = [str(i) for i in range(inputs.n_ar_steps)]
-
-    with pm.Model(coords=coords) as model:
+    with pm.Model(coords=dict(inputs.coords)) as model:
         season_league_idx = pm.Data("season_league_idx", inputs.season_league_idx)
         offense_idx = pm.Data("offense_idx", inputs.offense_idx)
         pitching_idx = pm.Data("pitching_idx", inputs.pitching_idx)

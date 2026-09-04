@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 
 from python_models.statistical.models._park_factor_data import (
@@ -13,6 +14,7 @@ from python_models.statistical.models._park_factor_data import (
     HOLDOUT_FOLD_ID,
     MIN_GAMES_PER_PARK_CELL,
     SINGLE_SOURCE_LABEL,
+    _build_ar_chains,
     prepare_park_factor_inputs,
 )
 from python_models.statistical.splits import game_hash_fold
@@ -224,3 +226,41 @@ def test_unseen_park_cell_encodes_to_negative_one_in_held_out(tmp_path: Path) ->
     assert any(code == -1 for code in codes)
     for code in codes:
         assert code == -1 or 0 <= code < n_park_cells
+
+
+def test_ar_chains_key_on_park_league_and_carry_season_gaps() -> None:
+    parks = ["MIL05", "MIL05", "MIL05", "DEN02", "DEN02", "BOS07"]
+    seasons = [1998, 1965, 1999, 2015, 2014, 1990]
+    leagues = ["NL", "NL", "NL", "NL", "NL", "AL"]
+
+    chain_idx, step_idx, season_gap, n_chains = _build_ar_chains(
+        parks, seasons, leagues
+    )
+
+    keys = [f"{p}|{lg}" for p, lg in zip(parks, leagues, strict=True)]
+    assert n_chains == len(set(keys))
+    for i, j in [(a, b) for a in range(len(keys)) for b in range(len(keys))]:
+        assert (chain_idx[i] == chain_idx[j]) == (keys[i] == keys[j])
+
+    for cid in range(n_chains):
+        members = np.flatnonzero(chain_idx == cid)
+        ordered = members[np.argsort(step_idx[members])]
+        assert sorted(step_idx[members].tolist()) == list(range(len(members)))
+        assert season_gap[ordered[0]] == 0
+        for prev, cur in zip(ordered[:-1], ordered[1:], strict=True):
+            assert seasons[prev] < seasons[cur]
+            assert season_gap[cur] == seasons[cur] - seasons[prev]
+    assert season_gap.shape == (len(parks),)
+
+
+def test_prep_emits_one_ar_cell_per_park_cell(tmp_path: Path) -> None:
+    dataset_path, _dense, _sparse, _unseen, _holdout = _write_dataset(tmp_path)
+    inputs = prepare_park_factor_inputs(dataset_path)
+
+    n_cells = len(inputs.park_season_league_labels)
+    assert inputs.ar_chain_idx.shape == (n_cells,)
+    assert inputs.ar_step_idx.shape == (n_cells,)
+    assert inputs.ar_season_gap.shape == (n_cells,)
+    assert inputs.n_ar_chains <= n_cells
+    assert (inputs.ar_season_gap[inputs.ar_step_idx == 0] == 0).all()
+    assert (inputs.ar_season_gap[inputs.ar_step_idx > 0] >= 1).all()

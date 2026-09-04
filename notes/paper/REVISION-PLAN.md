@@ -3,7 +3,7 @@ title: Revision plan — modeling response to the referee report
 type: design-doc
 status: draft
 audience: agents, David
-last-verified: 2026-07-13
+last-verified: 2026-09-04
 ---
 
 # Revision plan
@@ -116,3 +116,46 @@ T3,T4,T5,T6,T9,T10 ─ T11 paper revision + response to reviewers + PDF
 
 Agents: implementation via Sonnet/Opus subagents per task, code-review round
 before merge, fits run detached where >10 min. No subagent runs mutating git.
+
+## Second revision — modeling review of 2026-09-03
+
+Responds to `notes/data-coverage-implementation/modeling-review-2026-09-03.md`.
+Branch: `modeling-review-fixes`. Code fixes landed in one commit ("Fix the
+modeling-review findings that need code changes"); the refits it forces —
+geometry (location dims and trajectory, both flavors), run_expectancy,
+state_transition, pitch_summary, putout credit, the six observation-propensity
+targets, park factors — ran after it and landed on 2026-09-04.
+
+Text changes that do not wait on the refits (done in this pass):
+
+- §5 rewritten around the derived-slice lower bound; the anchored offset, the
+  0.58 share, and the joint ribbon are withdrawn as identities of the observed
+  slice (H2, M27). γ_GB is inert, not wrong-signed (M24). Additive separability
+  labeled as the assumption. The four-design backtest table is stated as a
+  smoke-budget run with three identity rows (M25, M26).
+- §4 / §6: scalar γ with an inert prior (M12); outs-only reachability mask
+  (M5); Model C plain multinomial, fixed σ_box, both credit types through the
+  aggregate arm, putout export on the production slice (H5, M9); Model G
+  population filter, league key, per-state dispersion (H3, M2, M3); pitch
+  summary per-family mask (M4); unseen scorer/park levels zero (M7); location
+  dims publish deep-free because their production rows have no DL prediction,
+  written as a disclosed defect (H1).
+- §2 / §4 / §6 / §12: both game partitions described; the leakage consequence
+  stated (M11, M30).
+- §7 / §9 / §11: gate suite as it now is (H6, M16–M18, M20); confidence_status
+  history; weak_identification_flag from group-level diagnostics (M1); every
+  refit-dependent number replaced by `<!-- TODO: refit -->`.
+- Citations: the five nonexistent memory files replaced or marked
+  `<!-- TODO: unverified -->`; "38 runs a game", "+0.0068 / −0.001", "16.3M
+  events", "DH_AL_only +0.043" removed or marked (M31).
+- §8: Model B claim type is "the data are uninformative; any fit returns the
+  prior" throughout.
+- RESPONSE-TO-REVIEWERS.md rewritten to say what was actually done (M31).
+
+Done 2026-09-04, after the refits: every `<!-- TODO: refit -->` filled, the
+numeric tables regenerated (`notes/paper/tables/*.md` from
+`notes/paper/queries/*.sql`, with `transition_example.sql` switched to
+`start_state = '1_1'`), `just validate-gates --write` re-run, the estimated
+`@model`s re-materialized, and `data-coverage-paper.md` re-assembled. Open:
+the restated `linear_weights_estimated` lacks the `is_imputed` column the
+model declares.

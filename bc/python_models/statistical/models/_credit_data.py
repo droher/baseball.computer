@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
 
@@ -35,6 +34,10 @@ import numpy.typing as npt
 import polars as pl
 from pydantic import BaseModel, ConfigDict
 
+from python_models.statistical.models._event_data import (
+    _encode_codes_with_vocab,
+    _log_unseen_level_rates,
+)
 from python_models.statistical.splits import game_hash_fold
 
 _log = logging.getLogger(__name__)
@@ -230,28 +233,6 @@ def _build_fixed_effect_design(df: pl.DataFrame, column: str) -> FixedEffectDesi
     if not labels:
         raise ValueError(f"fixed-effect column {column!r} has zero levels")
     return FixedEffectDesign(levels=tuple(labels), codes=codes)
-
-
-def _encode_codes_with_vocab(
-    per_event: pl.DataFrame, column: str, labels: Sequence[str]
-) -> IntArray:
-    """Map a per-event column to int codes against a fixed ``labels`` vocab.
-
-    Booleans cast to utf8, NULLs fill to ``UNKNOWN_LEVEL``; unseen values
-    (and NULLs) fall back to ``UNKNOWN_LEVEL``'s index, or ``-1`` when
-    ``UNKNOWN_LEVEL`` is not in the vocab.
-    """
-    series = per_event.get_column(column)
-    if series.dtype == pl.Boolean:
-        series = series.cast(pl.Utf8)
-    series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
-    mapping = {c: i for i, c in enumerate(labels)}
-    fallback = mapping.get(UNKNOWN_LEVEL, -1)
-    return np.fromiter(
-        (mapping.get(str(v), fallback) for v in series.to_list()),
-        dtype=np.int64,
-        count=series.len(),
-    )
 
 
 def _collapse_event_grain(df: pl.DataFrame) -> pl.DataFrame:
@@ -892,6 +873,14 @@ def build_production_scoring_frame(
         else:
             codes = _encode_codes_with_vocab(per_event, column, list(design.levels))
         scoring_fe[column] = FixedEffectDesign(levels=design.levels, codes=codes)
+    _log_unseen_level_rates(
+        f"build_production_scoring_frame dim={dimension}",
+        {
+            column: design.codes
+            for column, design in scoring_fe.items()
+            if column != PUTOUT_POSITION_FE_COLUMN
+        },
+    )
 
     return ProductionScoringFrame(event_keys=event_keys, fixed_effects=scoring_fe)
 
@@ -1331,6 +1320,16 @@ def _build_held_out_set(
     for column, design in fixed_effects.items():
         codes = _resolve(column, list(design.levels))
         held_fe[column] = FixedEffectDesign(levels=design.levels, codes=codes)
+    _log_unseen_level_rates(
+        f"prepare_event_credit_inputs held_out dim={dimension}",
+        {
+            "season": season_idx,
+            "scorer": scorer_idx,
+            "park_id": park_idx,
+            "source_family": source_idx,
+            **{column: design.codes for column, design in held_fe.items()},
+        },
+    )
 
     return HeldOutSet(
         event_keys=event_keys,

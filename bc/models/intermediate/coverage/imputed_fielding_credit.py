@@ -47,6 +47,7 @@ _AUDITS = [
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
     ("estimated_contract_complete", {}),
+    ("min_row_count", {"threshold": 100000}),
 ]
 
 

@@ -296,6 +296,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _ = publish.add_argument("--model", required=True, help="Model name to publish.")
     _add_artifact_id_arg(publish)
+    _ = publish.add_argument(
+        "--relative",
+        action="store_true",
+        help=(
+            "Store manifest_path relative to the artifacts root so the pointer "
+            "resolves on another checkout (BC_STATS_ARTIFACTS_ROOT)."
+        ),
+    )
 
     fit_pretrain = subparsers.add_parser(
         "fit-pretrain",
@@ -704,6 +712,7 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
         write_published_pointer,
     )
     from python_models.statistical.schemas import PublishedPointer
+    from python_models.statistical.validate import manifest_is_smoke
 
     artifact_id = str(args.artifact_id)
     model_name = str(args.model)
@@ -728,6 +737,13 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
         raise ValueError(
             f"manifest.json at {found} reports artifact_id={manifest.artifact_id!r}, expected {artifact_id!r}"
         )
+    if manifest_is_smoke(manifest, found.parent):
+        raise ValueError(
+            f"artifact {artifact_id!r} for model {model_name!r} is a smoke fit "
+            "(is_smoke is set in its manifest or validation/diagnostics.json); "
+            "smoke fits are never published. Refit without --smoke, then publish "
+            "that artifact."
+        )
     pointer_name = model_name
     if manifest.kind == "deep":
         import importlib
@@ -749,13 +765,15 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
         published_at=datetime.now(tz=timezone.utc),
         manifest_path=found,
     )
-    target = write_published_pointer(pointer)
+    relative = bool(args.relative)
+    target = write_published_pointer(pointer, relative=relative)
     _log.info(
-        "publish-manifest wrote pointer model=%s pointer_name=%s artifact_id=%s path=%s",
+        "publish-manifest wrote pointer model=%s pointer_name=%s artifact_id=%s path=%s relative=%s",
         model_name,
         pointer_name,
         artifact_id,
         target,
+        relative,
     )
     return 0
 

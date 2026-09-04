@@ -20,6 +20,7 @@ import pytest
 from python_models.statistical import config as cfg
 from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from python_models.statistical.bayes.manifest_ingest import (
+    METHOD_HIERARCHICAL_BAYES_NB,
     PARK_FACTOR_SUMMARY_SCHEMA,
     aggregate_park_factor_frames,
     empty_park_factor_frame,
@@ -174,5 +175,6 @@ def test_yields_published_frame_with_artifact_id_and_unique_grain(
     ):
         assert frame.get_column(_contract_col).null_count() == 0
     assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
+    assert set(frame.get_column("method").unique().to_list()) == {METHOD_HIERARCHICAL_BAYES_NB}
     grain = frame.select("park_id", "season", "league", "outcome")
     assert grain.n_unique() == frame.height

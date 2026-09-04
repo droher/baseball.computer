@@ -158,3 +158,77 @@ def test_global_published_root_override_is_hermetic(
 def test_package_versions_subset_includes_pydantic() -> None:
     versions = package_versions()
     assert "pydantic" in versions
+
+
+def _pointer(manifest_path: Path) -> PublishedPointer:
+    return PublishedPointer(
+        model_name="fielding_credit",
+        artifact_id=new_artifact_id(),
+        published_at=datetime.now(tz=timezone.utc),
+        manifest_path=manifest_path,
+    )
+
+
+def test_artifacts_root_env_moves_global_published_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifacts_root = tmp_path / "canonical"
+    (artifacts_root / "published").mkdir(parents=True)
+    (artifacts_root / "published" / "fielding_credit.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(artifacts_root))
+    monkeypatch.delenv(cfg.ENV_GLOBAL_PUBLISHED_ROOT, raising=False)
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(tmp_path / "branch"))
+
+    assert find_published_manifest("fielding_credit") == (
+        artifacts_root / "published" / "fielding_credit.json"
+    )
+
+
+def test_relative_pointer_resolves_against_artifacts_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifacts_root = tmp_path / "canonical"
+    manifest = artifacts_root / "bayes" / "fielding_credit" / "abc" / "manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(artifacts_root))
+
+    written = write_published_pointer(
+        _pointer(manifest), root=tmp_path / "published", relative=True
+    )
+    raw = PublishedPointer.model_validate_json(written.read_text(encoding="utf-8"))
+    assert not raw.manifest_path.is_absolute()
+    assert raw.manifest_path == Path("bayes/fielding_credit/abc/manifest.json")
+
+    loaded = read_published_pointer(written)
+    assert loaded.manifest_path.is_absolute()
+    assert loaded.manifest_path == manifest.resolve()
+
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(tmp_path / "elsewhere"))
+    moved = read_published_pointer(written)
+    assert moved.manifest_path == (
+        tmp_path / "elsewhere" / "bayes" / "fielding_credit" / "abc" / "manifest.json"
+    )
+
+
+def test_absolute_pointer_ignores_artifacts_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = tmp_path / "anywhere" / "manifest.json"
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(tmp_path / "canonical"))
+    written = write_published_pointer(_pointer(manifest), root=tmp_path / "published")
+    assert read_published_pointer(written).manifest_path == manifest
+
+
+def test_relative_pointer_refuses_manifest_outside_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(tmp_path / "canonical"))
+    outside = tmp_path / "other" / "manifest.json"
+    with pytest.raises(ValueError, match="outside the artifacts root"):
+        write_published_pointer(
+            _pointer(outside), root=tmp_path / "published", relative=True
+        )
+    assert not (tmp_path / "published").exists()

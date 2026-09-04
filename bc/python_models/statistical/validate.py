@@ -17,23 +17,40 @@ parquet — PR3 wires the real Geometry baseline.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
+import os
+import tempfile
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import polars as pl
+from pydantic import BaseModel
 
 from python_models.statistical import config as _config
 from python_models.statistical.manifests import read_manifest
 from python_models.statistical.schemas import (
     ArtifactManifest,
+    BayesVariableDiagnostics,
     FindingSeverity,
     ValidationFinding,
     ValidationReport,
 )
 
+if TYPE_CHECKING:
+    import arviz as az
+
 _log = logging.getLogger(__name__)
+
+VALIDATION_GATE_VERSION: int = 2
+
+DIAGNOSTICS_MAX_ELEMENTS_PER_VARIABLE: int = 100_000
+GROUP_LEVEL_MAX_ELEMENTS: int = 512
+DIAGNOSTICS_BY_VARIABLE_FILENAME: str = "diagnostics_by_variable.json"
+SAMPLE_DIMS: frozenset[str] = frozenset({"chain", "draw"})
 
 _PROHIBITED_DEEP_COLUMNS: frozenset[str] = frozenset(
     {"predicted_class", "argmax_class", "argmax", "dl_argmax_class"}
@@ -45,7 +62,15 @@ def validate_artifact(
     *,
     model_name: str | None = None,
     candidate_roots: tuple[Path, ...] | None = None,
+    diagnostics_overrides: Mapping[str, object] | None = None,
 ) -> ValidationReport:
+    """Grade one artifact by its ``manifest.kind``.
+
+    ``diagnostics_overrides`` overlays keys onto the Bayes artifact's
+    ``validation/diagnostics.json`` payload before grading, so a caller that
+    has recomputed the convergence pair from the saved posterior grades those
+    numbers without writing them to disk. It is ignored for other kinds.
+    """
     roots = candidate_roots or (
         _config.DEEP_ROOT,
         _config.BAYES_ROOT,
@@ -62,7 +87,9 @@ def validate_artifact(
         case "dataset":
             return _validate_dataset(manifest, artifact_dir)
         case "bayes":
-            return _validate_bayes(manifest, artifact_dir)
+            return _validate_bayes(
+                manifest, artifact_dir, diagnostics_overrides=diagnostics_overrides
+            )
         case other:
             return ValidationReport(
                 artifact_id=manifest.artifact_id,
@@ -467,6 +494,213 @@ def diagnostics_indicate_weak_identification(
     )
 
 
+class PosteriorDiagnostics(BaseModel):
+    rhat_max: float
+    ess_bulk_min: float
+    ess_tail_min: float
+    group_level_rhat_max: float
+    group_level_ess_bulk_min: float
+    divergences: int
+    total_draws: int
+    by_variable: tuple[BayesVariableDiagnostics, ...]
+    group_level_max_elements: int = GROUP_LEVEL_MAX_ELEMENTS
+
+    @property
+    def excluded_variables(self) -> tuple[str, ...]:
+        return tuple(row.name for row in self.by_variable if not row.diagnosed)
+
+    @property
+    def group_level_variables(self) -> tuple[str, ...]:
+        return tuple(
+            row.name
+            for row in self.by_variable
+            if row.diagnosed and row.n_elements <= self.group_level_max_elements
+        )
+
+
+def _finite_extreme(values: object, *, largest: bool) -> float | None:
+    import numpy as np
+
+    arr = np.asarray(values, dtype=np.float64).ravel()
+    finite = arr[np.isfinite(arr)]
+    if finite.size == 0:
+        return None
+    return float(finite.max() if largest else finite.min())
+
+
+def nan_if_none(value: float | None) -> float:
+    return float("nan") if value is None else value
+
+
+def compute_posterior_diagnostics(
+    idata: az.InferenceData,
+    *,
+    max_elements_per_variable: int = DIAGNOSTICS_MAX_ELEMENTS_PER_VARIABLE,
+    group_level_max_elements: int = GROUP_LEVEL_MAX_ELEMENTS,
+) -> PosteriorDiagnostics:
+    """Convergence diagnostics over every posterior variable.
+
+    ``rhat_max`` / ``ess_*_min`` reduce over every element of every
+    variable whose non-sample element count is at most
+    ``max_elements_per_variable``; larger variables are skipped (recorded
+    with ``diagnosed=False``) and logged. The ``group_level_*`` pair
+    reduces over the diagnosed variables with at most
+    ``group_level_max_elements`` elements — scalars and small group-level
+    effects — and is the pair the weak-identification flag reads.
+    """
+    import arviz as az
+    import numpy as np
+    import xarray as xr
+
+    posterior = cast(xr.Dataset, idata["posterior"])
+    rows: list[BayesVariableDiagnostics] = []
+    rhat_all: list[float] = []
+    ess_bulk_all: list[float] = []
+    ess_tail_all: list[float] = []
+    rhat_group: list[float] = []
+    ess_bulk_group: list[float] = []
+    for raw_name in posterior.data_vars:
+        name = str(raw_name)
+        variable = posterior[name]
+        n_elements = int(
+            np.prod(
+                [
+                    size
+                    for dim, size in variable.sizes.items()
+                    if dim not in SAMPLE_DIMS
+                ],
+                dtype=np.int64,
+            )
+        )
+        if n_elements > max_elements_per_variable:
+            _log.warning(
+                "posterior diagnostics skipping %s: %d elements exceeds cap %d",
+                name,
+                n_elements,
+                max_elements_per_variable,
+            )
+            rows.append(
+                BayesVariableDiagnostics(
+                    name=name, n_elements=n_elements, diagnosed=False
+                )
+            )
+            continue
+        rhat_ds = cast(xr.Dataset, az.rhat(idata, var_names=[name]))
+        ess_bulk_ds = cast(xr.Dataset, az.ess(idata, var_names=[name], method="bulk"))
+        ess_tail_ds = cast(xr.Dataset, az.ess(idata, var_names=[name], method="tail"))
+        rhat = _finite_extreme(rhat_ds[name].values, largest=True)
+        ess_bulk = _finite_extreme(ess_bulk_ds[name].values, largest=False)
+        ess_tail = _finite_extreme(ess_tail_ds[name].values, largest=False)
+        rows.append(
+            BayesVariableDiagnostics(
+                name=name,
+                n_elements=n_elements,
+                rhat_max=rhat,
+                ess_bulk_min=ess_bulk,
+                ess_tail_min=ess_tail,
+            )
+        )
+        if rhat is not None:
+            rhat_all.append(rhat)
+        if ess_bulk is not None:
+            ess_bulk_all.append(ess_bulk)
+        if ess_tail is not None:
+            ess_tail_all.append(ess_tail)
+        if n_elements <= group_level_max_elements:
+            if rhat is not None:
+                rhat_group.append(rhat)
+            if ess_bulk is not None:
+                ess_bulk_group.append(ess_bulk)
+
+    sample_stats = getattr(idata, "sample_stats", None)
+    divergences = 0
+    if sample_stats is not None and "diverging" in sample_stats:
+        divergences = int(np.asarray(sample_stats["diverging"].values).sum())
+    total_draws = int(posterior.sizes["chain"] * posterior.sizes["draw"])
+
+    return PosteriorDiagnostics(
+        rhat_max=max(rhat_all) if rhat_all else float("nan"),
+        ess_bulk_min=min(ess_bulk_all) if ess_bulk_all else float("nan"),
+        ess_tail_min=min(ess_tail_all) if ess_tail_all else float("nan"),
+        group_level_rhat_max=max(rhat_group) if rhat_group else float("nan"),
+        group_level_ess_bulk_min=min(ess_bulk_group)
+        if ess_bulk_group
+        else float("nan"),
+        divergences=divergences,
+        total_draws=total_draws,
+        by_variable=tuple(rows),
+        group_level_max_elements=group_level_max_elements,
+    )
+
+
+def _atomic_write_json(target: Path, payload: str) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(target.parent), prefix=f".{target.name}.", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            _ = fh.write(payload)
+        os.replace(tmp_name, target)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def write_diagnostics_by_variable(
+    validation_dir: Path, rows: tuple[BayesVariableDiagnostics, ...]
+) -> Path:
+    target = validation_dir / DIAGNOSTICS_BY_VARIABLE_FILENAME
+    payload = json.dumps([row.model_dump(mode="json") for row in rows], indent=2)
+    _atomic_write_json(target, payload)
+    return target
+
+
+def read_diagnostics_by_variable(path: Path) -> tuple[BayesVariableDiagnostics, ...]:
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, list):
+        raise ValueError(f"{path} is not a JSON list")
+    return tuple(
+        BayesVariableDiagnostics.model_validate(entry)
+        for entry in cast(list[object], loaded)
+    )
+
+
+def manifest_declares_smoke(manifest: ArtifactManifest) -> bool:
+    if bool(manifest.metadata.get("is_smoke", False)):
+        return True
+    extras = manifest.bayes_extras
+    return extras is not None and extras.sampler_config.is_smoke
+
+
+def diagnostics_file_declares_smoke(artifact_dir: Path) -> bool:
+    path = artifact_dir / "validation" / "diagnostics.json"
+    if not path.exists():
+        return False
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return False
+    if not isinstance(loaded, dict):
+        return False
+    return bool(cast(dict[str, object], loaded).get("is_smoke", False))
+
+
+def manifest_is_smoke(manifest: ArtifactManifest, artifact_dir: Path) -> bool:
+    """Whether any of the artifact's smoke markers is set.
+
+    The fit records ``is_smoke`` in three places (manifest metadata, the
+    sampler config, and ``validation/diagnostics.json``); any one of them
+    marks the artifact as a smoke fit.
+    """
+    return manifest_declares_smoke(manifest) or diagnostics_file_declares_smoke(
+        artifact_dir
+    )
+
+
 def _finite_float(value: object) -> float | None:
     if isinstance(value, bool):
         return None
@@ -491,8 +725,6 @@ def _derive_baseline_log_loss(payload: dict[str, object]) -> float | None:
     a partial class set yields a finite but understated entropy that would
     make the gate falsely strict.
     """
-    from typing import cast
-
     distribution = payload.get("distribution_calibration")
     if not isinstance(distribution, dict):
         return None
@@ -537,56 +769,55 @@ def _grade_held_out_metrics(
     held-out check, which is itself graded at ``baseline_severity``.
     Argmax accuracy is recorded and reported at ``warn`` only: the
     multinomial targets publish per-event class shares, so top-1 is a
-    diagnostic rather than a gate. Absence of the file on a full-scale fit
-    is itself a ``warn``.
+    diagnostic rather than a gate. A missing or unreadable file is graded
+    at ``baseline_severity`` too: a full-scale fit with no held-out
+    evidence cannot pass, while a smoke fit only warns.
     """
-    import json as _json
-
     findings: list[ValidationFinding] = []
     metrics: dict[str, float | int] = {}
+    baseline_severity: FindingSeverity = "warn" if is_smoke else "block"
     path = artifact_dir / "validation" / "held_out_metrics.json"
     if not path.exists():
-        if not is_smoke:
-            findings.append(
-                ValidationFinding(
-                    severity="warn",
-                    code="bayes_held_out_metrics_absent",
-                    message=(
-                        f"no held_out_metrics.json at {path}; full-scale fit "
-                        "ships no out-of-sample calibration evidence"
-                    ),
-                )
+        findings.append(
+            ValidationFinding(
+                severity=baseline_severity,
+                code="bayes_held_out_metrics_absent",
+                message=(
+                    f"no held_out_metrics.json at {path}; the fit ships no "
+                    f"out-of-sample evidence (smoke={is_smoke})"
+                ),
             )
+        )
         return findings, metrics
 
     try:
-        loaded = _json.loads(path.read_text(encoding="utf-8"))
+        loaded = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
         findings.append(
             ValidationFinding(
-                severity="warn",
+                severity=baseline_severity,
                 code="bayes_held_out_metrics_malformed",
-                message=f"held_out_metrics.json at {path} is not valid JSON: {exc}",
+                message=(
+                    f"held_out_metrics.json at {path} is not valid JSON: {exc} "
+                    f"(smoke={is_smoke})"
+                ),
             )
         )
         return findings, metrics
     if not isinstance(loaded, dict):
         findings.append(
             ValidationFinding(
-                severity="warn",
+                severity=baseline_severity,
                 code="bayes_held_out_metrics_malformed",
                 message=(
                     f"held_out_metrics.json at {path} is not a JSON object "
-                    f"(got {type(loaded).__name__})"
+                    f"(got {type(loaded).__name__}; smoke={is_smoke})"
                 ),
             )
         )
         return findings, metrics
 
-    from typing import cast
-
     payload: dict[str, object] = cast(dict[str, object], loaded)
-    baseline_severity: FindingSeverity = "warn" if is_smoke else "block"
 
     ece = _finite_float(payload.get("ece_held_out"))
     if ece is not None:
@@ -714,25 +945,31 @@ def _grade_held_out_metrics(
     return findings, metrics
 
 
-def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> ValidationReport:
+def _validate_bayes(
+    manifest: ArtifactManifest,
+    artifact_dir: Path,
+    *,
+    diagnostics_overrides: Mapping[str, object] | None = None,
+) -> ValidationReport:
     findings: list[ValidationFinding] = []
     metrics: dict[str, float | int] = {}
     diagnostics_path = artifact_dir / "validation" / "diagnostics.json"
     if not diagnostics_path.exists():
-        findings.append(
-            ValidationFinding(
-                severity="block",
-                code="bayes_missing_diagnostics",
-                message=f"diagnostics.json not found at {diagnostics_path}",
+        if diagnostics_overrides is None:
+            findings.append(
+                ValidationFinding(
+                    severity="block",
+                    code="bayes_missing_diagnostics",
+                    message=f"diagnostics.json not found at {diagnostics_path}",
+                )
             )
+            return _finalize(manifest, findings, metrics)
+        return _grade_bayes_payload(
+            manifest, artifact_dir, dict(diagnostics_overrides), findings, metrics
         )
-        return _finalize(manifest, findings, metrics)
-
-    import json as _json
-    from typing import cast
 
     try:
-        loaded = _json.loads(diagnostics_path.read_text(encoding="utf-8"))
+        loaded = json.loads(diagnostics_path.read_text(encoding="utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
         findings.append(
             ValidationFinding(
@@ -757,8 +994,19 @@ def _validate_bayes(manifest: ArtifactManifest, artifact_dir: Path) -> Validatio
         )
         return _finalize(manifest, findings, metrics)
 
-    payload: dict[str, object] = cast(dict[str, object], loaded)
-    is_smoke = bool(payload.get("is_smoke", False))
+    payload: dict[str, object] = dict(cast(dict[str, object], loaded))
+    payload.update(diagnostics_overrides or {})
+    return _grade_bayes_payload(manifest, artifact_dir, payload, findings, metrics)
+
+
+def _grade_bayes_payload(
+    manifest: ArtifactManifest,
+    artifact_dir: Path,
+    payload: dict[str, object],
+    findings: list[ValidationFinding],
+    metrics: dict[str, float | int],
+) -> ValidationReport:
+    is_smoke = bool(payload.get("is_smoke", False)) or manifest_declares_smoke(manifest)
     thresholds = _BAYES_THRESHOLDS_SMOKE if is_smoke else _BAYES_THRESHOLDS_DEFAULT
     metrics["is_smoke"] = 1 if is_smoke else 0
 

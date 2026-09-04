@@ -41,9 +41,8 @@ def _load() -> Any:
         sys.modules[module_name] = module
         try:
             spec.loader.exec_module(module)
-        except Exception:
+        finally:
             sys.modules.pop(module_name, None)
-            raise
         return module
     finally:
         sys.path.remove(str(SCRIPTS_DIR))
@@ -525,7 +524,7 @@ def test_evaluate_gate_write_failure_keeps_artifact_id_and_flags_the_row(
     def _explode(*args: object, **kwargs: object) -> bool:
         raise OSError(28, "No space left on device")
 
-    monkeypatch.setattr(module, "_stamp_manifest_validation_status", _explode)
+    monkeypatch.setattr(module, "_stamp_manifest_gate_result", _explode)
 
     row = module.evaluate_gate(
         "synthetic_good",
@@ -703,12 +702,15 @@ def test_format_table_columns_and_dashes() -> None:
     ]
     table = module.format_table(rows)
     lines = table.splitlines()
-    assert lines[0].split()[:5] == [
+    assert lines[0].split()[:8] == [
         "model",
         "artifact_id",
         "status",
         "manifest_status",
+        "gate_v",
         "hdi_cov",
+        "hdi_cov_param",
+        "weak_id",
     ]
     assert "0.9123" in table
     assert "bayes_held_out_ece(warn)" in table
@@ -746,3 +748,353 @@ def test_discover_pointers_branch_shadows_global(tmp_path: Path) -> None:
     resolved = module.discover_pointers(None, roots=(branch_root, global_root))
     assert set(resolved) == {"m1", "m2"}
     assert resolved["m1"].parent == branch_root
+
+
+def _synthetic_posterior(
+    *, drift_large: float = 0.0, divergences: int = 0, seed: int = 0
+) -> Any:
+    import arviz as az
+    import numpy as np
+
+    from python_models.statistical.validate import GROUP_LEVEL_MAX_ELEMENTS
+
+    rng = np.random.default_rng(seed)
+    n_chains, n_draws = 2, 400
+    large = rng.normal(size=(n_chains, n_draws, GROUP_LEVEL_MAX_ELEMENTS + 1))
+    large[1, :, :] += drift_large
+    diverging = np.zeros((n_chains, n_draws), dtype=bool)
+    diverging.ravel()[:divergences] = True
+    return az.from_dict(
+        posterior={
+            "scalar": rng.normal(size=(n_chains, n_draws)),
+            "small": rng.normal(size=(n_chains, n_draws, 6)),
+            "large": large,
+        },
+        sample_stats={"diverging": diverging},
+    )
+
+
+def _write_posterior(artifact_dir: Path, idata: Any) -> Path:
+    inference = artifact_dir / "inference"
+    inference.mkdir(parents=True, exist_ok=True)
+    target = inference / "posterior.nc"
+    idata.to_netcdf(str(target))
+    return target
+
+
+_GOOD_HELD_OUT: dict[str, object] = {
+    "roc_auc": 0.9,
+    "pr_auc": 0.9,
+    "baseline_pr_auc": 0.3,
+    "ece_held_out": 0.02,
+}
+
+
+def test_evaluate_gate_write_stamps_gate_version_and_timestamp(tmp_path: Path) -> None:
+    from python_models.statistical.validate import VALIDATION_GATE_VERSION
+
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    manifest_path = bayes_root / "synthetic_good" / "aid-good" / "manifest.json"
+    before = datetime.now(tz=timezone.utc)
+
+    row = module.evaluate_gate(
+        "synthetic_good",
+        pointer_path,
+        write=True,
+        candidate_roots=(bayes_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert row.status == "passed"
+    stamped = read_manifest(manifest_path)
+    assert stamped.validation_status == "passed"
+    assert stamped.validation_gate_version == VALIDATION_GATE_VERSION
+    assert stamped.validated_at is not None
+    assert stamped.validated_at >= before
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert raw["validation_gate_version"] == VALIDATION_GATE_VERSION
+    assert datetime.fromisoformat(raw["validated_at"]) == stamped.validated_at
+
+
+def test_evaluate_gate_write_restamps_when_gate_version_differs(tmp_path: Path) -> None:
+    from python_models.statistical.validate import VALIDATION_GATE_VERSION
+
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    manifest_path = bayes_root / "synthetic_good" / "aid-good" / "manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["validation_status"] = "passed"
+    payload["validation_gate_version"] = VALIDATION_GATE_VERSION - 1
+    payload["validated_at"] = "2020-01-01T00:00:00+00:00"
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    before = _file_identity(manifest_path)
+
+    row = module.evaluate_gate(
+        "synthetic_good",
+        pointer_path,
+        write=True,
+        candidate_roots=(bayes_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert row.status == "passed"
+    assert _file_identity(manifest_path) != before
+    stamped = read_manifest(manifest_path)
+    assert stamped.validation_status == "passed"
+    assert stamped.validation_gate_version == VALIDATION_GATE_VERSION
+    assert stamped.validated_at is not None
+    assert stamped.validated_at.year > 2020
+
+
+def test_evaluate_gate_write_recomputes_diagnostics_from_posterior(
+    tmp_path: Path,
+) -> None:
+    from python_models.statistical.validate import (
+        DIAGNOSTICS_BY_VARIABLE_FILENAME,
+        compute_posterior_diagnostics,
+        diagnostics_indicate_weak_identification,
+        read_diagnostics_by_variable,
+    )
+
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    artifact_dir = bayes_root / "synthetic_good" / "aid-good"
+    idata = _synthetic_posterior(drift_large=4.0)
+    _ = _write_posterior(artifact_dir, idata)
+    expected = compute_posterior_diagnostics(idata)
+
+    row = module.evaluate_gate(
+        "synthetic_good",
+        pointer_path,
+        write=True,
+        candidate_roots=(bayes_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert row.status == "failed"
+    assert any(c.startswith("bayes_high_rhat") for c in row.findings)
+    expected_flag = diagnostics_indicate_weak_identification(
+        rhat_max=expected.group_level_rhat_max,
+        ess_bulk_min=expected.group_level_ess_bulk_min,
+        divergences=expected.divergences,
+    )
+    assert expected_flag is False
+    assert row.weak_identification_flag is expected_flag
+
+    diagnostics_payload = json.loads(
+        (artifact_dir / "validation" / "diagnostics.json").read_text(encoding="utf-8")
+    )
+    assert diagnostics_payload["rhat_max"] == expected.rhat_max
+    assert diagnostics_payload["ess_bulk_min"] == expected.ess_bulk_min
+    assert diagnostics_payload["group_level_rhat_max"] == expected.group_level_rhat_max
+    assert (
+        diagnostics_payload["group_level_ess_bulk_min"]
+        == expected.group_level_ess_bulk_min
+    )
+    assert diagnostics_payload["is_smoke"] is False
+
+    table = read_diagnostics_by_variable(
+        artifact_dir / "validation" / DIAGNOSTICS_BY_VARIABLE_FILENAME
+    )
+    assert table == expected.by_variable
+
+    stamped = read_manifest(artifact_dir / "manifest.json")
+    assert stamped.validation_status == "failed"
+    assert stamped.bayes_extras is not None
+    assert stamped.bayes_extras.weak_identification_flag is expected_flag
+    summary = stamped.bayes_extras.diagnostics_summary
+    assert summary.rhat_max == expected.rhat_max
+    assert summary.ess_bulk_min == expected.ess_bulk_min
+    assert summary.group_level_rhat_max == expected.group_level_rhat_max
+    assert summary.group_level_ess_bulk_min == expected.group_level_ess_bulk_min
+
+    report = json.loads(
+        (artifact_dir / "validation" / "validation_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["metrics"]["rhat_max"] == expected.rhat_max
+
+
+def test_evaluate_gate_write_flags_divergent_posterior_even_when_gate_passes(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    artifact_dir = bayes_root / "synthetic_good" / "aid-good"
+    _ = _write_posterior(artifact_dir, _synthetic_posterior(divergences=1))
+    manifest_before = read_manifest(artifact_dir / "manifest.json")
+    assert manifest_before.bayes_extras is not None
+    assert manifest_before.bayes_extras.weak_identification_flag is False
+
+    row = module.evaluate_gate(
+        "synthetic_good",
+        pointer_path,
+        write=True,
+        candidate_roots=(bayes_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert row.weak_identification_flag is True
+    stamped = read_manifest(artifact_dir / "manifest.json")
+    assert stamped.bayes_extras is not None
+    assert stamped.bayes_extras.weak_identification_flag is True
+    assert any(c.startswith("bayes_divergences") for c in row.findings)
+
+
+def test_evaluate_gate_read_only_grades_the_posterior_without_touching_files(
+    tmp_path: Path,
+) -> None:
+    from python_models.statistical.validate import DIAGNOSTICS_BY_VARIABLE_FILENAME
+
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    artifact_dir = bayes_root / "synthetic_good" / "aid-good"
+    _ = _write_posterior(artifact_dir, _synthetic_posterior(drift_large=4.0))
+    diagnostics_path = artifact_dir / "validation" / "diagnostics.json"
+    manifest_path = artifact_dir / "manifest.json"
+    diagnostics_before = diagnostics_path.read_text(encoding="utf-8")
+    manifest_before = manifest_path.read_text(encoding="utf-8")
+    assert json.loads(diagnostics_before)["rhat_max"] < 1.05
+
+    row = module.evaluate_gate(
+        "synthetic_good",
+        pointer_path,
+        write=False,
+        candidate_roots=(bayes_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert row.status == "failed"
+    assert any(c.startswith("bayes_high_rhat") for c in row.findings)
+    assert row.weak_identification_flag is False
+    assert diagnostics_path.read_text(encoding="utf-8") == diagnostics_before
+    assert manifest_path.read_text(encoding="utf-8") == manifest_before
+    assert not (artifact_dir / "validation" / DIAGNOSTICS_BY_VARIABLE_FILENAME).exists()
+    assert not (artifact_dir / "validation" / "validation_report.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("with_posterior", "drift_large", "divergences"),
+    [
+        (True, 0.0, 0),
+        (True, 4.0, 0),
+        (True, 0.0, 3),
+        (False, 0.0, 0),
+    ],
+)
+def test_read_only_and_write_sweeps_agree_on_status_and_flag(
+    tmp_path: Path, with_posterior: bool, drift_large: float, divergences: int
+) -> None:
+    module = _load()
+    read_only_root, read_only_pointer = _build_artifact(
+        tmp_path / "read_only", "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    write_root, write_pointer = _build_artifact(
+        tmp_path / "write", "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    if with_posterior:
+        idata = _synthetic_posterior(drift_large=drift_large, divergences=divergences)
+        for root in (read_only_root, write_root):
+            _ = _write_posterior(root / "synthetic_good" / "aid-good", idata)
+
+    read_only = module.evaluate_gate(
+        "synthetic_good",
+        read_only_pointer,
+        write=False,
+        candidate_roots=(read_only_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+    written = module.evaluate_gate(
+        "synthetic_good",
+        write_pointer,
+        write=True,
+        candidate_roots=(write_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert read_only.status == written.status
+    assert read_only.findings == written.findings
+    assert read_only.weak_identification_flag == written.weak_identification_flag
+    stamped = read_manifest(
+        write_root / "synthetic_good" / "aid-good" / "manifest.json"
+    )
+    assert stamped.validation_status == read_only.status
+    read_only_manifest = read_manifest(
+        read_only_root / "synthetic_good" / "aid-good" / "manifest.json"
+    )
+    assert read_only_manifest.validation_status == "exploratory"
+
+
+def test_evaluate_gate_write_without_posterior_keeps_manifest_flag(
+    tmp_path: Path,
+) -> None:
+    from python_models.statistical.validate import DIAGNOSTICS_BY_VARIABLE_FILENAME
+
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    artifact_dir = bayes_root / "synthetic_good" / "aid-good"
+    manifest_path = artifact_dir / "manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["bayes_extras"]["weak_identification_flag"] = True
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    row = module.evaluate_gate(
+        "synthetic_good",
+        pointer_path,
+        write=True,
+        candidate_roots=(bayes_root,),
+        datasets_root=tmp_path / "datasets",
+    )
+
+    assert row.status == "passed"
+    assert row.weak_identification_flag is True
+    stamped = read_manifest(manifest_path)
+    assert stamped.bayes_extras is not None
+    assert stamped.bayes_extras.weak_identification_flag is True
+    assert not (artifact_dir / "validation" / DIAGNOSTICS_BY_VARIABLE_FILENAME).exists()
+
+
+def test_evaluate_gate_recompute_failure_is_an_error_row_in_both_modes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load()
+    bayes_root, pointer_path = _build_artifact(
+        tmp_path, "synthetic_good", "aid-good", _GOOD_HELD_OUT
+    )
+    artifact_dir = bayes_root / "synthetic_good" / "aid-good"
+    _ = _write_posterior(artifact_dir, _synthetic_posterior())
+    manifest_path = artifact_dir / "manifest.json"
+    before = manifest_path.read_text(encoding="utf-8")
+
+    def _explode(*args: object, **kwargs: object) -> object:
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(module, "compute_diagnostics_from_posterior", _explode)
+
+    for write in (True, False):
+        row = module.evaluate_gate(
+            "synthetic_good",
+            pointer_path,
+            write=write,
+            candidate_roots=(bayes_root,),
+            datasets_root=tmp_path / "datasets",
+        )
+
+        assert row.status == "error"
+        assert row.artifact_id == "aid-good"
+        assert any(module.DIAGNOSTICS_FAILED_CODE in c for c in row.findings)
+        assert manifest_path.read_text(encoding="utf-8") == before

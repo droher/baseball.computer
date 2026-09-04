@@ -74,6 +74,15 @@ class BayesPosteriorSummary(BaseModel):
     rows: tuple[BayesPosteriorRow, ...] = ()
 
 
+class BayesVariableDiagnostics(BaseModel):
+    name: str
+    n_elements: int
+    diagnosed: bool = True
+    rhat_max: float | None = None
+    ess_bulk_min: float | None = None
+    ess_tail_min: float | None = None
+
+
 class BayesDiagnosticsSummary(BaseModel):
     rhat_max: float
     ess_bulk_min: float
@@ -82,6 +91,8 @@ class BayesDiagnosticsSummary(BaseModel):
     total_draws: int
     calibration_ece: float | None = None
     posterior_predictive_max_bucket_dev: float | None = None
+    group_level_rhat_max: float | None = None
+    group_level_ess_bulk_min: float | None = None
     diagnostics: tuple["Diagnostic", ...] = ()
 
 
@@ -117,6 +128,8 @@ class ArtifactManifest(BaseModel):
     package_versions: dict[str, str]
     random_seed: int | None = None
     validation_status: ValidationStatus = "exploratory"
+    validation_gate_version: int | None = None
+    validated_at: datetime | None = None
     blocking_findings: tuple[str, ...] = ()
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
     bayes_extras: BayesArtifactExtras | None = None

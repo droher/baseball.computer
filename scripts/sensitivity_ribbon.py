@@ -8,26 +8,21 @@ per-event class shares over the selection-log-odds grid and write
 The ribbon is the honest band on each imputed class mix under plausible MNAR;
 ``delta = 0`` reproduces the published (MAR) marginal.
 
-``--joint <anchor-run-dir>``: for the trajectory dimension only, sweep the
-anchored offset direction ``t · delta_anchor`` (era-specific magnitude) plus
-per-non-focal-class ±perturbations at ``t = 1``, grouped per era bucket, and
-write ``exports/sensitivity_ribbon_joint.parquet`` + a summary JSON beside the
-trajectory fit. The anchor is a SINGLE-CLASS GroundBall direction (the derived
-slice trajectory deduction recovers only ground balls), so all other class
-offsets are 0. The other four geometry dimensions have no anchor and stay
-marginal-only (``sensitivity_ribbon.parquet``), same as ``--publish``.
+``--bound <anchor-run-dir>``: for the trajectory dimension only, split the
+published export by paper era, sweep the marginal ribbon within each era, and
+add one derived number per era: the smallest GroundBall offset at which the
+corrected marginal GroundBall share on the unrecorded slice reaches the
+derived-slice lower bound from ``scripts/mnar_anchor.py``. Writes
+``exports/sensitivity_ribbon_by_era.parquet``,
+``exports/trajectory_bound_offset.parquet`` and
+``exports/trajectory_bound_offset_summary.json`` beside the trajectory fit, so a
+reader can see whether the +-1.0 grid contains the bound. The other four
+geometry dimensions have no derived slice; ``--publish`` covers them.
 
-CLASS-UNIVERSE DECISION (stated in the summary JSON and logged): the ribbon
-uses the anchored GroundBall offset recomputed over the paper's classifiable
-class universe — the observed-slice denominator excludes the unclassifiable
-bunt labels UnspecifiedBunt / FoulBunt (as ``notes/paper/queries/
-groundball_mnar.sql`` does), matching the geometry model's own trajectory
-vocabulary {Bunt, Fly, GroundBall, LineDrive, PopUp}, which carries no such
-labels. Those two labels are 0.01–0.14% of observed rows, so realigning moves
-the offset by <0.001 nats. The larger anchor(0.289)-vs-paper(0.337) pre-1950
-gap is a DIFFERENT decomposition, not a class-universe artifact: the paper's
-broad "ground" share folds GroundBallBunt into the numerator, whereas the
-anchor's single-class offset targets the pure GroundBall model class.
+The bound is a floor, not an anchor: the derived slice is 100% GroundBall, so
+contrasting it against the observed slice would only restate the observed
+GroundBall share. The offset reported here is the offset a reader would need
+to assume to make the MAR marginal respect the floor.
 
 ``--validate-backtest <run-dir>``: on the masked backtest, the real correction
 is known (the per-class mask probabilities recover the true maskable-slice
@@ -43,6 +38,7 @@ import json
 import logging
 import math
 import sys
+import time
 from pathlib import Path
 
 import polars as pl
@@ -51,15 +47,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "bc"))
 
 from python_models.statistical import mnar_anchor  # noqa: E402
-from python_models.statistical.duckdb_io import open_bc_db  # noqa: E402
-from python_models.statistical.manifests import find_published_manifest  # noqa: E402
+from python_models.statistical.manifests import (  # noqa: E402
+    find_published_manifest,
+    read_published_pointer,
+)
 from python_models.statistical.sensitivity import (  # noqa: E402
     DEFAULT_GRID,
-    JOINT_PERTURBATION_NATS,
-    JOINT_T_GRID,
-    SWEEP_JOINT_ANCHOR,
-    joint_ribbon_band,
-    joint_sensitivity_ribbon,
+    bound_offset_table,
+    era_sensitivity_ribbon,
     offset_recovers_target,
     ribbon_band,
     sensitivity_ribbon,
@@ -76,48 +71,23 @@ GEOMETRY_MODELS: tuple[str, ...] = (
 )
 _LOGIT_CLIP = 1e-6
 
-JOINT_DIMENSION = "trajectory"
-JOINT_MODEL = "geometry_trajectory"
+BOUND_DIMENSION = "trajectory"
+BOUND_MODEL = "geometry_trajectory"
 FOCAL_CLASS = "GroundBall"
-EXCLUDED_CLASSES: tuple[str, ...] = ("UnspecifiedBunt", "FoulBunt")
-
-CLASS_UNIVERSE_DECISION = (
-    "The ribbon uses the anchored GroundBall selection offset recomputed over "
-    "the paper's classifiable class universe: the observed-slice denominator "
-    "excludes the unclassifiable bunt labels UnspecifiedBunt and FoulBunt (as "
-    "notes/paper/queries/groundball_mnar.sql does), matching the geometry "
-    "model's trajectory vocabulary {Bunt, Fly, GroundBall, LineDrive, PopUp}, "
-    "which carries no such labels. Those two labels are 0.01-0.14% of observed "
-    "rows, so realigning moves the offset by <0.001 nats. The larger anchor "
-    "(pre-1950 p_obs 0.289) vs paper (ground share 0.337) gap is a DIFFERENT "
-    "decomposition, not a class-universe artifact: the paper's broad 'ground' "
-    "share folds GroundBallBunt into the numerator, whereas the anchor's "
-    "single-class offset targets the pure GroundBall model class. The derived "
-    "slice is 100% GroundBall, so the anchor is a single-class softmax "
-    "direction with all other class offsets 0; softmax offsets are identified "
-    "up to an additive constant, so the raw single-class offset (delta_raw, not "
-    "the degenerate centered delta) is a valid joint direction."
-)
-
-_SEASON_QUERY = (
-    "SELECT event_key, season FROM main_models.model_input_geometry "
-    "WHERE geometry_dimension = '{dimension}'"
-)
+BOUND_BUCKETING = "paper"
 
 
 def _published_export(model_name: str) -> tuple[str, Path] | None:
-    pointer = find_published_manifest(model_name)
-    if pointer is None:
+    pointer_path = find_published_manifest(model_name)
+    if pointer_path is None:
         log.warning("no published pointer for %s", model_name)
         return None
-    manifest = json.loads(pointer.read_text())
-    export = (
-        Path(manifest["manifest_path"]).parent / "exports" / "geometry_probabilities.parquet"
-    )
+    pointer = read_published_pointer(pointer_path)
+    export = pointer.manifest_path.parent / "exports" / "geometry_probabilities.parquet"
     if not export.exists():
         log.warning("%s pointer has no geometry export at %s", model_name, export)
         return None
-    return manifest["artifact_id"], export
+    return pointer.artifact_id, export
 
 
 def _dimension_of(export_df: pl.DataFrame) -> str:
@@ -155,59 +125,44 @@ def publish_ribbons() -> int:
     return 0
 
 
-def _aligned_anchor_offsets(
-    run_dir: Path,
-) -> tuple[dict[str, dict[str, float]], list[dict[str, object]]]:
-    """Per-era single-class GroundBall offset, realigned to the classifiable universe.
-
-    Reads the anchor artifact's paper-bucketing offsets and recomputes the
-    GroundBall selection offset with the observed / masked shares taken over the
-    classifiable class universe (UnspecifiedBunt / FoulBunt excluded). Returns
-    the per-era anchor direction plus per-era diagnostics (raw vs aligned).
-    """
-    offsets = pl.read_parquet(run_dir / "anchor_offsets.parquet").filter(
-        pl.col("bucketing") == "paper"
+def _bounds_by_era(anchor_dir: Path) -> pl.DataFrame:
+    bounds = pl.read_parquet(anchor_dir / "derived_slice_bounds.parquet").filter(
+        (pl.col("bucketing") == BOUND_BUCKETING)
+        & (pl.col("class_label") == FOCAL_CLASS)
     )
-    anchor_by_era: dict[str, dict[str, float]] = {}
-    diagnostics: list[dict[str, object]] = []
-    for era in offsets.get_column("era_bucket").unique().sort().to_list():
-        era_rows = offsets.filter(pl.col("era_bucket") == era)
-        classifiable = era_rows.filter(~pl.col("class_label").is_in(EXCLUDED_CLASSES))
-        focal = classifiable.filter(pl.col("class_label") == FOCAL_CLASS)
-        n_obs_focal = int(focal.get_column("n_obs").item())
-        n_masked_focal = int(focal.get_column("n_masked").item())
-        total_obs = int(classifiable.get_column("n_obs").sum())
-        total_masked = int(classifiable.get_column("n_masked").sum())
-        p_obs_aligned = n_obs_focal / total_obs
-        p_masked_aligned = n_masked_focal / total_masked
-        delta_aligned = math.log(p_masked_aligned / p_obs_aligned)
-        anchor_by_era[str(era)] = {FOCAL_CLASS: delta_aligned}
-        diagnostics.append(
-            {
-                "era_bucket": str(era),
-                "p_obs_full_universe": float(focal.get_column("p_obs").item()),
-                "p_obs_classifiable": p_obs_aligned,
-                "delta_raw_full_universe": float(focal.get_column("delta_raw").item()),
-                "delta_aligned": delta_aligned,
-            }
+    if bounds.height == 0:
+        raise ValueError(
+            f"{anchor_dir} has no {BOUND_BUCKETING}/{FOCAL_CLASS} rows in derived_slice_bounds.parquet"
         )
-    return anchor_by_era, diagnostics
+    return bounds.select(
+        "era_bucket",
+        "share_lower_bound",
+        "share_point_estimate",
+        "mar_share_unrecorded",
+        "mar_share_on_derived",
+        "n_unrecorded",
+        "n_derived_class",
+    ).sort("era_bucket")
 
 
-def _season_for_events(db_path: Path, dimension: str) -> pl.DataFrame:
-    with open_bc_db(db_path, read_only=True) as con:
-        _ = con.execute("PRAGMA disable_progress_bar")
-        return con.execute(_SEASON_QUERY.format(dimension=dimension)).pl()
-
-
-def _attach_era(export_df: pl.DataFrame, season_df: pl.DataFrame) -> pl.DataFrame:
-    joined = export_df.join(season_df, on="event_key", how="left")
-    missing = joined.filter(pl.col("season").is_null()).get_column("event_key").n_unique()
+def _attach_era(
+    export_df: pl.DataFrame, *, source: str, dataset_path: Path, db_path: Path
+) -> pl.DataFrame:
+    if source == "dataset":
+        slice_frame = mnar_anchor.load_dimension_slice(
+            BOUND_DIMENSION, dataset_path=dataset_path
+        )
+    else:
+        slice_frame = mnar_anchor.load_dimension_slice(BOUND_DIMENSION, db_path=db_path)
+    seasons = slice_frame.select("event_key", "season")
+    joined = export_df.with_columns(pl.col("event_key").cast(pl.Int64)).join(
+        seasons, on="event_key", how="left"
+    )
+    missing = (
+        joined.filter(pl.col("season").is_null()).get_column("event_key").n_unique()
+    )
     if missing:
-        log.warning(
-            "%d events have no season in model_input_geometry; dropping them", missing
-        )
-        joined = joined.filter(pl.col("season").is_not_null())
+        raise ValueError(f"{missing} export events have no season in the slice source")
     return joined.with_columns(
         pl.when(pl.col("season") < 1950)
         .then(pl.lit(mnar_anchor.PAPER_BUCKET_PRE_1950))
@@ -218,96 +173,136 @@ def _attach_era(export_df: pl.DataFrame, season_df: pl.DataFrame) -> pl.DataFram
     )
 
 
-def _log_joint_table(ribbon: pl.DataFrame) -> None:
-    band = joint_ribbon_band(ribbon)
-    for era in ribbon.get_column("era_bucket").unique().sort().to_list():
-        focal_t = (
+def _log_bound_table(table: pl.DataFrame, ribbon: pl.DataFrame) -> None:
+    for row in table.iter_rows(named=True):
+        era = row["era_bucket"]
+        focal = (
             ribbon.filter(
-                (pl.col("era_bucket") == era)
-                & (pl.col("sweep_kind") == SWEEP_JOINT_ANCHOR)
-                & (pl.col("class_label") == FOCAL_CLASS)
+                (pl.col("era_bucket") == era) & (pl.col("class_label") == FOCAL_CLASS)
             )
-            .sort("t")
-            .select("t", "marginal_share", "baseline_share")
+            .sort("delta_logodds")
+            .select("delta_logodds", "marginal_share")
         )
-        baseline = float(focal_t.get_column("baseline_share").item(0))
+        grid_text = "  ".join(f"d={d:+.2f}:{s:.4f}" for d, s in focal.iter_rows())
+        delta = row["delta_at_target"]
         log.info(
-            "[%s] %s baseline(MAR t=0)=%.4f", era, FOCAL_CLASS, baseline
-        )
-        for row in focal_t.iter_rows(named=True):
-            log.info("    t=%.2f  %s share=%.4f", row["t"], FOCAL_CLASS, row["marginal_share"])
-        focal_band = band.filter(
-            (pl.col("era_bucket") == era) & (pl.col("class_label") == FOCAL_CLASS)
-        )
-        if focal_band.height:
-            b = focal_band.row(0, named=True)
-            log.info(
-                "    t=1 anchor share=%.4f  perturbation band=[%.4f, %.4f]",
-                b["anchor_share"],
-                b["share_low"],
-                b["share_high"],
-            )
-
-
-def publish_joint_ribbons(anchor_dir: Path, db_path: Path) -> int:
-    anchor_by_era, diagnostics = _aligned_anchor_offsets(anchor_dir)
-    log.info("CLASS-UNIVERSE DECISION: %s", CLASS_UNIVERSE_DECISION)
-    for diag in diagnostics:
-        log.info(
-            "[%s] p_obs full=%.4f classifiable=%.4f | delta raw=%.4f aligned=%.4f",
-            diag["era_bucket"],
-            diag["p_obs_full_universe"],
-            diag["p_obs_classifiable"],
-            diag["delta_raw_full_universe"],
-            diag["delta_aligned"],
+            "[%s] %s MAR=%.4f  %s  bound=%.4f  delta_at_bound=%s  in_grid=%s",
+            era,
+            FOCAL_CLASS,
+            row["baseline_share"],
+            grid_text,
+            row["target_share"],
+            "unreachable" if delta is None else f"{delta:+.4f}",
+            row["target_in_grid"],
         )
 
-    resolved = _published_export(JOINT_MODEL)
-    if resolved is None:
-        log.error("no published %s export; cannot build joint ribbon", JOINT_MODEL)
-        return 1
-    artifact_id, export_path = resolved
-    export_df = pl.read_parquet(export_path)
+
+ANCHOR_SUMMARY_FILENAME = "summary.json"
+ANCHOR_ARTIFACT_KEY = "trajectory_artifact_id"
+
+
+def anchor_run_artifact_id(anchor_dir: Path) -> str:
+    """The published fit artifact id an anchor run computed its bounds against."""
+    summary_path = anchor_dir / ANCHOR_SUMMARY_FILENAME
+    if not summary_path.exists():
+        raise FileNotFoundError(f"{anchor_dir} has no {ANCHOR_SUMMARY_FILENAME}")
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    artifact_id = (
+        summary.get(ANCHOR_ARTIFACT_KEY) if isinstance(summary, dict) else None
+    )
+    if not isinstance(artifact_id, str) or not artifact_id:
+        raise ValueError(
+            f"{summary_path} carries no {ANCHOR_ARTIFACT_KEY}; the bounds cannot be "
+            "matched to a published fit"
+        )
+    return artifact_id
+
+
+def assert_anchor_matches_published(
+    anchor_dir: Path, published_artifact_id: str
+) -> None:
+    """Raise unless the anchor run's bounds were computed against the published fit."""
+    anchor_artifact_id = anchor_run_artifact_id(anchor_dir)
+    if anchor_artifact_id != published_artifact_id:
+        raise ValueError(
+            f"{anchor_dir} bounds were computed against {BOUND_MODEL} artifact "
+            f"{anchor_artifact_id!r}, but the published pointer now names "
+            f"{published_artifact_id!r}; rerun scripts/mnar_anchor.py against the "
+            "published fit before deriving its bound offsets"
+        )
+
+
+def publish_bound_ribbons(
+    anchor_dir: Path, *, source: str, dataset_path: Path | None, db_path: Path
+) -> int:
+    started = time.perf_counter()
+    inputs = mnar_anchor.resolve_published_geometry_inputs(
+        BOUND_MODEL, require_dataset=source == "dataset" and dataset_path is None
+    )
+    assert_anchor_matches_published(anchor_dir, inputs.artifact_id)
+    bounds = _bounds_by_era(anchor_dir)
+    resolved_dataset = dataset_path if dataset_path is not None else inputs.dataset_path
+    export_df = pl.read_parquet(inputs.export_path)
     dimension = _dimension_of(export_df)
-    season_df = _season_for_events(db_path, dimension)
+    if dimension != BOUND_DIMENSION:
+        raise ValueError(
+            f"{BOUND_MODEL} export is dimension {dimension!r}, not {BOUND_DIMENSION!r}"
+        )
+    export_df = _attach_era(
+        export_df, source=source, dataset_path=resolved_dataset, db_path=db_path
+    )
+
+    ribbon = era_sensitivity_ribbon(export_df, dimension=dimension)
+    target_by_era = {
+        str(row["era_bucket"]): float(row["share_lower_bound"])
+        for row in bounds.iter_rows(named=True)
+    }
+    table = bound_offset_table(
+        export_df, class_label=FOCAL_CLASS, target_by_era=target_by_era
+    )
+    table = table.join(
+        bounds.select(
+            "era_bucket",
+            "share_point_estimate",
+            "mar_share_on_derived",
+            "n_unrecorded",
+            "n_derived_class",
+        ),
+        on="era_bucket",
+        how="left",
+    )
+
+    ribbon_path = inputs.export_path.parent / "sensitivity_ribbon_by_era.parquet"
+    ribbon.write_parquet(ribbon_path)
+    table_path = inputs.export_path.parent / "trajectory_bound_offset.parquet"
+    table.write_parquet(table_path)
     log.info(
-        "attaching era via event_key join against main_models.model_input_geometry "
-        "(%s dimension, read-only %s)",
-        dimension,
-        db_path,
+        "%s -> %s (%d rows), %s (%d rows)",
+        BOUND_MODEL,
+        ribbon_path,
+        ribbon.height,
+        table_path,
+        table.height,
     )
-    export_df = _attach_era(export_df, season_df)
+    _log_bound_table(table, ribbon)
 
-    ribbon = joint_sensitivity_ribbon(
-        export_df,
-        dimension=dimension,
-        anchor_offset_by_era=anchor_by_era,
-        focal_class=FOCAL_CLASS,
-    )
-    out_path = export_path.parent / "sensitivity_ribbon_joint.parquet"
-    ribbon.write_parquet(out_path)
-    log.info("%s -> %s (%d rows)", JOINT_MODEL, out_path, ribbon.height)
-    _log_joint_table(ribbon)
-
+    elapsed = time.perf_counter() - started
     summary = {
         "focal_class": FOCAL_CLASS,
-        "class_universe_decision": CLASS_UNIVERSE_DECISION,
-        "excluded_classes": list(EXCLUDED_CLASSES),
         "anchor_run_dir": str(anchor_dir),
-        "trajectory_artifact_id": artifact_id,
-        "t_grid": list(JOINT_T_GRID),
-        "perturbation_nats": JOINT_PERTURBATION_NATS,
-        "era_offsets": diagnostics,
+        "trajectory_artifact_id": inputs.artifact_id,
+        "dataset_artifact_id": inputs.dataset_artifact_id,
+        "slice_source": source,
+        "slice_path": str(resolved_dataset if source == "dataset" else db_path),
+        "grid": list(DEFAULT_GRID),
+        "identification_statement": mnar_anchor.IDENTIFICATION_STATEMENT,
+        "elapsed_seconds": round(elapsed, 3),
+        "eras": table.to_dicts(),
     }
-    summary_path = export_path.parent / "sensitivity_ribbon_joint_summary.json"
+    summary_path = inputs.export_path.parent / "trajectory_bound_offset_summary.json"
     _ = summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True))
     log.info("wrote %s", summary_path)
-
-    for model_name in GEOMETRY_MODELS:
-        if model_name == JOINT_MODEL:
-            continue
-        log.info("%s has no anchor; emitting marginal-only ribbon", model_name)
-        _ = _publish_marginal(model_name)
+    log.info("elapsed %.2fs", elapsed)
     return 0
 
 
@@ -343,7 +338,9 @@ def validate_backtest(run_dir: Path) -> int:
 
     ribbon = sensitivity_ribbon(export_df, dimension=_dimension_of(export_df))
     band = ribbon_band(ribbon)
-    focal_band = next(r for r in band.iter_rows(named=True) if r["class_label"] == focal)
+    focal_band = next(
+        r for r in band.iter_rows(named=True) if r["class_label"] == focal
+    )
     focal_truth = truth[focal]
     brackets = focal_band["share_low"] <= focal_truth <= focal_band["share_high"]
 
@@ -351,7 +348,11 @@ def validate_backtest(run_dir: Path) -> int:
     log.info("oracle per-class offset (centered, nats):")
     for c in sorted(oracle):
         log.info("  %-12s %+.3f  in-grid=%s", c, oracle[c], in_grid[c])
-    log.info("TV vs truth: baseline(MAR)=%.4f  oracle-corrected=%.4f", baseline_tv, corrected_tv)
+    log.info(
+        "TV vs truth: baseline(MAR)=%.4f  oracle-corrected=%.4f",
+        baseline_tv,
+        corrected_tv,
+    )
     log.info(
         "focal band [%.4f, %.4f] brackets truth %.4f: %s",
         focal_band["share_low"],
@@ -383,17 +384,29 @@ def _parse_args() -> argparse.Namespace:
         help="validate grid coverage against a masked-backtest run dir instead of publishing",
     )
     _ = parser.add_argument(
-        "--joint",
+        "--bound",
         type=Path,
         default=None,
         metavar="ANCHOR_RUN_DIR",
-        help="build the joint anchored ribbon for trajectory from an anchor run dir",
+        help="per-era trajectory ribbon plus the GroundBall offset at the derived-slice bound",
+    )
+    _ = parser.add_argument(
+        "--source",
+        choices=("dataset", "db"),
+        default="dataset",
+        help="era source for --bound: the fit's frozen dataset parquet (default) or prod bc.db",
+    )
+    _ = parser.add_argument(
+        "--dataset",
+        type=Path,
+        default=None,
+        help="override the dataset parquet for --bound (default: from the published manifest)",
     )
     _ = parser.add_argument(
         "--db",
         type=Path,
         default=REPO_ROOT / "bc.db",
-        help="prod DuckDB for the era join (default: bc.db at repo root); READ-ONLY",
+        help="prod DuckDB for --source db (default: bc.db at repo root); READ-ONLY",
     )
     return parser.parse_args()
 
@@ -403,8 +416,10 @@ def main() -> int:
     args = _parse_args()
     if args.validate_backtest is not None:
         return validate_backtest(args.validate_backtest)
-    if args.joint is not None:
-        return publish_joint_ribbons(args.joint, args.db)
+    if args.bound is not None:
+        return publish_bound_ribbons(
+            args.bound, source=args.source, dataset_path=args.dataset, db_path=args.db
+        )
     return publish_ribbons()
 
 

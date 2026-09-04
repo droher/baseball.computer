@@ -11,11 +11,13 @@ scoring, with levels unseen in training encoded to ``-1``.
 
 ``cell_season_league_idx`` maps each park cell to its ``(season, league)``
 group so the builder can center the park effect within season-league.
-``ar_chain_idx`` / ``ar_step_idx`` map each park cell onto a padded
-``(n_ar_chains, n_ar_steps)`` grid keyed by (park, league) chain and the
-cell's season rank within that chain, for an AR(1) persistence prior across
-seasons; ``home_idx`` flags whether the batting team is the home team for a
-home-field-advantage term.
+``ar_chain_idx`` / ``ar_step_idx`` / ``ar_season_gap`` place each park cell
+in its (park, league) chain: the chain id, the cell's season rank within
+the chain, and the number of seasons since the previous observed cell of
+that chain (0 for the chain head). Only observed cells exist; the AR(1)
+persistence prior bridges gaps by season distance rather than padding
+unobserved seasons with latent cells. ``home_idx`` flags whether the
+batting team is the home team for a home-field-advantage term.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportAttributeAccessIssue=false
@@ -88,8 +90,8 @@ class ParkFactorInputs(BaseModel):
     cell_season_league_idx: IntArray
     ar_chain_idx: IntArray
     ar_step_idx: IntArray
+    ar_season_gap: IntArray
     n_ar_chains: int
-    n_ar_steps: int
 
     outcome: str
     coords: dict[str, list[str]]
@@ -138,11 +140,11 @@ def _encode_codes_with_vocab(
     )
 
 
-def _build_ar_chain_grid(
+def _build_ar_chains(
     park_id_by_cell: list[str],
     season_by_cell: list[int],
     league_by_cell: list[str],
-) -> tuple[IntArray, IntArray, int, int]:
+) -> tuple[IntArray, IntArray, IntArray, int]:
     chain_keys = [
         f"{park}|{league}"
         for park, league in zip(park_id_by_cell, league_by_cell, strict=True)
@@ -156,13 +158,13 @@ def _build_ar_chain_grid(
     )
     season = np.asarray(season_by_cell, dtype=np.int64)
     step_idx = np.zeros(len(chain_keys), dtype=np.int64)
+    season_gap = np.zeros(len(chain_keys), dtype=np.int64)
     for cid in range(len(chain_labels)):
         members = np.flatnonzero(chain_idx == cid)
         order = members[np.argsort(season[members], kind="stable")]
         step_idx[order] = np.arange(order.shape[0], dtype=np.int64)
-    n_chains = len(chain_labels)
-    n_steps = int(step_idx.max()) + 1 if step_idx.shape[0] else 1
-    return chain_idx, step_idx, n_chains, n_steps
+        season_gap[order[1:]] = np.diff(season[order])
+    return chain_idx, step_idx, season_gap, len(chain_labels)
 
 
 def _aggregate_team_games(parquet_path: Path) -> pl.DataFrame:
@@ -347,7 +349,7 @@ def prepare_park_factor_inputs(
         count=len(park_season_league_labels),
     )
 
-    ar_chain_idx, ar_step_idx, n_ar_chains, n_ar_steps = _build_ar_chain_grid(
+    ar_chain_idx, ar_step_idx, ar_season_gap, n_ar_chains = _build_ar_chains(
         park_id_by_cell, season_by_cell, league_by_cell
     )
 
@@ -393,8 +395,8 @@ def prepare_park_factor_inputs(
         cell_season_league_idx=cell_season_league_idx,
         ar_chain_idx=ar_chain_idx,
         ar_step_idx=ar_step_idx,
+        ar_season_gap=ar_season_gap,
         n_ar_chains=n_ar_chains,
-        n_ar_steps=n_ar_steps,
         outcome=OUTCOME,
         coords=coords,
         held_out=held_out,

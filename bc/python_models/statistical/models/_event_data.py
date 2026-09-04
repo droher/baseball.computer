@@ -201,21 +201,41 @@ def _encode_codes_with_vocab(
 ) -> IntArray:
     """Map a per-event column to int codes against a fixed ``labels`` vocab.
 
-    Booleans cast to utf8, NULLs fill to ``UNKNOWN_LEVEL``; unseen values
-    (and NULLs) fall back to ``UNKNOWN_LEVEL``'s index, or ``-1`` when
-    ``UNKNOWN_LEVEL`` is not in the vocab.
+    Booleans cast to utf8. A NULL encodes to ``UNKNOWN_LEVEL``'s index (the
+    level the training NULLs were fit under), or ``-1`` when the vocabulary
+    has no NULL level. A non-null value absent from the vocabulary encodes to
+    ``-1`` so every consumer gives it a zero effect rather than the NULL
+    level's effect.
     """
     series = per_event.get_column(column)
     if series.dtype == pl.Boolean:
         series = series.cast(pl.Utf8)
     series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
     mapping = {c: i for i, c in enumerate(labels)}
-    fallback = mapping.get(UNKNOWN_LEVEL, -1)
     return (
-        series.replace_strict(mapping, default=fallback, return_dtype=pl.Int64)
+        series.replace_strict(mapping, default=-1, return_dtype=pl.Int64)
         .to_numpy()
         .astype(np.int64)
     )
+
+
+def _log_unseen_level_rates(
+    frame_label: str, codes_by_column: dict[str, IntArray]
+) -> None:
+    for column, codes in codes_by_column.items():
+        n = int(codes.shape[0])
+        if n == 0:
+            continue
+        unseen = int((codes < 0).sum())
+        _log.log(
+            logging.INFO if unseen else logging.DEBUG,
+            "%s column=%s unseen_levels=%d/%d rate=%.4f",
+            frame_label,
+            column,
+            unseen,
+            n,
+            unseen / n,
+        )
 
 
 def _standardize_with_training_stats(
@@ -244,6 +264,7 @@ def _build_observation_held_out_set(
     source_labels: list[str],
     fixed_effects: dict[str, FixedEffectDesign],
     continuous: dict[str, ContinuousFeature],
+    frame_label: str,
 ) -> ObservationHeldOutSet:
     empty_int = np.zeros(0, dtype=np.int64)
     if df.height == 0:
@@ -286,6 +307,16 @@ def _build_observation_held_out_set(
         column: _standardize_with_training_stats(per_event, column, feature)
         for column, feature in continuous.items()
     }
+    _log_unseen_level_rates(
+        frame_label,
+        {
+            "season": season_idx,
+            "scorer": scorer_idx,
+            "park_id": park_idx,
+            "source_family": source_idx,
+            **{column: design.codes for column, design in held_fe.items()},
+        },
+    )
 
     return ObservationHeldOutSet(
         y=y,
@@ -351,6 +382,7 @@ def build_observation_scoring_frame(
         source_labels=list(inputs.coords["source"]),
         fixed_effects=inputs.fixed_effects,
         continuous=inputs.continuous,
+        frame_label=f"build_observation_scoring_frame dim={dimension}",
     )
     _log.info(
         "build_observation_scoring_frame dim=%s rows=%d seasons=%d",
@@ -504,6 +536,7 @@ def prepare_event_observation_inputs(
         source_labels=list(source_labels),
         fixed_effects=fixed_effects,
         continuous=continuous,
+        frame_label=f"prepare_event_observation_inputs held_out dim={dimension}",
     )
 
     _log.info(

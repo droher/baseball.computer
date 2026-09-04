@@ -15,6 +15,7 @@ from python_models.statistical.hdi_coverage import (
     state_transition_held_out_realization,
 )
 from python_models.statistical.splits import game_hash_fold
+from tests.statistical.run_values_fixtures import event_row
 
 
 def _estimate(n_cells: int, lower: float, upper: float) -> pl.DataFrame:
@@ -126,23 +127,27 @@ def test_state_transition_realization_recovers_frequencies(tmp_path: Path) -> No
     for gid in games:
         for _ in range(20):
             rows.append(
-                {
-                    "game_id": gid,
-                    "season": 2015,
-                    "league": "NL",
-                    "run_expectancy_start_key": "2015_NL_0_1",
-                    "run_expectancy_end_key": "2015_NL_0_2",
-                }
+                event_row(
+                    game_id=gid,
+                    season=2015,
+                    league="NL",
+                    outs=0,
+                    base=1,
+                    end_outs=0,
+                    end_base=2,
+                )
             )
         for _ in range(20):
             rows.append(
-                {
-                    "game_id": gid,
-                    "season": 2015,
-                    "league": "NL",
-                    "run_expectancy_start_key": "2015_NL_0_1",
-                    "run_expectancy_end_key": "2015_NL_3_0",
-                }
+                event_row(
+                    game_id=gid,
+                    season=2015,
+                    league="NL",
+                    outs=0,
+                    base=1,
+                    end_outs=3,
+                    end_base=0,
+                )
             )
     parquet = tmp_path / "dataset.parquet"
     pl.DataFrame(rows).write_parquet(parquet)

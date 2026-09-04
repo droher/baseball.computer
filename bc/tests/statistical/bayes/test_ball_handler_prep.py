@@ -194,8 +194,7 @@ def test_held_out_truth_is_zero_based_handler(tmp_path: Path) -> None:
         min_events_per_season=1,
     )
     held = inputs.held_out
-    if held.n_events == 0:
-        pytest.skip("no holdout events in this fixture")
+    assert held.n_events > 0
     assert held.true_position.min() >= 0
     assert held.true_position.max() < N_POSITIONS
     assert (held.U == 1).all()

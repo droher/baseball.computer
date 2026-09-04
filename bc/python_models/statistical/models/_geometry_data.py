@@ -38,10 +38,15 @@ from typing import ClassVar
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+
+from python_models.statistical.models._event_data import _encode_codes_with_vocab
 from pydantic import BaseModel, ConfigDict
 
 from python_models.statistical import config as cfg
-from python_models.statistical.bayes.dl_covariate import compute_dl_log_probs_per_class
+from python_models.statistical.bayes.dl_covariate import (
+    center_dl_log_probs,
+    compute_dl_log_probs_per_class_with_mask,
+)
 from python_models.statistical.bayes.handler_covariate import (
     handler_covariate_enabled,
     load_handler_outfield_logit,
@@ -126,6 +131,7 @@ FIXED_EFFECT_COLUMNS: tuple[str, ...] = (
 )
 
 PRODUCTION_FE_COVERAGE_FLOOR: float = 0.01
+PRODUCTION_DL_NULL_RATE_CEILING: float = 0.05
 
 _BUNT_VARIANTS: tuple[str, ...] = (
     "FoulBunt",
@@ -282,28 +288,6 @@ def _build_fixed_effect_design(df: pl.DataFrame, column: str) -> FixedEffectDesi
     if not labels:
         raise ValueError(f"fixed-effect column {column!r} has zero levels")
     return FixedEffectDesign(levels=tuple(labels), codes=codes)
-
-
-def _encode_codes_with_vocab(
-    per_event: pl.DataFrame, column: str, labels: Sequence[str]
-) -> IntArray:
-    """Map a per-event column to int codes against a fixed ``labels`` vocab.
-
-    Booleans cast to utf8, NULLs fill to ``UNKNOWN_LEVEL``; unseen values
-    (and NULLs) fall back to ``UNKNOWN_LEVEL``'s index, or ``-1`` when
-    ``UNKNOWN_LEVEL`` is not in the vocab.
-    """
-    series = per_event.get_column(column)
-    if series.dtype == pl.Boolean:
-        series = series.cast(pl.Utf8)
-    series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
-    mapping = {c: i for i, c in enumerate(labels)}
-    fallback = mapping.get(UNKNOWN_LEVEL, -1)
-    return np.fromiter(
-        (mapping.get(str(v), fallback) for v in series.to_list()),
-        dtype=np.int64,
-        count=series.len(),
-    )
 
 
 def _resolve_spec(dimension: str) -> GeometryDimensionSpec:
@@ -552,6 +536,91 @@ def _propensity_z_with_frozen_stats(
     return z.astype(np.float64)
 
 
+def _log_dl_null_rate(
+    present: npt.NDArray[np.bool_], *, dimension: str, context: str
+) -> float:
+    n = int(present.shape[0])
+    n_null = int((~present).sum())
+    rate = (n_null / n) if n else 0.0
+    _log.info(
+        "DL covariate null rate on %s slice dimension=%s: %d/%d (%.4f)",
+        context,
+        dimension,
+        n_null,
+        n,
+        rate,
+    )
+    return rate
+
+
+def _centered_training_dl_log_probs(
+    df: pl.DataFrame, *, n_classes: int, dimension: str
+) -> tuple[FloatArray, FloatArray]:
+    """Per-class DL log-probs centered on the class means of the present training rows.
+
+    The means are computed over rows with a non-NULL ``dl_p_class`` only and
+    are frozen for held-out and production scoring. NULL rows stay exactly
+    zero so the gamma_dl term contributes nothing for them.
+    """
+    log_probs, present = compute_dl_log_probs_per_class_with_mask(
+        df, n_classes=n_classes
+    )
+    _ = _log_dl_null_rate(present, dimension=dimension, context="training")
+    if present.any():
+        class_means = log_probs[present].mean(axis=0).astype(np.float64)
+    else:
+        class_means = np.zeros(n_classes, dtype=np.float64)
+    return center_dl_log_probs(log_probs, present, class_means), class_means
+
+
+def _dl_log_probs_with_frozen_means(
+    df: pl.DataFrame,
+    *,
+    n_classes: int,
+    class_means: FloatArray,
+    dimension: str,
+    context: str,
+) -> tuple[FloatArray, float]:
+    """Center present rows on the frozen training class means; NULL rows stay zero.
+
+    Returns the centered array and the slice's DL null rate.
+    """
+    log_probs, present = compute_dl_log_probs_per_class_with_mask(
+        df, n_classes=n_classes
+    )
+    null_rate = _log_dl_null_rate(present, dimension=dimension, context=context)
+    return center_dl_log_probs(log_probs, present, class_means), null_rate
+
+
+def _assert_dl_covariate_informative_on_production(
+    *,
+    null_rate: float,
+    n_production: int,
+    dimension: str,
+    gamma_dl_active: bool,
+    max_null_rate: float = PRODUCTION_DL_NULL_RATE_CEILING,
+) -> None:
+    if not gamma_dl_active or n_production == 0:
+        return
+    if null_rate > max_null_rate:
+        raise ValueError(
+            f"dl_p_class is NULL on {null_rate:.4f} of the geometry-unobserved "
+            f"production rows (n={n_production}) for dimension={dimension!r}, "
+            f"above the ceiling {max_null_rate}, so the gamma_dl covariate is "
+            "inert on too much of the inference target and the fit would "
+            "publish surfaces driven by the training-slice centering there; "
+            "publish the gamma_dl_zero flavor for this dimension, or score the "
+            "production slice with the DL model before fitting"
+        )
+    if null_rate > 0.0:
+        _log.warning(
+            "DL covariate is NULL on %.4f of the production slice for "
+            "dimension=%s; gamma_dl contributes nothing on those rows",
+            null_rate,
+            dimension,
+        )
+
+
 def _handler_logit_with_mask(
     event_keys: IntArray, logit_by_event: dict[int, float]
 ) -> tuple[FloatArray, npt.NDArray[np.bool_]]:
@@ -712,6 +781,7 @@ def build_geometry_production_frame(
     handler_logit_std: float = 1.0,
     handler_active: bool = False,
     selection_log_odds_offset: tuple[float, ...] | None = None,
+    gamma_dl_active: bool = False,
 ) -> GeometryProductionFrame:
     """One row per geometry-unobserved event with FE codes + per-class DL logits.
 
@@ -722,6 +792,11 @@ def build_geometry_production_frame(
     rides along so the builder can apply γ_dl on the production slice; the
     scalar propensity z rides along (computed with the FROZEN training
     mean/std) so the export can apply γ_propensity.
+
+    Rows with a NULL ``dl_p_class`` carry an exactly-zero DL logit row (not
+    the negated training means), so γ_dl contributes nothing for them. When
+    ``gamma_dl_active`` and every production row is NULL, raises: the fit
+    must publish the ``gamma_dl_zero`` flavor instead.
     """
     schema_names = set(pl.scan_parquet(parquet_path).collect_schema().names())
     select_columns = ["event_key", "dl_p_class", *FIXED_EFFECT_COLUMNS]
@@ -759,8 +834,19 @@ def build_geometry_production_frame(
         )
         for column, design in fixed_effects.items()
     }
-    dl_logit_per_class = compute_dl_log_probs_per_class(per_event, n_classes=n_classes)
-    dl_logit_per_class = dl_logit_per_class - dl_logit_class_means[None, :]
+    dl_logit_per_class, dl_null_rate = _dl_log_probs_with_frozen_means(
+        per_event,
+        n_classes=n_classes,
+        class_means=dl_logit_class_means,
+        dimension=dimension,
+        context="production",
+    )
+    _assert_dl_covariate_informative_on_production(
+        null_rate=dl_null_rate,
+        n_production=per_event.height,
+        dimension=dimension,
+        gamma_dl_active=gamma_dl_active,
+    )
     if propensity_active and has_propensity_column:
         propensity_z = _propensity_z_with_frozen_stats(
             per_event,
@@ -963,9 +1049,9 @@ def prepare_geometry_inputs(
     event_keys = (
         per_event.get_column("event_key").cast(pl.Int64).to_numpy().astype(np.int64)
     )
-    dl_logit_per_class = compute_dl_log_probs_per_class(per_event, n_classes=n_classes)
-    dl_logit_class_means = dl_logit_per_class.mean(axis=0).astype(np.float64)
-    dl_logit_per_class = dl_logit_per_class - dl_logit_class_means[None, :]
+    dl_logit_per_class, dl_logit_class_means = _centered_training_dl_log_probs(
+        per_event, n_classes=n_classes, dimension=dimension
+    )
 
     if PROPENSITY_COLUMN in per_event.columns:
         propensity_active = True
@@ -1046,11 +1132,12 @@ def prepare_geometry_inputs(
         held_out_propensity_z = np.zeros(0, dtype=np.float64)
         held_out_handler_z = np.zeros(0, dtype=np.float64)
     else:
-        held_out_dl_logit_per_class = compute_dl_log_probs_per_class(
-            held_out_df.sort("event_key"), n_classes=n_classes
-        )
-        held_out_dl_logit_per_class = (
-            held_out_dl_logit_per_class - dl_logit_class_means[None, :]
+        held_out_dl_logit_per_class, _ = _dl_log_probs_with_frozen_means(
+            held_out_df.sort("event_key"),
+            n_classes=n_classes,
+            class_means=dl_logit_class_means,
+            dimension=dimension,
+            context="held-out",
         )
         if propensity_active:
             held_out_propensity_z = _propensity_z_with_frozen_stats(

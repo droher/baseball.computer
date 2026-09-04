@@ -11,8 +11,9 @@ schema persists when no targets have been published yet.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 
+import duckdb
 import polars as pl
 
 from python_models.statistical.bayes.registry import all_target_names, get_target
@@ -20,8 +21,10 @@ from python_models.statistical.bayes.specs import BayesTargetSpec
 from python_models.statistical.manifests import (
     find_published_manifest,
     read_manifest,
+    read_published_pointer,
 )
-from python_models.statistical.schemas import ArtifactManifest, PublishedPointer
+from python_models.statistical.schemas import ArtifactManifest
+from python_models.statistical.validate import VALIDATION_GATE_VERSION
 
 _log = logging.getLogger(__name__)
 
@@ -57,7 +60,10 @@ def stamp_estimated_contract(
     ``model_version`` / ``weak_identification_flag`` come from the bayes
     extras; ``artifact_id`` / ``source_snapshot_id`` / ``validation_status``
     come from the top-level manifest; ``method`` / ``observed_status`` are
-    per-family constants supplied by the caller.
+    per-family constants supplied by the caller. A ``passed`` status is
+    published as ``exploratory`` when the manifest was stamped by a gate
+    version other than the current one, so a verdict from an older gate
+    never reaches the tables as a pass.
     """
     extras = manifest.bayes_extras
     if extras is None:
@@ -74,13 +80,30 @@ def stamp_estimated_contract(
         ),
         pl.lit(method, dtype=pl.Utf8).alias("method"),
         pl.lit(observed_status, dtype=pl.Utf8).alias("observed_status"),
-        pl.lit(str(manifest.validation_status), dtype=pl.Utf8).alias(
+        pl.lit(confidence_status_for(manifest), dtype=pl.Utf8).alias(
             "confidence_status"
         ),
         pl.lit(extras.weak_identification_flag, dtype=pl.Boolean()).alias(
             "weak_identification_flag"
         ),
     )
+
+
+def confidence_status_for(manifest: ArtifactManifest) -> str:
+    status = str(manifest.validation_status)
+    if status != "passed":
+        return status
+    if manifest.validation_gate_version == VALIDATION_GATE_VERSION:
+        return status
+    _log.warning(
+        "bayes.manifest_ingest: artifact %s (%s) passed under gate version %s, "
+        "current is %s; publishing confidence_status=exploratory until re-validated",
+        manifest.artifact_id,
+        manifest.name,
+        manifest.validation_gate_version,
+        VALIDATION_GATE_VERSION,
+    )
+    return "exploratory"
 
 
 PROPENSITY_SCHEMA: dict[str, pl.DataType] = {
@@ -244,6 +267,66 @@ def empty_assist_count_frame() -> pl.DataFrame:
     return _empty_frame(ASSIST_COUNT_SUMMARY_SCHEMA)
 
 
+SHARE_SUM_ATOL: float = 1e-6
+
+
+def assert_shares_sum_to_one(
+    frame: pl.DataFrame,
+    grain_columns: Sequence[str],
+    share_columns: Sequence[str],
+    *,
+    grain_constant_columns: Sequence[str] = (),
+    atol: float = SHARE_SUM_ATOL,
+) -> None:
+    """Raise unless every grain's shares form a simplex.
+
+    ``share_columns`` are summed over the rows of each grain.
+    ``grain_constant_columns`` ride along on every row of a grain (the
+    assist export's ``none_share``): each must take a single value within
+    the grain and is counted once. Nulls count as zero.
+    """
+    if frame.height == 0:
+        return
+    grain = list(grain_columns)
+    row_total = pl.sum_horizontal(
+        [pl.col(c).cast(pl.Float64).fill_null(0.0) for c in share_columns]
+    )
+    aggs: list[pl.Expr] = [row_total.sum().alias("_row_share_total")]
+    for column in grain_constant_columns:
+        aggs.append(
+            pl.col(column).cast(pl.Float64).fill_null(0.0).first().alias(f"_{column}")
+        )
+        aggs.append(
+            pl.col(column)
+            .cast(pl.Float64)
+            .fill_null(0.0)
+            .n_unique()
+            .alias(f"_{column}_n_unique")
+        )
+    per_grain = frame.group_by(grain).agg(aggs)
+    for column in grain_constant_columns:
+        varying = per_grain.filter(pl.col(f"_{column}_n_unique") > 1)
+        if varying.height > 0:
+            raise ValueError(
+                f"{column} varies within {varying.height} of {per_grain.height} "
+                f"grains {grain}; first offender: "
+                f"{varying.select(grain).row(0)}"
+            )
+    total = per_grain.get_column("_row_share_total")
+    for column in grain_constant_columns:
+        total = total + per_grain.get_column(f"_{column}")
+    deviation = (total - 1.0).abs()
+    violating = per_grain.filter(deviation > atol)
+    if violating.height > 0:
+        worst = float(deviation.to_numpy().max())
+        raise ValueError(
+            f"shares over {list(share_columns)} do not sum to 1 within {atol} for "
+            f"{violating.height} of {per_grain.height} grains {grain} "
+            f"(max |sum - 1| = {worst:.3e}); first offender: "
+            f"{violating.select(grain).row(0)}"
+        )
+
+
 def _iter_specs_by_kind(kind: str) -> Iterator[BayesTargetSpec]:
     from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 
@@ -291,7 +374,10 @@ def _iterate_published_export_frames(
     Resolves each spec's published pointer, reads the artifact's
     ``exports/<export_filename>``, and delegates the per-family column
     transform to ``build_frame(df, manifest, spec)``. Skips targets with
-    no pointer, a missing export file, or an empty export.
+    no pointer or an empty export. A pointer whose manifest belongs to a
+    different model, or whose export file is missing, raises: a published
+    pointer is a promise that the table can be built, and silently
+    yielding nothing would empty the production table on the next restate.
     """
     for spec in specs:
         pointer_path = find_published_manifest(spec.published_manifest_name())
@@ -301,19 +387,23 @@ def _iterate_published_export_frames(
                 spec.published_manifest_name(),
             )
             continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
-        )
+        pointer = read_published_pointer(pointer_path)
         manifest = read_manifest(pointer.manifest_path)
+        extras = manifest.bayes_extras
+        if extras is None or extras.model_name != spec.name:
+            raise ValueError(
+                f"pointer {pointer_path} for {spec.published_manifest_name()} resolves "
+                f"to manifest {pointer.manifest_path} with model_name="
+                f"{None if extras is None else extras.model_name!r}, expected "
+                f"{spec.name!r}"
+            )
         export_path = pointer.manifest_path.parent / "exports" / export_filename
         if not export_path.exists():
-            _log.warning(
-                "bayes.manifest_ingest: missing %s for %s at %s",
-                export_filename,
-                spec.published_manifest_name(),
-                export_path,
+            raise FileNotFoundError(
+                f"pointer {pointer_path} for {spec.published_manifest_name()} names "
+                f"artifact {manifest.artifact_id} but its export is missing at "
+                f"{export_path}"
             )
-            continue
         df = pl.read_parquet(str(export_path))
         if df.height == 0:
             _log.info(
@@ -420,6 +510,12 @@ def _build_credit_frame(
         pl.col("expected_share").cast(pl.Float64),
         pl.col("none_share").cast(pl.Float64),
     )
+    assert_shares_sum_to_one(
+        out,
+        ("event_key", "credit_type"),
+        ("expected_share",),
+        grain_constant_columns=("none_share",),
+    )
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )
@@ -459,6 +555,7 @@ def _build_ball_handler_frame(
         pl.col("fielding_position").cast(pl.UInt8),
         pl.col("expected_share").cast(pl.Float64),
     )
+    assert_shares_sum_to_one(out, ("event_key",), ("expected_share",))
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )
@@ -469,6 +566,72 @@ def _build_ball_handler_frame(
         spec.dimension,
     )
     return out
+
+
+def query_ball_handler_personnel(
+    cursor: duckdb.DuckDBPyConnection,
+    *,
+    epl_table: str,
+    pfs_table: str,
+    event_keys: pl.DataFrame,
+) -> pl.DataFrame:
+    """Resolve ``player_id`` per ``(event_key, fielding_position)`` for the events.
+
+    ``event_keys`` is a one-column ``event_key`` frame; the personnel state
+    joins through ``event_personnel_lookup`` on ``(game_id,
+    personnel_fielding_key)`` and keeps positions 1..9.
+    """
+    cursor.register("ball_handler_event_keys", event_keys)
+    try:
+        return cursor.sql(
+            f"""
+            SELECT
+                epl.event_key::UINTEGER AS event_key,
+                pfs.fielding_position::UTINYINT AS fielding_position,
+                pfs.player_id::VARCHAR AS player_id
+            FROM {epl_table} AS epl
+            INNER JOIN {pfs_table} AS pfs
+                ON pfs.game_id = epl.game_id
+                AND pfs.personnel_fielding_key = epl.personnel_fielding_key
+            WHERE epl.event_key IN (SELECT event_key FROM ball_handler_event_keys)
+                AND pfs.fielding_position BETWEEN 1 AND 9
+            """
+        ).pl()
+    finally:
+        cursor.unregister("ball_handler_event_keys")
+
+
+def stamp_ball_handler_personnel(
+    handler_frame: pl.DataFrame, personnel: pl.DataFrame
+) -> pl.DataFrame:
+    """Attach ``player_id`` per ``(event_key, fielding_position)``.
+
+    An event whose personnel state resolves fewer positions than the
+    export carries is dropped whole: publishing the positions that did
+    resolve would leave a partial simplex, and renormalizing would hand
+    the unresolved fielder's probability to the others.
+    """
+    joined = handler_frame.join(
+        personnel.select("event_key", "fielding_position", "player_id"),
+        on=["event_key", "fielding_position"],
+        how="inner",
+    )
+    exported = handler_frame.group_by("event_key").agg(pl.len().alias("_exported"))
+    resolved = joined.group_by("event_key").agg(pl.len().alias("_resolved"))
+    complete_events = (
+        exported.join(resolved, on="event_key", how="left")
+        .filter(pl.col("_resolved") == pl.col("_exported"))
+        .select("event_key")
+    )
+    dropped = exported.height - complete_events.height
+    if dropped:
+        _log.warning(
+            "bayes.manifest_ingest: dropping %d of %d ball-handler events whose "
+            "personnel state resolves fewer positions than the export carries",
+            dropped,
+            exported.height,
+        )
+    return joined.join(complete_events, on="event_key", how="inner")
 
 
 def iterate_published_ball_handler_frames() -> Iterator[pl.DataFrame]:
@@ -516,6 +679,9 @@ def _build_geometry_frame(
         pl.col("class_label").cast(pl.Utf8),
         pl.col("expected_share").cast(pl.Float64),
     )
+    assert_shares_sum_to_one(
+        out, ("event_key", "geometry_dimension"), ("expected_share",)
+    )
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     ).select(list(GEOMETRY_SCHEMA.keys()))
@@ -556,6 +722,7 @@ def _build_advancement_frame(
         pl.col("advancement_class").cast(pl.Utf8),
         pl.col("expected_share").cast(pl.Float64),
     )
+    assert_shares_sum_to_one(out, ("event_key", "baserunner"), ("expected_share",))
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     ).select(list(ADVANCEMENT_SCHEMA.keys()))
@@ -693,8 +860,11 @@ def _build_pitch_summary_frame(
         pl.col("prob_hdi_lower").cast(pl.Float64),
         pl.col("prob_hdi_upper").cast(pl.Float64),
     )
+    assert_shares_sum_to_one(
+        out, ("result_family", "season", "league"), ("prob_mean",)
+    )
     out = stamp_estimated_contract(
-        out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB
+        out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
@@ -738,6 +908,7 @@ def _build_state_transition_frame(
         pl.col("prob_hdi_lower").cast(pl.Float64),
         pl.col("prob_hdi_upper").cast(pl.Float64),
     )
+    assert_shares_sum_to_one(out, ("start_state", "season", "league"), ("prob_mean",))
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )
@@ -781,6 +952,9 @@ def _build_assist_count_frame(
         pl.col("prob_sd").cast(pl.Float64),
         pl.col("prob_hdi_lower").cast(pl.Float64),
         pl.col("prob_hdi_upper").cast(pl.Float64),
+    )
+    assert_shares_sum_to_one(
+        out, ("result_family", "base_state_start", "outs_start"), ("prob_mean",)
     )
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX

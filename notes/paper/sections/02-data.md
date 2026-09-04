@@ -17,10 +17,16 @@ sampled synthetic event are different quantities and are never stored in one
 column <!-- src: notes/data-coverage-implementation/README.md -->.
 
 Within the 1910–2025 target span the source mix is dominated by play-by-play but
-not exclusively so. The snapshot holds 205,845 play-by-play games, 1,953
-box-score-only games, and 4 gamelog-only games <!-- src: notes/data-coverage-implementation/README.md -->.
-The event table, `event_states_full`, contains 18,141,020 events, all of them
-from the play-by-play games <!-- src: tables/corpus_by_decade.md -->.
+not exclusively so. The snapshot holds 205,845 play-by-play games in the span, 1,953
+box-score-only games, and 4 gamelog-only games <!-- src: notes/data-coverage-implementation/README.md -->,
+plus 41 play-by-play games from the 1900s decade that lie before the target
+span and surface as a `1900` row wherever a table is keyed by decade
+<!-- src: tables/corpus_by_decade.md -->. The event table, `event_states_full`,
+contains 18,141,020 events, all of them from play-by-play games; that count is
+the whole table and so includes whatever the 41 early games contribute
+<!-- src: tables/corpus_by_decade.md -->. Surfaces keyed by season — park
+factors and Model G's cells — cover every season the source carries, which is
+why a few descriptive rows fall before 1910.
 Event-level estimation is scoped to those games; the box-score-only and
 gamelog-only rows stay at aggregate grain and are not given fabricated event
 records <!-- src: notes/data-coverage-implementation/README.md -->. At the
@@ -76,3 +82,14 @@ statistic, and we present it as a table in the Results section rather than
 restating raw counts here. What the counts above establish is only the shape of
 the problem: complete outcomes, field-level gaps that run into the millions, and
 a missingness pattern that tracks the scorer and the era rather than the game.
+
+The modeling datasets carry two game-level partitions, and the paper's
+held-out numbers come from one or the other, never both. The datasets stamp
+`primary_fold` from `HASH(game_id) % 100` — buckets 0–69 `TRAIN`, 70–84
+`VALIDATE`, 85–99 `TEST` — and the deep supplements of §6 train, early-stop,
+and report on it <!-- src: bc/models/intermediate/modeling_datasets/model_input_event_universe.sql -->.
+Every Bayesian fit, and every coverage gate in §7, instead holds out fold 0
+of a ten-fold BLAKE2s hash of `game_id`, removed before any subsampling
+<!-- src: bc/python_models/statistical/splits.py -->. The two hashes are
+unrelated, so the Bayes holdout is a 10% sample of games that cuts across all
+three deep partitions; §6 states what that means for the deep covariate.

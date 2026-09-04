@@ -27,26 +27,27 @@ details themselves. Twelve probabilistic surfaces are defined — ten populated,
 two deferred as typed zero-row frames — spanning observation propensity,
 batted-ball geometry, fielding credit, park factors, run expectancy, base-out
 transitions, and pitch summaries, each row carrying provenance and uncertainty.
-Held-out calibration gates — expected calibration error ≤ 0.018 across
-propensity dimensions — and posterior-predictive interval coverage gate
-publication.
+Publication is gated on convergence and on held-out predictive lift over a
+baseline; held-out calibration error and posterior-predictive interval coverage
+are reported beside the gate as diagnostics.
 
 Three findings organize the paper. First, trajectory recording before 1988 is
-missing not at random — ground balls appear at half their true share — and a
-masked backtest refutes the natural learned correction: a coefficient on
-observation propensity learns the selection effect with the wrong sign while
-passing every convergence diagnostic. The identified fix is a fixed per-class
-selection offset — a ground-ball selection log-odds of +1.24 before 1950,
-anchored from the trajectory-deduction slice — published as a joint sensitivity
-ribbon because its magnitude is unidentified: the pre-1950 unobserved
-ground-ball share rises from 0.32 under MAR to 0.58 [0.56, 0.60] at the full
-anchor. Masked backtests bound the correction — near-exact under class-only and
-era-graded selection, partial under class-by-covariate selection, inert under
-block absence. Second, shared entity-embedding pretraining over the full corpus
-multiplies player-effect signal in downstream models by roughly 6×, under
-cross-fitting and leakage gates that caught one real leak; an ablation shows the
-deep covariate materially reshapes trajectory estimates yet is retained on
-predictive grounds. Third, several natural estimands — scorer label confusion,
-fielder responsibility, shift propensity — are unidentifiable from a
+missing not at random: among pre-1950 batted balls whose trajectory the scorer
+did not write, 763,993 are ground balls the fielding string alone identifies —
+more than the whole recorded slice — putting a floor of 0.29 under the
+unrecorded ground-ball share, while the missing-at-random fit scores those known
+ground balls at 0.32. A masked backtest shows the natural learned correction — a
+coefficient on observation propensity — is inert while passing every convergence
+diagnostic; the correct form is a fixed per-class selection offset the observed
+slice cannot identify, published as an assumed sensitivity band that the floor
+constrains from below, not as a point. An earlier revision's data-anchored offset
+is withdrawn as an identity of the observed slice. Second, shared
+entity-embedding pretraining multiplies player-effect permutation importance in
+the trajectory supplement by roughly 6× under a cross-fitting contract that
+caught one real leak, and the deep proposal beats a class-prior baseline on
+held-out log-loss for every dimension it feeds; a defect disclosed in this
+revision — three location dimensions whose production rows carried no deep
+prediction and were shifted by its absence — is corrected by publishing their
+deep-free fits. Third, several natural estimands — scorer label confusion,
+fielder responsibility, shift propensity — cannot be learned from a
 single-source record; we document why and publish nothing.
-

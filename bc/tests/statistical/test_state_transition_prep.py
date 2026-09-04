@@ -20,6 +20,11 @@ from python_models.statistical.models._state_transition_data import (
     prepare_state_transition_inputs,
 )
 from python_models.statistical.splits import game_hash_fold
+from tests.statistical.run_values_fixtures import (
+    event_row,
+    find_holdout_game,
+    train_games,
+)
 
 SEASON = 1933
 LEAGUE = "AL"
@@ -27,67 +32,32 @@ HOLDOUT_FOLD_COUNT = 10
 HOLDOUT_FOLD_ID = 0
 
 
-def _key(outs: int, base: int) -> str:
-    return f"{SEASON}_{LEAGUE}_{outs}_{base}"
-
-
-def _train_games(prefix: str, count: int) -> list[str]:
-    games: list[str] = []
-    i = 0
-    while len(games) < count:
-        gid = f"{prefix}_T{i:05d}"
-        if game_hash_fold(gid, fold_count=HOLDOUT_FOLD_COUNT) != HOLDOUT_FOLD_ID:
-            games.append(gid)
-        i += 1
-    return games
-
-
-def _find_holdout_game(prefix: str) -> str:
-    i = 0
-    while True:
-        gid = f"{prefix}_H{i:05d}"
-        if game_hash_fold(gid, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID:
-            return gid
-        i += 1
+def _row(
+    game_id: str, *, outs: int, base: int, end_outs: int, end_base: int, runs: int
+) -> dict[str, object]:
+    return event_row(
+        game_id=game_id,
+        season=SEASON,
+        league=LEAGUE,
+        outs=outs,
+        base=base,
+        end_outs=end_outs,
+        end_base=end_base,
+        runs_on_play=runs,
+        runs_to_end=runs,
+    )
 
 
 def _write_dataset(tmp_path: Path) -> Path:
     rows: list[dict[str, object]] = []
 
-    for gid in _train_games("S00", MIN_EVENTS_PER_CELL + 5):
-        rows.append(
-            {
-                "game_id": gid,
-                "season": SEASON,
-                "league": LEAGUE,
-                "run_expectancy_start_key": _key(0, 0),
-                "run_expectancy_end_key": _key(1, 0),
-                "runs_on_play": 0,
-            }
-        )
-    for gid in _train_games("S00END", MIN_EVENTS_PER_CELL + 5):
-        rows.append(
-            {
-                "game_id": gid,
-                "season": SEASON,
-                "league": LEAGUE,
-                "run_expectancy_start_key": _key(2, 0),
-                "run_expectancy_end_key": _key(3, 0),
-                "runs_on_play": 1,
-            }
-        )
+    for gid in train_games("S00", MIN_EVENTS_PER_CELL + 5):
+        rows.append(_row(gid, outs=0, base=0, end_outs=1, end_base=0, runs=0))
+    for gid in train_games("S00END", MIN_EVENTS_PER_CELL + 5):
+        rows.append(_row(gid, outs=2, base=0, end_outs=3, end_base=0, runs=1))
 
-    thin = _find_holdout_game("THINHOLD")
-    rows.append(
-        {
-            "game_id": thin,
-            "season": SEASON,
-            "league": LEAGUE,
-            "run_expectancy_start_key": _key(0, 1),
-            "run_expectancy_end_key": _key(0, 3),
-            "runs_on_play": 0,
-        }
-    )
+    thin = find_holdout_game("THINHOLD")
+    rows.append(_row(thin, outs=0, base=1, end_outs=0, end_base=3, runs=0))
 
     path = tmp_path / "transition.parquet"
     pl.DataFrame(rows).write_parquet(path)

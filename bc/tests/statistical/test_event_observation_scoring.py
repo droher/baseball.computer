@@ -14,8 +14,10 @@ from python_models.statistical.models._event_data import (
     CONTINUOUS_COLUMNS,
     HOLDOUT_FOLD_COUNT,
     HOLDOUT_FOLD_ID,
+    UNKNOWN_LEVEL,
     EventObservationInputs,
     ObservationHeldOutSet,
+    _encode_codes_with_vocab,
     build_observation_scoring_frame,
     prepare_event_observation_inputs,
 )
@@ -27,6 +29,9 @@ KEPT_SEASONS = ("1995", "2005")
 SATURATED_SEASON = "2015"
 UNSEEN_PARK = "ZZZZ"
 UNSEEN_GAME_TYPE = "Exhibition"
+UNSEEN_SCORER = "never_trained"
+UNSEEN_SCORER_ROW = 4
+NULL_SCORER_ROW = 3
 EXTREME_SCORE_MARGIN = 50
 
 
@@ -232,6 +237,18 @@ def _write_dataset(tmp_path: Path) -> Path:
                 "game_type": pl.Series(
                     "game_type",
                     [UNSEEN_GAME_TYPE] + ["RegularSeason"] * (n_scoring_only - 1),
+                    dtype=pl.Utf8,
+                ),
+                "scorer": pl.Series(
+                    "scorer",
+                    [
+                        UNSEEN_SCORER
+                        if i == UNSEEN_SCORER_ROW
+                        else None
+                        if i == NULL_SCORER_ROW
+                        else "A"
+                        for i in range(n_scoring_only)
+                    ],
                     dtype=pl.Utf8,
                 ),
             },
@@ -450,4 +467,80 @@ def test_export_schema_and_row_count_match_scoring_frame(tmp_path: Path) -> None
     assert (
         reloaded.with_columns(pl.col("event_key").cast(pl.UInt32)).height
         == reloaded.height
+    )
+
+
+def test_encode_codes_null_and_unseen_values_differ() -> None:
+    frame = pl.DataFrame(
+        {"level": pl.Series("level", ["seen", None, "unseen"], dtype=pl.Utf8)}
+    )
+    with_null_level = ["seen", UNKNOWN_LEVEL]
+    codes = _encode_codes_with_vocab(frame, "level", with_null_level)
+    assert codes.tolist() == [
+        with_null_level.index("seen"),
+        with_null_level.index(UNKNOWN_LEVEL),
+        -1,
+    ]
+
+    without_null_level = ["seen", "other"]
+    codes = _encode_codes_with_vocab(frame, "level", without_null_level)
+    assert codes.tolist() == [without_null_level.index("seen"), -1, -1]
+
+
+def test_unseen_scorer_gets_zero_effect_while_null_scorer_keeps_its_level(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("pymc")
+    az = pytest.importorskip("arviz")
+    from python_models.statistical.bayes.training import (
+        _posterior_held_out_means_bernoulli,
+    )
+
+    parquet_path, inputs, scoring = _prepare(tmp_path)
+    df = pl.read_parquet(parquet_path)
+
+    assert UNKNOWN_LEVEL in inputs.coords["scorer"]
+    assert UNSEEN_SCORER not in inputs.coords["scorer"]
+    unknown_idx = inputs.coords["scorer"].index(UNKNOWN_LEVEL)
+
+    scoring_only = df.filter(
+        (pl.col("dimension") == DIMENSION) & (pl.col("training_weight") == 0.0)
+    ).sort("event_key")
+    unseen_key = int(scoring_only.get_column("event_key")[UNSEEN_SCORER_ROW])
+    null_key = int(scoring_only.get_column("event_key")[NULL_SCORER_ROW])
+    assert scoring_only.get_column("scorer")[UNSEEN_SCORER_ROW] == UNSEEN_SCORER
+    assert scoring_only.get_column("scorer")[NULL_SCORER_ROW] is None
+
+    i = int(np.searchsorted(scoring.event_keys, unseen_key))
+    j = int(np.searchsorted(scoring.event_keys, null_key))
+    assert scoring.event_keys[i] == unseen_key
+    assert scoring.event_keys[j] == null_key
+    assert scoring.scorer_idx[i] == -1
+    assert scoring.scorer_idx[j] == unknown_idx
+
+    rng = np.random.default_rng(20260903)
+    n_chain, n_draw = 2, 4
+    alpha = rng.normal(size=(n_chain, n_draw))
+    beta_season = rng.normal(size=(n_chain, n_draw, len(inputs.coords["season"])))
+    beta_scorer = rng.normal(size=(n_chain, n_draw, len(inputs.coords["scorer"])))
+    idata = az.from_dict(
+        posterior={
+            "alpha": alpha,
+            "beta_season": beta_season,
+            "beta_scorer": beta_scorer,
+        }
+    )
+    means = _posterior_held_out_means_bernoulli(idata, scoring)
+
+    def _sigmoid(x: np.ndarray) -> np.ndarray:
+        return 1.0 / (1.0 + np.exp(-x))
+
+    without_scorer = alpha + beta_season[..., scoring.season_idx[i]]
+    assert means[i] == pytest.approx(float(_sigmoid(without_scorer).mean()))
+    with_unknown = (
+        alpha + beta_season[..., scoring.season_idx[j]] + beta_scorer[..., unknown_idx]
+    )
+    assert means[j] == pytest.approx(float(_sigmoid(with_unknown).mean()))
+    assert means[j] != pytest.approx(
+        float(_sigmoid(alpha + beta_season[..., scoring.season_idx[j]]).mean())
     )

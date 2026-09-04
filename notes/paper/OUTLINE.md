@@ -3,7 +3,7 @@ title: Paper plan — Estimating the Unrecorded Game
 type: design-doc
 status: draft
 audience: writer agents, David
-last-verified: 2026-07-13
+last-verified: 2026-09-04
 ---
 
 # Paper plan
@@ -32,9 +32,17 @@ single-source record and must not be published.
 - Notation (use exactly this):
   - Event index i; geometry dimension d; class c; K classes.
   - R_i ∈ {0,1} observation indicator; Model A estimates P(R_i=1 | x_i).
-  - Softmax logits η_{i,c}; DL proposal term γ_c · log p̃^dl_{i,c}, γ_c ~ N(0, 0.5).
-  - MNAR per-class selection offset δ_c: P(c|x,R=0) via softmax(η_c + δ_c).
-  - Splits: HASH(game_id) % 100 → TRAIN/VALIDATE/TEST, shared by all models.
+  - Softmax logits η_{i,c}; DL proposal term γ · log p̃^dl_{i,c} with ONE
+    scalar γ ~ N(0, 0.5) shared across classes (posterior sd ~0.03; the prior
+    is inert — never call it "shrinkage" as a mechanism).
+  - MNAR per-class selection offset δ_c (nats): P(c|x,R=0) via
+    softmax(η_c + δ_c). Additive separability of the masking log-odds is an
+    ASSUMPTION, stated where the offset is introduced. There is no anchored
+    δ_c; the derived slice gives a lower bound on P(GB | unrecorded) only.
+  - Splits: two unrelated game partitions. Deep fits: DuckDB
+    `HASH(game_id) % 100` → TRAIN/VALIDATE/TEST (70/15/15, `primary_fold`).
+    Bayes fits and coverage gates: BLAKE2s `game_hash_fold(game_id, 10) == 0`
+    held out. They are not nested; never write "shared by all models".
 - Model letters are canonical: A observation propensity, B contact-label
   confusion (blocked), C fielding credit, D ball handler, E batted-ball
   geometry, F park factors, G run expectancy + state transition, H advancement
@@ -49,10 +57,26 @@ single-source record and must not be published.
 - Write ONLY your assigned file under notes/paper/sections/. No git commands of
   any kind. Read any repo file you need.
 
+## Revision history
+
+- 2026-07-14: referee round (REFEREE-REPORT.md → REVISION-PLAN.md →
+  RESPONSE-TO-REVIEWERS.md).
+- 2026-09-04: modeling-review round
+  (notes/data-coverage-implementation/modeling-review-2026-09-03.md). The
+  per-section briefs below are the ORIGINAL drafting briefs and several of
+  their claims were later withdrawn (the anchored MNAR offset, the joint
+  ribbon, the "wrong sign" reading of γ_GB, the shared split, the per-class
+  γ_c, the memory-file sources that never existed). The sections themselves are
+  authoritative; where a brief and a section disagree, the section wins.
+
 ## Section map
 
-Assembled order (I concatenate; write each as `## <Section title>` top level,
-subsections `###`):
+Assembled order (write each as `## <Section title>` top level, subsections
+`###`). Assembly is a plain concatenation with two blank lines between files:
+
+```
+cd notes/paper && for f in sections/*.md; do cat "$f"; printf '\n\n'; done > data-coverage-paper.md
+```
 
 | # | File | Section | Writer | Words |
 |---|------|---------|--------|-------|

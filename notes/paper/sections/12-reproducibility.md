@@ -7,23 +7,32 @@ ad hoc writes — from 45 source parquet files and the coverage pipeline's
 The queries and outputs behind every number are checked in alongside the
 prose: `notes/paper/queries/<name>.sql` is the exact query, and
 `notes/paper/tables/<name>.md` is its output against the published database,
-for each of the eleven SQL-query-backed tables cited in this section. A
-further set of tables — the ones behind §7's Validation subsection — are
-recipe-driven rather than single-query outputs, and each carries its own
-regeneration command inline in `notes/paper/tables/<name>.md`: `just
-validate-gates` (read-only; sweeps every published artifact pointer through
-`validate_artifact` and reports the gate-status table, the state-transition
-and run-expectancy predictive-coverage numbers, and the
-`geometry_location_depth` disposition), `just mnar-backtest --mask-design
-{w_class_intensity,covariate_joint,scorer_blocked,era_graded}` (the masked
-backtest across the four robustness designs), `just sensitivity-ribbon
---joint <anchor-run-dir>` (the joint anchored sensitivity ribbon), and the
-anchor driver that feeds it, `uv run --group stats python
-scripts/mnar_anchor.py --run-id <id>` (reads `bc.db` read-only and writes the
-per-era GroundBall selection offset). None of these four writes to `bc.db` or
-mutates any published artifact; they are read-only sweeps and re-derivations
-against the current published pointers, and together with the queries above
-they reproduce every number in §7's Validation subsection.
+for each of the SQL-query-backed tables cited in §7. A further set of tables —
+the ones behind §5 and §7's Validation subsection — are recipe-driven rather
+than single-query outputs, and each carries its own regeneration command inline
+in `notes/paper/tables/<name>.md`: `just validate-gates` (read-only; sweeps
+every published artifact pointer through `validate_artifact` and reports the
+gate-status table and the state-transition and run-expectancy
+predictive-coverage numbers; `--write` is the only path that stamps a
+manifest's `validation_status`, gate version, and weak-identification flag),
+`uv run --group stats python scripts/mnar_anchor.py --run-id <id>` (reads the
+frozen geometry dataset and the published trajectory export read-only and writes
+the per-era derived-slice bounds and the MAR-on-derived diagnostic), `just
+sensitivity-ribbon --bound <anchor-run-dir>` (the per-era ribbon and the offset
+at which it reaches the bound), and `just mnar-backtest --model geometry --smoke
+--mask-design {w_class_intensity,covariate_joint,scorer_blocked,era_graded}`
+(the masked backtest across the four designs — the recorded numbers are
+smoke-budget runs, the flag is part of the command that reproduces them, and no
+run artifacts are checked in, so a reader must rerun to re-check them). None of
+these writes to `bc.db` or mutates any published artifact.
+
+Two game-level partitions are in use and a reader reproducing a held-out number
+must pick the right one. Every Bayes fit and every coverage gate holds out fold 0
+of `blake2s(game_id) % 10` (`splits.game_hash_fold`); the deep supplements
+train, early-stop, and report on the `HASH(game_id) % 100` `TRAIN` / `VALIDATE`
+/ `TEST` partition the modeling datasets carry as `primary_fold`, with their
+out-of-fold predictions assigned by `blake2s(game_id) % 5` inside `TRAIN`. The
+two hashes are unrelated. <!-- src: bc/python_models/statistical/splits.py --> <!-- src: bc/python_models/statistical/deep/training.py -->
 
 Provenance runs deeper than the query. Every `estimated`-tier row carries an
 `artifact_id` that resolves to an `ArtifactManifest` — a JSON document

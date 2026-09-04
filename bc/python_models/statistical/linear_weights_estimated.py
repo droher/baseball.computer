@@ -11,6 +11,18 @@ per (season, league) and per RE draw, the combo-frequency weights are drawn
 from a Jeffreys Dirichlet over the cell's transition types rather than fixed at
 the observed counts, so sparse cells widen while dense cells are unchanged to
 first order.
+
+Posterior cells are keyed on the transition row's own ``season`` and ``league``
+columns plus the ``outs_base`` suffix of the run-expectancy key, never on the
+key's ``season_group`` / ``league_group`` prefix. Rows whose start state has no
+posterior cell are dropped, as the deterministic sibling drops events whose
+start key misses the run-expectancy matrix; a missing non-terminal end state
+maps to zero, matching its ``COALESCE(RE_end, 0)``. The deterministic
+occurrence floor per (season, league, play) is ``DETERMINISTIC_PLAY_FLOOR``,
+pinned to the ``QUALIFY COUNT(*) OVER result > N`` clause of
+``linear_weights.sql`` by a unit test; cells at or below it publish the
+corpus-pooled per-play value with ``is_imputed = True``, exactly as the
+deterministic table does.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAny=false
@@ -19,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -31,6 +44,18 @@ JEFFREYS_ALPHA: float = 0.5
 
 DIRICHLET_BASE_SEED: int = 20260713
 
+INNING_END_OUTS: int = 3
+
+DETERMINISTIC_LINEAR_WEIGHTS_SQL: Path = (
+    Path(__file__).resolve().parents[2]
+    / "models"
+    / "intermediate"
+    / "expectancy"
+    / "linear_weights.sql"
+)
+
+DETERMINISTIC_PLAY_FLOOR: int = 100
+
 RUN_VALUE_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
     "season": pl.Int16(),
     "league": pl.Utf8(),
@@ -41,28 +66,32 @@ RUN_VALUE_SUMMARY_SCHEMA: dict[str, pl.DataType] = {
     "run_value_sd": pl.Float64(),
     "run_value_hdi_lower": pl.Float64(),
     "run_value_hdi_upper": pl.Float64(),
+    "is_imputed": pl.Boolean(),
 }
 
 
-def _distinct_keys_with_components(counts: pl.DataFrame, key_column: str) -> pl.DataFrame:
-    """Return distinct RE keys with parsed posterior-join components.
+def _distinct_keys_with_components(
+    counts: pl.DataFrame, key_column: str
+) -> pl.DataFrame:
+    """Return distinct ``(season, league, key)`` triples with parsed components.
 
-    The key is ``CONCAT_WS('_', season_group, league_group, outs, base_state)``;
-    ``re_season`` / ``re_league`` are the first two parts, ``re_state`` is the
-    ``outs_base`` suffix (matching the posterior's ``state`` column), and
-    ``re_outs`` is the outs component as an integer (for the inning-end zero).
+    ``re_state`` is the ``outs_base`` suffix of the key (matching the
+    posterior's ``state`` column) and ``re_outs`` its outs component; the
+    posterior join uses the row's own ``season`` / ``league`` columns.
     """
     parts = pl.col("re_key").str.split("_")
     return (
-        counts.select(pl.col(key_column).alias("re_key"))
+        counts.select(
+            pl.col("season"),
+            pl.col("league"),
+            pl.col(key_column).alias("re_key"),
+        )
         .unique()
         .with_columns(
-            parts.list.get(0).cast(pl.Int16).alias("re_season"),
-            parts.list.get(1).cast(pl.Utf8).alias("re_league"),
             pl.concat_str(
-                [parts.list.get(2), parts.list.get(3)], separator="_"
+                [parts.list.get(-2), parts.list.get(-1)], separator="_"
             ).alias("re_state"),
-            parts.list.get(2).cast(pl.Int64).alias("re_outs"),
+            parts.list.get(-2).cast(pl.Int64).alias("re_outs"),
         )
         .with_row_index("key_id")
     )
@@ -71,18 +100,14 @@ def _distinct_keys_with_components(counts: pl.DataFrame, key_column: str) -> pl.
 def _draw_value_matrix(
     keys: pl.DataFrame,
     re_draws: pl.DataFrame,
-    *,
-    zero_when_inning_end: bool,
-) -> np.ndarray:
-    """Return an ``(n_keys, n_draws)`` matrix of RE values per key per draw.
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return ``(values, has_cell)`` for the distinct keys.
 
-    ``keys`` carries one row per distinct RE key with parsed
-    ``re_season``/``re_league``/``re_state`` columns and (when
-    ``zero_when_inning_end``) ``re_outs``. ``re_draws`` is the posterior in
-    long form ``(state, season, league, draw_id, value)``. Keys whose parsed
-    state matches no posterior cell, or (for the end key) whose ``outs >= 3``,
-    map to RE = 0 (mirroring ``COALESCE(RE_end, 0)`` and inning-end
-    transitions).
+    ``values`` is an ``(n_keys, n_draws)`` matrix of RE values per key per
+    draw and ``has_cell`` a boolean per key that is True when the key's
+    ``(season, league, state)`` matched a posterior cell. Unmatched keys
+    carry zeros; callers decide whether that is a drop (start keys) or a
+    zero run expectancy (end keys past the inning).
     """
     draw_ids = re_draws.get_column("draw_id").unique().sort()
     n_draws = draw_ids.len()
@@ -91,7 +116,7 @@ def _draw_value_matrix(
     wide = (
         keys.join(
             re_draws,
-            left_on=["re_season", "re_league", "re_state"],
+            left_on=["season", "league", "re_state"],
             right_on=["season", "league", "state"],
             how="left",
         )
@@ -101,6 +126,7 @@ def _draw_value_matrix(
 
     n_keys = keys.height
     out = np.zeros((n_keys, n_draws), dtype=np.float64)
+    has_cell = np.zeros(n_keys, dtype=bool)
     if wide.height > 0:
         key_pos = wide.get_column("key_id").to_numpy()
         draw_pos = np.array(
@@ -108,11 +134,8 @@ def _draw_value_matrix(
             dtype=np.int64,
         )
         out[key_pos, draw_pos] = wide.get_column("value").to_numpy()
-
-    if zero_when_inning_end:
-        outs = keys.get_column("re_outs").to_numpy()
-        out[outs >= 3, :] = 0.0
-    return out
+        has_cell[np.unique(key_pos)] = True
+    return out, has_cell
 
 
 def _cell_generator(season: int, league: str, base_seed: int) -> np.random.Generator:
@@ -153,12 +176,31 @@ def _dirichlet_weight_matrix(
     return out
 
 
+def _key_positions(
+    keys: pl.DataFrame, counts: pl.DataFrame, key_column: str
+) -> np.ndarray:
+    position = {
+        (int(s), str(lg), str(k)): int(i)
+        for s, lg, k, i in keys.select(
+            ["season", "league", "re_key", "key_id"]
+        ).iter_rows()
+    }
+    return np.array(
+        [
+            position[(int(s), str(lg), str(k))]
+            for s, lg, k in counts.select(["season", "league", key_column]).iter_rows()
+        ],
+        dtype=np.int64,
+    )
+
+
 def propagate_linear_weights_draws(
     transition_counts: pl.DataFrame,
     re_draws: pl.DataFrame,
     *,
     dirichlet_alpha: float | None = JEFFREYS_ALPHA,
     base_seed: int = DIRICHLET_BASE_SEED,
+    min_events_per_play: int | None = None,
 ) -> pl.DataFrame:
     """Propagate RE posterior draws through the linear-weights formula.
 
@@ -174,6 +216,19 @@ def propagate_linear_weights_draws(
     league) all-play weighted mean for draw ``d``. Collapsing over draws yields
     ``run_value_{mean, sd, hdi_lower, hdi_upper}`` (94% HDI).
 
+    Rows whose start state has no posterior cell for their ``(season,
+    league)`` are dropped. An end state past the inning (``outs >= 3``) or
+    with no posterior cell contributes ``RE_end = 0``.
+
+    ``min_events_per_play`` is the occurrence floor per (season, league,
+    play); ``None`` uses ``DETERMINISTIC_PLAY_FLOOR``, the deterministic
+    sibling's floor.
+    Cells whose occurrence count is at or below the floor publish the
+    corpus-pooled per-play value (event-weighted over every season and
+    league, centered against the pooled all-play mean) with
+    ``is_imputed = True``; cells above it carry their own value with
+    ``is_imputed = False``.
+
     When ``dirichlet_alpha`` is a float (default ``JEFFREYS_ALPHA``) the combo
     weights carry finite-sample transition-count uncertainty: per (season,
     league) and per RE-posterior draw, the combo-frequency vector is drawn from
@@ -184,6 +239,12 @@ def propagate_linear_weights_draws(
     """
     if transition_counts.height == 0 or re_draws.height == 0:
         return pl.DataFrame(schema=RUN_VALUE_SUMMARY_SCHEMA)
+
+    floor = (
+        DETERMINISTIC_PLAY_FLOOR
+        if min_events_per_play is None
+        else int(min_events_per_play)
+    )
 
     re_draws = re_draws.with_columns(
         (
@@ -218,41 +279,48 @@ def propagate_linear_weights_draws(
     start_keys = _distinct_keys_with_components(counts, "run_expectancy_start_key")
     end_keys = _distinct_keys_with_components(counts, "run_expectancy_end_key")
 
-    start_matrix = _draw_value_matrix(
-        start_keys, re_draws, zero_when_inning_end=False
-    )
-    end_matrix = _draw_value_matrix(end_keys, re_draws, zero_when_inning_end=True)
+    start_matrix, start_has_cell = _draw_value_matrix(start_keys, re_draws)
+    end_matrix, end_has_cell = _draw_value_matrix(end_keys, re_draws)
+    end_outs = end_keys.get_column("re_outs").to_numpy()
+    end_matrix[end_outs >= INNING_END_OUTS, :] = 0.0
 
-    start_pos = dict(
-        zip(
-            start_keys.get_column("re_key").to_list(),
-            start_keys.get_column("key_id").to_list(),
-        )
-    )
-    end_pos = dict(
-        zip(
-            end_keys.get_column("re_key").to_list(),
-            end_keys.get_column("key_id").to_list(),
-        )
-    )
+    start_idx = _key_positions(start_keys, counts, "run_expectancy_start_key")
+    end_idx = _key_positions(end_keys, counts, "run_expectancy_end_key")
 
-    start_idx = np.array(
-        [start_pos[k] for k in counts.get_column("run_expectancy_start_key").to_list()],
-        dtype=np.int64,
+    keep = start_has_cell[start_idx]
+    dropped_events = float(counts.get_column("n").to_numpy()[~keep].sum())
+    if dropped_events:
+        _log.info(
+            "linear_weights_estimated: dropped %d transition rows (%d events) "
+            "whose start state has no posterior cell",
+            int((~keep).sum()),
+            int(dropped_events),
+        )
+    end_zeroed = end_idx[keep]
+    missing_end = int(
+        counts.get_column("n")
+        .to_numpy()[keep][
+            ~end_has_cell[end_zeroed] & (end_outs[end_zeroed] < INNING_END_OUTS)
+        ]
+        .sum()
     )
-    end_idx = np.array(
-        [end_pos[k] for k in counts.get_column("run_expectancy_end_key").to_list()],
-        dtype=np.int64,
-    )
+    if missing_end:
+        _log.info(
+            "linear_weights_estimated: %d events carry a non-terminal end state "
+            "with no posterior cell; RE_end = 0 for them",
+            missing_end,
+        )
+    counts = counts.filter(pl.Series(keep))
+    start_idx = start_idx[keep]
+    end_idx = end_idx[keep]
+    if counts.height == 0:
+        _log.info("linear_weights_estimated: no rows survive the start-cell join")
+        return pl.DataFrame(schema=RUN_VALUE_SUMMARY_SCHEMA)
 
     raw_weights = counts.get_column("n").to_numpy().astype(np.float64)
     runs_on_play = counts.get_column("runs_on_play").to_numpy()
 
-    erc = (
-        runs_on_play[:, None]
-        + end_matrix[end_idx, :]
-        - start_matrix[start_idx, :]
-    )
+    erc = runs_on_play[:, None] + end_matrix[end_idx, :] - start_matrix[start_idx, :]
 
     season = counts.get_column("season").to_numpy()
     league = counts.get_column("league").to_list()
@@ -274,11 +342,17 @@ def propagate_linear_weights_draws(
             slp_index[k] = len(slp_index)
             slp_order.append(k)
             slp_category.append(category)
+    play_index: dict[str, int] = {}
+    for p in play:
+        if p not in play_index:
+            play_index[p] = len(play_index)
 
     sl_codes = np.array([sl_index[k] for k in sl_keys], dtype=np.int64)
     slp_codes = np.array([slp_index[k] for k in slp_keys], dtype=np.int64)
+    play_codes = np.array([play_index[p] for p in play], dtype=np.int64)
     n_sl = len(sl_index)
     n_slp = len(slp_index)
+    n_play = len(play_index)
 
     if dirichlet_alpha is None:
         weight_matrix = np.broadcast_to(
@@ -307,7 +381,17 @@ def propagate_linear_weights_draws(
     slp_count = np.zeros(n_slp, dtype=np.float64)
     np.add.at(slp_count, slp_codes, raw_weights)
 
-    del erc, weighted
+    pooled = erc * raw_weights[:, None]
+    play_pooled_sum = np.zeros((n_play, n_draws), dtype=np.float64)
+    play_pooled_weight = np.zeros(n_play, dtype=np.float64)
+    np.add.at(play_pooled_sum, play_codes, pooled)
+    np.add.at(play_pooled_weight, play_codes, raw_weights)
+    all_pooled_mean = pooled.sum(axis=0) / raw_weights.sum()
+    play_pooled_centered = (
+        play_pooled_sum / play_pooled_weight[:, None] - all_pooled_mean[None, :]
+    )
+
+    del erc, weighted, pooled
 
     slp_mean = slp_weighted_sum / slp_weight
     sl_mean = sl_weighted_sum / sl_weight
@@ -316,6 +400,20 @@ def propagate_linear_weights_draws(
         [sl_index[(s, lg)] for (s, lg, _p) in slp_order], dtype=np.int64
     )
     centered = slp_mean - sl_mean[slp_to_sl, :]
+
+    is_imputed = slp_count <= floor
+    if is_imputed.any():
+        slp_to_play = np.array(
+            [play_index[p] for (_s, _lg, p) in slp_order], dtype=np.int64
+        )
+        centered[is_imputed, :] = play_pooled_centered[slp_to_play[is_imputed], :]
+        _log.info(
+            "linear_weights_estimated: %d of %d (season, league, play) cells at or "
+            "below the %d-occurrence floor take the pooled per-play value",
+            int(is_imputed.sum()),
+            n_slp,
+            floor,
+        )
 
     mean = centered.mean(axis=1)
     sd = centered.std(axis=1, ddof=1) if n_draws > 1 else np.zeros(n_slp)
@@ -332,6 +430,7 @@ def propagate_linear_weights_draws(
             "run_value_sd": sd.tolist(),
             "run_value_hdi_lower": hdi_lower.tolist(),
             "run_value_hdi_upper": hdi_upper.tolist(),
+            "is_imputed": is_imputed.tolist(),
         }
     ).select(
         pl.col("season").cast(pl.Int16),
@@ -343,6 +442,7 @@ def propagate_linear_weights_draws(
         pl.col("run_value_sd").cast(pl.Float64),
         pl.col("run_value_hdi_lower").cast(pl.Float64),
         pl.col("run_value_hdi_upper").cast(pl.Float64),
+        pl.col("is_imputed").cast(pl.Boolean),
     )
     _log.info(
         "linear_weights_estimated: %d (season, league, play) rows over %d draws",

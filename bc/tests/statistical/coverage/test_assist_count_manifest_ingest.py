@@ -37,6 +37,7 @@ def _write_assist_count_artifact_with_pointer(
     *,
     tmp_path: Path,
     artifact_id: str,
+    share_scale: float = 1.0,
 ) -> Path:
     from python_models.statistical.bayes.artifacts import bayes_artifact_dir
     from python_models.statistical.manifests import (
@@ -72,7 +73,9 @@ def _write_assist_count_artifact_with_pointer(
                     count_class.append(c)
     n_row = len(result_family)
     rng = np.random.default_rng(0)
-    prob_mean = rng.uniform(0.01, 0.4, size=n_row).astype(np.float64)
+    n_grain = len(RESULT_FAMILIES) * len(BASE_STATES) * len(OUTS)
+    raw = rng.uniform(0.01, 0.4, size=(n_grain, len(COUNT_CLASSES)))
+    prob_mean = (share_scale * raw / raw.sum(axis=1, keepdims=True)).reshape(-1)
     prob_sd = rng.uniform(0.001, 0.02, size=n_row).astype(np.float64)
     pl.DataFrame(
         {
@@ -192,3 +195,18 @@ def test_yields_published_frame_with_artifact_id_and_unique_grain(
         "result_family", "base_state_start", "outs_start", "assist_count_class"
     )
     assert grain.n_unique() == frame.height
+    per_grain = frame.group_by("result_family", "base_state_start", "outs_start").agg(
+        pl.col("prob_mean").sum().alias("total")
+    )
+    np.testing.assert_allclose(per_grain.get_column("total").to_numpy(), 1.0, atol=1e-9)
+
+
+def test_export_whose_grains_do_not_sum_to_one_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published_root = _write_assist_count_artifact_with_pointer(
+        tmp_path=tmp_path, artifact_id="ac-bad", share_scale=0.5
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    with pytest.raises(ValueError, match="do not sum to 1"):
+        _ = list(aggregate_assist_count_frames())

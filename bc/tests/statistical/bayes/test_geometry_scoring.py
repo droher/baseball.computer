@@ -113,6 +113,33 @@ def test_dl_term_inert_when_gamma_dl_absent() -> None:
     np.testing.assert_allclose(passed_dl, no_dl, atol=1e-12)
 
 
+def test_null_dl_rows_score_as_alpha_plus_fe_alone() -> None:
+    rng = np.random.default_rng(11)
+    dl = rng.normal(size=(N_EVENTS, N_CLASSES))
+    null_rows = np.array([1, 4])
+    dl[null_rows, :] = 0.0
+    carrier = _geometry_carrier(dl)
+    idata = _posterior(with_gamma_dl=True, gamma_value=2.0)
+
+    with_dl = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        dl_logit_per_class=dl,
+    )
+    without_dl = _posterior_event_softmax(
+        idata,
+        carrier,
+        n_positions=N_CLASSES,
+        intercept_name="alpha_class",
+        dl_logit_per_class=None,
+    )
+    np.testing.assert_allclose(with_dl[null_rows], without_dl[null_rows], atol=1e-12)
+    present_rows = np.setdiff1d(np.arange(N_EVENTS), null_rows)
+    assert not np.allclose(with_dl[present_rows], without_dl[present_rows])
+
+
 def _posterior_arrays(
     idata: az.InferenceData,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:

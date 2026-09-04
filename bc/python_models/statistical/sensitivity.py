@@ -14,6 +14,11 @@ The grid is in selection log-odds (nats), the interpretable unit of `delta_c`:
 a class under-recorded with a selection log-odds of `+0.5` means its recording
 odds are `exp(0.5) ~ 1.6x` the average. The masked backtest's recovered oracle
 offsets land near `+-0.4..1.0`, so a grid out to `+-1.0` spans realistic MNAR.
+
+Where an external lower bound on a class's unrecorded-slice share exists (the
+derived-slice bound of `mnar_anchor.py`), `offset_reaching_share` inverts the
+single-class sweep to find the smallest offset at which the corrected marginal
+reaches it, so a reader can see whether the grid contains the bound.
 """
 
 from __future__ import annotations
@@ -29,25 +34,33 @@ FloatArray = npt.NDArray[np.float64]
 
 DEFAULT_GRID: tuple[float, ...] = (-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0)
 
-JOINT_T_GRID: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5)
-JOINT_PERTURBATION_NATS: float = 0.25
-JOINT_ANCHOR_T: float = 1.0
+OFFSET_SEARCH_LIMIT_NATS: float = 64.0
+OFFSET_SEARCH_TOLERANCE_NATS: float = 1e-10
 
-SWEEP_MARGINAL: str = "marginal"
-SWEEP_JOINT_ANCHOR: str = "joint_anchor"
-SWEEP_JOINT_ANCHOR_PERTURBED: str = "joint_anchor_perturbed"
+BOUND_OFFSET_COLUMNS: tuple[str, ...] = (
+    "era_bucket",
+    "class_label",
+    "baseline_share",
+    "grid_low_delta",
+    "grid_low_share",
+    "grid_high_delta",
+    "grid_high_share",
+    "target_share",
+    "delta_at_target",
+    "target_in_grid",
+)
 
-_JOINT_RIBBON_SCHEMA: dict[str, pl.DataType] = {
-    "geometry_dimension": pl.Utf8(),
+_BOUND_OFFSET_SCHEMA: dict[str, pl.DataType] = {
     "era_bucket": pl.Utf8(),
-    "sweep_kind": pl.Utf8(),
     "class_label": pl.Utf8(),
-    "delta_logodds": pl.Float64(),
-    "t": pl.Float64(),
-    "perturbed_class": pl.Utf8(),
-    "perturbation_nats": pl.Float64(),
-    "marginal_share": pl.Float64(),
     "baseline_share": pl.Float64(),
+    "grid_low_delta": pl.Float64(),
+    "grid_low_share": pl.Float64(),
+    "grid_high_delta": pl.Float64(),
+    "grid_high_share": pl.Float64(),
+    "target_share": pl.Float64(),
+    "delta_at_target": pl.Float64(),
+    "target_in_grid": pl.Boolean(),
 }
 
 
@@ -68,15 +81,12 @@ def marginal_shares(
         str(row[class_column]): math.exp(offset.get(str(row[class_column]), 0.0))
         for row in export_df.select(class_column).unique().iter_rows(named=True)
     }
-    reweighted = (
-        export_df.with_columns(
-            pl.col(class_column)
-            .cast(pl.Utf8)
-            .replace_strict(weight_by_label, default=1.0, return_dtype=pl.Float64)
-            .alias("_w")
-        )
-        .with_columns((pl.col(share_column) * pl.col("_w")).alias("_num"))
-    )
+    reweighted = export_df.with_columns(
+        pl.col(class_column)
+        .cast(pl.Utf8)
+        .replace_strict(weight_by_label, default=1.0, return_dtype=pl.Float64)
+        .alias("_w")
+    ).with_columns((pl.col(share_column) * pl.col("_w")).alias("_num"))
     denom = reweighted.group_by(event_column).agg(pl.col("_num").sum().alias("_denom"))
     per_event = (
         reweighted.join(denom, on=event_column)
@@ -94,6 +104,32 @@ def marginal_shares(
     return out
 
 
+def _pivot_wide(
+    export_df: pl.DataFrame,
+    *,
+    class_column: str,
+    share_column: str,
+    event_column: str,
+) -> tuple[list[str], pl.DataFrame]:
+    wide = (
+        export_df.select(event_column, class_column, share_column)
+        .pivot(values=share_column, index=event_column, on=class_column)
+        .fill_null(0.0)
+    )
+    labels = sorted(c for c in wide.columns if c != event_column)
+    return labels, wide
+
+
+def _single_class_marginal(share: FloatArray, total: FloatArray, delta: float) -> float:
+    """Population mean of one class's share after shifting only that class by `delta`.
+
+    A single-class offset only rescales that class, so the per-event
+    renormalizer is `total + share * (exp(delta) - 1)`.
+    """
+    scale = math.exp(delta)
+    return float(np.mean(share * scale / (total + share * (scale - 1.0))))
+
+
 def sensitivity_ribbon(
     export_df: pl.DataFrame,
     *,
@@ -108,32 +144,27 @@ def sensitivity_ribbon(
     For grid value `g` (a selection log-odds, nats) and class `c`, the offset is
     `g` on `c` alone (others 0). Each row is one `(class, delta_logodds)` point;
     `delta_logodds = 0` reproduces the baseline marginal.
-
-    Pivots to one row per event once, then each single-class sweep is column
-    arithmetic: a class-`c` offset only rescales `c`, so the per-event renormalizer
-    is `total + share_c * (exp(g) - 1)` with no join or per-point group-by.
     """
-    wide = (
-        export_df.select(event_column, class_column, share_column)
-        .pivot(values=share_column, index=event_column, on=class_column)
-        .fill_null(0.0)
+    labels, wide = _pivot_wide(
+        export_df,
+        class_column=class_column,
+        share_column=share_column,
+        event_column=event_column,
     )
-    labels = sorted(c for c in wide.columns if c != event_column)
-    total = pl.sum_horizontal(*labels)
+    mat = np.asarray(wide.select(labels).to_numpy(), dtype=np.float64)
+    total = mat.sum(axis=1)
     rows: list[dict[str, object]] = []
-    for label in labels:
-        baseline = wide.select((pl.col(label) / total).mean()).item()
+    for k, label in enumerate(labels):
+        share = mat[:, k]
+        baseline = _single_class_marginal(share, total, 0.0)
         for g in grid:
-            scale = math.exp(g)
-            denom = total + pl.col(label) * (scale - 1.0)
-            marginal = wide.select((pl.col(label) * scale / denom).mean()).item()
             rows.append(
                 {
                     "geometry_dimension": dimension,
                     "class_label": label,
                     "delta_logodds": float(g),
-                    "marginal_share": float(marginal),
-                    "baseline_share": float(baseline),
+                    "marginal_share": _single_class_marginal(share, total, float(g)),
+                    "baseline_share": baseline,
                 }
             )
     return pl.DataFrame(rows).sort(["class_label", "delta_logodds"])
@@ -179,181 +210,184 @@ def offset_recovers_target(
     )
 
 
-def _pivot_wide_matrix(
+def _bracket(
+    share: FloatArray, total: FloatArray, target: float
+) -> tuple[float, float] | None:
+    lo, hi = -1.0, 1.0
+    while _single_class_marginal(share, total, lo) > target:
+        lo *= 2.0
+        if lo < -OFFSET_SEARCH_LIMIT_NATS:
+            return None
+    while _single_class_marginal(share, total, hi) < target:
+        hi *= 2.0
+        if hi > OFFSET_SEARCH_LIMIT_NATS:
+            return None
+    return lo, hi
+
+
+def _offset_reaching_share(
+    share: FloatArray, total: FloatArray, target: float
+) -> float | None:
+    baseline = _single_class_marginal(share, total, 0.0)
+    if math.isclose(baseline, target, abs_tol=OFFSET_SEARCH_TOLERANCE_NATS):
+        return 0.0
+    supremum = float(np.mean(share > 0.0))
+    if target <= 0.0 or target >= supremum:
+        return None
+    bracket = _bracket(share, total, target)
+    if bracket is None:
+        return None
+    lo, hi = bracket
+    while hi - lo > OFFSET_SEARCH_TOLERANCE_NATS:
+        mid = 0.5 * (lo + hi)
+        if _single_class_marginal(share, total, mid) < target:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def _class_share_and_total(
     export_df: pl.DataFrame,
     *,
+    class_label: str,
     class_column: str,
     share_column: str,
     event_column: str,
-) -> tuple[list[str], FloatArray]:
-    """One row per event, one column per class, as a dense float matrix.
-
-    Returns the sorted class labels aligned to the matrix columns. Missing
-    per-event class rows fill to a zero share.
-    """
-    wide = (
-        export_df.select(event_column, class_column, share_column)
-        .pivot(values=share_column, index=event_column, on=class_column)
-        .fill_null(0.0)
+) -> tuple[FloatArray, FloatArray]:
+    labels, wide = _pivot_wide(
+        export_df,
+        class_column=class_column,
+        share_column=share_column,
+        event_column=event_column,
     )
-    labels = sorted(c for c in wide.columns if c != event_column)
+    if class_label not in labels:
+        raise ValueError(f"{class_label!r} not in export classes {labels}")
     mat = np.asarray(wide.select(labels).to_numpy(), dtype=np.float64)
-    return labels, mat
+    return mat[:, labels.index(class_label)], mat.sum(axis=1)
 
 
-def _marginal_under_offset(mat: FloatArray, offset_vec: FloatArray) -> FloatArray:
-    """Population mean of the per-event softmax reweight `shares · exp(offset)`.
-
-    Closed form, no per-point group-by: reweight, renormalize per event, average
-    over events. An all-zero `offset_vec` returns the unweighted marginal.
-    """
-    weighted = mat * np.exp(offset_vec)
-    denom = weighted.sum(axis=1, keepdims=True)
-    return np.asarray((weighted / denom).mean(axis=0), dtype=np.float64)
-
-
-def joint_sensitivity_ribbon(
+def offset_reaching_share(
     export_df: pl.DataFrame,
     *,
-    dimension: str,
-    anchor_offset_by_era: Mapping[str, Mapping[str, float]],
-    focal_class: str,
-    t_grid: Sequence[float] = JOINT_T_GRID,
-    perturbation_nats: float = JOINT_PERTURBATION_NATS,
-    grid: Sequence[float] = DEFAULT_GRID,
+    class_label: str,
+    target_share: float,
     class_column: str = "class_label",
     share_column: str = "expected_share",
     event_column: str = "event_key",
-    era_column: str = "era_bucket",
-) -> pl.DataFrame:
-    """Joint anchored sensitivity ribbon, grouped per era bucket.
+) -> float | None:
+    """Smallest single-class offset at which `class_label`'s marginal reaches `target_share`.
 
-    Extends the single-class marginal sweep with an anchored-direction sweep.
-    Per era bucket (from `era_column`) three families of rows are produced:
-
-    - `marginal`: the existing per-class single-class sweep over `grid`
-      (`sensitivity_ribbon`), unchanged in value, tagged with its era.
-    - `joint_anchor`: the population class mix under the offset vector
-      `t · delta_anchor` for each `t` in `t_grid`, where `delta_anchor` is the
-      era's anchored offset (`anchor_offset_by_era[era]`, a per-class map;
-      missing classes are 0). `t = 0` reproduces the MAR marginal exactly.
-    - `joint_anchor_perturbed`: at `t = 1`, each non-focal class perturbed by
-      `±perturbation_nats` one at a time on top of the anchor, exposing joint
-      reallocation uncertainty among the remaining classes. These rows bracket
-      the unperturbed `t = 1` `joint_anchor` row.
-
-    Each offset config is a closed-form per-event renormalization; no refit.
+    The marginal is continuous and strictly increasing in the class's own
+    offset, so the answer is unique; it is found by bisection to
+    `OFFSET_SEARCH_TOLERANCE_NATS`. Returns `None` when the target is at or
+    below zero, at or above the sweep's supremum (the share of events with any
+    mass on the class), or otherwise not reached within
+    `+-OFFSET_SEARCH_LIMIT_NATS`.
     """
+    share, total = _class_share_and_total(
+        export_df,
+        class_label=class_label,
+        class_column=class_column,
+        share_column=share_column,
+        event_column=event_column,
+    )
+    return _offset_reaching_share(share, total, float(target_share))
+
+
+def era_sensitivity_ribbon(
+    export_df: pl.DataFrame,
+    *,
+    dimension: str,
+    grid: Sequence[float] = DEFAULT_GRID,
+    era_column: str = "era_bucket",
+    class_column: str = "class_label",
+    share_column: str = "expected_share",
+    event_column: str = "event_key",
+) -> pl.DataFrame:
+    """`sensitivity_ribbon` computed within each era bucket, tagged with the era."""
+    frames: list[pl.DataFrame] = []
     eras = sorted(
         str(era) for era in export_df.select(era_column).unique().to_series().to_list()
     )
-    frames: list[pl.DataFrame] = []
     for era in eras:
-        era_df = export_df.filter(pl.col(era_column) == era)
-        labels, mat = _pivot_wide_matrix(
-            era_df,
+        ribbon = sensitivity_ribbon(
+            export_df.filter(pl.col(era_column) == era),
+            dimension=dimension,
+            grid=grid,
             class_column=class_column,
             share_column=share_column,
             event_column=event_column,
         )
-        anchor = anchor_offset_by_era.get(era, {})
-        anchor_vec = np.asarray(
-            [anchor.get(label, 0.0) for label in labels], dtype=np.float64
-        )
-        baseline = _marginal_under_offset(mat, np.zeros(len(labels), dtype=np.float64))
-        baseline_by_label = {label: float(baseline[k]) for k, label in enumerate(labels)}
-
-        marginal_frame = (
-            sensitivity_ribbon(
-                era_df,
-                dimension=dimension,
-                grid=grid,
-                class_column=class_column,
-                share_column=share_column,
-                event_column=event_column,
-            )
-            .with_columns(
-                pl.lit(era).alias("era_bucket"),
-                pl.lit(SWEEP_MARGINAL).alias("sweep_kind"),
-                pl.lit(None, dtype=pl.Float64).alias("t"),
-                pl.lit(None, dtype=pl.Utf8).alias("perturbed_class"),
-                pl.lit(None, dtype=pl.Float64).alias("perturbation_nats"),
-            )
-            .select(list(_JOINT_RIBBON_SCHEMA.keys()))
-        )
-        frames.append(marginal_frame)
-
-        rows: list[dict[str, object]] = []
-        for t in t_grid:
-            marginal_t = _marginal_under_offset(mat, anchor_vec * float(t))
-            for k, label in enumerate(labels):
-                rows.append(
-                    {
-                        "geometry_dimension": dimension,
-                        "era_bucket": era,
-                        "sweep_kind": SWEEP_JOINT_ANCHOR,
-                        "class_label": label,
-                        "delta_logodds": None,
-                        "t": float(t),
-                        "perturbed_class": None,
-                        "perturbation_nats": None,
-                        "marginal_share": float(marginal_t[k]),
-                        "baseline_share": baseline_by_label[label],
-                    }
-                )
-        for j, perturbed_label in enumerate(labels):
-            if perturbed_label == focal_class:
-                continue
-            for signed in (perturbation_nats, -perturbation_nats):
-                offset_vec = anchor_vec * JOINT_ANCHOR_T
-                offset_vec[j] += signed
-                marginal_p = _marginal_under_offset(mat, offset_vec)
-                for k, label in enumerate(labels):
-                    rows.append(
-                        {
-                            "geometry_dimension": dimension,
-                            "era_bucket": era,
-                            "sweep_kind": SWEEP_JOINT_ANCHOR_PERTURBED,
-                            "class_label": label,
-                            "delta_logodds": None,
-                            "t": JOINT_ANCHOR_T,
-                            "perturbed_class": perturbed_label,
-                            "perturbation_nats": float(signed),
-                            "marginal_share": float(marginal_p[k]),
-                            "baseline_share": baseline_by_label[label],
-                        }
-                    )
-        frames.append(pl.DataFrame(rows, schema=_JOINT_RIBBON_SCHEMA))
-
+        frames.append(ribbon.with_columns(pl.lit(era).alias("era_bucket")))
     if not frames:
-        return pl.DataFrame(schema=_JOINT_RIBBON_SCHEMA)
-    return pl.concat(frames).sort(
-        "era_bucket", "sweep_kind", "class_label", "t", "delta_logodds"
+        return pl.DataFrame(
+            schema={
+                "geometry_dimension": pl.Utf8,
+                "class_label": pl.Utf8,
+                "delta_logodds": pl.Float64,
+                "marginal_share": pl.Float64,
+                "baseline_share": pl.Float64,
+                "era_bucket": pl.Utf8,
+            }
+        )
+    return pl.concat(frames).select(
+        "era_bucket",
+        "geometry_dimension",
+        "class_label",
+        "delta_logodds",
+        "marginal_share",
+        "baseline_share",
     )
 
 
-def joint_ribbon_band(ribbon: pl.DataFrame) -> pl.DataFrame:
-    """Per-(era, class) perturbation band around the anchored `t = 1` mix.
+def bound_offset_table(
+    export_df: pl.DataFrame,
+    *,
+    class_label: str,
+    target_by_era: Mapping[str, float],
+    grid: Sequence[float] = DEFAULT_GRID,
+    era_column: str = "era_bucket",
+    class_column: str = "class_label",
+    share_column: str = "expected_share",
+    event_column: str = "event_key",
+) -> pl.DataFrame:
+    """Per era: the class's MAR share, its share at the grid ends, the target, and
+    the offset at which the corrected marginal reaches the target.
 
-    Collapses the `joint_anchor_perturbed` rows to `[low, high]` over the
-    perturbations, paired with the unperturbed `joint_anchor` `t = 1` share.
+    `target_in_grid` says whether that offset lies within `[min(grid), max(grid)]`,
+    so a reader can see whether the published band contains the external bound.
+    Eras absent from `target_by_era` are skipped.
     """
-    anchored = (
-        ribbon.filter(
-            (pl.col("sweep_kind") == SWEEP_JOINT_ANCHOR)
-            & (pl.col("t") == JOINT_ANCHOR_T)
+    grid_low, grid_high = float(min(grid)), float(max(grid))
+    rows: list[dict[str, object]] = []
+    eras = sorted(
+        str(era) for era in export_df.select(era_column).unique().to_series().to_list()
+    )
+    for era in eras:
+        if era not in target_by_era:
+            continue
+        share, total = _class_share_and_total(
+            export_df.filter(pl.col(era_column) == era),
+            class_label=class_label,
+            class_column=class_column,
+            share_column=share_column,
+            event_column=event_column,
         )
-        .group_by("era_bucket", "class_label")
-        .agg(pl.col("marginal_share").first().alias("anchor_share"))
-    )
-    perturbed = (
-        ribbon.filter(pl.col("sweep_kind") == SWEEP_JOINT_ANCHOR_PERTURBED)
-        .group_by("era_bucket", "class_label")
-        .agg(
-            pl.col("marginal_share").min().alias("share_low"),
-            pl.col("marginal_share").max().alias("share_high"),
+        target = float(target_by_era[era])
+        delta = _offset_reaching_share(share, total, target)
+        rows.append(
+            {
+                "era_bucket": era,
+                "class_label": class_label,
+                "baseline_share": _single_class_marginal(share, total, 0.0),
+                "grid_low_delta": grid_low,
+                "grid_low_share": _single_class_marginal(share, total, grid_low),
+                "grid_high_delta": grid_high,
+                "grid_high_share": _single_class_marginal(share, total, grid_high),
+                "target_share": target,
+                "delta_at_target": delta,
+                "target_in_grid": delta is not None and grid_low <= delta <= grid_high,
+            }
         )
-    )
-    return anchored.join(perturbed, on=["era_bucket", "class_label"], how="left").sort(
-        "era_bucket", "class_label"
-    )
+    return pl.DataFrame(rows, schema=_BOUND_OFFSET_SCHEMA).sort("era_bucket")

@@ -78,3 +78,34 @@ def test_resolve_global_published_root_honors_env(tmp_path: Path) -> None:
         _, global_ = config.resolve_published_roots()
     assert resolved == target
     assert global_ == target
+
+
+def test_resolve_artifact_root_defaults_to_checkout() -> None:
+    with _temporary_env({config.ENV_ARTIFACTS_ROOT: None}):
+        assert config.resolve_artifact_root() == config.ARTIFACT_ROOT
+
+
+def test_artifact_root_env_drives_global_published_root(tmp_path: Path) -> None:
+    canonical = tmp_path / "canonical"
+    with _temporary_env(
+        {
+            config.ENV_ARTIFACTS_ROOT: str(canonical),
+            config.ENV_GLOBAL_PUBLISHED_ROOT: None,
+            config.ENV_PUBLISHED_ROOT: None,
+        }
+    ):
+        assert config.resolve_artifact_root() == canonical
+        branch, global_ = config.resolve_published_roots()
+    assert global_ == canonical / "published"
+    assert branch == canonical / "published"
+
+
+def test_explicit_global_root_wins_over_artifact_root(tmp_path: Path) -> None:
+    with _temporary_env(
+        {
+            config.ENV_ARTIFACTS_ROOT: str(tmp_path / "canonical"),
+            config.ENV_GLOBAL_PUBLISHED_ROOT: str(tmp_path / "explicit"),
+        }
+    ):
+        _, global_ = config.resolve_published_roots()
+    assert global_ == tmp_path / "explicit"

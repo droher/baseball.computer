@@ -35,6 +35,18 @@ DATA_PATH = BC_DIR / DATA_DIR_NAME
 DATA_VERSION_FILE = BC_DIR / "data_version.txt"
 
 PUBLISH_SCHEMAS = ("main_models", "main_seeds")
+ESTIMATED_ROW_COUNT_FLOORS: dict[str, int] = {
+    "scorer_observation_propensities": 100_000,
+    "imputed_ball_handler_probabilities": 100_000,
+    "imputed_batted_ball_geometry": 100_000,
+    "imputed_fielding_credit": 100_000,
+    "park_factor_summary": 500,
+    "run_expectancy_summary": 1_000,
+    "pitch_summary_distribution": 1_000,
+    "state_transition_summary": 10_000,
+    "linear_weights_estimated": 1_000,
+    "assist_count_distribution": 100,
+}
 COMPRESSION = "zstd"
 ROW_GROUP_SIZE = "1966080"
 KEEP_LAST_N_SNAPSHOTS = 5
@@ -114,6 +126,48 @@ def select_with_enum_casts(cols: list[tuple[str, str]]) -> str:
         else:
             parts.append(quoted)
     return ", ".join(parts)
+
+
+def table_row_count(
+    con: duckdb.DuckDBPyConnection, catalog: str, schema: str, table: str
+) -> int:
+    row = con.execute(
+        f'SELECT COUNT(*) FROM "{catalog}"."{schema}"."{table}"'
+    ).fetchone()
+    if row is None:
+        return 0
+    count: object = row[0]
+    return int(str(count))
+
+
+def assert_estimated_tables_populated(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    catalog: str = "bc",
+    floors: dict[str, int] = ESTIMATED_ROW_COUNT_FLOORS,
+) -> dict[str, int]:
+    """Refuse to publish estimated tables that fell back to their empty frame.
+
+    Mirrors the ``min_row_count`` audit each of these ``@model``s declares;
+    a build whose published pointers did not resolve yields zero rows, and
+    this is the last stop before those rows reach R2.
+    """
+    counts: dict[str, int] = {}
+    short: list[str] = []
+    for table, floor in floors.items():
+        count = table_row_count(con, catalog, "main_models", table)
+        counts[table] = count
+        _log.info("main_models.%s rows=%d floor=%d", table, count, floor)
+        if count < floor:
+            short.append(f"main_models.{table}: {count} rows < {floor}")
+    if short:
+        listing = "\n  ".join(short)
+        raise SystemExit(
+            "estimated tables below their row-count floor; refusing to publish."
+            + " Check that BC_STATS_ARTIFACTS_ROOT resolved the published pointers"
+            + f" before the SQLMesh plan.\n  {listing}"
+        )
+    return counts
 
 
 def attach_catalog(con: duckdb.DuckDBPyConnection, *, read_only: bool = False) -> None:
@@ -256,6 +310,7 @@ def publish() -> None:
         # logical size (drops and overwrites accumulate stale pages until
         # checkpoint).
         _ = con.execute("CHECKPOINT")
+        _ = assert_estimated_tables_populated(con)
         attach_catalog(con)
         set_catalog_options(con)
 

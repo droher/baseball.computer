@@ -12,7 +12,6 @@ shares in the intended direction, never that the corrected fit wins
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 from collections.abc import Mapping
@@ -456,40 +455,50 @@ def test_assert_export_covers_masked_slice() -> None:
         assert_export_covers_masked_slice(export, masked_event_keys={1, 2})
 
 
-def test_generate_mask_default_design_regression_snapshot() -> None:
+def test_generate_mask_default_design_summary_is_self_consistent() -> None:
     universe = _mask_universe()
+    config = MaskConfig()
     result = generate_mask(universe, variant=GEOMETRY_VARIANT, seed=3)
+    summary = result.summary
+    labels = np.asarray(universe.get_column(TRUE_LABEL_COLUMN).to_list())
+    masked = result.masked
+    maskable = ~result.holdout
+    focal = GEOMETRY_VARIANT.focal_class
 
-    assert int(result.masked.sum()) == 3679
-    assert (
-        hashlib.sha256(result.masked.tobytes()).hexdigest()
-        == "517e3a7e177fc776e334f490d5a1a5d4bade39eed0781a4b6556d7c435369c29"
+    assert summary["design"] == config.design == "w_class_intensity"
+    assert summary["intensity_tiers"] == list(config.intensity_tiers)
+    assert summary["n_rows"] == universe.height
+    assert summary["n_holdout_rows"] == int(result.holdout.sum())
+    assert summary["n_maskable_rows"] == int(maskable.sum())
+    assert summary["n_masked_rows"] == int(masked.sum())
+    assert not masked[result.holdout].any()
+    assert summary["overall_masked_share"] == pytest.approx(
+        float(masked[maskable].mean())
     )
-    assert (
-        hashlib.sha256(result.holdout.tobytes()).hexdigest()
-        == "b655db1b915ca7fea7c103dd2fa3a9c1f8acceb76972ffb4f59eb1cbeeea4601"
+    for label in TRAJECTORY_LABELS:
+        rows = maskable & (labels == label)
+        assert summary["masked_share_by_class"][label] == pytest.approx(
+            float(masked[rows].mean())
+        )
+    observed = maskable & ~masked
+    assert summary["observed_focal_share"] == pytest.approx(
+        float(np.mean(labels[observed] == focal))
     )
-    assert result.summary["overall_masked_share"] == pytest.approx(0.6812962962962963)
-    assert result.summary["observed_focal_share"] == pytest.approx(0.3957001743172574)
-    assert result.summary["masked_share_by_class"] == pytest.approx(
-        {
-            "Fly": 0.6228338430173292,
-            "GroundBall": 0.7321007081038552,
-            "LineDrive": 0.643796992481203,
-            "PopUp": 0.6340579710144928,
-            "Bunt": 0.6590038314176245,
-        }
+    assert summary["class_mask_probabilities"] == calibrate_class_mask_probabilities(
+        labels[maskable],
+        focal_class=focal,
+        class_labels=GEOMETRY_VARIANT.class_labels,
+        config=config,
     )
-    assert result.summary["class_mask_probabilities"] == pytest.approx(
-        {
-            "Fly": 0.6519706088173546,
-            "GroundBall": 0.754,
-            "LineDrive": 0.6519706088173546,
-            "PopUp": 0.6519706088173546,
-            "Bunt": 0.6519706088173546,
-        }
+    probabilities = summary["class_mask_probabilities"]
+    non_focal = {probabilities[c] for c in TRAJECTORY_LABELS if c != focal}
+    assert len(non_focal) == 1
+    assert probabilities[focal] > next(iter(non_focal))
+    assert all(
+        summary["masked_share_by_class"][focal] > summary["masked_share_by_class"][c]
+        for c in TRAJECTORY_LABELS
+        if c != focal
     )
-    assert result.summary["design"] == "w_class_intensity"
 
 
 def _mask_universe_with_covariate(

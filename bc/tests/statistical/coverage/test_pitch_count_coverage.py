@@ -21,6 +21,7 @@ import pytest
 from python_models.statistical import config as cfg
 from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from python_models.statistical.bayes.manifest_ingest import (
+    METHOD_HIERARCHICAL_LOGISTIC,
     PROPENSITY_SCHEMA,
     aggregate_observation_propensity_frames,
     aggregate_pitch_coverage_frames,
@@ -148,6 +149,7 @@ def test_yields_published_pitch_coverage_frame(
     ):
         assert frame.get_column(_contract_col).null_count() == 0
     assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
+    assert set(frame.get_column("method").unique().to_list()) == {METHOD_HIERARCHICAL_LOGISTIC}
     assert set(frame.get_column("dimension").unique().to_list()) == {"has_count"}
 
 

@@ -20,6 +20,7 @@ import pytest
 from python_models.statistical import config as cfg
 from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from python_models.statistical.bayes.manifest_ingest import (
+    METHOD_HIERARCHICAL_BAYES_SOFTMAX,
     GEOMETRY_SCHEMA,
     aggregate_geometry_frames,
     iterate_published_ball_handler_frames,
@@ -162,6 +163,7 @@ def test_yields_per_target_frame_with_dimension_and_artifact_id(
     ):
         assert frame.get_column(_contract_col).null_count() == 0
     assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
+    assert set(frame.get_column("method").unique().to_list()) == {METHOD_HIERARCHICAL_BAYES_SOFTMAX}
     assert set(frame.get_column("class_label").unique().to_list()) == set(CLASS_LABELS)
     per_event = frame.group_by("event_key", "geometry_dimension").agg(
         pl.col("expected_share").sum().alias("total")

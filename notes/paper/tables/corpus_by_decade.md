@@ -1,4 +1,4 @@
-Count of games by primary source type (play-by-play, box score, or gamelog), grouped by decade, from `main_models.game_start_info`.
+Count of games by primary source type (play-by-play, box score, or gamelog), grouped by decade, from `main_models.game_start_info`. Re-run 2026-09-04; unchanged by the refits, which touch only the estimated tables.
 
 | decade | box_score_games | gamelog_games | play_by_play_games |
 |-------:|-----------------:|---------------:|--------------------:|

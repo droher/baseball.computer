@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import importlib
 import os
-
-_ = os.environ.setdefault("KERAS_BACKEND", "torch")
+from types import ModuleType
 
 import polars as pl
 import pytest
@@ -17,10 +17,15 @@ from python_models.statistical.deep.targets.geometry import (
     LOW_CARD_COLUMNS as GEOMETRY_LOW_CARD,
     NUMERIC_COLUMNS as GEOMETRY_NUMERIC,
 )
-from python_models.statistical.deep.pretrain.training import (
-    _collect_input_stats,
-    _encode_inputs,
-)
+
+
+@pytest.fixture
+def pretrain_training(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    if "KERAS_BACKEND" not in os.environ:
+        monkeypatch.setenv("KERAS_BACKEND", "torch")
+    return importlib.import_module(
+        "python_models.statistical.deep.pretrain.training"
+    )
 
 
 COUNT_COLS = ("count_balls", "count_strikes")
@@ -62,15 +67,21 @@ def _synth_frame() -> pl.DataFrame:
     return pl.DataFrame(cols)
 
 
-def test_null_count_encodes_to_oov_distinct_from_zero() -> None:
+def test_null_count_encodes_to_oov_distinct_from_zero(
+    pretrain_training: ModuleType,
+) -> None:
     df = _synth_frame()
-    vocabularies, _means, _vars = _collect_input_stats(df, layout=EVENT_UNIVERSE_LAYOUT)
+    vocabularies, _means, _vars = pretrain_training._collect_input_stats(
+        df, layout=EVENT_UNIVERSE_LAYOUT
+    )
 
     bal_vocab = vocabularies["count_balls"]
     assert "0" in bal_vocab.values
     assert "" not in bal_vocab.values
 
-    encoded = _encode_inputs(df, layout=EVENT_UNIVERSE_LAYOUT, vocabularies=vocabularies)
+    encoded = pretrain_training._encode_inputs(
+        df, layout=EVENT_UNIVERSE_LAYOUT, vocabularies=vocabularies
+    )
     bal_codes = encoded["count_balls"].reshape(-1).tolist()
     str_codes = encoded["count_strikes"].reshape(-1).tolist()
 

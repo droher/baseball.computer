@@ -11,9 +11,44 @@ import polars as pl
 import pytest
 
 from python_models.statistical.bayes.dl_covariate import (
-    compute_dl_logits,
+    center_dl_log_probs,
     compute_dl_log_probs_per_class,
+    compute_dl_log_probs_per_class_with_mask,
+    compute_dl_logits,
 )
+
+
+def test_with_mask_marks_null_and_empty_rows_absent() -> None:
+    rows: list[list[float] | None] = [[0.7, 0.2, 0.1], None, [], [0.2, 0.3, 0.5]]
+    df = _frame(rows)
+    log_probs, present = compute_dl_log_probs_per_class_with_mask(df, n_classes=3)
+    assert present.dtype == np.bool_
+    assert present.tolist() == [True, False, False, True]
+    assert np.all(log_probs[~present] == 0.0)
+    assert np.all(log_probs[present] < 0.0)
+    np.testing.assert_array_equal(
+        log_probs, compute_dl_log_probs_per_class(df, n_classes=3)
+    )
+
+
+def test_center_keeps_absent_rows_exactly_zero_and_centers_present_rows() -> None:
+    rows: list[list[float] | None] = [[0.7, 0.2, 0.1], None, [0.2, 0.3, 0.5]]
+    df = _frame(rows)
+    log_probs, present = compute_dl_log_probs_per_class_with_mask(df, n_classes=3)
+    means = np.array([-1.0, 0.5, -2.0])
+    centered = center_dl_log_probs(log_probs, present, means)
+    assert centered.shape == log_probs.shape
+    assert np.all(centered[~present] == 0.0)
+    np.testing.assert_allclose(centered[present], log_probs[present] - means[None, :])
+
+
+def test_center_rejects_mismatched_shapes() -> None:
+    log_probs = np.zeros((2, 3))
+    present = np.ones(2, dtype=np.bool_)
+    with pytest.raises(ValueError):
+        _ = center_dl_log_probs(log_probs, present, np.zeros(2))
+    with pytest.raises(ValueError):
+        _ = center_dl_log_probs(log_probs, np.ones(3, dtype=np.bool_), np.zeros(3))
 
 
 def _frame(rows: list[list[float] | None]) -> pl.DataFrame:

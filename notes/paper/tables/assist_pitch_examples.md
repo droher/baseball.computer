@@ -2,7 +2,7 @@
 
 ## (a) `assist_count_distribution`: bases-empty vs. runner-on-first double-play cell
 
-Comparing a routine bases-empty groundout to a runner-on-first/0-out ball-in-play out shows multi-assist mass jumping from 0.8% to 36.6%, consistent with the double-play states carrying the model's multi-assist probability.
+Comparing a routine bases-empty groundout to a runner-on-first/0-out ball-in-play out shows multi-assist mass jumping from 0.8% to 36.6%, consistent with the double-play states carrying the model's multi-assist probability (`assist-count-v1`, not refit in this revision).
 
 | result_family | base_state_start | outs_start | assist_count_class | prob_mean |
 | --- | ---: | ---: | --- | ---: |
@@ -17,7 +17,7 @@ Comparing a routine bases-empty groundout to a runner-on-first/0-out ball-in-pla
 
 ## (b) `pitch_summary_distribution`: strikeouts, 2015 NL (all 12 final-count classes)
 
-Every strikeout ends on two strikes: the eight non-two-strike classes carry zero posterior mass, recovering the structural constraint without hard-coding it.
+Every strikeout ends on two strikes: the eight non-two-strike classes carry exactly zero posterior mass because the per-family structural mask of the refit (`ps-cut1-full-v7`) pins them. The four two-strike shares are unchanged to three decimals from the previously published fit, which had no mask and carried up to 0.06 of strikeout mass on fewer-than-two-strike counts in some season-leagues.
 
 | final_count_class | balls | strikes | prob_mean |
 | --- | ---: | ---: | ---: |

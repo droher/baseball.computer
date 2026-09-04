@@ -20,6 +20,7 @@ import pytest
 from python_models.statistical import config as cfg
 from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from python_models.statistical.bayes.manifest_ingest import (
+    METHOD_HIERARCHICAL_BAYES_SOFTMAX,
     ADVANCEMENT_SCHEMA,
     aggregate_advancement_frames,
     empty_advancement_frame,
@@ -36,6 +37,7 @@ def _write_advancement_artifact_with_pointer(
     *,
     tmp_path: Path,
     artifact_id: str,
+    share_scale: float = 1.0,
 ) -> Path:
     from python_models.statistical.bayes.artifacts import bayes_artifact_dir
     from python_models.statistical.manifests import (
@@ -68,7 +70,8 @@ def _write_advancement_artifact_with_pointer(
             advancement_class.append(label)
     n_row = len(event_key)
     rng = np.random.default_rng(0)
-    shares = rng.uniform(0.05, 0.3, size=n_row).astype(np.float64)
+    raw = rng.uniform(0.05, 0.3, size=(len(EVENT_KEYS), len(class_labels)))
+    shares = (share_scale * raw / raw.sum(axis=1, keepdims=True)).reshape(-1)
     pl.DataFrame(
         {
             "event_key": pl.Series("event_key", event_key, dtype=pl.Int64),
@@ -164,8 +167,24 @@ def test_yields_published_frame_with_artifact_id_and_unique_grain(
     ):
         assert frame.get_column(_contract_col).null_count() == 0
     assert set(frame.get_column("observed_status").unique().to_list()) == {"estimated"}
+    assert set(frame.get_column("method").unique().to_list()) == {METHOD_HIERARCHICAL_BAYES_SOFTMAX}
     grain = frame.select("event_key", "baserunner", "advancement_class")
     assert grain.n_unique() == frame.height
+    per_grain = frame.group_by("event_key", "baserunner").agg(
+        pl.col("expected_share").sum().alias("total")
+    )
+    np.testing.assert_allclose(per_grain.get_column("total").to_numpy(), 1.0, atol=1e-9)
     assert set(frame.get_column("advancement_class").unique().to_list()) == set(
         ADVANCEMENT_CLASS_LABELS
     )
+
+
+def test_export_whose_grains_do_not_sum_to_one_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published_root = _write_advancement_artifact_with_pointer(
+        tmp_path=tmp_path, artifact_id="adv-bad", share_scale=2.0
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    with pytest.raises(ValueError, match="do not sum to 1"):
+        _ = list(aggregate_advancement_frames())

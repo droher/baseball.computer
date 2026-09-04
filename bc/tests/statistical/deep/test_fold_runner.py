@@ -9,8 +9,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-os.environ.setdefault("KERAS_BACKEND", "torch")
-
 import numpy as np
 import polars as pl
 import pytest
@@ -22,6 +20,12 @@ from python_models.statistical.splits import game_hash_fold
 
 
 pytestmark = pytest.mark.slow
+
+
+@pytest.fixture(autouse=True)
+def keras_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    if "KERAS_BACKEND" not in os.environ:
+        monkeypatch.setenv("KERAS_BACKEND", "torch")
 
 N_ROWS: int = 600
 N_GAMES: int = 30

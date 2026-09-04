@@ -26,8 +26,9 @@ normality of the two equations' errors, or an exclusion restriction that moves
 selection without moving the outcome. Our record offers no credible exclusion
 restriction — no covariate moves a 1930s scorer's recording behavior without
 also proxying the play itself — and we decline the distributional route: δ_c is
-treated as unidentified from the observed slice, estimated only where an
-external partial-truth anchor exists, and otherwise swept, not solved for.
+treated as unidentified from the observed slice, bounded from below where a
+partial-truth slice internal to the record supplies a floor, and otherwise
+swept, not solved for.
 
 That sweep places the paper in the second tradition: pattern-mixture models and
 delta-adjustment sensitivity analysis. Little (1993) specified the distribution
@@ -48,12 +49,13 @@ and Carpenter (2020) give the current practical guide to controlled multiple
 imputation in this style. The published object of §5 is this device
 transplanted: δ_c is a delta adjustment on the class logits, the
 missing-at-random fit is the δ = 0 point, and the ribbon is the tipping-point
-trajectory, reported per class and jointly along an anchored direction. What
-the paper adds to the template is the anchor itself — a deduced-trajectory
-partial-truth slice internal to the record that yields a per-era estimate of
-δ_c, so the sweep is centered by evidence rather than convention — and the
-masked backtests that test the offset's functional form against selection
-processes it does not nest. The structure of the treatment — a selection-model
+trajectory, reported per class. What the paper adds to the template is a hard
+constraint on the sweep — a deduced-trajectory partial-truth slice internal to
+the record that places a floor under one class's share on the missing stratum,
+and a known-truth subslice on which the missing-at-random fit can be scored —
+and a masked backtest that tests the offset's functional form against a
+selection process it does not nest. An earlier revision read the same slice as
+an estimate of δ_c; §5 explains why it is a floor and not an estimate. The structure of the treatment — a selection-model
 parameterization with pattern-mixture-style sensitivity reporting — reflects
 the standard observation that the two factorizations describe the same joint
 distribution and can be mixed rather than chosen between.

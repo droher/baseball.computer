@@ -45,6 +45,7 @@ _AUDITS = [
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
     ("estimated_contract_complete", {}),
+    ("min_row_count", {"threshold": 100000}),
 ]
 
 
@@ -89,6 +90,8 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
     from python_models.statistical.bayes.manifest_ingest import (
         ESTIMATED_CONTRACT_SCHEMA,
         aggregate_ball_handler_frames,
+        query_ball_handler_personnel,
+        stamp_ball_handler_personnel,
     )
 
     log = logging.getLogger(__name__)
@@ -106,27 +109,13 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
         event_keys_df = (
             handler_frame.get_column("event_key").unique().cast(pl.UInt32).to_frame()
         )
-        cursor.register("event_keys_tbl", event_keys_df)
-        try:
-            personnel = cursor.sql(
-                f"""
-                SELECT
-                    epl.event_key::UINTEGER AS event_key,
-                    pfs.fielding_position::UTINYINT AS fielding_position,
-                    pfs.player_id::VARCHAR AS player_id
-                FROM {epl_table} AS epl
-                INNER JOIN {pfs_table} AS pfs
-                    ON pfs.game_id = epl.game_id
-                    AND pfs.personnel_fielding_key = epl.personnel_fielding_key
-                WHERE epl.event_key IN (SELECT event_key FROM event_keys_tbl)
-                    AND pfs.fielding_position BETWEEN 1 AND 9
-                """
-            ).pl()
-        finally:
-            cursor.unregister("event_keys_tbl")
-        joined = handler_frame.join(
-            personnel, on=["event_key", "fielding_position"], how="inner"
-        ).select(
+        personnel = query_ball_handler_personnel(
+            cursor,
+            epl_table=epl_table,
+            pfs_table=pfs_table,
+            event_keys=event_keys_df,
+        )
+        joined = stamp_ball_handler_personnel(handler_frame, personnel).select(
             [
                 pl.col("event_key").cast(pl.UInt32),
                 pl.col("player_id").cast(pl.Utf8),

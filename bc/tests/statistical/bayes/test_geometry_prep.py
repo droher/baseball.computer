@@ -14,7 +14,10 @@ import polars as pl
 import pytest
 
 from python_models.statistical import config as cfg
-from python_models.statistical.bayes.dl_covariate import compute_dl_log_probs_per_class
+from python_models.statistical.bayes.dl_covariate import (
+    center_dl_log_probs,
+    compute_dl_log_probs_per_class_with_mask,
+)
 from python_models.statistical.deep.targets.geometry import (
     GEOMETRY_SPECS as DEEP_GEOMETRY_SPECS,
 )
@@ -24,6 +27,9 @@ from python_models.statistical.models._geometry_data import (
     GEOMETRY_DIMENSIONS,
     HOLDOUT_FOLD_COUNT,
     HOLDOUT_FOLD_ID,
+    PRODUCTION_DL_NULL_RATE_CEILING,
+    GeometryInputs,
+    _assert_dl_covariate_informative_on_production,
     _handler_z_with_frozen_stats,
     _standardized_handler_logit,
     build_geometry_production_frame,
@@ -176,6 +182,8 @@ def _trajectory_dataset(
     n_production_events: int = 0,
     production_result_family_rate: float = 1.0,
     with_dl: bool = False,
+    dl_rate: float = 1.0,
+    production_dl_rate: float = 1.0,
     seed: int = 20260525,
 ) -> Path:
     rng = np.random.default_rng(seed)
@@ -188,7 +196,7 @@ def _trajectory_dataset(
             eid = 100_000 + g * events_per_game + e
             label_idx = int(rng.choice(k, p=weights))
             dl_p = None
-            if with_dl:
+            if with_dl and rng.random() < dl_rate:
                 logits = rng.normal(size=k)
                 exp = np.exp(logits - logits.max())
                 dl_p = (exp / exp.sum()).tolist()
@@ -207,7 +215,7 @@ def _trajectory_dataset(
         eid = 900_000 + i
         keep = rng.random() < production_result_family_rate
         dl_p = None
-        if with_dl:
+        if with_dl and rng.random() < production_dl_rate:
             logits = rng.normal(size=k)
             exp = np.exp(logits - logits.max())
             dl_p = (exp / exp.sum()).tolist()
@@ -325,8 +333,7 @@ def test_held_out_truth_is_zero_based_class(tmp_path: Path) -> None:
         min_events_per_season=1,
     )
     held = inputs.held_out
-    if held.n_events == 0:
-        pytest.skip("no holdout events in this fixture")
+    assert held.n_events > 0
     assert held.true_position.min() >= 0
     assert held.true_position.max() < inputs.n_classes
     assert (held.U == 1).all()
@@ -483,8 +490,7 @@ def test_held_out_dl_logit_shape_and_row_alignment(
         min_events_per_season=1,
     )
     held = inputs.held_out
-    if held.n_events == 0:
-        pytest.skip("no holdout events in this fixture")
+    assert held.n_events > 0
     assert inputs.held_out_dl_logit_per_class.shape == (
         held.n_events,
         inputs.n_classes,
@@ -521,8 +527,7 @@ def test_held_out_dl_logit_zero_when_dl_p_class_null(tmp_path: Path) -> None:
         min_events_per_season=1,
     )
     held = inputs.held_out
-    if held.n_events == 0:
-        pytest.skip("no holdout events in this fixture")
+    assert held.n_events > 0
     assert inputs.held_out_dl_logit_per_class.shape == (
         held.n_events,
         inputs.n_classes,
@@ -649,6 +654,15 @@ def test_production_frame_dl_logit_centered_by_training_means(
         dl_logit_class_means=inputs.dl_logit_class_means,
     )
     assert frame.n_events > 0
+    raw, present = _production_dl_log_probs(dataset_path, n_classes=inputs.n_classes)
+    assert present.all()
+    expected = raw - inputs.dl_logit_class_means[None, :]
+    assert np.allclose(frame.dl_logit_per_class, expected)
+
+
+def _production_dl_log_probs(
+    dataset_path: Path, *, n_classes: int
+) -> tuple[np.ndarray, np.ndarray]:
     per_event = (
         pl.scan_parquet(dataset_path)
         .filter(
@@ -660,9 +674,279 @@ def test_production_frame_dl_logit_centered_by_training_means(
         .sort("event_key")
         .collect()
     )
-    raw = compute_dl_log_probs_per_class(per_event, n_classes=inputs.n_classes)
-    expected = raw - inputs.dl_logit_class_means[None, :]
-    assert np.allclose(frame.dl_logit_per_class, expected)
+    return compute_dl_log_probs_per_class_with_mask(per_event, n_classes=n_classes)
+
+
+def _inputs_with_nonzero_dl_means(
+    tmp_path: Path, deep_root: Path, *, production_dl_rate: float
+) -> tuple[Path, GeometryInputs]:
+    dataset_path = _trajectory_dataset(
+        tmp_path,
+        n_production_events=200,
+        production_result_family_rate=1.0,
+        with_dl=True,
+        production_dl_rate=production_dl_rate,
+    )
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
+    )
+    inputs = prepare_geometry_inputs(
+        dataset_path,
+        dimension="trajectory",
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    assert not np.allclose(inputs.dl_logit_class_means, 0.0)
+    return dataset_path, inputs
+
+
+def test_production_frame_null_dl_rows_are_exactly_zero_under_zero_flavor(
+    tmp_path: Path, deep_root: Path
+) -> None:
+    dataset_path, inputs = _inputs_with_nonzero_dl_means(
+        tmp_path, deep_root, production_dl_rate=0.0
+    )
+    frame = build_geometry_production_frame(
+        dataset_path,
+        dimension="trajectory",
+        fixed_effects=inputs.fixed_effects,
+        n_classes=inputs.n_classes,
+        dl_logit_class_means=inputs.dl_logit_class_means,
+        gamma_dl_active=False,
+    )
+    assert frame.n_events > 0
+    assert np.all(frame.dl_logit_per_class == 0.0)
+
+
+def test_production_frame_mixes_zero_null_rows_with_centered_present_rows(
+    tmp_path: Path, deep_root: Path
+) -> None:
+    dataset_path, inputs = _inputs_with_nonzero_dl_means(
+        tmp_path, deep_root, production_dl_rate=0.99
+    )
+    frame = build_geometry_production_frame(
+        dataset_path,
+        dimension="trajectory",
+        fixed_effects=inputs.fixed_effects,
+        n_classes=inputs.n_classes,
+        dl_logit_class_means=inputs.dl_logit_class_means,
+        gamma_dl_active=True,
+    )
+    raw, present = _production_dl_log_probs(dataset_path, n_classes=inputs.n_classes)
+    assert present.any() and not present.all()
+    assert np.all(frame.dl_logit_per_class[~present] == 0.0)
+    expected_present = raw[present] - inputs.dl_logit_class_means[None, :]
+    assert np.allclose(frame.dl_logit_per_class[present], expected_present)
+    assert np.allclose(
+        frame.dl_logit_per_class,
+        center_dl_log_probs(raw, present, inputs.dl_logit_class_means),
+    )
+
+
+def test_all_null_production_dl_raises_under_active_gamma_only(
+    tmp_path: Path, deep_root: Path
+) -> None:
+    dataset_path, inputs = _inputs_with_nonzero_dl_means(
+        tmp_path, deep_root, production_dl_rate=0.0
+    )
+    with pytest.raises(ValueError, match="gamma_dl_zero"):
+        _ = build_geometry_production_frame(
+            dataset_path,
+            dimension="trajectory",
+            fixed_effects=inputs.fixed_effects,
+            n_classes=inputs.n_classes,
+            dl_logit_class_means=inputs.dl_logit_class_means,
+            gamma_dl_active=True,
+        )
+    frame = build_geometry_production_frame(
+        dataset_path,
+        dimension="trajectory",
+        fixed_effects=inputs.fixed_effects,
+        n_classes=inputs.n_classes,
+        dl_logit_class_means=inputs.dl_logit_class_means,
+        gamma_dl_active=False,
+    )
+    assert frame.n_events > 0
+
+
+def test_null_rate_above_ceiling_raises_under_active_gamma(
+    tmp_path: Path, deep_root: Path
+) -> None:
+    dataset_path, inputs = _inputs_with_nonzero_dl_means(
+        tmp_path, deep_root, production_dl_rate=0.5
+    )
+    _, present = _production_dl_log_probs(dataset_path, n_classes=inputs.n_classes)
+    null_rate = float((~present).sum()) / float(present.shape[0])
+    assert null_rate > PRODUCTION_DL_NULL_RATE_CEILING
+    with pytest.raises(ValueError, match="gamma_dl_zero"):
+        _ = build_geometry_production_frame(
+            dataset_path,
+            dimension="trajectory",
+            fixed_effects=inputs.fixed_effects,
+            n_classes=inputs.n_classes,
+            dl_logit_class_means=inputs.dl_logit_class_means,
+            gamma_dl_active=True,
+        )
+    frame = build_geometry_production_frame(
+        dataset_path,
+        dimension="trajectory",
+        fixed_effects=inputs.fixed_effects,
+        n_classes=inputs.n_classes,
+        dl_logit_class_means=inputs.dl_logit_class_means,
+        gamma_dl_active=False,
+    )
+    assert frame.n_events > 0
+
+
+@pytest.mark.parametrize("gamma_dl_active", [True, False])
+def test_null_rate_guard_is_inert_when_gamma_is_off_or_target_is_empty(
+    gamma_dl_active: bool,
+) -> None:
+    _assert_dl_covariate_informative_on_production(
+        null_rate=1.0,
+        n_production=0 if gamma_dl_active else 10,
+        dimension="trajectory",
+        gamma_dl_active=gamma_dl_active,
+    )
+
+
+@pytest.mark.parametrize("ceiling", [0.0, 0.02, PRODUCTION_DL_NULL_RATE_CEILING, 0.5])
+def test_null_rate_guard_raises_just_above_and_passes_at_and_below_the_ceiling(
+    ceiling: float, caplog: pytest.LogCaptureFixture
+) -> None:
+    epsilon = 1e-9
+    logger_name = "python_models.statistical.models._geometry_data"
+    with pytest.raises(ValueError, match=f"{ceiling}"):
+        _assert_dl_covariate_informative_on_production(
+            null_rate=ceiling + epsilon,
+            n_production=10,
+            dimension="trajectory",
+            gamma_dl_active=True,
+            max_null_rate=ceiling,
+        )
+    with pytest.raises(ValueError):
+        _assert_dl_covariate_informative_on_production(
+            null_rate=1.0,
+            n_production=10,
+            dimension="trajectory",
+            gamma_dl_active=True,
+            max_null_rate=ceiling,
+        )
+    for rate in (ceiling, max(ceiling - epsilon, 0.0), 0.0):
+        with caplog.at_level(logging.WARNING, logger=logger_name):
+            _assert_dl_covariate_informative_on_production(
+                null_rate=rate,
+                n_production=10,
+                dimension="trajectory",
+                gamma_dl_active=True,
+                max_null_rate=ceiling,
+            )
+        warned = any("DL covariate is NULL" in r.getMessage() for r in caplog.records)
+        assert warned == (rate > 0.0)
+        caplog.clear()
+
+
+def test_default_ceiling_is_a_fraction_strictly_between_zero_and_one() -> None:
+    assert 0.0 < PRODUCTION_DL_NULL_RATE_CEILING < 1.0
+
+
+def test_partial_null_production_dl_below_ceiling_warns_under_active_gamma(
+    tmp_path: Path, deep_root: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    dataset_path, inputs = _inputs_with_nonzero_dl_means(
+        tmp_path, deep_root, production_dl_rate=0.99
+    )
+    _, present = _production_dl_log_probs(dataset_path, n_classes=inputs.n_classes)
+    expected_rate = float((~present).sum()) / float(present.shape[0])
+    assert 0.0 < expected_rate <= PRODUCTION_DL_NULL_RATE_CEILING
+    logger_name = "python_models.statistical.models._geometry_data"
+    with caplog.at_level(logging.WARNING, logger=logger_name):
+        frame = build_geometry_production_frame(
+            dataset_path,
+            dimension="trajectory",
+            fixed_effects=inputs.fixed_effects,
+            n_classes=inputs.n_classes,
+            dl_logit_class_means=inputs.dl_logit_class_means,
+            gamma_dl_active=True,
+        )
+    assert frame.n_events > 0
+    warnings = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "DL covariate is NULL" in r.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert f"{expected_rate:.4f}" in warnings[0].getMessage()
+
+
+def test_dl_null_rate_logged_on_training_held_out_and_production(
+    tmp_path: Path, deep_root: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    dataset_path = _trajectory_dataset(
+        tmp_path,
+        n_production_events=50,
+        with_dl=True,
+        dl_rate=0.5,
+        production_dl_rate=0.5,
+    )
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
+    )
+    logger_name = "python_models.statistical.models._geometry_data"
+    with caplog.at_level(logging.INFO, logger=logger_name):
+        inputs = prepare_geometry_inputs(
+            dataset_path, dimension="trajectory", min_events_per_season=1
+        )
+        assert inputs.held_out.n_events > 0
+        _ = build_geometry_production_frame(
+            dataset_path,
+            dimension="trajectory",
+            fixed_effects=inputs.fixed_effects,
+            n_classes=inputs.n_classes,
+            dl_logit_class_means=inputs.dl_logit_class_means,
+        )
+    contexts = [
+        r.getMessage().split(" slice ")[0].removeprefix("DL covariate null rate on ")
+        for r in caplog.records
+        if r.getMessage().startswith("DL covariate null rate on ")
+    ]
+    assert sorted(contexts) == ["held-out", "production", "training"]
+
+
+def test_training_dl_means_use_present_rows_only(
+    tmp_path: Path, deep_root: Path
+) -> None:
+    dataset_path = _trajectory_dataset(tmp_path, with_dl=True, dl_rate=0.5)
+    _ = _write_dl_artifact(
+        deep_root,
+        dimension="trajectory",
+        artifact_id="artifact-x",
+        labels=list(TRAJECTORY_LABELS),
+    )
+    inputs = prepare_geometry_inputs(
+        dataset_path,
+        dimension="trajectory",
+        min_events_per_season=1,
+        held_out_fold_count=999,
+    )
+    df = (
+        pl.read_parquet(dataset_path)
+        .filter(pl.col("event_key").is_in(inputs.event_keys.tolist()))
+        .sort("event_key")
+    )
+    raw, present = compute_dl_log_probs_per_class_with_mask(
+        df, n_classes=inputs.n_classes
+    )
+    assert present.any() and not present.all()
+    assert np.allclose(inputs.dl_logit_class_means, raw[present].mean(axis=0))
+    assert np.all(inputs.dl_logit_per_class[~present] == 0.0)
+    assert np.allclose(inputs.dl_logit_per_class[present].mean(axis=0), 0.0, atol=1e-9)
 
 
 def test_fixed_effect_columns_present_including_batter_hand(tmp_path: Path) -> None:

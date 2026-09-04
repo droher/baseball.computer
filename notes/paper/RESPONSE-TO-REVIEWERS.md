@@ -3,28 +3,27 @@ title: Response to reviewers — Estimating the Unrecorded Game
 type: design-doc
 status: draft
 audience: referee, editor, David
-last-verified: 2026-07-14
+last-verified: 2026-09-04
 ---
 
 # Response to reviewers
 
-The revision adds the inferential evidence the report found missing and reframes
-what the report found overstated. Concretely: a data-anchored MNAR offset
-estimator (`bc/python_models/statistical/mnar_anchor.py`) replaces the
-simulation-tuned δ grid; the marginal ribbon is superseded by a joint anchored
-sensitivity ribbon that ships in the body rather than being deferred; the single
-masked backtest becomes a four-design robustness study
-(`bc/python_models/statistical/backtests/mnar_masked.py`); linear-weights bands
-gain finite-sample Dirichlet propagation; held-out calibration (ECE) and
-posterior-predictive HDI coverage are wired into the acceptance gate and swept by
-`just validate-gates`; the `gamma_dl` counterfactual ablation was actually run —
-and it refuted the paper's own prior "<0.25 SD" claim for the trajectory
-dimension, which the text now reports honestly; and the related-work and
-statistical-vs-pipeline framing are rewritten. What was not done this round is
-stated plainly per point and collected at the end.
+This letter has two layers. The first revision (2026-07-14) answered the
+referee report with new modeling: a masked-backtest robustness study, held-out
+calibration and posterior-predictive coverage checks, finite-sample propagation
+in the linear-weights bands, and a counterfactual `gamma_dl` ablation. A
+subsequent internal modeling review (2026-09-03) found that several of the
+first revision's answers overstated what had been done — an MNAR "anchor" that
+was an identity of the observed slice, an ablation whose artifacts were not on
+disk, gate results quoted from smoke-budget runs without saying so, and three
+published location surfaces shifted by a missing covariate. The second revision
+corrects the code, refits the affected models, and rewrites the text; the
+refits completed and the tables were restated on 2026-09-04, and every number
+in the manuscript is read from the restated tables. Each response below says
+what the paper now claims and what was withdrawn.
 
 Each response names the module, script, table, or revised section that carries
-the change and the headline number where one exists.
+the change.
 
 ---
 
@@ -34,21 +33,25 @@ the change and the headline number where one exists.
 > calibration; there is no reliability diagram, ECE value, or posterior-predictive
 > check in the manuscript.
 
-**Response:** The primitives existed but were unread; the gate now consumes them.
-`validation/held_out_metrics.json` (written by the Bernoulli branch with
-`roc_auc` / `pr_auc` / `ece_held_out`) is now read by `validate.py` and
-`publication.py`, and equivalent held-out reliability/ECE computation was added to
-the multinomial branch (Models E, D, C). Model A's six Bernoulli propensity
-dimensions report held-out ECE ≤ 0.0179 (worst: trajectory 0.0179; best:
-location_edge 0.0054), well inside the 0.05 band (revised §7, §9). A new
-posterior-predictive HDI-coverage validator grades aggregate surfaces on held-out
-season folds: `state_transition` predictive coverage 0.9772 (in band),
-`run_expectancy` 0.8774 (below the 0.88 floor, fired at `warn`). The whole sweep
-runs read-only via `just validate-gates`; results are tabulated in
-`notes/paper/tables/validation_gates.md` (18/23 targets pass). The table also
-documents why raw parameter-HDI coverage collapses to ~0.21/0.32 on a dense
-corpus (the parameter interval of the mean is not meant to contain a
-finite-sample frequency) and why the predictive interval is the correct object.
+**Response:** Held-out expected calibration error is computed for every
+Bernoulli and multinomial target (`validation/held_out_metrics.json`, read by
+`validate.py`), and a posterior-predictive HDI-coverage validator
+(`hdi_coverage.py`) grades the two aggregate surfaces that have a coverage hook,
+`state_transition` and `run_expectancy`, on the held-out game fold. Both are
+reported in revised §7. Two things the first revision's letter implied are
+corrected. Neither check gates publication: ECE and predictive coverage are
+`warn`-only findings, and the paper now says so rather than calling them gates.
+And the paper no longer sells itself as "calibrated": the abstract and §1 say
+publication is gated on convergence and held-out predictive lift over a
+baseline, with calibration error and coverage reported as diagnostics. The
+previously published values (Model A ECE 0.0054–0.0179; predictive coverage
+0.9772 for transitions, 0.8774 for run expectancy, the latter below the 0.88
+floor) are quoted as the previous fits' numbers; the six propensity dimensions
+and both Model G surfaces were refit, the latter on a corrected population with
+a per-state dispersion, which the review traced part of the under-coverage to.
+The refit values are Model A ECE 0.0049–0.0181, predictive coverage 0.9780 for
+transitions and 0.9062 for run expectancy, both inside the band. Park factors have no coverage hook and
+the paper says so (§7, §11).
 
 ## M2. The MNAR conclusions rest on one self-designed masked backtest; robustness is absent.
 
@@ -56,21 +59,25 @@ finite-sample frequency) and why the predictive interval is the correct object.
 > masking design the authors chose; the sign-flip and ribbon coverage may be
 > artifacts of that one mechanism.
 
-**Response:** The harness (`backtests/mnar_masked.py`, `MaskConfig`) now carries
-four registered designs, and the oracle-offset arm was run against all four at the
-smoke budget (`notes/paper/tables/mnar_backtest_robustness.md`). The relative
-focal-error reductions are 0.995 (`w_class_intensity`, the original per-class
-form), 0.958 (`era_graded` — class-marginal selection graded by season), 0.537
-(`covariate_joint` — selection depends on class × `batter_hand`, a covariate the
-geometry model conditions on, so the marginal-offset assumption is genuinely
-violated), and 0.015 (`scorer_blocked` — whole-game/scorer-bucket blocking,
-class-independent, so the per-class offset is ≈ flat and the reweight is a
-near-no-op). This establishes the correction's scope by construction: exact when
-selection is per-class (with or without an unconditioned era grade), only partial
-when selection interacts with a conditioned covariate, and inapplicable to
-class-independent block absence. The four-design ordering is the honest scope
-statement the report asked for; revised §5 now presents the robustness study
-rather than the lone simulation.
+**Response:** The harness (`backtests/mnar_masked.py`, `MaskConfig`) carries
+four registered designs and the oracle-offset arm was run against all four
+(`notes/paper/tables/mnar_backtest_robustness.md`). The first revision presented
+the four relative reductions (0.995, 0.958, 0.537, 0.015) as a scope statement.
+Revised §5 presents them with two caveats the first revision omitted. First,
+three of the four designs cannot fail: when selection depends on class alone (or
+on nothing), `P(c | R=0) ∝ P(c | R=1) · odds_mask(c)` holds at the marginal level
+for any per-event shares, so the oracle offset reproduces the masked marginal by
+construction; the ≈exact and ≈no-op rows are properties of those designs, and
+only `covariate_joint` (0.537) tests the offset against a selection process it
+does not encode. Second, every run is a `SMOKE_BUDGET` fit (50 draws × 50 tune ×
+2 chains) whose convergence gates fail (ESS 20–47), and no run artifacts are
+checked in; the reproducibility command now carries `--smoke`. The "sign-flip"
+is also withdrawn: under the code's sign convention (`z` is the standardized
+logit of P(observed), so masked events have low `z`) the learned
+`gamma_GB = −0.083` points in the direction a correction needs; the arm is inert
+(relative reduction −0.001), not wrong-signed. The refutation stands on the
+inertness, not on a sign. Rerunning the four designs at full budget with
+artifacts checked in is listed as open work (§11).
 
 ## M3. The published sensitivity ribbon is marginal, but the phenomenon is joint — the shipped uncertainty is known to be too narrow.
 
@@ -78,26 +85,27 @@ rather than the lone simulation.
 > you have shown the shift is joint and the reweight is refit-free; and justify the
 > grid width from something external to the single simulation.
 
-**Response:** The joint anchored ribbon ships in the body (revised §5.4;
-`notes/paper/tables/joint_ribbon_trajectory.md`). `mnar_anchor.py` derives a
-data-anchored per-era selection offset by contrasting the observed slice
-(`observed_status='observed'`) against the derived slice (`observed_status='derived'`)
-of `main_models.model_input_geometry`, and `joint_sensitivity_ribbon()` sweeps
-`t · δ_anchor` for `t ∈ {0, 0.25, …, 1.5}` with ±0.25-nat per-class perturbations
-at `t=1`, all as closed-form per-event renormalization (no refit). Headline: for
-the pre-1950 unobserved slice the MAR default puts the GroundBall share at 0.3204;
-the full anchor raises it to 0.5818 with a perturbation band of [0.5627, 0.5984] —
-the MAR default understates pre-1950 ground balls by nearly half, and the graded
-surface across `t` is the published object. This also answers the grid-width
-objection: the offset magnitudes (+1.241 / +0.917 / +0.835 nats per era) are read
-off the data, not tuned so one simulated truth lands inside a chosen band.
-
-**Partial-identification caveat (stated in the paper):** trajectory deduction from
-fielding strings recovers only ground balls, so the derived slice is a single
-class and the anchor is a one-dimensional GroundBall-only softmax direction, not a
-full per-class offset vector. Non-ground trajectory classes and rows with
-`observed_status ∈ {unknown_code, missing}` remain uncharacterized by the anchor.
-This is a property of the record, and §5.4 says so.
+**Response:** The first revision answered this with a "data-anchored" per-era
+offset (`+1.241 / +0.917 / +0.835` nats) and a joint ribbon along it, headlining a
+pre-1950 unrecorded ground-ball share of 0.5818 [0.5627, 0.5984]. That answer is
+withdrawn. The derived slice the anchor contrasted against the observed slice is
+100% GroundBall, so the "anchor" `log(p_derived / p_obs)` was `−ln(p_obs_GB)` —
+`−ln(0.289 / 0.400 / 0.434)` exactly — a function of the observed slice alone that
+carried no information about the unrecorded slice; the 0.58 was `1/(2 − p_obs)`
+up to renormalization, and the joint ribbon moved non-focal classes only through
+renormalization of a single-class offset. `mnar_anchor.py` now computes what the
+derived slice does support: a hard lower bound `P(GB | unrecorded) ≥ n_derived /
+n_unrecorded` per era (0.292 / 0.339 / 0.400) and a known-truth diagnostic — the
+MAR export's mean p(GB) on the derived rows (0.32 / 0.40 / 0.38 against a truth
+of 1). Revised §5 publishes the marginal ribbon as an explicitly assumed ±1.0-nat
+band, reports the offset at which the ribbon reaches the floor (−0.15 / −0.19 /
++0.04 nats: inside the grid in every era, and binding in 1988+ where MAR sits
+0.008 below the floor), and states that the band is an assumption, not a
+data-identified interval. On grid width: the width was checked once against the
+synthetic mask's oracle correction, which lands inside ±1.0, and the paper says
+that calibrates the width against one synthetic process and identifies nothing
+about the real one. We do not have a joint data-identified sweep to offer; the
+record supports a floor on one class, and the paper claims exactly that.
 
 ## M4. The paper conflates its engineering pipeline with its statistical contribution.
 
@@ -106,29 +114,37 @@ This is a property of the record, and §5.4 says so.
 > permutation-importance diagnostic — connect it to a downstream estimand
 > improvement or demote it.
 
-**Response — framing:** The intro and §10 now lead with the statistical
-contribution (the event-dimension missingness ontology and the selection-model
-treatment) and the two §6 negatives are labeled as ML-workflow QA findings, not
-statistical results.
+**Response — framing:** §1 leads with the statistical contributions and §10
+positions them; the two §6 negatives are labeled in the text as ML-workflow
+quality findings, not statistical results.
 
-**Response — the ablation the report specifically flagged.** The report is
-correct that the "moves posteriors < 0.25 SD" claim was unverifiable — the
-`gamma_dl_zero` counterfactual it depends on had never been fit for any of the
-four DL-consuming geometry dimensions. Those four fits were run
-(`scripts/gamma_dl_shift.py` / `bc/python_models/statistical/gamma_dl_shift.py`;
-`notes/paper/tables/gamma_dl_ablation.md`), and the diagnostic **fails the paper's
-prior claim for trajectory**: 69.6% of publication-tier effect cells shift by more
-than 0.25 posterior SD between the zero and shrunk fits (mean 0.74 SD, max 3.27
-SD). The blanket claim cannot stand. The shrunk flavor nonetheless wins held-out
-log-loss (−0.094), top-1 (+4.0 points on 616K held-out events), and macro PR-AUC
-(+0.114), and wins log-loss and PR-AUC on all four dimensions, so it remains
-published on predictive grounds — the DL covariate carries real signal, not
-distortion. The paper now reports the measured per-dimension shifts (trajectory
-0.696, location_side 0.217, location_depth 0.272, location_edge 0.391 of cells
-over threshold) in place of the blanket claim, states that the DL logit materially
-reshapes the trajectory model's effects, and keeps the "<0.25 SD on most cells"
-characterization only for the three location dimensions. The review caught a real
-unverified claim; the revision reports what the fit actually shows.
+**Response — the ablation.** The first revision's letter reported four
+`gamma_dl_zero` counterfactual fits and a per-cell shift diagnostic (trajectory
+69.6% of cells over 0.25 SD, etc.). The review found that the zero-fit artifacts
+and the `gamma_dl_shift.json` files those numbers came from are not on disk; only
+the fit logs survive, and they record convergence and top-1, not log-loss or the
+shift statistic. The numbers are therefore unreproducible and revised §6 says so
+rather than quoting them. Two further corrections: `gamma_dl` is one scalar
+shared across classes (the previous draft wrote `γ_c` per class), with a
+`N(0, 0.5)` prior whose posterior sd is ~0.03 — the prior is inert, so "shrunk"
+is a flavor name, not a mechanism; and the ablation did not guide the published
+flavor, because the zero fits were run on 2026-07-14 after the shrunk fits had
+been published. This revision refit both flavors for every dimension, and §6 reports the
+held-out comparison and shift diagnostic from artifacts that are on disk
+(`e-v12-noprop-*-zero`, each with `validation/gamma_dl_shift.json`). On the 6×: the deep proposals are now measured against a
+baseline for the first time — TEST log-loss against a per-`result_family` class
+prior is 1.229 vs 1.258 (trajectory), 0.996 vs 1.035 (side), 1.094 vs 1.114
+(depth), 0.899 vs 0.922 (edge) — a real, modest downstream improvement, reported
+in §6 next to the permutation-importance diagnostic rather than in place of it.
+
+**Disclosed defect.** The review also found that the three location dimensions'
+production rows carried no deep prediction (the location DL specs score only
+observed rows), and that the covariate's centering turned that absence into a
+constant per-class shift on every imputed logit; the published `location_edge`
+`All` share was 0.173 against a training share of 0.009. The covariate now
+contributes zero on rows without a prediction, a fit whose production slice has
+none must publish the deep-free flavor, and the three dimensions are refit
+deep-free. §6 reports this as a defect fixed in this revision.
 
 ## M5. The identification claims for B, I, K are argued at very unequal rigor, and K is not an identification result at all.
 
@@ -136,16 +152,17 @@ unverified claim; the revision reports what the fit actually shows.
 > B, lead with the absence of an independent second label and drop the
 > "collapses onto the prior" gloss that conflates small effect with non-identified.
 
-**Response:** Revised §8 separates the three by claim type up front: B is an
-identification limit, I a data-availability limit, K unfinished scope. The Model B
-argument now leads with the load-bearing point — the deduced class is not an
-independent second label, so the confusion matrix Ω is thinly informed off the
-outcome-anchored sliver (702 disagreements in ~6M) and is non-identified, which is
-a distinct statement from "confusion is rare"; the "collapses onto the prior"
-gloss is dropped. Model I is framed explicitly as data-availability (the
-zone-responsibility kernel does not exist in the source), not an identification
-proof. Model K is described as "designed, not built" with no identification or
-data-availability claim attached.
+**Response:** Revised §8 separates the three by claim type up front and uses one
+claim type for Model B throughout: the data are uninformative about Ω — the only
+outcome anchors disagree with the recorded label on 702 of 6.0M events with no
+era or scorer structure, so any fit returns the prior. The first revision called
+this both a "formal identification limit" and "uninformative"; the paper now says
+the latter only, and explicitly not a formal non-identification proof, since the
+anchored sliver does move the posterior, just not by enough to matter. Model I is
+a data-availability limit (the zone-responsibility kernel does not exist in the
+source); Model K is "designed, not built" with no identification claim attached.
+§4 adds the letter → estimand → published table → tier → status table the
+report's Minor 1 asked for.
 
 ## M6. The headline findings are unverifiable from the paper and supplements.
 
@@ -153,38 +170,47 @@ data-availability claim attached.
 > γ-refutation, the oracle-δ recovery, the permutation-importance gate, the
 > ablation, and every diagnostic are stated but not shown.
 
-**Response:** The inferential evidence now ships as supplement artifacts and
-runnable recipes (revised §12). The backtest harness and its
-`metrics.json`/`mask_summary.json` outputs are reproduced by
-`just mnar-backtest --mask-design {w_class_intensity,covariate_joint,scorer_blocked,era_graded}`
-and tabulated in `mnar_backtest_robustness.md`; the joint ribbon by
-`scripts/mnar_anchor.py` + `just sensitivity-ribbon --joint <anchor-dir>`
-(`joint_ribbon_trajectory.md`); the gate reports by `just validate-gates`
-(`validation_gates.md`); the ablation by `scripts/gamma_dl_shift.py`
-(`gamma_dl_ablation.md`); and the finite-sample band comparison by the snippet in
-`linear_weights_width_comparison.md`. All are read-only against the published
-pointers and write no `bc.db` state. The descriptive claims were already
-checkable; the inferential ones now are too.
+**Response:** The recipes ship (revised §12): `just validate-gates` for the gate
+table, `scripts/mnar_anchor.py` plus `just sensitivity-ribbon --bound` for the
+derived-slice bound and ribbon, `just mnar-backtest --smoke --mask-design ...`
+for the backtest. What does not yet ship, stated plainly: the backtest run
+artifacts (`metrics.json`, `mask_summary.json`) are not checked in, so the
+robustness numbers cannot be re-checked without rerunning; the `gamma_dl`
+ablation artifacts the first revision cited were not on disk and were
+regenerated in this revision; and the four deep-proposal pointers are not validated by the gate
+sweep (it resolves them under a layout they do not use and reports `missing`).
+The permutation-importance gate is documented in
+`notes/data-coverage-implementation/phase3-acceptance-gates-v6.md` with its log
+paths; the linear-probe margins the previous draft quoted for the proxy-metric
+negative result have no repository source and are marked `TODO: unverified`.
 
 ## M7. Every published surface is `exploratory`; none has cleared the paper's own gate.
 
 > Reconcile shipping `exploratory` results with arguing the gate is the
 > discipline; state precisely what fails the `passed` gate.
 
-**Response:** Revised §7 and §9 reconcile this. `confidence_status` is stamped
-once at publish time from the manifest's `validation_status` and does not update
-retroactively; the gate suite that would move it postdates every current stamp, so
-passing the suite (18/23 targets) is necessary but not sufficient — a table's
-status only advances on re-publication, which has not happened for any table in
-this paper. The two concrete gate results are stated: `geometry_location_depth`
-fails on top-1 accuracy (0.5609 vs a 0.5611 majority baseline on a `Default`-
-dominated dimension) but is dispositioned — its calibrated shares match held-out
-empirical shares to a total-variation distance of 0.0051 with a +0.0403-nat
-log-loss lift, so the block correctly warns against its arg-max while the shares
-are fit for probabilistic use; and `run_expectancy` posterior-predictive coverage
-is 0.8774, below the 94% target's 0.88 floor and flagged at `warn`
-(`state_transition` is 0.9772, in band). The results are framed as provisional
-pending the re-stamp.
+**Response:** Revised §9 gives the column's mechanics and its history. The stamp
+is copied at materialization from the manifest's `validation_status`, which only
+`just validate-gates --write` sets, and it publishes as `passed` only when the
+gate version that graded it is the current one. The tables were restated to
+`passed` on 2026-07-30 under the first sweep — the first revision's letter, which
+said the re-stamp had not run, was overtaken — this revision's gate-version bump
+reverted every table to `exploratory`; and after the version-2 sweep and the
+restate of 2026-09-04 every populated table reads `passed` again. What changed
+in the gate: the publish path refuses
+smoke fits; a full-scale fit with no held-out evidence blocks; the multinomial
+gate blocks on held-out log-loss against the pooled held-out marginal's entropy
+(the `geometry_location_depth` top-1 block the report asked about was the gate
+grading an argmax the policy bans, and it passes on log-loss by 0.040 nats);
+and `weak_identification_flag` is derived from group-level diagnostics
+(variables with at most 512 elements) and recomputed by the sweep, so the
+run-expectancy table is no longer flagged on a per-cell element. The
+park-factor table is not flagged either, on evidence: its non-centered
+gap-aware refit mixes the persistence hyperparameters at bulk ESS 3,261 and
+1,891. The flag is TRUE on `state_transition_summary`, on the assist rows of
+`imputed_fielding_credit`, and on four of the six observation dimensions
+(`ball_handler_position`, `location_depth`, `location_edge`, `trajectory`) in
+`scorer_observation_propensities`, and FALSE elsewhere (§11).
 
 ## M8. Related work is inadequate for a journal and omits the literatures the paper rediscovers.
 
@@ -192,17 +218,14 @@ pending the re-stamp.
 > delta-adjusted / tipping-point pattern-mixture sensitivity analysis; the survey
 > informative-nonresponse literature is on point. All uncited.
 
-**Response:** §10 is rewritten to position the contribution against these
-literatures. Added: Heckman (1976, 1979) for the selection-model formalization
-of §5; Scharfstein–Rotnitzky–Robins (1999), Molenberghs & Kenward (2007), and
-Cro–Morris–Kenward–Carpenter (2020) for the delta-adjustment / tipping-point /
-pattern-mixture sensitivity lineage the ribbon instantiates; Little (1993)
-repositioned within that lineage rather than cited alone; and Groves–Dillman–
-Eltinge–Little, *Survey Nonresponse* (2002) for the informative-nonresponse
-stance toward the scorer as an observation process. The section states what is
-methodologically new (event-dimension-level missingness assignment plus a
-data-anchored offset on an unusually vivid record) versus what is an application
-of established delta-adjustment sensitivity analysis.
+**Response:** §10 positions the contribution against these literatures: Heckman
+(1976, 1979) for the selection-model formalization; Scharfstein–Rotnitzky–Robins
+(1999), Molenberghs & Kenward (2007), and Cro–Morris–Kenward–Carpenter (2020)
+for the delta-adjustment / tipping-point lineage the ribbon instantiates; Little
+(1993) within that lineage; Groves–Dillman–Eltinge–Little (2002) and Rubin
+(1977) for informative nonresponse. The sentence describing what the paper adds
+now says a floor and a known-truth subslice, not an anchor, since the anchor is
+withdrawn (M3).
 
 ## M9. HDI coverage under sparsity is asserted, not validated.
 
@@ -211,18 +234,24 @@ of established delta-adjustment sensitivity analysis.
 > uncertainty are a concrete instance of intervals that are not honest under
 > sparsity, contradicting the park-factor narrative.
 
-**Response:** The coverage assertion is now validated by the same held-out
-posterior-predictive machinery as M1 (revised §7). The `linear_weights_estimated`
-gap is fixed at the source: `propagate_linear_weights_draws` now draws per-(season,
-league, play) play-frequency vectors from Dirichlet(counts + 0.5) (Jeffreys), one
-draw per RE-posterior draw, so sparse cells widen automatically while dense cells
-are unchanged to first order. Band width is non-decreasing on 99.57% of cells
-(0.43% narrowed), median width ratio 1.5588, p90 4.1936, with the largest
-widenings on the smallest-n cells (10 largest at median n=21 vs overall median
-n=544) — `notes/paper/tables/linear_weights_width_comparison.md`. §11 reconciles
-this with the park-factor narrative. **This is validated in dev and has NOT yet
-been restated into prod;** the published artifact still carries the old fixed-count
-bands until a restate, and §11 says so.
+**Response:** Two corrections to the first revision's answer. The park-factor
+interval-width narrative is not validated by the predictive-coverage machinery:
+`park_factor_runs` has no coverage hook, only `state_transition` and
+`run_expectancy` do, and revised §7 and §11 say that the width-versus-sparsity
+pattern is a description of the posterior, not a validated coverage claim. The
+`linear_weights_estimated` finite-sample gap is fixed as the first revision
+described — `propagate_linear_weights_draws` draws per-cell Dirichlet(counts +
+0.5) combination weights per RE-posterior draw, median width ratio 1.5588, p90
+4.1936, widest on the smallest-n cells (`linear_weights_width_comparison.md`) —
+and, contrary to the first revision's "not yet restated into prod," that
+propagation has been the published one since 2026-07-14. This revision also
+adds the deterministic sibling's occurrence floor (cells at or below 100
+occurrences publish the pooled value with `is_imputed = True`, where the
+previous surface published a 1924 NN1 `Triple` on one event) and drops
+transitions whose start state has no posterior cell. The table was re-derived from
+`re-full-eraregime-v4` on 2026-09-04; the restated table carries the pooled
+values for its 827 floor cells but not yet the `is_imputed` column, which §11
+records.
 
 ---
 
@@ -230,111 +259,118 @@ bands until a restate, and §11 says so.
 
 ### Minor 1. Model counting is inconsistent.
 
-**Response:** The intro now states the counting once and the paper uses it
-consistently: twelve published surfaces, ten populated and two deferred as typed
-zero-row frames; seven model letters published (A, C, D, E, F, G, J), three
-withheld with documented identification failures (B, I, K), and Model H deferred
-on upstream data (§11).
+**Response:** §4 opens with a table mapping letter → estimand → published table
+→ tier → status for A–K, and the paper counts from it: twelve tables, ten
+populated; seven letters published, three withheld, one deferred.
 
 ### Minor 2. Span inconsistency.
 
-**Response:** The intro states the actual event universe — 18,141,020 events over
-1910–2025 across 205,845 games — and distinguishes it from the season span of the
-descriptive/pooled tables (park factors and Model G's 1901+ pooling), reconciling
-the pre-1910 descriptive rows against the event universe.
+**Response:** §2 states the event universe (18,141,020 events; 205,845
+play-by-play games in the 1910–2025 span) and reconciles the pre-1910 rows: the
+snapshot holds a further 41 play-by-play games from the 1900s decade, which is
+why decade-keyed tables show a `1900` row, and season-keyed surfaces (park
+factors, Model G cells) cover every season the source carries. The
+`event_states_full` count is the whole table and includes those games' events.
+§4's "pools 1901 through 2025" is replaced by "every season the source carries."
 
 ### Minor 3. Garbled sentence.
 
-**Response:** "Model D is Model D's first publication" is repaired in the revised
-models section.
+**Response:** Repaired in §4.
 
 ### Minor 4. Units.
 
-**Response:** §5 states once that δ_c is a natural-log log-odds in nats and uses
-that consistently for both the offset and the grid.
+**Response:** §5 states once, where the offset is introduced, that δ_c is a
+natural-log log-odds in nats, and uses nats for the offset, the grid, and the
+bound-offset throughout.
 
 ### Minor 5. 94% HDI.
 
-**Response:** §7 adds one sentence stating why the 94% default is used, so the
-convention is motivated rather than silently applied to every interval.
+**Response:** §7 opens with one sentence: 0.94 is the ArviZ default the fits
+summarize with, kept unchanged so every published HDI is the library's native
+summary rather than a probability re-chosen per table, and its unfamiliar width
+is a standing reminder that the interval probability is a convention.
 
 ### Minor 6. Illustrative tables.
 
-**Response:** §7 labels extreme-only tables (RE states, top/bottom park-seasons)
-as illustrative and moves full surfaces to the supplement where a claim depends on
-the whole surface (e.g. linear-weights agreement across all play types).
+**Response:** §7 labels every extremes-only or single-cell table as illustrative
+(the two RE states, the transition example, the park-factor extremes, the
+five-play linear-weights comparison, the assist-count and pitch-summary
+examples) and cites the full table under `notes/paper/tables/` wherever a claim
+depends on the whole surface.
 
 ### Minor 7. Define s(c,x).
 
-**Response:** §5 gives the range s(c,x) ∈ (0,1] and states explicitly that the
-class-independent part of the selection logit cancels under the per-event softmax,
-cross-referencing the same invariance that kills the scalar random effect.
+**Response:** §5 gives the range s(c,x) ∈ (0,1], states additive separability of
+the masking log-odds as the assumption, and states that the class-independent
+part cancels under the per-event softmax, cross-referencing the same invariance
+that kills the scalar random effect.
 
 ### Minor 8. Tone.
 
-**Response:** The editorializing asides ("exactly where a fan would expect it,"
-"a lesson worth its own telling," "the offset is right, and the offset is
-unidentified") are trimmed to journal register in the writing pass.
+**Response:** "Exactly where a fan would expect it" (§7) and "a lesson worth its
+own telling" (§4) are removed; "the offset is right, and the offset is
+unidentified" did not survive the §5 rewrite.
 
 ### Minor 9. Section length.
 
-**Response:** "Published surfaces" is compressed to the tables that carry an
-argument; the data-tour material moves to the supplement.
+**Response:** §7 is compressed to the tables that carry an argument, but in
+this revision it also carries the disclosed corrections and the refit
+comparisons the review required, so it remains above the target length.
 
 ### Minor 10. Provenance comments.
 
-**Response:** The `<!-- src: … -->` scaffolding and internal repo paths are
-stripped in the submission build, so no uncheckable internal-path pseudo-citations
-survive into the manuscript.
+**Response:** The `<!-- src: … -->` scaffolding is stripped in the submission
+build. The five citations to memory files that did not exist are replaced with
+repository sources or marked `TODO: unverified`.
 
 ---
 
 ## Questions to the authors
 
-Each restates a major; the concrete answer lives in the referenced response above.
-
-1. **Calibration evidence** — see M1: held-out ECE ≤ 0.0179 (Model A), predictive
-   coverage 0.9772 / 0.8774 (`validation_gates.md`).
-2. **Does the MNAR result survive alternative masking designs** — see M2:
-   four-design study, relative reductions 0.995 / 0.958 / 0.537 / 0.015.
-3. **Joint offset-vector sweep** — see M3: joint anchored ribbon, pre-1950
-   0.3204 → 0.5818 [0.5627, 0.5984], shipped in §5.4.
-4. **Basis for the grid width / principled upper bound** — see M3: the offset is
-   now the data-anchored derived-vs-observed contrast (+1.241 / +0.917 / +0.835
-   nats), not a band tuned to one simulation; the four-design backtest bounds the
-   correction's scope.
-5. **Is Model B "Ω ≈ identity" or "Ω non-identified"** — see M5: non-identified,
-   argued from the absence of an independent second label; the rarity gloss is
-   dropped.
-6. **Why is Model K grouped with B and I** — see M5: it no longer is; K is
-   "designed, not built," separated from the identification/availability limits.
-7. **What fails the `passed` gate; provisional framing** — see M7:
-   `geometry_location_depth` top-1 (dispositioned) and `run_expectancy` predictive
-   coverage 0.8774; status advances only on re-publication, which has not happened.
-8. **Release backtest harness, gate reports, ablation tables** — see M6: shipped as
-   supplement tables plus `just` recipes.
+1. **Calibration evidence** — see M1: held-out ECE and predictive coverage are
+   computed and reported; both are warn-only diagnostics; the refit values are ECE
+   0.0049–0.0181 and predictive coverage 0.9780 / 0.9062.
+2. **Does the MNAR result survive alternative masking designs** — see M2: one
+   informative design (`covariate_joint`, 0.537); the other three are identities;
+   all four are smoke-budget runs.
+3. **Joint offset-vector sweep** — see M3: withdrawn; the record supports a floor
+   on one class (0.292 / 0.339 / 0.400), published with an assumed ±1.0-nat band.
+4. **Basis for the grid width / principled upper bound** — see M3: the width is
+   checked against one synthetic mask; there is no data-identified upper bound
+   and the paper does not claim one.
+5. **Is Model B "Ω ≈ identity" or "Ω non-identified"** — see M5: neither
+   phrasing; the data are uninformative about Ω and any fit returns the prior.
+6. **Why is Model K grouped with B and I** — see M5: it is not; K is "designed,
+   not built."
+7. **What fails the `passed` gate; provisional framing** — see M7: the column's
+   history is given; every populated table reads `passed` under the version-2
+   sweep since 2026-09-04.
+8. **Release backtest harness, gate reports, ablation tables** — see M6: recipes
+   ship; the backtest run artifacts and the ablation artifacts do not yet.
 9. **Does the 6× translate into a measured estimand improvement** — see M4: the
-   `gamma_dl` ablation was run; the shrunk fit wins held-out log-loss/PR-AUC on all
-   four dimensions and top-1 on trajectory, but it moves trajectory
-   publication-tier effects well past 0.25 SD on 69.6% of cells, refuting the
-   paper's prior "<0.25 SD" claim, which the text now reports honestly.
-10. **Reconcile park-factor "honest uncertainty" with the too-tight linear-weights
-    bands** — see M9: Dirichlet(counts + 0.5) finite-sample propagation, median
-    width ratio 1.5588, validated in dev, not yet restated in prod.
+   deep proposals beat a class-prior baseline on TEST log-loss on every
+   dimension (measured for the first time in this revision); the ablation was
+   re-run and its artifacts are on disk.
+10. **Reconcile park-factor "honest uncertainty" with the too-tight
+    linear-weights bands** — see M9: the Dirichlet propagation is published; the
+    park-factor width pattern is not a validated coverage claim.
 
 ---
 
 ## Remaining limitations
 
-Several items are honestly still open. The `confidence_status` re-stamp across
-published artifacts has not run, so every published table still reads
-`exploratory` even though 18/23 targets clear the gate suite; `run_expectancy`
-posterior-predictive coverage (0.8774) sits just below the 94% target and is
-flagged rather than resolved; the linear-weights Dirichlet bands are validated in
-dev but not yet restated into prod; and the trajectory anchor is a partial-truth,
-single-class (GroundBall-only) direction, so non-ground classes and
-`unknown_code`/`missing` rows remain uncharacterized. Per REVISION-PLAN.md, the
-Model H buildout, the error-credit and DP unblocks, a joint EM selection model,
-and Statcast second-source ingestion are out of scope this round; the first would
-need upstream SQL, the middle two need signal/truth columns that do not exist, and
-the last two would either contradict the paper's stance or live in the parser repo.
+The refits that carry this revision's corrections into the tables — geometry
+(both flavors, every dimension), run expectancy, state transition, pitch
+summary, putout credit, the six observation-propensity targets, park factors —
+completed on 2026-09-04, and every number in the manuscript is read from the
+restated tables. What remains: the MNAR offset is
+unidentified for every class and bounded from below for one; the backtest
+robustness table is a smoke-budget run without checked-in artifacts; the deep
+out-of-fold predictions carry a pretraining leak the paper quantifies as an
+overlap (70.1% of Bayes held-out trajectory rows inside the pretrain's labeled
+set) but not as a magnitude; the location deep specs score only observed rows,
+so the deep supplement reaches one geometry dimension; the deep pointers sit
+outside the gate sweep; and park factors have no coverage hook. Per
+REVISION-PLAN.md, the Model H buildout, the error-credit and DP unblocks, a
+joint EM selection model, and Statcast second-source ingestion remain out of
+scope.

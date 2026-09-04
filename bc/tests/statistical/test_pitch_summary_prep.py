@@ -4,24 +4,35 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
+import numpy as np
 import polars as pl
+import pytest
 
+from python_models.statistical.models import _pitch_summary_data as prep_module
 from python_models.statistical.models._pitch_summary_data import (
     HOLDOUT_FOLD_COUNT,
     HOLDOUT_FOLD_ID,
+    MAX_BALLS,
     MAX_STRIKES,
     MIN_EVENTS_PER_CELL,
     N_CLASSES,
     SINGLE_SOURCE_LABEL,
+    STRIKEOUT_FAMILY,
     UNKNOWN_RESULT,
+    WALK_FAMILY,
     prepare_pitch_summary_inputs,
+    reachable_classes,
 )
 from python_models.statistical.splits import game_hash_fold
 
 SEASON = 2023
 LEAGUE = "AL"
+
+IMPOSSIBLE_STRIKEOUT_EVENTS = 3
+IMPOSSIBLE_WALK_EVENTS = 2
 
 
 def _cell_key(result_family: str) -> str:
@@ -70,10 +81,33 @@ def _row(
 def _write_dataset(tmp_path: Path) -> tuple[Path, str, str]:
     rows: list[dict[str, object]] = []
 
-    for gid in _train_games("STRIKEOUT", MIN_EVENTS_PER_CELL + 5):
+    strikeout_games = _train_games("STRIKEOUT", MIN_EVENTS_PER_CELL + 5)
+    for i, gid in enumerate(strikeout_games):
         rows.append(
-            _row(game_id=gid, result_family="strikeout", balls=2, strikes=MAX_STRIKES)
+            _row(
+                game_id=gid,
+                result_family=STRIKEOUT_FAMILY,
+                balls=i % (MAX_BALLS + 1),
+                strikes=MAX_STRIKES,
+            )
         )
+    for gid in strikeout_games[:IMPOSSIBLE_STRIKEOUT_EVENTS]:
+        rows.append(
+            _row(game_id=gid, result_family=STRIKEOUT_FAMILY, balls=0, strikes=0)
+        )
+
+    walk_games = _train_games("WALK", MIN_EVENTS_PER_CELL + 5)
+    for i, gid in enumerate(walk_games):
+        rows.append(
+            _row(
+                game_id=gid,
+                result_family=WALK_FAMILY,
+                balls=MAX_BALLS,
+                strikes=i % (MAX_STRIKES + 1),
+            )
+        )
+    for gid in walk_games[:IMPOSSIBLE_WALK_EVENTS]:
+        rows.append(_row(game_id=gid, result_family=WALK_FAMILY, balls=1, strikes=1))
 
     for gid in _train_games("OUTINPLAY", MIN_EVENTS_PER_CELL + 5):
         rows.append(_row(game_id=gid, result_family="out_in_play", balls=1, strikes=1))
@@ -81,19 +115,15 @@ def _write_dataset(tmp_path: Path) -> tuple[Path, str, str]:
     for gid in _train_games("UNKNOWN", MIN_EVENTS_PER_CELL + 5):
         rows.append(_row(game_id=gid, result_family=None, balls=0, strikes=0))
 
-    thin_family = "walk"
+    thin_family = "hbp"
     for gid in _train_games("THIN", MIN_EVENTS_PER_CELL - 5):
-        rows.append(
-            _row(
-                game_id=gid, result_family=thin_family, balls=MAX_STRIKES + 1, strikes=0
-            )
-        )
+        rows.append(_row(game_id=gid, result_family=thin_family, balls=2, strikes=0))
 
     for gid in _train_games("EXCLUDED", 10):
         rows.append(
             _row(
                 game_id=gid,
-                result_family="strikeout",
+                result_family=STRIKEOUT_FAMILY,
                 balls=0,
                 strikes=0,
                 has_count=False,
@@ -105,11 +135,14 @@ def _write_dataset(tmp_path: Path) -> tuple[Path, str, str]:
         rows.append(
             _row(
                 game_id=holdout_game,
-                result_family="strikeout",
+                result_family=STRIKEOUT_FAMILY,
                 balls=3,
                 strikes=MAX_STRIKES,
             )
         )
+    rows.append(
+        _row(game_id=holdout_game, result_family=STRIKEOUT_FAMILY, balls=1, strikes=0)
+    )
 
     dataset_path = tmp_path / "pitch_summary.parquet"
     pl.DataFrame(
@@ -133,7 +166,7 @@ def _recompute_train_cell_counts(raw: pl.DataFrame) -> pl.DataFrame:
         for g in raw.get_column("game_id").unique().to_list()
         if game_hash_fold(g, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID
     ]
-    return (
+    frame = (
         raw.filter(
             pl.col("has_count")
             & ~pl.col("game_id").is_in(holdout_games)
@@ -156,9 +189,32 @@ def _recompute_train_cell_counts(raw: pl.DataFrame) -> pl.DataFrame:
                 + pl.col("league")
             ).alias("cell")
         )
+    )
+    keep = [
+        bool(reachable_classes(str(family))[int(final_class)])
+        for family, final_class in frame.select(
+            ["result_family", "final_class"]
+        ).iter_rows()
+    ]
+    return (
+        frame.filter(pl.Series(keep))
         .group_by(["cell", "final_class"])
         .agg(pl.len().alias("n"))
     )
+
+
+def test_reachability_rule_matches_structural_constraint() -> None:
+    labels, balls, strikes = prep_module._class_labels()
+    assert len(labels) == N_CLASSES
+    strikeout = reachable_classes(STRIKEOUT_FAMILY)
+    walk = reachable_classes(WALK_FAMILY)
+    for j in range(N_CLASSES):
+        assert bool(strikeout[j]) == (strikes[j] == MAX_STRIKES)
+        assert bool(walk[j]) == (balls[j] == MAX_BALLS)
+    for family in ("hit", "out_in_play", "hbp", UNKNOWN_RESULT, "sacrifice"):
+        assert reachable_classes(family).all()
+    assert int(strikeout.sum()) == MAX_BALLS + 1
+    assert int(walk.sum()) == MAX_STRIKES + 1
 
 
 def test_counts_row_sums_match_groupby(tmp_path: Path) -> None:
@@ -187,6 +243,63 @@ def test_counts_row_sums_match_groupby(tmp_path: Path) -> None:
     assert inputs.n_cells == len(inputs.cell_labels)
 
 
+def test_impossible_cells_dropped_and_logged(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    dataset_path, _thin, _holdout = _write_dataset(tmp_path)
+    raw = pl.read_parquet(dataset_path)
+    with caplog.at_level(logging.INFO, logger=prep_module.__name__):
+        inputs = prepare_pitch_summary_inputs(dataset_path)
+
+    cell_reachable = inputs.cell_reachable_mask
+    assert int(inputs.counts[~cell_reachable].sum()) == 0
+    assert int(inputs.held_out.counts[~inputs.reachable_mask[inputs.held_out.cell_result_idx]].sum()) == 0
+
+    def _raw_impossible(family: str) -> int:
+        frame = raw.filter(
+            pl.col("has_count") & (pl.col("result_family") == family)
+        ).with_columns(
+            (
+                pl.col("count_balls_raw").cast(pl.Int64) * (MAX_STRIKES + 1)
+                + pl.col("count_strikes_raw").cast(pl.Int64)
+            ).alias("final_class")
+        )
+        mask = reachable_classes(family)
+        return sum(
+            1 for c in frame.get_column("final_class").to_list() if not mask[int(c)]
+        )
+
+    expected = {
+        STRIKEOUT_FAMILY: _raw_impossible(STRIKEOUT_FAMILY),
+        WALK_FAMILY: _raw_impossible(WALK_FAMILY),
+    }
+    assert expected[STRIKEOUT_FAMILY] > 0 and expected[WALK_FAMILY] > 0
+
+    logged: dict[str, int] = {}
+    for record in caplog.records:
+        if "structurally impossible" in record.getMessage():
+            assert isinstance(record.args, tuple)
+            dropped, family = record.args
+            logged[str(family)] = int(str(dropped))
+    assert logged == expected
+
+
+def test_reference_class_is_reachable_and_modal(tmp_path: Path) -> None:
+    dataset_path, _thin, _holdout = _write_dataset(tmp_path)
+    inputs = prepare_pitch_summary_inputs(dataset_path)
+
+    assert inputs.reachable_mask.shape == (inputs.n_result_families, N_CLASSES)
+    assert inputs.ref_class_by_result.shape == (inputs.n_result_families,)
+    per_result = np.zeros_like(inputs.reachable_mask, dtype=np.int64)
+    np.add.at(per_result, inputs.cell_result_idx, inputs.counts)
+    for r, family in enumerate(inputs.result_family_labels):
+        ref = int(inputs.ref_class_by_result[r])
+        assert inputs.reachable_mask[r, ref]
+        np.testing.assert_array_equal(inputs.reachable_mask[r], reachable_classes(family))
+        reachable_counts = np.where(inputs.reachable_mask[r], per_result[r], -1)
+        assert per_result[r, ref] == reachable_counts.max()
+
+
 def test_class_encoding_round_trips(tmp_path: Path) -> None:
     dataset_path, _thin, _holdout = _write_dataset(tmp_path)
     inputs = prepare_pitch_summary_inputs(dataset_path)
@@ -204,6 +317,7 @@ def test_class_encoding_round_trips(tmp_path: Path) -> None:
     assert inputs.coords["class"] == inputs.class_labels
     assert inputs.coords["cell"] == inputs.cell_labels
     assert inputs.coords["result_family"] == inputs.result_family_labels
+    assert "class_nonref" not in inputs.coords
 
     for k, label in enumerate(inputs.cell_labels):
         rebuilt = (
@@ -220,7 +334,7 @@ def test_strikeout_cell_lands_in_two_strike_classes(tmp_path: Path) -> None:
     dataset_path, _thin, _holdout = _write_dataset(tmp_path)
     inputs = prepare_pitch_summary_inputs(dataset_path)
 
-    strikeout_cell = _cell_key("strikeout")
+    strikeout_cell = _cell_key(STRIKEOUT_FAMILY)
     assert strikeout_cell in inputs.cell_labels
     row = inputs.counts[inputs.cell_labels.index(strikeout_cell)]
     two_strike_classes = {
@@ -254,7 +368,7 @@ def test_has_count_false_rows_excluded(tmp_path: Path) -> None:
     dataset_path, _thin, _holdout = _write_dataset(tmp_path)
     inputs = prepare_pitch_summary_inputs(dataset_path)
 
-    strikeout_cell = _cell_key("strikeout")
+    strikeout_cell = _cell_key(STRIKEOUT_FAMILY)
     row = inputs.counts[inputs.cell_labels.index(strikeout_cell)]
     b0_s0 = next(
         j

@@ -7,6 +7,8 @@ import math
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from python_models.statistical.manifests import package_versions
 from python_models.statistical.schemas import (
     ArtifactManifest,
@@ -65,6 +67,17 @@ def _write_diagnostics(artifact_dir: Path, text: str) -> None:
     (validation / "diagnostics.json").write_text(text, encoding="utf-8")
 
 
+def _write_healthy_held_out(artifact_dir: Path) -> None:
+    validation = artifact_dir / "validation"
+    validation.mkdir(parents=True, exist_ok=True)
+    (validation / "held_out_metrics.json").write_text(
+        json.dumps(
+            {"roc_auc": 0.9, "pr_auc": 0.9, "baseline_pr_auc": 0.3, "ece_held_out": 0.02}
+        ),
+        encoding="utf-8",
+    )
+
+
 def _block_codes(artifact_dir: Path) -> set[str]:
     report = _validate_bayes(_bayes_manifest("aid"), artifact_dir)
     return {f.code for f in report.findings if f.severity == "block"}
@@ -82,6 +95,7 @@ def _healthy_payload() -> dict[str, object]:
 
 def test_gate_passes_on_healthy_diagnostics(tmp_path: Path) -> None:
     _write_diagnostics(tmp_path, json.dumps(_healthy_payload()))
+    _write_healthy_held_out(tmp_path)
     report = _validate_bayes(_bayes_manifest("aid"), tmp_path)
     assert report.status == "passed"
     assert not [f for f in report.findings if f.severity == "block"]
@@ -235,3 +249,151 @@ def test_flag_set_on_non_finite_diagnostics() -> None:
     assert diagnostics_indicate_weak_identification(
         rhat_max=math.inf, ess_bulk_min=ess_ok, divergences=0
     )
+
+
+def _findings_by_code(artifact_dir: Path) -> dict[str, str]:
+    report = _validate_bayes(_bayes_manifest("aid"), artifact_dir)
+    return {f.code: f.severity for f in report.findings}
+
+
+def _thresholds(is_smoke: bool) -> dict[str, float]:
+    return _BAYES_THRESHOLDS_SMOKE if is_smoke else _BAYES_THRESHOLDS_DEFAULT
+
+
+def _healthy_payload_for(is_smoke: bool) -> dict[str, object]:
+    thresholds = _thresholds(is_smoke)
+    return {
+        "rhat_max": 1.0,
+        "ess_bulk_min": thresholds["ess_bulk_min"] * 10.0,
+        "divergences": 0,
+        "total_draws": 4000,
+        "is_smoke": is_smoke,
+    }
+
+
+def _past(threshold: float, *, direction: float) -> float:
+    return math.nextafter(threshold, direction)
+
+
+def _convergence_cases() -> list[tuple[str, str, bool, dict[str, object], dict[str, object]]]:
+    cases: list[tuple[str, str, bool, dict[str, object], dict[str, object]]] = []
+    for is_smoke in (False, True):
+        thresholds = _thresholds(is_smoke)
+        draws = 4000
+        cases.append(
+            (
+                "bayes_high_rhat",
+                "block",
+                is_smoke,
+                {"rhat_max": _past(thresholds["rhat_max"], direction=math.inf)},
+                {"rhat_max": thresholds["rhat_max"]},
+            )
+        )
+        cases.append(
+            (
+                "bayes_low_ess",
+                "block",
+                is_smoke,
+                {"ess_bulk_min": _past(thresholds["ess_bulk_min"], direction=-math.inf)},
+                {"ess_bulk_min": thresholds["ess_bulk_min"]},
+            )
+        )
+        limit = int(thresholds["divergence_fraction"] * draws)
+        cases.append(
+            (
+                "bayes_divergences",
+                "block",
+                is_smoke,
+                {"divergences": limit + 1, "total_draws": draws},
+                {"divergences": limit, "total_draws": draws},
+            )
+        )
+        cases.append(
+            (
+                "bayes_divergences",
+                "block",
+                is_smoke,
+                {"divergences": 1, "total_draws": 0},
+                {"divergences": 0, "total_draws": 0},
+            )
+        )
+        cases.append(
+            (
+                "bayes_calibration_ece",
+                "warn",
+                is_smoke,
+                {
+                    "calibration_ece": _past(
+                        thresholds["calibration_ece_warn"], direction=math.inf
+                    )
+                },
+                {"calibration_ece": thresholds["calibration_ece_warn"]},
+            )
+        )
+        cases.append(
+            (
+                "bayes_post_pred_bucket_dev",
+                "warn",
+                is_smoke,
+                {
+                    "posterior_predictive_max_bucket_dev": _past(
+                        thresholds["post_pred_bucket_dev_warn"], direction=math.inf
+                    )
+                },
+                {
+                    "posterior_predictive_max_bucket_dev": thresholds[
+                        "post_pred_bucket_dev_warn"
+                    ]
+                },
+            )
+        )
+    return cases
+
+
+@pytest.mark.parametrize(
+    ("code", "severity", "is_smoke", "past", "inside"),
+    _convergence_cases(),
+    ids=lambda value: value if isinstance(value, str) else None,
+)
+def test_convergence_gate_fires_just_past_threshold_and_not_inside(
+    tmp_path: Path,
+    code: str,
+    severity: str,
+    is_smoke: bool,
+    past: dict[str, object],
+    inside: dict[str, object],
+) -> None:
+    past_dir = tmp_path / "past"
+    _write_diagnostics(past_dir, json.dumps({**_healthy_payload_for(is_smoke), **past}))
+    _write_healthy_held_out(past_dir)
+    fired = _findings_by_code(past_dir)
+    assert fired.get(code) == severity, fired
+
+    inside_dir = tmp_path / "inside"
+    _write_diagnostics(
+        inside_dir, json.dumps({**_healthy_payload_for(is_smoke), **inside})
+    )
+    _write_healthy_held_out(inside_dir)
+    quiet = _findings_by_code(inside_dir)
+    assert code not in quiet, quiet
+    assert _validate_bayes(_bayes_manifest("aid"), inside_dir).status == "passed"
+
+
+def test_smoke_divergence_limit_scales_with_total_draws(tmp_path: Path) -> None:
+    fraction = _BAYES_THRESHOLDS_SMOKE["divergence_fraction"]
+    assert fraction > 0.0
+    for draws in (100, 4000):
+        limit = int(fraction * draws)
+        artifact_dir = tmp_path / str(draws)
+        _write_diagnostics(
+            artifact_dir,
+            json.dumps(
+                {
+                    **_healthy_payload_for(True),
+                    "divergences": limit + 1,
+                    "total_draws": draws,
+                }
+            ),
+        )
+        _write_healthy_held_out(artifact_dir)
+        assert _findings_by_code(artifact_dir).get("bayes_divergences") == "block"

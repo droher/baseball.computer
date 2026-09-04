@@ -10,6 +10,28 @@ twice on the same masked dataset — ``gamma_propensity_class`` vs
 The class flavor passes when it recovers the masked-slice class shares
 better than the zero flavor without regressing on the never-masked fold,
 with clean sampler diagnostics on both fits.
+
+Three things to know before reading a result from this harness:
+
+1. The oracle-offset arm is an algebraic identity for the ``w_class_intensity``,
+   ``scorer_blocked`` and ``era_graded`` designs. When selection depends on
+   class alone (or on nothing), ``P(c | masked) is proportional to
+   P(c | observed) * odds_mask(c)`` holds at the marginal level for any
+   per-event shares, including a constant model, so reweighting by the
+   realized per-class masked rate recovers the masked-slice marginal by
+   construction and cannot fail. Only ``covariate_joint``, whose selection
+   depends on class and a covariate the model conditions on, tests the
+   offset against something it does not already encode.
+2. The results recorded in ``notes/paper/tables/mnar_backtest_robustness.md``
+   are ``SMOKE_BUDGET=1000`` runs (50 draws x 50 tune x 2 chains) whose
+   convergence gates fail (``ess_bulk_min`` 20-47 against the 100 floor;
+   ``overall_pass`` False for every design). No run artifacts are checked in.
+3. The sign of ``gamma_propensity_class``: ``z`` is the standardized logit of
+   ``propensity_p_observed`` (``_geometry_data.py``), so masked events have
+   LOW ``z``. A negative GroundBall coefficient therefore raises GroundBall on
+   the masked slice, which is the direction a correction needs. The learned
+   arm's -0.001 relative reduction means it is inert on the masked slice, not
+   wrong-signed.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportUnknownParameterType=false, reportAny=false, reportExplicitAny=false

@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 import pymc as pm
 import pytest
 from pytensor.graph.basic import ancestors
@@ -14,6 +15,9 @@ from pytensor.graph.basic import ancestors
 from python_models.statistical.models._credit_data import FixedEffectDesign
 from python_models.statistical.models._pitch_coverage_data import (
     CONTEXT_FIXED_EFFECT_COLUMNS,
+    HOLDOUT_FOLD_COUNT,
+    HOLDOUT_FOLD_ID,
+    UNSEEN_LEVEL_CODE,
     PitchCoverageHeldOutSet,
     PitchCoverageInputs,
     prepare_pitch_coverage_inputs,
@@ -21,15 +25,17 @@ from python_models.statistical.models._pitch_coverage_data import (
 from python_models.statistical.models._pitch_summary_data import (
     PitchSummaryHeldOutSet,
     PitchSummaryInputs,
+    _reachable_mask,
+    _reference_by_result,
 )
 from python_models.statistical.models.pitch_coverage import build_pitch_coverage_model
-from python_models.statistical.models.pitch_summary import build_pitch_summary_model
+from python_models.statistical.models.pitch_summary import (
+    MASK_LOGIT,
+    build_pitch_summary_model,
+)
+from python_models.statistical.splits import game_hash_fold
 
 N_CLASSES = 12
-
-_COVERAGE_PARQUET = Path(
-    "artifacts/statistical/datasets/model_input_pitch_summary/ps-v1/dataset.parquet"
-)
 
 
 def _class_axes() -> tuple[list[str], list[int], list[int]]:
@@ -49,23 +55,31 @@ def _tiny_inputs() -> PitchSummaryInputs:
         "out_in_play|2023|AL",
         "strikeout|2023|AL",
         "strikeout|2023|NL",
+        "walk|2023|AL",
     ]
-    result_by_cell = ["out_in_play", "strikeout", "strikeout"]
-    season_by_cell = [2023, 2023, 2023]
-    league_by_cell = ["AL", "AL", "NL"]
-    result_family_labels = ["out_in_play", "strikeout"]
+    result_by_cell = ["out_in_play", "strikeout", "strikeout", "walk"]
+    season_by_cell = [2023, 2023, 2023, 2023]
+    league_by_cell = ["AL", "AL", "NL", "AL"]
+    result_family_labels = ["out_in_play", "strikeout", "walk"]
     result_to_idx = {r: i for i, r in enumerate(result_family_labels)}
     cell_result_idx = np.array(
         [result_to_idx[r] for r in result_by_cell], dtype=np.int64
     )
     class_labels, balls_by_class, strikes_by_class = _class_axes()
 
+    reachable = _reachable_mask(result_family_labels)
     rng = np.random.default_rng(20260513)
-    counts = rng.integers(2, 9, size=(len(cell_labels), N_CLASSES)).astype(np.int64)
+    counts = (
+        rng.integers(2, 9, size=(len(cell_labels), N_CLASSES))
+        * reachable[cell_result_idx]
+    ).astype(np.int64)
+    ref_class_by_result = _reference_by_result(counts, cell_result_idx, reachable)
 
     return PitchSummaryInputs(
         counts=counts,
         cell_result_idx=cell_result_idx,
+        reachable_mask=reachable,
+        ref_class_by_result=ref_class_by_result,
         cell_labels=list(cell_labels),
         result_by_cell=result_by_cell,
         season_by_cell=season_by_cell,
@@ -78,7 +92,6 @@ def _tiny_inputs() -> PitchSummaryInputs:
         coords={
             "source": ["__single__"],
             "class": list(class_labels),
-            "class_nonref": list(class_labels[1:]),
             "result_family": list(result_family_labels),
             "cell": list(cell_labels),
         },
@@ -95,10 +108,82 @@ def test_builds_model_with_cell_class_prob() -> None:
     model = build_pitch_summary_model(inputs)
     assert isinstance(model, pm.Model)
     assert "cell_class_prob" in model.named_vars
-    assert "beta0" in model.named_vars
+    assert "result_class_prob" in model.named_vars
     assert "result_logodds" in model.named_vars
     assert "cell_logodds" in model.named_vars
+    assert "beta0" not in model.named_vars
     assert "final_count_obs" in {rv.name for rv in model.observed_RVs}
+
+
+def test_free_parameters_cover_only_reachable_nonreference_pairs() -> None:
+    inputs = _tiny_inputs()
+    model = build_pitch_summary_model(inputs)
+    reachable = inputs.reachable_mask
+    ref = inputs.ref_class_by_result
+    n_result_pairs = sum(
+        1
+        for r in range(inputs.n_result_families)
+        for k in range(N_CLASSES)
+        if reachable[r, k] and k != ref[r]
+    )
+    n_cell_pairs = sum(
+        1
+        for c in range(inputs.n_cells)
+        for k in range(N_CLASSES)
+        if reachable[inputs.cell_result_idx[c], k]
+        and k != ref[inputs.cell_result_idx[c]]
+    )
+    assert n_result_pairs < inputs.n_result_families * (N_CLASSES - 1)
+    assert tuple(model["result_logodds"].type.shape) == (n_result_pairs,)
+    assert tuple(model["cell_logodds"].type.shape) == (n_cell_pairs,)
+
+
+def test_softmax_sums_to_one_and_masks_unreachable() -> None:
+    inputs = _tiny_inputs()
+    model = build_pitch_summary_model(inputs)
+    cell_prob = np.asarray(
+        pm.draw(model["cell_class_prob"], draws=1, random_seed=0), dtype=np.float64
+    )
+    result_prob = np.asarray(
+        pm.draw(model["result_class_prob"], draws=1, random_seed=0), dtype=np.float64
+    )
+    assert cell_prob.shape == (inputs.n_cells, N_CLASSES)
+    assert result_prob.shape == (inputs.n_result_families, N_CLASSES)
+    assert np.allclose(cell_prob.sum(axis=1), 1.0, atol=1e-9)
+    assert np.allclose(result_prob.sum(axis=1), 1.0, atol=1e-9)
+    cell_reachable = inputs.cell_reachable_mask
+    assert (~cell_reachable).any()
+    assert float(cell_prob[~cell_reachable].max()) < 1e-10
+    assert float(cell_prob[cell_reachable].min()) > 0.0
+    assert float(result_prob[~inputs.reachable_mask].max()) < 1e-10
+    assert float(result_prob[inputs.reachable_mask].min()) > 0.0
+    assert float(cell_prob[~cell_reachable].max()) <= np.exp(MASK_LOGIT)
+
+
+def test_reference_class_carries_zero_logit_under_prior_draw() -> None:
+    inputs = _tiny_inputs()
+    model = build_pitch_summary_model(inputs)
+    cell_prob = np.asarray(
+        model["cell_class_prob"].eval(
+            {model["cell_logodds"]: np.zeros(model["cell_logodds"].type.shape)}
+        ),
+        dtype=np.float64,
+    )
+    for c in range(inputs.n_cells):
+        r = int(inputs.cell_result_idx[c])
+        n_reachable = int(inputs.reachable_mask[r].sum())
+        reachable_probs = cell_prob[c][inputs.reachable_mask[r]]
+        assert np.allclose(reachable_probs, 1.0 / n_reachable, atol=1e-9)
+
+
+def test_observed_count_in_unreachable_entry_raises() -> None:
+    inputs = _tiny_inputs()
+    bad_counts = inputs.counts.copy()
+    strikeout_cell = inputs.cell_labels.index("strikeout|2023|AL")
+    bad_counts[strikeout_cell, 0] = 5
+    bad = inputs.model_copy(update={"counts": bad_counts})
+    with pytest.raises(AssertionError, match="unreachable"):
+        build_pitch_summary_model(bad)
 
 
 def test_cell_class_prob_is_the_only_cell_sized_deterministic() -> None:
@@ -156,9 +241,9 @@ def _tiny_coverage_inputs() -> PitchCoverageInputs:
     fixed_effects: dict[str, FixedEffectDesign] = {}
     fe_levels: dict[str, list[str]] = {}
     for pos, column in enumerate(CONTEXT_FIXED_EFFECT_COLUMNS):
-        levels = sorted({r[2 + pos] for r in rows})
+        levels = sorted({str(r[2 + pos]) for r in rows})
         vocab = {lvl: i for i, lvl in enumerate(levels)}
-        codes = np.array([vocab[r[2 + pos]] for r in rows], dtype=np.int64)
+        codes = np.array([vocab[str(r[2 + pos])] for r in rows], dtype=np.int64)
         fixed_effects[column] = FixedEffectDesign(codes=codes, levels=tuple(levels))
         fe_levels[column] = levels
 
@@ -239,13 +324,67 @@ def test_coverage_single_level_fixed_effect_omitted() -> None:
     assert f"delta_{column}" not in model.named_vars
 
 
-@pytest.mark.skipif(
-    not _COVERAGE_PARQUET.exists(), reason="pitch-summary dataset artifact absent"
-)
-def test_coverage_prep_populates_inputs_from_real_parquet() -> None:
-    inputs = prepare_pitch_coverage_inputs(_COVERAGE_PARQUET, smoke_limit=20_000)
+def _games_in_fold(prefix: str, count: int, *, held_out: bool) -> list[str]:
+    games: list[str] = []
+    i = 0
+    while len(games) < count:
+        gid = f"{prefix}{i:05d}"
+        in_holdout = (
+            game_hash_fold(gid, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID
+        )
+        if in_holdout == held_out:
+            games.append(gid)
+        i += 1
+    return games
+
+
+def _coverage_dataset(
+    tmp_path: Path, *, train_games: int = 30, events_per_game: int = 12
+) -> Path:
+    rng = np.random.default_rng(20260904)
+    seasons = (2023, 2024)
+    leagues = ("AL", "NL")
+    scorers = ("s0", "s1", "s2")
+    families = ("strikeout", "single", "out_in_play")
+    regimes = ("pre_shift_era", "full_shift_era")
+    rows: list[dict[str, object]] = []
+    event_key = 0
+
+    def _append(game_id: str, *, scorer: str, result_family: str) -> None:
+        nonlocal event_key
+        rows.append(
+            {
+                "event_key": event_key,
+                "game_id": game_id,
+                "has_count": bool(rng.random() < 0.6),
+                "season": seasons[event_key % len(seasons)],
+                "league": leagues[(event_key // 2) % len(leagues)],
+                "scorer": scorer,
+                "result_family": result_family,
+                "alignment_regime": regimes[event_key % len(regimes)],
+            }
+        )
+        event_key += 1
+
+    for gid in _games_in_fold("TRAIN", train_games, held_out=False):
+        for e in range(events_per_game):
+            _append(gid, scorer=scorers[e % 3], result_family=families[e % 3])
+    for gid in _games_in_fold("HELD", 2, held_out=True):
+        for e in range(events_per_game):
+            _append(gid, scorer=scorers[e % 3], result_family=families[e % 3])
+        _append(gid, scorer="unseen_scorer", result_family="unseen_family")
+    dataset_path = tmp_path / "pitch_coverage_dataset.parquet"
+    pl.DataFrame(rows).write_parquet(dataset_path)
+    return dataset_path
+
+
+def test_coverage_prep_populates_inputs_from_synthetic_parquet(tmp_path: Path) -> None:
+    smoke_limit = 200
+    inputs = prepare_pitch_coverage_inputs(
+        _coverage_dataset(tmp_path), smoke_limit=smoke_limit
+    )
     assert inputs.outcome == "has_count"
-    assert inputs.n_events == 20_000
+    assert inputs.n_events == smoke_limit
     assert inputs.n_cells == len(inputs.coords["season_league"])
     assert set(np.unique(inputs.y)).issubset({0, 1})
     assert 0.0 < float(inputs.y.mean()) < 1.0
@@ -260,14 +399,30 @@ def test_coverage_prep_populates_inputs_from_real_parquet() -> None:
         assert list(design.levels) == inputs.coords[f"{column}_levels"]
 
 
-@pytest.mark.skipif(
-    not _COVERAGE_PARQUET.exists(), reason="pitch-summary dataset artifact absent"
-)
-def test_coverage_held_out_disjoint_and_unseen_levels_sentinel() -> None:
-    inputs = prepare_pitch_coverage_inputs(_COVERAGE_PARQUET, smoke_limit=20_000)
+def test_coverage_held_out_disjoint_and_unseen_levels_sentinel(tmp_path: Path) -> None:
+    dataset_path = _coverage_dataset(tmp_path)
+    inputs = prepare_pitch_coverage_inputs(dataset_path, smoke_limit=10_000)
     held = inputs.held_out
-    assert held.n_events > 0
+    held_games = {
+        g
+        for g in pl.read_parquet(dataset_path).get_column("game_id").unique().to_list()
+        if game_hash_fold(g, fold_count=HOLDOUT_FOLD_COUNT) == HOLDOUT_FOLD_ID
+    }
+    assert held_games
+    assert held.n_events == pl.read_parquet(dataset_path).filter(
+        pl.col("game_id").is_in(list(held_games))
+    ).height
+    assert held.n_events + inputs.n_events == pl.read_parquet(dataset_path).height
     assert set(np.unique(held.y)).issubset({0, 1})
-    assert int(held.cell_idx.min()) >= -1
+    assert int(held.cell_idx.min()) >= UNSEEN_LEVEL_CODE
     assert int(held.cell_idx.max()) < inputs.n_cells
-    assert int(held.scorer_idx.min()) >= -1
+    assert int(held.scorer_idx.min()) == UNSEEN_LEVEL_CODE
+    assert int(held.scorer_idx.max()) < len(inputs.scorer_labels)
+    assert "unseen_scorer" not in inputs.scorer_labels
+    unseen_scorer_rows = held.scorer_idx == UNSEEN_LEVEL_CODE
+    assert int(unseen_scorer_rows.sum()) == len(held_games)
+    family_codes = held.fixed_effect_codes["result_family"]
+    assert family_codes.shape == held.y.shape
+    assert int(family_codes.min()) == UNSEEN_LEVEL_CODE
+    np.testing.assert_array_equal(family_codes == UNSEEN_LEVEL_CODE, unseen_scorer_rows)
+    assert int(family_codes.max()) < len(inputs.fixed_effects["result_family"].levels)

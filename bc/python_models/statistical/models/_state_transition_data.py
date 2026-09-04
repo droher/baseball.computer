@@ -1,8 +1,11 @@
 """Cell-grain prep for the Markov base-out transition submodel.
 
-Reads the per-event ``model_input_run_values`` Parquet and aggregates to
-transition cell grain — one row per ``(season, league, start_state)`` carrying a
-length-25 end-state count vector. The start state is the ``(outs, base)`` suffix
+Reads the per-event ``model_input_run_values`` Parquet, restricts it to the
+deterministic run-expectancy population (``filter_event_population``: regular
+season, innings before the ninth, untruncated exposure, real events only), and
+aggregates to transition cell grain — one row per ``season|league|start_state``
+cell (the label shared with the run-expectancy prep) carrying a length-25
+end-state count vector. The start state is the ``(outs, base)`` suffix
 of ``run_expectancy_start_key`` (``outs*8+base``, 24 base-out states). The end
 class is the ``(outs, base)`` suffix of ``run_expectancy_end_key``: an
 inning-ending transition is encoded as ``outs==3`` (suffix ``3_0``) and maps to a
@@ -27,6 +30,11 @@ import numpy.typing as npt
 import polars as pl
 from pydantic import BaseModel, ConfigDict
 
+from python_models.statistical.models._run_values_data import (
+    cell_label_expr,
+    filter_event_population,
+    parse_cell_label,
+)
 from python_models.statistical.splits import game_hash_fold
 
 _log = logging.getLogger(__name__)
@@ -147,22 +155,18 @@ def _end_class_index(key: str) -> int:
 
 
 def _aggregate_cells(parquet_path: Path) -> pl.DataFrame:
+    frame = filter_event_population(
+        pl.scan_parquet(parquet_path), label="prepare_state_transition_inputs"
+    )
     return (
-        pl.scan_parquet(parquet_path)
-        .filter(
+        frame.filter(
             pl.col("game_id").is_not_null()
+            & pl.col("season").is_not_null()
+            & pl.col("league").is_not_null()
             & pl.col("run_expectancy_start_key").is_not_null()
             & pl.col("run_expectancy_end_key").is_not_null()
         )
-        .with_columns(
-            (
-                pl.col("season").cast(pl.Utf8)
-                + pl.lit("|")
-                + pl.col("league").cast(pl.Utf8)
-                + pl.lit("|")
-                + pl.col("run_expectancy_start_key").str.split("_").list.tail(2).list.join("_")
-            ).alias("cell")
-        )
+        .with_columns(cell_label_expr().alias("cell"))
         .group_by(
             ["cell", "game_id", "run_expectancy_start_key", "run_expectancy_end_key"]
         )
@@ -279,9 +283,10 @@ def prepare_state_transition_inputs(
     cell_labels = sorted(train_cells.get_column("cell").unique().to_list())
     counts = _count_matrix(train_cells, cell_labels)
 
-    season_by_cell = [int(str(c).split("|")[0]) for c in cell_labels]
-    league_by_cell = [str(c).split("|")[1] for c in cell_labels]
-    start_suffix_by_cell = [str(c).split("|")[2] for c in cell_labels]
+    parsed = [parse_cell_label(str(c)) for c in cell_labels]
+    season_by_cell = [season for season, _lg, _o, _b in parsed]
+    league_by_cell = [league for _s, league, _o, _b in parsed]
+    start_suffix_by_cell = [f"{outs}_{base}" for _s, _lg, outs, base in parsed]
 
     start_state_labels = _start_state_labels()
     start_to_idx = {lbl: i for i, lbl in enumerate(start_state_labels)}

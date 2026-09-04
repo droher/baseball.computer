@@ -231,10 +231,13 @@ mnar-backtest *ARGS:
     {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group stats python scripts/mnar_masked_backtest.py "$@"
 
 # MNAR sensitivity ribbon: publish the selection-log-odds band beside each
-# published geometry_* fit, or validate grid coverage against a masked-backtest
-# run dir. Read-only against published pointers; writes sensitivity_ribbon.parquet
-# beside the fit (--publish, default) or nothing (--validate-backtest).
-# Usage: just sensitivity-ribbon [--validate-backtest <run-dir>]
+# published geometry_* fit, place the trajectory band against the derived-slice
+# bound from scripts/mnar_anchor.py, or validate grid coverage against a
+# masked-backtest run dir. Read-only against published pointers; writes
+# sensitivity_ribbon.parquet beside the fit (--publish, default), the per-era
+# ribbon + trajectory_bound_offset.parquet beside the trajectory fit (--bound),
+# or nothing (--validate-backtest).
+# Usage: just sensitivity-ribbon [--bound <anchor-run-dir>] [--validate-backtest <run-dir>]
 sensitivity-ribbon *ARGS:
     {{ _dev_env }} BC_STATS_PUBLISHED_ROOT="{{ repo_root }}/artifacts/statistical/published-{{ _branch_slug }}/" PYTHONPATH="{{ repo_root }}/bc" uv run --group stats python scripts/sensitivity_ribbon.py "$@"
 
@@ -246,7 +249,7 @@ gen-llm-context *ARGS:
 
 # --- Tests ---
 
-# pytest under bc/tests (dev DB env).
+# pytest under bc/tests (dev DB env). Fast tier by default (pyproject addopts deselect `slow`); `just test -m slow` runs the slow tier.
 test *ARGS:
     {{ _dev_env }} uv run --group build pytest bc/tests "$@"
 
@@ -271,7 +274,9 @@ promote-prod *MODELS:
     fi
     args=()
     for m in "$@"; do args+=(--restate-model "$m"); done
-    cd bc && uv run --group build sqlmesh plan "${args[@]}" --auto-apply --no-prompts
+    cd bc
+    uv run --group build sqlmesh plan --auto-apply --no-prompts
+    uv run --group build sqlmesh plan "${args[@]}" --auto-apply --no-prompts
 
 # Wipe bc.db + bc/bc_state.db, then preload + plan PROD from sources. After: re-run `just bootstrap-dev` to resync dev.
 [confirm("Delete bc.db AND bc/bc_state.db and rebuild PROD from sources? Type 'yes' to proceed.")]

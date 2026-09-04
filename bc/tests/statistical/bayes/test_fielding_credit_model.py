@@ -376,3 +376,65 @@ def test_subsample_held_out_is_deterministic_and_preserves_levels() -> None:
         assert design.codes.shape[0] == 50
     passthrough = _subsample_held_out(carrier, limit=10_000, seed=7)
     assert passthrough.n_events == carrier.n_events
+
+
+def _softmax_mean(eta: np.ndarray) -> np.ndarray:
+    eta = eta - eta.max(axis=-1, keepdims=True)
+    exp_eta = np.exp(eta)
+    return (exp_eta / exp_eta.sum(axis=-1, keepdims=True)).mean(axis=(0, 1))
+
+
+def test_event_softmax_gives_unseen_fe_level_zero_effect() -> None:
+    from python_models.statistical.bayes.training import _posterior_event_softmax
+
+    idata = _synthetic_credit_idata(np.random.default_rng(3), k=N_POSITIONS_ASSIST)
+    carrier = _carrier_with_putout_at(1)
+    rf_codes = carrier.fixed_effects["result_family"].codes
+    unseen_row = int(np.flatnonzero(rf_codes < 0)[0])
+    seen_row = int(np.flatnonzero(rf_codes >= 0)[0])
+
+    shares = _posterior_event_softmax(idata, carrier, n_positions=N_POSITIONS_ASSIST)
+    np.testing.assert_allclose(shares.sum(axis=1), 1.0, atol=1e-9)
+
+    alpha = np.asarray(idata.posterior["alpha_position"].values)
+    delta_rf = np.asarray(idata.posterior["delta_result_family"].values)
+    delta_po = np.asarray(idata.posterior["delta_putout_position"].values)
+    po_code = int(carrier.fixed_effects["putout_position"].codes[0])
+
+    without_rf = alpha + delta_po[:, :, po_code, :]
+    np.testing.assert_allclose(shares[unseen_row], _softmax_mean(without_rf), atol=1e-9)
+    with_rf = without_rf + delta_rf[:, :, int(rf_codes[seen_row]), :]
+    np.testing.assert_allclose(shares[seen_row], _softmax_mean(with_rf), atol=1e-9)
+    assert not np.allclose(shares[seen_row], shares[unseen_row], atol=1e-6)
+
+
+def test_putout_posterior_scoring_gives_unseen_fe_level_zero_effect() -> None:
+    import arviz as az
+
+    from python_models.statistical.bayes.training import _score_putout_posterior
+
+    rng = np.random.default_rng(4)
+    n_chain, n_draw = 2, 5
+    alpha = rng.normal(size=(n_chain, n_draw, N_POSITIONS))
+    delta_rf = rng.normal(size=(n_chain, n_draw, 3, N_POSITIONS))
+    putout_idata = az.from_dict(
+        posterior={"alpha_position": alpha, "delta_result_family": delta_rf},
+        coords={"result_family_levels": ["a", "b", "c"], "position": list(range(9))},
+        dims={
+            "alpha_position": ["position"],
+            "delta_result_family": ["result_family_levels", "position"],
+        },
+    )
+    carrier = _carrier_with_putout_at(1)
+    rf_codes = carrier.fixed_effects["result_family"].codes
+    unseen_row = int(np.flatnonzero(rf_codes < 0)[0])
+    seen_row = int(np.flatnonzero(rf_codes >= 0)[0])
+
+    weights = _score_putout_posterior(putout_idata, carrier)
+    np.testing.assert_allclose(weights.sum(axis=1), 1.0, atol=1e-9)
+    np.testing.assert_allclose(weights[unseen_row], _softmax_mean(alpha), atol=1e-9)
+    np.testing.assert_allclose(
+        weights[seen_row],
+        _softmax_mean(alpha + delta_rf[:, :, int(rf_codes[seen_row]), :]),
+        atol=1e-9,
+    )

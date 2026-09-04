@@ -76,6 +76,7 @@ override-dependencies = [
 [tool.pytest.ini_options]
 testpaths = ["bc/tests"]
 pythonpath = ["bc"]
+addopts = "-m 'not slow'"
 markers = [
     "slow: tests that import Keras/Torch or hit bc_dev.db; opt in with `pytest -m slow`",
 ]

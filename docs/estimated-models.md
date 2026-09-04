@@ -4,7 +4,7 @@ title: Estimated Models — Reference
 type: architecture
 status: active
 audience: humans-and-agents
-last-verified: 2026-07-13
+last-verified: 2026-09-04
 ---
 
 # Estimated Models — Reference
@@ -35,14 +35,14 @@ Every table carries the same eight provenance columns:
 
 | Column | Meaning |
 | --- | --- |
-| `artifact_id` | the fit that produced the row, e.g. `state-transition-v4` |
+| `artifact_id` | the fit that produced the row, e.g. `state-transition-v5` |
 | `model_name` | the registered Bayes target |
 | `model_version` | model code version at fit time |
 | `source_snapshot_id` | source-data snapshot the fit read |
 | `method` | `hierarchical_logistic` (Bernoulli), `hierarchical_bayes_softmax` (multinomial shares), or `hierarchical_bayes_nb` (count/distribution summaries) |
 | `observed_status` | constant `estimated`, the namespace marker |
 | `confidence_status` | the fit's validation status |
-| `weak_identification_flag` | `True` when a convergent fit is nonetheless weakly identified (low group-level ESS, high r-hat, any divergences, or non-finite diagnostics); see [weak identification](#weak-identification). Populated from each fit's own diagnostics; several current tables carry `True`, the rest `False`. |
+| `weak_identification_flag` | `True` when a convergent fit is nonetheless weakly identified (low group-level ESS, high r-hat, any divergences, or non-finite diagnostics); see [weak identification](#weak-identification). Populated from each fit's own diagnostics; currently `True` for every row of `state_transition_summary`, for `imputed_fielding_credit` assist rows (putout rows are `False`), and for `scorer_observation_propensities` rows from the `ball_handler_position`, `location_depth`, `location_edge`, and `trajectory` observedness models (`general_location` and `location_side` rows are `False`); every other table is `False`. |
 
 `event_key` joins to `main_models.event_states_full` for season, league, game, batter, and base-out context.
 
@@ -113,7 +113,7 @@ G_i ~ Categorical(π_i)
 expected_share = E[ π_{i,k} | data ]
 ```
 
-The four DL-backed dimensions optionally carry a centered per-class deep-learning logit (`gamma_dl`) as a regularized covariate. The published operating points use the shrunk DL flavor on those four and a DL-free fit on `general_location`.
+The four DL-backed dimensions optionally carry a centered per-class deep-learning logit (`gamma_dl`) as a regularized covariate. Events without a DL prediction carry a zero logit, so the covariate contributes nothing to their shares; a dimension whose unrecorded events all lack a DL prediction is published with the DL-free (`gamma_dl_zero`) fit. The published operating points use the shrunk DL flavor where the DL prediction covers the unrecorded slice and a DL-free fit elsewhere, including `general_location`.
 
 **Example: most-likely trajectory per event (argmax), 5 events.**
 
@@ -127,11 +127,11 @@ LIMIT 5;
 
 | event_key | class_label | p |
 | --- | --- | --- |
-| 282541797 | LineDrive | 0.478 |
-| 282541801 | Fly | 0.377 |
-| 282541803 | GroundBall | 0.484 |
-| 282541804 | PopUp | 0.316 |
-| 282541805 | LineDrive | 0.354 |
+| 218283855 | Fly | 0.449 |
+| 218283857 | Fly | 0.396 |
+| 218283858 | Fly | 0.429 |
+| 218283859 | Fly | 0.593 |
+| 218283861 | Fly | 0.407 |
 
 Take the full distribution, not the argmax, when you need calibrated probabilities. The top class often sits below 0.5.
 
@@ -172,7 +172,7 @@ Held-out top-1 accuracy is 0.220 against a 0.171 position-prior baseline. The ha
 
 **Estimand.** P(fielder position earned the credit) for events where the official record left a putout or assist unattributed, per credit type.
 
-**Table.** Grain `(event_key, player_id, fielding_position, credit_type)`. `credit_type ∈ {putout, assist}`. `none_share` rides along on assist rows (the K=10 NONE-sentinel mass) so a consumer computes `P(any assist) = 1 − none_share` without a re-join; it is NULL for putouts.
+**Table.** Grain `(event_key, player_id, fielding_position, credit_type)`. `credit_type ∈ {putout, assist}`. Both credit types cover the same event set: the production slice of events whose putout the official record left unattributed (`unknown_credit_need > 0` with personnel available and eligible for allocation). Each event carries nine putout rows and nine assist rows. `none_share` rides along on assist rows (the K=10 NONE-sentinel mass) so a consumer computes `P(any assist) = 1 − none_share` without a re-join; it is NULL for putouts. Events whose putout was recorded are not in the table, so summing `expected_share` over the table never double-counts a recorded putout.
 
 **Formula.** Per-event softmax over the personnel-eligible position set, fit with two likelihoods sharing the same `π`:
 
@@ -183,7 +183,7 @@ aggregate:   T_m ~ Normal( Σ_e U_e · π_{e,k}, σ_box )          on the masked
 expected_share = E[ π_{e,k} | data ]
 ```
 
-The supervised arm carries the per-event signal; the aggregate arm anchors the masked subset to box-score totals. The assist export is scored over the production unknown slice and marginalizes the unknown putout position over the published putout posterior.
+The supervised arm carries the per-event signal; the aggregate arm anchors the masked subset to box-score totals. Both exports are scored over the production unknown slice, never the well-attributed training events. The putout export applies the fitted softmax to each production event's own covariates. The assist export does the same but marginalizes the unknown putout position over the published putout posterior.
 
 **Example: assist credit shares for one event, with any-assist probability.**
 
@@ -221,10 +221,12 @@ State grain uses the string `{outs}_{base_state}`. `0_0` is 0 outs / bases empty
 
 **Table.** Grain `(state, season, league, outcome)`, with `base_state` and `outs` split out. Payload `re_value_mean` + sd + HDI.
 
-**Formula.** Cell-grain negative binomial. The sum of n i.i.d. `NB(λ, φ)` sharing a cell mean is `NB(nλ, nφ)`, so ~10M events collapse to a few thousand cells exactly:
+**Population.** The same rows the deterministic `run_expectancy_matrix` uses: regular season, innings 1–8, untruncated exposure (`denominator_policy = 'include'`), and only real events (a plate appearance, a base-out change, or a run), so substitutions and other no-op rows are not counted. `season` and `league` are the dataset's own columns, not the `season_group` / `league_group` buckets inside `run_expectancy_start_key`, so `league` carries real codes (NAL, NN2, ECL) and joins `state_transition_summary` on `(season, league)`.
+
+**Formula.** Cell-grain negative binomial. The sum of n i.i.d. `NB(λ, φ_state)` sharing a cell mean is `NB(nλ, nφ_state)`, so ~14M events collapse to a few thousand cells exactly. The dispersion is per base-out state, because bases-empty and two-out states are about twice as over-dispersed as loaded zero-out states:
 
 ```
-runs_cell ~ NB( n_cell · λ_cell, n_cell · φ )
+runs_cell ~ NB( n_cell · λ_cell, n_cell · φ[state] )
 log λ:  global_mu → mu_state[24 base-out states] → theta_cell        (centered hierarchy)
 re_value_mean = E[ exp(theta_cell) | data ]
 ```
@@ -240,18 +242,20 @@ ORDER BY re_value_mean DESC LIMIT 4;
 
 | state | base_state | outs | re |
 | --- | --- | --- | --- |
-| 0_7 | 7 (loaded) | 0 | 2.202 |
-| 0_6 | 6 (2B+3B) | 0 | 1.980 |
-| 0_5 | 5 (1B+3B) | 0 | 1.672 |
-| 1_7 | 7 (loaded) | 1 | 1.554 |
+| 0_7 | 7 (loaded) | 0 | 2.323 |
+| 0_6 | 6 (2B+3B) | 0 | 1.986 |
+| 0_5 | 5 (1B+3B) | 0 | 1.688 |
+| 1_7 | 7 (loaded) | 1 | 1.559 |
 
-Bases loaded, nobody out: 2.20 expected runs, matching standard run-expectancy tables.
+Bases loaded, nobody out: 2.32 expected runs, matching standard run-expectancy tables.
 
 ### `state_transition_summary` (Model G, transition arm)
 
 **Estimand.** The Markov transition matrix: P(end base-out state | start base-out state) per season and league, over the 24 base-out states plus an inning-end sentinel.
 
 **Table.** Grain `(start_state, season, league, end_class)`. Payload `prob_mean` + sd + HDI. Rows per `start_state` sum to 1.
+
+**Population.** Identical to `run_expectancy_summary` (regular season, innings 1–8, untruncated exposure, real events only) with the same `(season, league, state)` cell, so a self-transition such as `0_0 → 0_0` is a home run or a no-advance play, never a substitution.
 
 **Formula.** Reachability-masked reference-class softmax. Outs never decrease within an event, so reachable end classes for a start state are the base states at out counts `≥ start_outs` plus inning-end; unreachable cells are pinned to a large negative logit and carry no free parameter, and each start state pins its own modal reachable class as the reference:
 
@@ -262,7 +266,7 @@ reachable(start, end)  ⇔  end_outs ≥ start_outs
 prob_mean = E[ p_cell | data ]
 ```
 
-This masking is what made the fit converge. Treating all 24×25 pairs as reachable left >50% structural zeros and an unreachable global reference, which walled the sampler out at rhat 4. The published `state-transition-v4` clears the strict gate (rhat 1.048, ess 185, 0 divergences).
+This masking is what made the fit converge. Treating all 24×25 pairs as reachable left >50% structural zeros and an unreachable global reference, which walled the sampler out at rhat 4. The published `state-transition-v5` clears the strict gate (rhat 1.026, ess 227, 0 divergences).
 
 **Example: transitions from bases-empty / 0 outs, 2015 NL.**
 
@@ -275,11 +279,11 @@ ORDER BY prob_mean DESC;
 
 | end_class | p | reading |
 | --- | --- | --- |
-| 1_0 | 0.486 | batter out, bases stay empty |
-| 0_0 | 0.309 | bases empty, still 0 out |
-| 0_1 | 0.165 | batter reaches first |
-| 0_2 | 0.035 | batter reaches second |
-| 0_4 | 0.004 | batter reaches third |
+| 1_0 | 0.684 | batter out, bases stay empty |
+| 0_1 | 0.232 | batter reaches first |
+| 0_2 | 0.050 | batter reaches second |
+| 0_0 | 0.028 | bases empty, still 0 out |
+| 0_4 | 0.006 | batter reaches third |
 
 Every reachable end has outs ∈ {0, 1}: no 2-out end appears from a 0-out start, the reachability mask in effect. The distribution sums to exactly 1.0.
 
@@ -294,14 +298,15 @@ Every reachable end has outs ∈ {0, 1}: no 2-out end appears from a 0-out start
 ```
 team_runs_g ~ NB( λ_g, φ )
 log λ_g = log(PA_g) + α_{season,league} + offense[team,season] + pitching[opp,season] + θ_park[park,season,league] + h·is_home
-θ_raw[park,league]:  AR(1) over the season steps of that park-league chain
-    θ_raw_1 ~ Normal(0, σ_init)
-    θ_raw_t = ρ · θ_raw_{t-1} + ε_t,   ε_t ~ Normal(0, σ_innov),   ρ ~ Beta(2,1)
+θ_raw[park,league]:  gap-aware AR(1) over the observed cells of that park-league chain
+    θ_raw_1 = σ_init · ε_1
+    θ_raw_t = ρ^d · θ_raw_{t-1} + σ_innov · sqrt((1 − ρ^{2d}) / (1 − ρ²)) · ε_t
+    ε_t ~ Normal(0, 1),   d = seasons since the previous observed cell,   ρ ~ Beta(2,1)
 θ_park = center-within-group( θ_raw, group = (season, league) )
 park_factor_mean = exp(θ_park)
 ```
 
-The raw per-cell effect follows an AR(1) persistence prior across consecutive seasons within a `(park, league)` chain before centering, so a park's factor is pulled toward its own recent history rather than fit independently cell by cell; `BC_PARK_FACTOR_DISABLE_AR1` swaps it for an independent `z · σ_park` raw effect when needed. Centering θ within the season-league group rather than globally stops era-level scoring from leaking into the park effect.
+The raw per-cell effect follows an AR(1) persistence prior along each `(park, league)` chain of observed cells before centering, so a park's factor is pulled toward its own recent history rather than fit independently cell by cell. The prior is non-centered: every cell draws a standard-normal `ε` and the recursion scales it, which keeps the sampler off the funnel that a tiny `σ_innov` creates. Steps are measured in seasons, not in chain rank: a cell that follows a 33-season gap (MIL05 in the NL, 1965 to 1998) is correlated with its predecessor by `ρ^33` and carries the stationary bridging variance for that gap, so it is nearly independent of it, while a one-season step is the ordinary AR(1). Unobserved seasons get no latent cells; the chain grid is exactly the set of published cells. `BC_PARK_FACTOR_DISABLE_AR1` swaps the prior for an independent `z · σ_park` raw effect when needed. Centering θ within the season-league group rather than globally stops era-level scoring from leaking into the park effect.
 
 **Example: most hitter-friendly park-seasons.**
 
@@ -323,14 +328,14 @@ ORDER BY park_factor_mean DESC LIMIT 3;
 
 **Estimand.** P(plate appearance ended on a given ball-strike count) per result family, season, and league, for the slice where the final count was recorded.
 
-**Table.** Grain `(result_family, season, league, final_count_class)`, with `balls` and `strikes` split out. 12 classes (`balls 0–3 × strikes 0–2`). Rows per cell sum to 1.
+**Table.** Grain `(result_family, season, league, final_count_class)`, with `balls` and `strikes` split out. 12 classes (`balls 0–3 × strikes 0–2`). Rows per cell sum to 1. Structurally impossible classes are present with `prob_mean = 0` exactly: a strikeout can only end with two strikes and a walk can only end with three balls, so those families carry mass on 4 and 3 classes respectively. Recorded events in an impossible cell are data errors and are dropped before the fit.
 
-**Formula.** Cell-grain multinomial with a centered reference-class softmax. Class `b0_s0` is the pinned reference; a three-level hierarchy carries the rest:
+**Formula.** Cell-grain multinomial with a reachability-masked reference-class softmax. Each result family pins its modal reachable class as the reference and its impossible classes to a large negative logit; a centered two-level hierarchy carries the reachable non-reference logits:
 
 ```
 counts_cell ~ Multinomial( N_cell, p_cell )
-p_cell = softmax( [0, cell_logodds] )
-cell_logodds:  beta0 → result_family_logodds → cell_logodds         (centered)
+p_cell = softmax over reachable classes (unreachable → logit −30; per-family reference → 0)
+cell_logodds:  result_family_logodds → cell_logodds                  (centered)
 prob_mean = E[ p_cell | data ]
 ```
 
@@ -393,9 +398,9 @@ A bases-empty groundout is one assist (6-3) 99% of the time. Multi-assist mass c
 
 **Estimand.** The run value of each play type per season-league, carrying the run-expectancy posterior's uncertainty. This is the estimated sibling of the deterministic `linear_weights` point surface, which is left untouched.
 
-**Table.** Grain `(season, league, play)`. `play_category ∈ {BATTING, BASERUNNING}`. Payload `run_value_mean` + sd + HDI, plus `n_events`.
+**Table.** Grain `(season, league, play)`. `play_category ∈ {BATTING, BASERUNNING}`. Payload `run_value_mean` + sd + HDI, plus `n_events` and `is_imputed`.
 
-**Formula.** Posterior propagation, not a new fit. Each run-expectancy draw flows through the deterministic linear-weights formula:
+**Formula.** Posterior propagation, not a new fit. Each run-expectancy draw flows through the deterministic linear-weights formula. Run-expectancy cells are looked up by the transition's own `(season, league)` and base-out state; transitions whose start state has no posterior cell are dropped, as the deterministic table drops them. Cells with at most the deterministic occurrence floor (100 events per season-league-play, read from `linear_weights.sql`) carry the corpus-pooled per-play value with `is_imputed = TRUE`, mirroring `linear_weights.is_imputed`:
 
 ```
 for each RE posterior draw d:
@@ -415,13 +420,13 @@ ORDER BY run_value_mean DESC LIMIT 7;
 
 | play | play_category | rv |
 | --- | --- | --- |
-| HomeRun | BATTING | 1.387 |
-| Triple | BATTING | 1.065 |
-| Double | BATTING | 0.742 |
-| ReachedOnError | BATTING | 0.475 |
-| Single | BATTING | 0.436 |
-| HitByPitch | BATTING | 0.316 |
-| Walk | BATTING | 0.298 |
+| HomeRun | BATTING | 1.395 |
+| Triple | BATTING | 1.062 |
+| Double | BATTING | 0.749 |
+| ReachedOnError | BATTING | 0.497 |
+| Single | BATTING | 0.440 |
+| HitByPitch | BATTING | 0.323 |
+| Walk | BATTING | 0.302 |
 
 Standard linear weights (home run ~1.4 runs, walk ~0.3), now with an HDI per value instead of a single number.
 
@@ -439,18 +444,25 @@ Standard linear weights (home run ~1.4 runs, walk ~0.3), now with an HDI per val
 
 ### MNAR: the shares are MAR, not MNAR-corrected
 
-The event-level imputation shares are fit on observed-only data under a missing-at-random assumption. The masked backtest showed the naive learned-propensity correction learns the survivor tilt and extrapolates it wrong-signed, so it is not published. The correct correction is a fixed per-class selection-offset applied at scoring time; `python_models/statistical/sensitivity.py` produces a per-class sensitivity ribbon that bounds how far a class share could move under plausible MNAR. Treat the published share as the MAR point and the ribbon as the uncertainty around the missingness mechanism.
+The event-level imputation shares are fit on observed-only data under a missing-at-random assumption. The masked backtest showed the learned per-class propensity coefficient (`gamma_propensity_class`) leaves the masked-slice class error essentially unchanged (relative reduction −0.001), so it is not published. Under the code's convention the covariate `z` is the standardized logit of P(observed), so masked events have low `z` and a negative GroundBall coefficient would raise GroundBall on the masked slice, the direction a correction needs; the learned arm is inert, not wrong-signed. The correct form of a correction is a fixed per-class selection offset applied at scoring time, but its magnitude is not identified from the data. `python_models/statistical/sensitivity.py` produces a per-class sensitivity ribbon (an assumed ±1.0-nat band) showing how far a class share could move under MNAR of that strength, and for trajectory `python_models/statistical/mnar_anchor.py` supplies the one data-derived constraint available: the derived slice (trajectory deduced from the fielding string, all GroundBall) gives a hard lower bound P(GroundBall | unrecorded) ≥ n_derived / n_unrecorded per era, plus a known-truth subslice on which the MAR shares can be scored. Treat the published share as the MAR point, the ribbon as an assumed band, and the bound as a floor the band must respect.
 
 ### Weak identification
 
-`weak_identification_flag` is populated at fit time from the run's own convergence diagnostics, via `weak_identification_thresholds()` / `diagnostics_indicate_weak_identification()` in `python_models/statistical/validate.py`. A fit that clears the convergence gate is nonetheless marked weakly identified (`True`) when any of:
+`weak_identification_flag` is computed from the fit's convergence diagnostics, via `weak_identification_thresholds()` / `diagnostics_indicate_weak_identification()` in `python_models/statistical/validate.py`. The diagnostics themselves are computed over every variable in the saved posterior, not a per-model allowlist, with one exception: a variable with more than 100,000 elements (the `DIAGNOSTICS_MAX_ELEMENTS_PER_VARIABLE` cap) is skipped and named in the log and in the per-variable table. Two summaries come out of that pass:
 
-- the minimum group-level bulk ESS across the fit's random effects falls below 4× the convergence gate's ESS floor (400 for a default fit, 12 for a smoke fit)
-- r-hat exceeds a comfort band set at half the convergence gate's margin above 1.0 (1.025 for a default fit, 1.25 for a smoke fit)
+- the convergence gate pair (`rhat_max`, `ess_bulk_min`) is the worst element across every diagnosed variable, including large per-cell and per-scorer effects; it decides `validation_status`
+- the group-level pair (`group_level_rhat_max`, `group_level_ess_bulk_min`) is the worst element across the variables with at most 512 elements (`GROUP_LEVEL_MAX_ELEMENTS`): scalars, hyperparameters such as `phi`, `rho_park`, `sigma_park_innov`, and `home_adv`, and small group-level effects; it decides the weak-identification flag
+
+The per-variable table (name, element count, worst r-hat, smallest bulk and tail ESS) is written beside the summary as `validation/diagnostics_by_variable.json`, so a flag can be traced to the variable that set it. A fit that clears the convergence gate is nonetheless marked weakly identified (`True`) when any of:
+
+- the group-level bulk ESS falls below 4× the convergence gate's ESS floor (400 for a default fit, 12 for a smoke fit)
+- the group-level r-hat exceeds a comfort band set at half the convergence gate's margin above 1.0 (1.025 for a default fit, 1.25 for a smoke fit)
 - the fit recorded any divergences
 - any diagnostic is non-finite (fail-safe: treat "can't tell" as weak)
 
-The retrained league-dependent fits populate this flag from their own diagnostics, so it is now a live signal on the published rows. Several tables carry `True` — the run-expectancy and state-transition summaries, the pitch-summary distribution, the estimated linear weights (which inherit run-expectancy's flag), and part of the observation-propensity rows — reflecting group-level ESS below the 4× floor or r-hat above the comfort band in those cell-grain fits. The geometry, ball-handler, fielding-credit, park-factor, and assist-count tables carry `False`. Read the flag per row: `True` means the fit converged but is weakly identified in that slice, not that the value is unusable.
+The flag is stamped at fit time and recomputed whenever `just validate-gates --write` runs: the sweep reloads `inference/posterior.nc`, recomputes both pairs and the per-variable table with the current thresholds, and writes the new flag into the manifest. Because the flag reads the group-level pair, a fit whose only slow-mixing parameters are thousands of per-cell effects can carry `False` while a fit whose pooling hyperparameter mixes poorly carries `True`, whichever way the gate pair went. Read the flag per row: `True` means the fit converged but its group-level structure is weakly identified, not that the value is unusable. Currently `True` for every row of `state_transition_summary`, for `imputed_fielding_credit` assist rows (putout rows are `False`), and for `scorer_observation_propensities` rows from the `ball_handler_position`, `location_depth`, `location_edge`, and `trajectory` observedness models (`general_location` and `location_side` rows are `False`); every other table is `False`.
+
+A `passed` status only reaches the tables as `confidence_status = 'passed'` when the manifest was stamped by the current validation gate version (`VALIDATION_GATE_VERSION` in `validate.py`, recorded as `validation_gate_version` with a `validated_at` timestamp). A manifest that passed under an older gate, or that carries no gate version at all, publishes as `exploratory` with a warning naming the artifact until the sweep re-stamps it.
 
 ## Glossary
 

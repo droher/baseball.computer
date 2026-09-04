@@ -23,13 +23,14 @@ OOS scoring. The production scoring slice is the handler-unobserved rows
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+
+from python_models.statistical.models._event_data import _encode_codes_with_vocab
 from pydantic import BaseModel, ConfigDict
 
 from python_models.statistical.models._credit_data import (
@@ -136,28 +137,6 @@ def _build_fixed_effect_design(df: pl.DataFrame, column: str) -> FixedEffectDesi
     if not labels:
         raise ValueError(f"fixed-effect column {column!r} has zero levels")
     return FixedEffectDesign(levels=tuple(labels), codes=codes)
-
-
-def _encode_codes_with_vocab(
-    per_event: pl.DataFrame, column: str, labels: Sequence[str]
-) -> IntArray:
-    """Map a per-event column to int codes against a fixed ``labels`` vocab.
-
-    Booleans cast to utf8, NULLs fill to ``UNKNOWN_LEVEL``; unseen values
-    (and NULLs) fall back to ``UNKNOWN_LEVEL``'s index, or ``-1`` when
-    ``UNKNOWN_LEVEL`` is not in the vocab.
-    """
-    series = per_event.get_column(column)
-    if series.dtype == pl.Boolean:
-        series = series.cast(pl.Utf8)
-    series = series.fill_null(UNKNOWN_LEVEL).cast(pl.Utf8)
-    mapping = {c: i for i, c in enumerate(labels)}
-    fallback = mapping.get(UNKNOWN_LEVEL, -1)
-    return np.fromiter(
-        (mapping.get(str(v), fallback) for v in series.to_list()),
-        dtype=np.int64,
-        count=series.len(),
-    )
 
 
 def _with_handler_and_season_league(lf: pl.LazyFrame) -> pl.LazyFrame:

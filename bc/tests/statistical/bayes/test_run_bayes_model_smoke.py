@@ -12,8 +12,10 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import math
 from pathlib import Path
 
+import arviz as az
 import numpy as np
 import polars as pl
 import pytest
@@ -29,6 +31,10 @@ from python_models.statistical.models._event_data import (
     ObservationHeldOutSet,
 )
 from python_models.statistical.splits import game_hash_fold
+from python_models.statistical.validate import (
+    diagnostics_indicate_weak_identification,
+    read_diagnostics_by_variable,
+)
 
 
 def _game_id_pool(*, n_holdout: int, n_train: int) -> list[str]:
@@ -248,6 +254,7 @@ def test_full_smoke_writes_event_propensity_export(tmp_path: Path) -> None:
         "exports/calibration_curve.parquet",
         "exports/event_propensity.parquet",
         "validation/diagnostics.json",
+        "validation/diagnostics_by_variable.json",
         "validation/held_out_metrics.json",
     ):
         assert (artifact_dir / rel).exists(), f"missing {rel}"
@@ -275,6 +282,26 @@ def test_full_smoke_writes_event_propensity_export(tmp_path: Path) -> None:
     assert payload["is_smoke"] is True
     assert "source_effect_active" in payload
     assert payload["calibration_ece"] is not None
+    assert math.isfinite(payload["group_level_rhat_max"])
+    assert math.isfinite(payload["group_level_ess_bulk_min"])
+    assert payload["group_level_ess_bulk_min"] >= payload["ess_bulk_min"]
+    assert payload["group_level_rhat_max"] <= payload["rhat_max"]
+    summary = reloaded.bayes_extras.diagnostics_summary
+    assert summary.group_level_rhat_max == payload["group_level_rhat_max"]
+    assert summary.group_level_ess_bulk_min == payload["group_level_ess_bulk_min"]
+    assert reloaded.bayes_extras.weak_identification_flag == (
+        diagnostics_indicate_weak_identification(
+            rhat_max=summary.group_level_rhat_max,
+            ess_bulk_min=summary.group_level_ess_bulk_min,
+            divergences=summary.divergences,
+            is_smoke=True,
+        )
+    )
+    by_variable = read_diagnostics_by_variable(
+        artifact_dir / "validation" / "diagnostics_by_variable.json"
+    )
+    posterior_vars = set(az.from_netcdf(artifact_dir / "inference" / "posterior.nc")["posterior"].data_vars)
+    assert {row.name for row in by_variable} == {str(v) for v in posterior_vars}
 
     held_out_payload = json.loads(
         (artifact_dir / "validation" / "held_out_metrics.json").read_text(

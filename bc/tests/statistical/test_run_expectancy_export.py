@@ -20,7 +20,7 @@ from python_models.statistical.models._run_values_data import (
     _build_era_regime_design,
 )
 
-CELL_LABELS = ["1933_AL_0_0", "1933_NL_1_3", "1934_AL_2_7"]
+CELL_LABELS = ["1933|AL|0_0", "1933|NL|1_3", "1934|AL|2_7"]
 STATE_LABELS = ["0_0", "1_3", "2_7"]
 OUTS = [0, 1, 2]
 BASE = [0, 3, 7]
@@ -70,7 +70,7 @@ def _idata() -> az.InferenceData:
     posterior = {
         "re_value": rng.gamma(2.0, 0.5, size=(N_CHAIN, N_DRAW, N_CELL)),
         "mu_state": rng.normal(size=(N_CHAIN, N_DRAW, len(STATE_LABELS))),
-        "phi": rng.gamma(5.0, 1.0, size=(N_CHAIN, N_DRAW)),
+        "phi": rng.gamma(5.0, 1.0, size=(N_CHAIN, N_DRAW, len(STATE_LABELS))),
     }
     coords = {
         "cell": list(CELL_LABELS),
@@ -79,6 +79,7 @@ def _idata() -> az.InferenceData:
     dims = {
         "re_value": ["cell"],
         "mu_state": ["state"],
+        "phi": ["state"],
     }
     return az.from_dict(posterior=posterior, coords=coords, dims=dims)
 
@@ -147,7 +148,7 @@ def test_summary_export_schema_and_one_row_per_cell(tmp_path: Path) -> None:
     for k in range(N_CELL):
         row = df.row(k, named=True)
         assert row["state"] == STATE_LABELS[k]
-        rebuilt = f"{row['season']}_{row['league']}_{row['outs']}_{row['base_state']}"
+        rebuilt = f"{row['season']}|{row['league']}|{row['outs']}_{row['base_state']}"
         assert rebuilt == CELL_LABELS[k]
 
     value = np.asarray(idata.posterior["re_value"].values, dtype=np.float64)

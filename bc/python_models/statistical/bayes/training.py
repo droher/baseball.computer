@@ -42,6 +42,7 @@ from python_models.statistical.config import BAYES_ROOT, DATASETS_ROOT
 from python_models.statistical.manifests import (
     find_published_manifest,
     package_versions,
+    read_published_pointer,
     utc_now,
     write_manifest,
 )
@@ -101,7 +102,11 @@ from python_models.statistical.schemas import (
     BayesSamplerConfig,
 )
 from python_models.statistical.validate import (
+    PosteriorDiagnostics,
+    compute_posterior_diagnostics,
     diagnostics_indicate_weak_identification,
+    nan_if_none,
+    write_diagnostics_by_variable,
 )
 
 _log = logging.getLogger(__name__)
@@ -391,96 +396,36 @@ def _diagnostics_from_idata(
     *,
     calibration_ece: float | None,
     posterior_predictive_max_bucket_dev: float | None,
-    outcome_kind: str = "bernoulli",
-) -> BayesDiagnosticsSummary:
-    posterior = idata.posterior
-    if outcome_kind == "multinomial":
-        multinomial_focus = {
-            "alpha_position",
-            "alpha_class",
-            "beta0",
-            "alpha_trans",
-            "beta0_count",
-            "event_class_logodds",
-            "sigma_event_class",
-            "cell_logodds",
-            "result_logodds",
-            "sigma_result",
-            "gamma_dl",
-            "beta_season",
-            "beta_season_league",
-            "z_season_league",
-            "sigma_season_league",
-            "beta_scorer",
-            "beta_park",
-            "beta_source",
-            "z_scorer",
-            "z_park",
-            "z_source",
-            "sigma_cell",
-            "cell_class_prob",
-        }
-        relevant_names = [
-            name
-            for name in posterior.data_vars
-            if str(name) in multinomial_focus or str(name).startswith("delta_")
-        ]
-    elif outcome_kind == "count":
-        count_focus = {
-            "alpha_season_league",
-            "theta_park",
-            "sigma_park",
-            "phi",
-            "sigma_offense",
-            "sigma_pitching",
-            "offense",
-            "pitching",
-            "global_mu",
-            "mu_state",
-            "sigma_state",
-            "sigma_cell",
-            "re_value",
-        }
-        relevant_names = [
-            name for name in posterior.data_vars if str(name) in count_focus
-        ]
-    else:
-        relevant_names = list(posterior.data_vars)
-    rhat_ds = az.rhat(idata, var_names=relevant_names)
-    ess_bulk_ds = az.ess(idata, var_names=relevant_names, method="bulk")
-    ess_tail_ds = az.ess(idata, var_names=relevant_names, method="tail")
-
-    def _finite_floats(ds: object) -> list[float]:
-        out: list[float] = []
-        for name in ds.data_vars:
-            arr = np.asarray(ds[name].values, dtype=np.float64).ravel()
-            out.extend(float(x) for x in arr[np.isfinite(arr)].tolist())
-        return out
-
-    rhat_values = _finite_floats(rhat_ds)
-    ess_bulk_values = _finite_floats(ess_bulk_ds)
-    ess_tail_values = _finite_floats(ess_tail_ds)
-
-    rhat_max = max(rhat_values) if rhat_values else float("nan")
-    ess_bulk_min = min(ess_bulk_values) if ess_bulk_values else float("nan")
-    ess_tail_min = min(ess_tail_values) if ess_tail_values else float("nan")
-
-    sample_stats = getattr(idata, "sample_stats", None)
-    divergences = 0
-    if sample_stats is not None and "diverging" in sample_stats:
-        divergences = int(np.asarray(sample_stats["diverging"].values).sum())
-    posterior = idata.posterior
-    total_draws = int(posterior.sizes["chain"] * posterior.sizes["draw"])
-
-    return BayesDiagnosticsSummary(
-        rhat_max=rhat_max,
-        ess_bulk_min=ess_bulk_min,
-        ess_tail_min=ess_tail_min,
-        divergences=divergences,
-        total_draws=total_draws,
+) -> tuple[BayesDiagnosticsSummary, PosteriorDiagnostics]:
+    diagnostics = compute_posterior_diagnostics(idata)
+    if diagnostics.excluded_variables:
+        _log.warning(
+            "posterior diagnostics excluded %d oversized variables: %s",
+            len(diagnostics.excluded_variables),
+            ", ".join(diagnostics.excluded_variables),
+        )
+    _log.info(
+        "posterior diagnostics rhat_max=%.4f ess_bulk_min=%.1f group_level_rhat_max=%.4f "
+        "group_level_ess_bulk_min=%.1f over %d variables (%d group-level)",
+        diagnostics.rhat_max,
+        diagnostics.ess_bulk_min,
+        diagnostics.group_level_rhat_max,
+        diagnostics.group_level_ess_bulk_min,
+        len(diagnostics.by_variable),
+        len(diagnostics.group_level_variables),
+    )
+    summary = BayesDiagnosticsSummary(
+        rhat_max=diagnostics.rhat_max,
+        ess_bulk_min=diagnostics.ess_bulk_min,
+        ess_tail_min=diagnostics.ess_tail_min,
+        divergences=diagnostics.divergences,
+        total_draws=diagnostics.total_draws,
         calibration_ece=calibration_ece,
         posterior_predictive_max_bucket_dev=posterior_predictive_max_bucket_dev,
+        group_level_rhat_max=diagnostics.group_level_rhat_max,
+        group_level_ess_bulk_min=diagnostics.group_level_ess_bulk_min,
     )
+    return summary, diagnostics
 
 
 def _posterior_event_means_bernoulli(
@@ -1247,8 +1192,7 @@ def _resolve_published_putout_idata(
     pointer = find_published_manifest(model_name)
     if pointer is None:
         return None
-    data = json.loads(pointer.read_text())
-    manifest_path = Path(data["manifest_path"])
+    manifest_path = read_published_pointer(pointer).manifest_path
     posterior_path = manifest_path.parent / "inference" / "posterior.nc"
     if not posterior_path.exists():
         _log.warning(
@@ -1550,6 +1494,88 @@ def _export_event_credit_shares(
         target_path,
     )
     return df
+
+
+def _export_credit_shares_for_target(
+    posterior_idata: az.InferenceData,
+    inputs: EventCreditInputs,
+    *,
+    dataset_parquet: Path,
+    dimension: str,
+    putout_idata: az.InferenceData | None,
+    target_path: Path,
+) -> pl.DataFrame:
+    """Write ``event_credit.parquet`` over the production unknown-credit slice.
+
+    Both credit types score the slice built by ``build_production_scoring_frame``
+    (the events whose putout the official record left unattributed), never the
+    training grain. The putout target scores it with the plain per-event
+    softmax from the production rows' own fixed-effect codes; the assist target
+    marginalizes the unknown putout position over the published putout
+    posterior. When the slice is empty, or the assist target has no putout
+    posterior to marginalize over, the training grain is exported instead with
+    a warning so the fit still ships a file.
+    """
+    production = build_production_scoring_frame(
+        dataset_parquet, dimension=dimension, fixed_effects=inputs.fixed_effects
+    )
+    if production.n_events == 0:
+        _log.warning(
+            "%s production slice empty; exporting training grain instead",
+            inputs.credit_type,
+        )
+        return _export_credit_training_grain(posterior_idata, inputs, target_path)
+    if inputs.credit_type == "assist":
+        if putout_idata is None:
+            _log.warning(
+                "no published putout posterior resolved; assist export uses "
+                "training grain and held-out metrics are observed-putout only"
+            )
+            return _export_credit_training_grain(posterior_idata, inputs, target_path)
+        putout_weights = _score_putout_posterior(putout_idata, production)
+        shares = _posterior_event_softmax_putout_marginalized(
+            posterior_idata,
+            production,
+            putout_posterior=putout_weights,
+            n_positions=inputs.n_positions,
+        )
+        scoring = "putout-marginalized"
+    else:
+        shares = _posterior_event_softmax(
+            posterior_idata, production, n_positions=inputs.n_positions
+        )
+        scoring = "plain softmax"
+    df = _export_event_credit_shares(
+        shares,
+        event_keys=production.event_keys,
+        credit_type=inputs.credit_type,
+        n_positions=inputs.n_positions,
+        target_path=target_path,
+    )
+    _log.info(
+        "%s export scored production slice events=%d (%s)",
+        inputs.credit_type,
+        production.n_events,
+        scoring,
+    )
+    return df
+
+
+def _export_credit_training_grain(
+    posterior_idata: az.InferenceData,
+    inputs: EventCreditInputs,
+    target_path: Path,
+) -> pl.DataFrame:
+    shares = _posterior_event_softmax(
+        posterior_idata, inputs, n_positions=inputs.n_positions
+    )
+    return _export_event_credit_shares(
+        shares,
+        event_keys=inputs.event_keys,
+        credit_type=inputs.credit_type,
+        n_positions=inputs.n_positions,
+        target_path=target_path,
+    )
 
 
 def _export_ball_handler_probabilities(
@@ -1973,7 +1999,7 @@ def _evaluate_run_expectancy_held_out(
     mu_state = np.asarray(posterior["mu_state"].values, dtype=np.float64).mean(
         axis=(0, 1)
     )
-    phi = float(np.asarray(posterior["phi"].values, dtype=np.float64).mean())
+    phi_state = np.asarray(posterior["phi"].values, dtype=np.float64).mean(axis=(0, 1))
 
     sum_runs = held.sum_runs.astype(np.float64)
     n = held.cell_event_count.astype(np.float64)
@@ -1981,7 +2007,7 @@ def _evaluate_run_expectancy_held_out(
 
     lam_full = re_value[held.cell_idx]
     lam_baseline = np.exp(mu_state[held.cell_state_idx])
-    alpha = n * phi
+    alpha = n * phi_state[held.cell_state_idx]
     loglik_full = nbinom.logpmf(sum_runs, alpha, alpha / (alpha + n * lam_full))
     loglik_baseline = nbinom.logpmf(sum_runs, alpha, alpha / (alpha + n * lam_baseline))
 
@@ -2010,7 +2036,13 @@ def _export_pitch_summary_summary(
     *,
     target_path: Path,
 ) -> None:
-    """Write one-row-per-(cell, class) ``cell_class_prob`` posterior summary."""
+    """Write one-row-per-(cell, class) ``cell_class_prob`` posterior summary.
+
+    Every cell keeps all 12 class rows so the published grain is complete.
+    Structurally impossible classes (``inputs.reachable_mask``) are written
+    with exactly zero probability, sd, and HDI and null diagnostics; the
+    reachable rows of each cell sum to one.
+    """
     prob = np.asarray(idata.posterior["cell_class_prob"].values, dtype=np.float64)
     n_cell, n_class = prob.shape[-2], prob.shape[-1]
     if n_cell != inputs.n_cells or n_class != len(inputs.class_labels):
@@ -2018,22 +2050,33 @@ def _export_pitch_summary_summary(
             f"cell_class_prob shape ({n_cell}, {n_class}) != "
             f"({inputs.n_cells}, {len(inputs.class_labels)})"
         )
-    prob_mean = prob.mean(axis=(0, 1)).reshape(-1)
-    prob_sd = prob.std(axis=(0, 1)).reshape(-1)
+    reachable = inputs.cell_reachable_mask.reshape(-1)
+    prob_mean = np.where(reachable, prob.mean(axis=(0, 1)).reshape(-1), 0.0)
+    prob_sd = np.where(reachable, prob.std(axis=(0, 1)).reshape(-1), 0.0)
     hdi = np.asarray(
         az.hdi(idata, var_names=["cell_class_prob"], hdi_prob=0.94)[
             "cell_class_prob"
         ].values,
         dtype=np.float64,
     )
-    ess = np.asarray(
-        az.ess(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
-        dtype=np.float64,
-    ).reshape(-1)
-    rhat = np.asarray(
-        az.rhat(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
-        dtype=np.float64,
-    ).reshape(-1)
+    hdi_lower = np.where(reachable, hdi[..., 0].reshape(-1), 0.0)
+    hdi_upper = np.where(reachable, hdi[..., 1].reshape(-1), 0.0)
+    ess = np.where(
+        reachable,
+        np.asarray(
+            az.ess(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
+            dtype=np.float64,
+        ).reshape(-1),
+        np.nan,
+    )
+    rhat = np.where(
+        reachable,
+        np.asarray(
+            az.rhat(idata, var_names=["cell_class_prob"])["cell_class_prob"].values,
+            dtype=np.float64,
+        ).reshape(-1),
+        np.nan,
+    )
 
     cell_pos = np.repeat(np.arange(n_cell), n_class)
     class_pos = np.tile(np.arange(n_class), n_cell)
@@ -2072,21 +2115,18 @@ def _export_pitch_summary_summary(
             ),
             "prob_mean": pl.Series("prob_mean", prob_mean, dtype=pl.Float64),
             "prob_sd": pl.Series("prob_sd", prob_sd, dtype=pl.Float64),
-            "prob_hdi_lower": pl.Series(
-                "prob_hdi_lower", hdi[..., 0].reshape(-1), dtype=pl.Float64
-            ),
-            "prob_hdi_upper": pl.Series(
-                "prob_hdi_upper", hdi[..., 1].reshape(-1), dtype=pl.Float64
-            ),
-            "ess_bulk": pl.Series("ess_bulk", ess, dtype=pl.Float64),
-            "rhat": pl.Series("rhat", rhat, dtype=pl.Float64),
+            "prob_hdi_lower": pl.Series("prob_hdi_lower", hdi_lower, dtype=pl.Float64),
+            "prob_hdi_upper": pl.Series("prob_hdi_upper", hdi_upper, dtype=pl.Float64),
+            "ess_bulk": pl.Series("ess_bulk", ess, dtype=pl.Float64).fill_nan(None),
+            "rhat": pl.Series("rhat", rhat, dtype=pl.Float64).fill_nan(None),
         }
     )
     write_parquet_atomic(df, target_path)
     _log.info(
-        "wrote pitch_summary summary export rows=%d cells=%d path=%s",
+        "wrote pitch_summary summary export rows=%d cells=%d impossible_rows=%d path=%s",
         df.height,
         n_cell,
+        int((~reachable).sum()),
         target_path,
     )
 
@@ -2094,9 +2134,12 @@ def _export_pitch_summary_summary(
 def _evaluate_pitch_summary_held_out(
     inputs: PitchSummaryInputs, idata: az.InferenceData
 ) -> dict[str, object]:
-    """Per-event multinomial log-lik lift + total-variation vs result-mean baseline."""
-    from scipy.special import softmax
+    """Per-event multinomial log-lik lift + total-variation vs result-family baseline.
 
+    Held-out counts are restricted to each family's structurally reachable
+    classes (the same ``reachable_mask`` the builder pins), and the baseline is
+    the posterior mean of the per-family ``result_class_prob`` marginal.
+    """
     held = inputs.held_out
     if held.n_cells == 0:
         return {"n_cells": 0}
@@ -2105,14 +2148,12 @@ def _evaluate_pitch_summary_held_out(
     full_prob = np.asarray(posterior["cell_class_prob"].values, dtype=np.float64).mean(
         axis=(0, 1)
     )
-    result_lo_draws = np.asarray(posterior["result_logodds"].values, dtype=np.float64)
-    ref_draws = np.zeros(result_lo_draws.shape[:-1] + (1,))
-    base_prob_draws = softmax(
-        np.concatenate([ref_draws, result_lo_draws], axis=-1), axis=-1
-    )
-    base_prob = base_prob_draws.mean(axis=(0, 1))
+    base_prob = np.asarray(
+        posterior["result_class_prob"].values, dtype=np.float64
+    ).mean(axis=(0, 1))
 
-    counts = held.counts.astype(np.float64)
+    reachable = inputs.reachable_mask[held.cell_result_idx]
+    counts = np.where(reachable, held.counts.astype(np.float64), 0.0)
     cell_n = counts.sum(axis=1)
     total = float(cell_n.sum())
     full = full_prob[held.cell_idx]
@@ -2220,9 +2261,9 @@ def _evaluate_state_transition_held_out(
     full_prob = np.asarray(posterior["cell_class_prob"].values, dtype=np.float64).mean(
         axis=(0, 1)
     )
-    base_prob = np.asarray(
-        posterior["start_state_prob"].values, dtype=np.float64
-    ).mean(axis=(0, 1))
+    base_prob = np.asarray(posterior["start_state_prob"].values, dtype=np.float64).mean(
+        axis=(0, 1)
+    )
 
     counts = held.counts.astype(np.float64)
     cell_n = counts.sum(axis=1)
@@ -2513,8 +2554,8 @@ def run_bayes_model(
                 posterior_predictive is not None
                 and "cell_class_prob" in posterior_predictive
             ):
-                posterior_idata.posterior_predictive = (
-                    posterior_predictive.drop_vars("cell_class_prob")
+                posterior_idata.posterior_predictive = posterior_predictive.drop_vars(
+                    "cell_class_prob"
                 )
 
         elif spec.multinomial_export == "assist_count" and isinstance(
@@ -2525,9 +2566,7 @@ def run_bayes_model(
                 inputs,
                 target_path=exports_dir / ASSIST_COUNT_SUMMARY_FILENAME,
             )
-            held_out_metrics = _evaluate_assist_count_held_out(
-                inputs, posterior_idata
-            )
+            held_out_metrics = _evaluate_assist_count_held_out(inputs, posterior_idata)
             _atomic_write_text(
                 validation_dir / "held_out_metrics.json",
                 json.dumps(held_out_metrics, indent=2, default=_json_default),
@@ -2551,8 +2590,8 @@ def run_bayes_model(
                 posterior_predictive is not None
                 and "cell_class_prob" in posterior_predictive
             ):
-                posterior_idata.posterior_predictive = (
-                    posterior_predictive.drop_vars("cell_class_prob")
+                posterior_idata.posterior_predictive = posterior_predictive.drop_vars(
+                    "cell_class_prob"
                 )
 
         posterior_path = inference_dir / "posterior.nc"
@@ -2789,6 +2828,9 @@ def run_bayes_model(
                     handler_logit_std=inputs.handler_logit_std,
                     handler_active=inputs.handler_active,
                     selection_log_odds_offset=inputs.selection_log_odds_offset,
+                    gamma_dl_active=(
+                        gamma_dl_flavor == "gamma_dl_shrunk" and inputs.dl_active
+                    ),
                 )
                 if production.n_events > 0:
                     shares = _posterior_event_softmax(
@@ -2942,66 +2984,14 @@ def run_bayes_model(
                     )
                     else None
                 )
-                credit_export_path = exports_dir / CREDIT_EXPORT_FILENAME
-                if inputs.credit_type == "assist" and putout_idata is not None:
-                    production = build_production_scoring_frame(
-                        dataset_parquet,
-                        dimension=spec.dataset_dimension_filter,
-                        fixed_effects=inputs.fixed_effects,
-                    )
-                    if production.n_events > 0:
-                        putout_weights = _score_putout_posterior(
-                            putout_idata, production
-                        )
-                        production_shares = (
-                            _posterior_event_softmax_putout_marginalized(
-                                posterior_idata,
-                                production,
-                                putout_posterior=putout_weights,
-                                n_positions=inputs.n_positions,
-                            )
-                        )
-                        _ = _export_event_credit_shares(
-                            production_shares,
-                            event_keys=production.event_keys,
-                            credit_type=inputs.credit_type,
-                            n_positions=inputs.n_positions,
-                            target_path=credit_export_path,
-                        )
-                        _log.info(
-                            "assist export scored production slice events=%d (putout-marginalized)",
-                            production.n_events,
-                        )
-                    else:
-                        _log.warning(
-                            "assist production slice empty; exporting training grain instead"
-                        )
-                        shares = _posterior_event_softmax(
-                            posterior_idata, inputs, n_positions=inputs.n_positions
-                        )
-                        _ = _export_event_credit_shares(
-                            shares,
-                            event_keys=inputs.event_keys,
-                            credit_type=inputs.credit_type,
-                            n_positions=inputs.n_positions,
-                            target_path=credit_export_path,
-                        )
-                else:
-                    if inputs.credit_type == "assist":
-                        _log.warning(
-                            "no published putout posterior resolved; assist export uses "
-                            "training grain and held-out metrics are observed-putout only"
-                        )
-                    shares = _posterior_event_softmax(
-                        posterior_idata, inputs, n_positions=inputs.n_positions
-                    )
-                    _ = _export_event_credit_shares(
-                        shares,
-                        event_keys=inputs.event_keys,
-                        credit_type=inputs.credit_type,
-                        n_positions=inputs.n_positions,
-                        target_path=credit_export_path,
-                    )
+                _ = _export_credit_shares_for_target(
+                    posterior_idata,
+                    inputs,
+                    dataset_parquet=dataset_parquet,
+                    dimension=spec.dataset_dimension_filter,
+                    putout_idata=putout_idata,
+                    target_path=exports_dir / CREDIT_EXPORT_FILENAME,
+                )
                 held_out_metrics = _evaluate_held_out(
                     inputs,
                     posterior_idata,
@@ -3022,15 +3012,17 @@ def run_bayes_model(
                 float(held_out_metrics.get("baseline_top1_accuracy", float("nan"))),
             )
 
-    diagnostics_summary = (
-        _diagnostics_from_idata(
+    if posterior_idata is not None:
+        diagnostics_summary, posterior_diagnostics = _diagnostics_from_idata(
             posterior_idata,
             calibration_ece=calibration_ece,
             posterior_predictive_max_bucket_dev=max_bucket_dev,
-            outcome_kind=spec.outcome_kind,
         )
-        if posterior_idata is not None
-        else BayesDiagnosticsSummary(
+        _ = write_diagnostics_by_variable(
+            validation_dir, posterior_diagnostics.by_variable
+        )
+    else:
+        diagnostics_summary = BayesDiagnosticsSummary(
             rhat_max=float("nan"),
             ess_bulk_min=float("nan"),
             ess_tail_min=float("nan"),
@@ -3039,7 +3031,6 @@ def run_bayes_model(
             calibration_ece=None,
             posterior_predictive_max_bucket_dev=None,
         )
-    )
 
     diagnostics_payload: dict[str, object] = {
         "rhat_max": diagnostics_summary.rhat_max,
@@ -3051,6 +3042,8 @@ def run_bayes_model(
         "posterior_predictive_max_bucket_dev": (
             diagnostics_summary.posterior_predictive_max_bucket_dev
         ),
+        "group_level_rhat_max": diagnostics_summary.group_level_rhat_max,
+        "group_level_ess_bulk_min": diagnostics_summary.group_level_ess_bulk_min,
         "is_smoke": smoke,
         "source_effect_active": source_effect_active,
         "backend": sampler.backend,
@@ -3081,8 +3074,8 @@ def run_bayes_model(
         ),
         propensity_active=propensity_active,
         weak_identification_flag=diagnostics_indicate_weak_identification(
-            rhat_max=diagnostics_summary.rhat_max,
-            ess_bulk_min=diagnostics_summary.ess_bulk_min,
+            rhat_max=nan_if_none(diagnostics_summary.group_level_rhat_max),
+            ess_bulk_min=nan_if_none(diagnostics_summary.group_level_ess_bulk_min),
             divergences=diagnostics_summary.divergences,
             is_smoke=smoke,
         ),

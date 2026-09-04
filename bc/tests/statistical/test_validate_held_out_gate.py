@@ -504,26 +504,59 @@ def test_loglik_lift_positive_passes(tmp_path: Path) -> None:
     assert report.status == "passed"
 
 
-def test_absent_file_warns_on_full_scale(tmp_path: Path) -> None:
+def test_absent_file_blocks_on_full_scale(tmp_path: Path) -> None:
     _write(tmp_path, diagnostics=_healthy_diagnostics(), held_out=None)
-    codes = _codes(tmp_path, "warn")
-    assert "bayes_held_out_metrics_absent" in codes
+    report = _validate_bayes(_manifest(), tmp_path)
+    assert report.status == "failed"
+    assert "bayes_held_out_metrics_absent" in {
+        f.code for f in report.findings if f.severity == "block"
+    }
 
 
-def test_absent_file_silent_on_smoke(tmp_path: Path) -> None:
+def test_absent_file_only_warns_on_smoke(tmp_path: Path) -> None:
     _write(tmp_path, diagnostics=_healthy_diagnostics(is_smoke=True), held_out=None)
-    assert "bayes_held_out_metrics_absent" not in _codes(tmp_path)
+    report = _validate_bayes(_manifest(), tmp_path)
+    assert report.status == "passed"
+    assert "bayes_held_out_metrics_absent" in {
+        f.code for f in report.findings if f.severity == "warn"
+    }
 
 
-def test_malformed_held_out_warns(tmp_path: Path) -> None:
+@pytest.mark.parametrize("text", ["{not json", "[1, 2, 3]"])
+def test_malformed_held_out_blocks_on_full_scale(tmp_path: Path, text: str) -> None:
     validation = tmp_path / "validation"
     validation.mkdir(parents=True, exist_ok=True)
     (validation / "diagnostics.json").write_text(
         json.dumps(_healthy_diagnostics()), encoding="utf-8"
     )
-    (validation / "held_out_metrics.json").write_text("{not json", encoding="utf-8")
+    (validation / "held_out_metrics.json").write_text(text, encoding="utf-8")
+    report = _validate_bayes(_manifest(), tmp_path)
+    assert report.status == "failed"
+    assert "bayes_held_out_metrics_malformed" in {
+        f.code for f in report.findings if f.severity == "block"
+    }
+
+
+@pytest.mark.parametrize("text", ["{not json", "[1, 2, 3]"])
+def test_malformed_held_out_only_warns_on_smoke(tmp_path: Path, text: str) -> None:
+    validation = tmp_path / "validation"
+    validation.mkdir(parents=True, exist_ok=True)
+    (validation / "diagnostics.json").write_text(
+        json.dumps(_healthy_diagnostics(is_smoke=True)), encoding="utf-8"
+    )
+    (validation / "held_out_metrics.json").write_text(text, encoding="utf-8")
     report = _validate_bayes(_manifest(), tmp_path)
     assert report.status == "passed"
     assert "bayes_held_out_metrics_malformed" in {
+        f.code for f in report.findings if f.severity == "warn"
+    }
+
+
+def test_smoke_declared_only_in_manifest_relaxes_absent_file(tmp_path: Path) -> None:
+    _write(tmp_path, diagnostics=_healthy_diagnostics(), held_out=None)
+    manifest = _manifest().model_copy(update={"metadata": {"is_smoke": True}})
+    report = _validate_bayes(manifest, tmp_path)
+    assert report.status == "passed"
+    assert "bayes_held_out_metrics_absent" in {
         f.code for f in report.findings if f.severity == "warn"
     }

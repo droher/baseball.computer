@@ -15,21 +15,24 @@ The distinction matters because detail completeness is a property of the
 observation process, not of the game. A scorer in 1935 and a scorer in 2015 both
 watched a ground ball to shortstop; only one of them reliably wrote down that it
 was a ground ball. When the record omits the trajectory, the omission is
-systematic. Using the deduced-trajectory rows — cases where fielding evidence
-lets a rule recover the broad class that the scorer did not write down — as a
-partial view of the unobserved population, the ground-ball share among recorded
-trajectories before 1950 is 33.7 percent, against 68.0 percent once the deduced
-rows are folded in <!-- src: notes/data-coverage-implementation/implementation-review.md -->.
-Across 1950–1987 the gap persists: 44.1 percent recorded against 77.8 percent
-including deduced <!-- src: notes/paper/tables/groundball_mnar.md -->.
-From 1988 on the two figures converge to within a point and a half
-<!-- src: notes/data-coverage-implementation/implementation-review.md -->. Scorers
-before 1988 selectively omitted routine grounders, and the omitted population is
-far ground-enriched. A model that treats the recorded trajectories as a random
-sample of all trajectories will under-impute ground balls by tens of points in
-exactly the era where nearly everything must be imputed — the unobserved slice
-is 78 to 95 percent of all events before 1988 across the geometry and location
-dimensions <!-- src: notes/data-coverage-implementation/implementation-review.md -->.
+systematic. Before 1950 the scorer wrote a trajectory on 712,469 batted balls
+and omitted it on 2.6 million; of the omitted, 763,993 are ground balls whose
+class the fielding string alone recovers — a ball fielded by the shortstop and
+thrown to first — more events than the whole recorded slice, and a floor of
+0.29 under the unrecorded ground-ball share before a single genuinely unknown
+event is counted <!-- src: notes/paper/tables/groundball_mnar.md -->. A model
+trained on the recorded slice assigns those known ground balls a mean
+ground-ball probability of 0.32 <!-- src: notes/paper/tables/groundball_mnar.md -->.
+The pattern holds through 1987 and collapses after 1988, when the unrecorded
+slice shrinks to 135 thousand events against 4.8 million recorded
+<!-- src: notes/paper/tables/groundball_mnar.md -->. Scorers before 1988 omitted
+the trajectory on routine grounders the fielding string made redundant, and a
+model that treats the recorded trajectories as a random sample of all
+trajectories misstates the unrecorded class mix by an amount the recorded data
+cannot bound from above, in exactly the era where nearly everything must be
+imputed — the unobserved slice is 78 to 95 percent of all events before 1988
+across the geometry and location dimensions
+<!-- src: notes/data-coverage-implementation/implementation-review.md -->.
 
 This is the record problem: the play-by-play archive is the joint output of two
 coupled processes. One is the game — a ball is hit, it has a latent trajectory
@@ -63,11 +66,11 @@ fielding, and missing a putout fielder. We classify ten missingness mechanisms
 and identify which are selection-biased on the unobserved value itself.
 
 Second, a family of hierarchical Bayesian coverage models that share one
-statistical contract — non-centered partial pooling, shared hash-based data
-splits, a per-model deep-learning-covariate ablation, and acceptance gates that
-pair convergence diagnostics with held-out predictive accuracy, held-out
-calibration, and posterior-predictive interval coverage
-<!-- src: notes/paper/tables/validation_gates.md -->. The family spans
+statistical contract — non-centered partial pooling, game-grouped holdouts, a
+per-model deep-learning-covariate ablation, and acceptance gates that pair
+convergence diagnostics with held-out predictive lift over a baseline, with
+held-out calibration and posterior-predictive interval coverage reported
+alongside as diagnostics <!-- src: bc/python_models/statistical/validate.py -->. The family spans
 observation propensity (Model A, published as `scorer_observation_propensities`),
 fielding credit (Model C, `imputed_fielding_credit`), ball handler (Model D,
 `imputed_ball_handler_probabilities`), batted-ball geometry (Model E,
@@ -78,24 +81,27 @@ run expectancy and base-out transitions (Model G, `run_expectancy_summary` and
 
 Third, a treatment of missingness that is not at random. For the trajectory and
 location dimensions, whether a label was recorded is correlated with what the
-label would have been. We report a learned correction that we refute — a
-propensity coefficient that converges cleanly but estimates the wrong sign — a
-fixed per-class selection offset δ_c that the observed-only likelihood cannot
-identify by itself, an anchored per-era estimate of δ_c drawn from a
-deduced-trajectory partial-truth slice, and a joint sensitivity ribbon over the
-offset vector in place of a single point estimate
-<!-- src: bc/python_models/statistical/mnar_anchor.py, bc/python_models/statistical/sensitivity.py -->. The offset
-mechanism is checked across four masking designs spanning class-marginal,
-covariate-joint, and block-structured selection; correction quality ranges from
-near-exact recovery under class-marginal selection to a documented partial
-correction when selection depends on a covariate the model already conditions
-on <!-- src: notes/paper/tables/mnar_backtest_robustness.md -->.
+label would have been. We report a learned correction that is inert — a
+propensity coefficient that converges cleanly and leaves the masked-slice error
+unchanged — a fixed per-class selection offset δ_c that the observed-only
+likelihood cannot identify, a hard lower bound on the unrecorded ground-ball
+share from the deduced-trajectory slice together with a known-truth diagnostic
+of the missing-at-random fit on that slice, and a sensitivity ribbon over the
+offset published as an assumed band that the bound constrains from below
+<!-- src: bc/python_models/statistical/mnar_anchor.py, bc/python_models/statistical/sensitivity.py -->.
+An earlier revision's data-anchored offset is withdrawn as an identity of the
+observed slice. The offset mechanism is checked in a masked backtest whose one
+informative design — selection on class and a covariate the model conditions
+on — shows the per-class offset recovering about half the bias
+<!-- src: notes/paper/tables/mnar_backtest_robustness.md -->.
 
-Fourth, a deep-learning supplement that supplies shrunk proposal distributions
-and shared entity embeddings to the Bayesian layer, never published facts. Its
-term enters the softmax as γ_c · log p̃^dl_{i,c} with γ_c ~ N(0, 0.5), behind
-calibration and leakage gates and a cross-fitting contract; argmax-to-fact is
-banned.
+Fourth, a deep-learning supplement that supplies proposal distributions and
+shared entity embeddings to the Bayesian layer, never published facts. Its term
+enters the softmax as γ · log p̃^dl_{i,c} with one scalar γ ~ N(0, 0.5) whose
+posterior the data dominate, behind leakage gates and a cross-fitting contract;
+argmax-to-fact is banned. A defect in how the term handled a missing prediction
+shifted three published location surfaces and is disclosed and corrected in
+this revision.
 
 Fifth, a publication policy. Estimated surfaces ship as posteriors with an
 eight-column provenance contract — artifact_id, model_name, model_version,
@@ -104,8 +110,8 @@ weak_identification_flag <!-- src: notes/paper/OUTLINE.md --> — kept in a
 separate namespace from recorded and deterministic facts. Three designed models
 are withheld with their names reserved, for three different reasons: contact-
 label confusion (B), where a single scorer per event and no independent second
-label leave the data uninformative about the confusion matrix — a genuine
-identification limit; fielder responsibility (I), where the positioning prior a
+label leave the data uninformative about the confusion matrix, so any fit
+returns its prior; fielder responsibility (I), where the positioning prior a
 correct model needs does not exist anywhere in the source — a data-availability
 limitation, not an identification proof; and shift propensity (K), designed but
 not yet built in this pass — unfinished scope, not a claim about the record.

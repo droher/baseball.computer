@@ -71,8 +71,8 @@ def _inputs(*, held_out_games: int) -> ParkFactorInputs:
         cell_season_league_idx=np.array([0, 0, 1], dtype=np.int64),
         ar_chain_idx=np.array([0, 1, 2], dtype=np.int64),
         ar_step_idx=np.array([0, 0, 0], dtype=np.int64),
+        ar_season_gap=np.array([0, 0, 0], dtype=np.int64),
         n_ar_chains=3,
-        n_ar_steps=1,
         outcome="team_runs",
         coords={
             "source": ["__single__"],

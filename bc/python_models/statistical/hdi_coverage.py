@@ -27,6 +27,9 @@ import numpy as np
 import polars as pl
 from pydantic import BaseModel
 
+from python_models.statistical.models._run_values_data import (
+    filter_event_population,
+)
 from python_models.statistical.schemas import ValidationFinding
 from python_models.statistical.splits import game_hash_fold
 
@@ -166,18 +169,20 @@ def state_transition_held_out_realization(
 ) -> pl.DataFrame:
     """Recompute held-out cell class frequencies for the transition model.
 
-    Applies the same deterministic 10% game holdout the fit uses, then
-    materializes, per qualifying ``(start_state, season, league)`` cell,
-    the empirical frequency of every reachable ``end_class`` (zeros
-    included). Cells with fewer than ``min_cell_events`` held-out events
-    are dropped as too noisy to grade.
+    Applies the fit's population filter and the same deterministic 10% game
+    holdout the fit uses, then materializes, per qualifying
+    ``(start_state, season, league)`` cell, the empirical frequency of every
+    reachable ``end_class`` (zeros included). Cells with fewer than
+    ``min_cell_events`` held-out events are dropped as too noisy to grade.
     """
     end_outs = (
         pl.col("run_expectancy_end_key").str.split("_").list.tail(2).list.first()
     ).cast(pl.Int32)
     end_suffix = _suffix_expr("run_expectancy_end_key")
     scanned = (
-        pl.scan_parquet(dataset_parquet)
+        filter_event_population(
+            pl.scan_parquet(dataset_parquet), label="state_transition realization"
+        )
         .filter(
             pl.col("game_id").is_not_null()
             & pl.col("run_expectancy_start_key").is_not_null()
@@ -554,15 +559,18 @@ def run_expectancy_held_out_realization(
 ) -> pl.DataFrame:
     """Recompute held-out per-cell mean runs-to-end for the run-expectancy model.
 
-    Applies the same deterministic 10% game holdout the fit uses, then
-    materializes, per ``(state, season, league)`` cell, the held-out mean
-    and standard deviation of ``runs_to_end_of_inning`` plus the event
-    count. ``state`` is the ``(outs, base)`` suffix of
-    ``run_expectancy_start_key`` matching the summary export's ``state``.
-    Cells with fewer than ``min_cell_events`` held-out events are dropped.
+    Applies the fit's population filter and the same deterministic 10% game
+    holdout the fit uses, then materializes, per ``(state, season, league)``
+    cell, the held-out mean and standard deviation of
+    ``runs_to_end_of_inning`` plus the event count. ``state`` is the
+    ``(outs, base)`` suffix of ``run_expectancy_start_key`` matching the
+    summary export's ``state``. Cells with fewer than ``min_cell_events``
+    held-out events are dropped.
     """
     scanned = (
-        pl.scan_parquet(dataset_parquet)
+        filter_event_population(
+            pl.scan_parquet(dataset_parquet), label="run_expectancy realization"
+        )
         .filter(
             pl.col("game_id").is_not_null()
             & pl.col("run_expectancy_start_key").is_not_null()

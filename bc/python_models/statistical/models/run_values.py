@@ -1,8 +1,12 @@
 """Cell-grain NegativeBinomial run-expectancy builder.
 
 Models the summed ``runs_to_end_of_inning`` over the events in each
-``(state, season, league)`` cell as ``NB(mu=n*lambda, alpha=n*phi)``, the exact
-aggregate of ``n`` per-event ``NB(lambda, phi)`` draws that share the cell mean.
+``(state, season, league)`` cell as ``NB(mu=n*lambda, alpha=n*phi[state])``,
+the exact aggregate of ``n`` per-event ``NB(lambda, phi[state])`` draws that
+share the cell mean. The dispersion ``phi`` is per base-out state: the
+empirical variance-to-mean ratio of runs-to-end runs from ~2 for bases-empty
+and two-out states down to ~1.2 for loaded zero-out states, so one global
+``phi`` under-disperses some states and over-disperses others.
 ``log lambda`` follows a centered global -> 24-state base-out -> cell
 varying-intercept hierarchy: ``mu_state ~ N(global_mu, sigma_state)`` and
 ``theta_cell ~ N(mu_state, sigma_cell)``. Every cell clears a 25-event floor and
@@ -74,12 +78,17 @@ def build_run_expectancy_model(
         )
         re_value = pm.Deterministic("re_value", pm.math.exp(theta_cell), dims="cell")
 
-        phi = pm.Gamma("phi", alpha=cfg.nb_phi_prior_alpha, beta=cfg.nb_phi_prior_beta)
+        phi = pm.Gamma(
+            "phi",
+            alpha=cfg.nb_phi_prior_alpha,
+            beta=cfg.nb_phi_prior_beta,
+            dims="state",
+        )
 
         _ = pm.NegativeBinomial(
             "sum_runs_obs",
             mu=cell_event_count * re_value,
-            alpha=cell_event_count * phi,
+            alpha=cell_event_count * phi[cell_state_idx],
             observed=inputs.sum_runs.astype(np.int64),
         )
 

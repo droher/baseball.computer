@@ -37,6 +37,7 @@ _AUDITS = [
                     exp.column("play"),
                     exp.column("play_category"),
                     exp.column("run_value_mean"),
+                    exp.column("is_imputed"),
                 ]
             ),
         },
@@ -46,6 +47,7 @@ _AUDITS = [
         {"columns": exp.Tuple(expressions=list(_GRAIN_COLUMNS))},
     ),
     ("estimated_contract_complete", {}),
+    ("min_row_count", {"threshold": 1000}),
 ]
 
 
@@ -62,6 +64,7 @@ _AUDITS = [
         "run_value_sd": "DOUBLE",
         "run_value_hdi_lower": "DOUBLE",
         "run_value_hdi_upper": "DOUBLE",
+        "is_imputed": "BOOLEAN",
         "artifact_id": "VARCHAR",
         "model_name": "VARCHAR",
         "model_version": "VARCHAR",
@@ -79,7 +82,9 @@ _AUDITS = [
         "through the deterministic linear-weights formula. Grain "
         "(season, league, play). Carries the centered run value posterior "
         "summary (run_value_mean / sd / 94% HDI) plus the estimated-metadata "
-        "contract. The estimated sibling of the deterministic linear_weights "
+        "contract. is_imputed marks (season, league, play) cells at or below "
+        "the deterministic occurrence floor, which carry the corpus-pooled "
+        "per-play value. The estimated sibling of the deterministic linear_weights "
         "point surface; the two are never joined or unioned (their columns "
         "differ). Materializes a typed empty frame until Model G publishes."
     ),
@@ -100,8 +105,8 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
     from python_models.statistical.manifests import (
         find_published_manifest,
         read_manifest,
+        read_published_pointer,
     )
-    from python_models.statistical.schemas import PublishedPointer
 
     log = logging.getLogger(__name__)
 
@@ -125,32 +130,32 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
         yield pl.DataFrame(schema=empty_schema)
         return
 
-    pointer = PublishedPointer.model_validate_json(
-        pointer_path.read_text(encoding="utf-8")
-    )
+    pointer = read_published_pointer(pointer_path)
     manifest = read_manifest(pointer.manifest_path)
+    if (
+        manifest.bayes_extras is None
+        or manifest.bayes_extras.model_name != "run_expectancy"
+    ):
+        raise ValueError(
+            f"run_expectancy pointer {pointer_path} resolves to artifact "
+            f"{manifest.artifact_id}, which is not a run_expectancy fit"
+        )
     posterior_path = (
         pointer.manifest_path.parent / "exports" / "run_expectancy_posterior.parquet"
     )
     if not posterior_path.exists():
-        log.warning(
-            "linear_weights_estimated: missing posterior at %s; yielding empty frame",
-            posterior_path,
+        raise FileNotFoundError(
+            f"run_expectancy pointer {pointer_path} names artifact "
+            f"{manifest.artifact_id} but its posterior export is missing at {posterior_path}"
         )
-        yield pl.DataFrame(schema=empty_schema)
-        return
 
     re_draws = pl.read_parquet(str(posterior_path))
     if re_draws.height == 0:
-        log.info(
-            "linear_weights_estimated: empty posterior; yielding empty frame"
-        )
+        log.info("linear_weights_estimated: empty posterior; yielding empty frame")
         yield pl.DataFrame(schema=empty_schema)
         return
 
-    counts_table = context.resolve_table(
-        "main_models.linear_weights_transition_counts"
-    )
+    counts_table = context.resolve_table("main_models.linear_weights_transition_counts")
     cursor = context.engine_adapter.cursor
     transition_counts = cursor.sql(
         f"""
@@ -189,6 +194,7 @@ def execute(context: ExecutionContext, **kwargs: t.Any) -> Iterator[pl.DataFrame
         pl.col("run_value_sd").cast(pl.Float64),
         pl.col("run_value_hdi_lower").cast(pl.Float64),
         pl.col("run_value_hdi_upper").cast(pl.Float64),
+        pl.col("is_imputed").cast(pl.Boolean),
         pl.col("artifact_id").cast(pl.Utf8),
         pl.col("model_name").cast(pl.Utf8),
         pl.col("model_version").cast(pl.Utf8),

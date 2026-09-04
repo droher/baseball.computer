@@ -38,6 +38,7 @@ def _write_state_transition_artifact_with_pointer(
     *,
     tmp_path: Path,
     artifact_id: str,
+    share_scale: float = 1.0,
 ) -> Path:
     from python_models.statistical.bayes.artifacts import bayes_artifact_dir
     from python_models.statistical.manifests import (
@@ -70,7 +71,8 @@ def _write_state_transition_artifact_with_pointer(
                 end_class.append(label)
     n_row = len(start_state)
     rng = np.random.default_rng(0)
-    prob_mean = rng.uniform(0.01, 0.4, size=n_row).astype(np.float64)
+    raw = rng.uniform(0.01, 0.4, size=(len(START_STATES) * len(SEASONS), len(END_CLASSES)))
+    prob_mean = (share_scale * raw / raw.sum(axis=1, keepdims=True)).reshape(-1)
     prob_sd = rng.uniform(0.001, 0.02, size=n_row).astype(np.float64)
     pl.DataFrame(
         {
@@ -181,3 +183,18 @@ def test_yields_published_frame_with_artifact_id_and_unique_grain(
     }
     grain = frame.select("start_state", "season", "league", "end_class")
     assert grain.n_unique() == frame.height
+    per_grain = frame.group_by("start_state", "season", "league").agg(
+        pl.col("prob_mean").sum().alias("total")
+    )
+    np.testing.assert_allclose(per_grain.get_column("total").to_numpy(), 1.0, atol=1e-9)
+
+
+def test_export_whose_grains_do_not_sum_to_one_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published_root = _write_state_transition_artifact_with_pointer(
+        tmp_path=tmp_path, artifact_id="st-bad", share_scale=0.9
+    )
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+    with pytest.raises(ValueError, match="do not sum to 1"):
+        _ = list(aggregate_state_transition_frames())

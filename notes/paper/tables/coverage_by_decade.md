@@ -1,4 +1,4 @@
-Share of batted-ball offense events with unknown (directly-recorded) trajectory and unknown batted-ball location, by decade, from the `offense_events` BSL table (`main_models.event_offense_stats` joined to `main_models.team_game_start_info`).
+Share of batted-ball offense events with unknown (directly-recorded) trajectory and unknown batted-ball location, by decade, from the `offense_events` BSL table (`main_models.event_offense_stats` joined to `main_models.team_game_start_info`). Re-run 2026-09-04; unchanged by the refits, which touch only the estimated tables.
 
 | decade | share_unknown_trajectory | share_unknown_location |
 |-------:|--------------------------:|-------------------------:|
