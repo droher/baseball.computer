@@ -33,6 +33,7 @@ DATA_DIR_NAME = "bc_publish_data"
 CATALOG_PATH = BC_DIR / CATALOG_NAME
 DATA_PATH = BC_DIR / DATA_DIR_NAME
 DATA_VERSION_FILE = BC_DIR / "data_version.txt"
+PUBLIC_HOST = "data.baseball.computer"
 
 PUBLISH_SCHEMAS = ("main_models", "main_seeds")
 ESTIMATED_ROW_COUNT_FLOORS: dict[str, int] = {
@@ -68,9 +69,23 @@ def read_data_version() -> str:
     return text
 
 
+def public_data_path(data_version: str) -> str:
+    return f"https://{PUBLIC_HOST}/baseball/v{data_version}/{DATA_DIR_NAME}/"
+
+
+def sql_literal(value: str) -> str:
+    return value.replace("'", "''")
+
+
+def attach_source_database(con: duckdb.DuckDBPyConnection, source_path: Path) -> None:
+    _ = con.execute(
+        f"ATTACH '{sql_literal(str(source_path.resolve()))}' AS bc (READ_ONLY)"
+    )
+
+
 _LIST_TABLES_SQL = (
     "SELECT table_name FROM information_schema.tables"
-    " WHERE table_catalog = 'bc' AND table_schema = ? AND table_type = 'BASE TABLE'"
+    " WHERE table_catalog = ? AND table_schema = ? AND table_type = 'BASE TABLE'"
     " ORDER BY table_name"
 )
 _ENUM_TYPES_SQL = (
@@ -89,8 +104,12 @@ _SAMPLE_TABLES_SQL = (
 )
 
 
-def list_tables(con: duckdb.DuckDBPyConnection, schema: str) -> list[str]:
-    rows = con.execute(_LIST_TABLES_SQL, [schema]).fetchall()
+def list_tables(
+    con: duckdb.DuckDBPyConnection,
+    schema: str,
+    catalog: str = "bc",
+) -> list[str]:
+    rows = con.execute(_LIST_TABLES_SQL, [catalog, schema]).fetchall()
     return [r[0] for r in rows]
 
 
@@ -170,27 +189,57 @@ def assert_estimated_tables_populated(
     return counts
 
 
-def attach_catalog(con: duckdb.DuckDBPyConnection, *, read_only: bool = False) -> None:
-    """ATTACH the local DuckLake catalog using relative paths.
-
-    Caller must have chdir'd to BC_DIR first so the relative paths resolve
-    correctly. We use relative paths (not absolute) so the catalog file is
-    portable: when uploaded to R2 alongside the data dir, consumers can
-    attach by URL and DuckLake resolves data files against the catalog
-    URL's parent.
-    """
+def attach_catalog(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    data_version: str,
+    read_only: bool = False,
+) -> None:
     _ = con.execute("INSTALL ducklake")
     _ = con.execute("LOAD ducklake")
+    if CATALOG_PATH.exists():
+        assert_catalog_data_path(con, CATALOG_PATH, data_version)
     DATA_PATH.mkdir(parents=True, exist_ok=True)
     suffix = ", READ_ONLY" if read_only else ""
     sql = (
         f"ATTACH 'ducklake:{CATALOG_NAME}' AS bc_publish"
-        f" (DATA_PATH '{DATA_DIR_NAME}/'{suffix})"
+        f" (DATA_PATH '{sql_literal(str(DATA_PATH))}/', OVERRIDE_DATA_PATH true{suffix})"
     )
+    if not CATALOG_PATH.exists():
+        _ = con.execute(
+            f"ATTACH 'ducklake:{CATALOG_NAME}' AS bc_publish"
+            f" (DATA_PATH '{public_data_path(data_version)}')"
+        )
+        _ = con.execute("DETACH bc_publish")
     _ = con.execute(sql)
 
 
+def assert_catalog_data_path(
+    con: duckdb.DuckDBPyConnection,
+    catalog_path: Path,
+    data_version: str,
+) -> None:
+    catalog = "bc_publish_validation"
+    _ = con.execute(
+        f"ATTACH 'ducklake:{sql_literal(str(catalog_path))}' AS {catalog} (READ_ONLY)"
+    )
+    row = con.execute(
+        f"SELECT data_path FROM ducklake_settings('{catalog}')"
+    ).fetchone()
+    _ = con.execute(f"DETACH {catalog}")
+    actual = str(row[0]) if row is not None else ""
+    expected = public_data_path(data_version)
+    if actual != expected:
+        raise SystemExit(
+            f"DuckLake catalog data path {actual!r} does not match {expected!r}; "
+            "rerun with --reset to create a catalog for the current DATA_VERSION"
+        )
+
+
 def set_catalog_options(con: duckdb.DuckDBPyConnection) -> None:
+    _ = con.execute(
+        "CALL ducklake_set_option('bc_publish', 'target_file_size', '128MB')"
+    )
     _ = con.execute(
         "CALL ducklake_set_option('bc_publish', 'parquet_compression', ?)",
         [COMPRESSION],
@@ -215,11 +264,16 @@ def publish_table(
     select_list = select_with_enum_casts(cols)
     fqn_src = f'"bc"."{schema}"."{table}"'
     fqn_dst = f'"bc_publish"."{schema}"."{table}"'
+    source_rows = table_row_count(con, "bc", schema, table)
     _ = con.execute(
         f"CREATE OR REPLACE TABLE {fqn_dst} AS SELECT {select_list} FROM {fqn_src}"
     )
-    row = con.execute(f"SELECT COUNT(*) FROM {fqn_dst}").fetchone()
-    rowcount = int(row[0]) if row else 0
+    rowcount = table_row_count(con, "bc_publish", schema, table)
+    if rowcount != source_rows:
+        raise RuntimeError(
+            f"published row-count mismatch for {schema}.{table}: "
+            f"source={source_rows} published={rowcount}"
+        )
     _log.info(
         "published %s.%s rows=%d enum_cols=%d",
         schema,
@@ -228,6 +282,22 @@ def publish_table(
         len(enum_cols),
     )
     return rowcount
+
+
+def reconcile_published_tables(con: duckdb.DuckDBPyConnection) -> None:
+    for schema in PUBLISH_SCHEMAS:
+        source = set(list_tables(con, schema))
+        published = set(list_tables(con, schema, "bc_publish"))
+        for table in sorted(published - source):
+            _ = con.execute(f'DROP TABLE "bc_publish"."{schema}"."{table}"')
+            _log.info("dropped stale published table %s.%s", schema, table)
+
+
+def assert_catalog_exists(catalog_path: Path) -> None:
+    if not catalog_path.exists():
+        raise SystemExit(
+            f"catalog not found at {catalog_path}; run publish_ducklake.py first"
+        )
 
 
 def expire_snapshots(con: duckdb.DuckDBPyConnection) -> None:
@@ -274,15 +344,23 @@ def report_sizes() -> tuple[int, int]:
 
 
 def smoke_check() -> None:
+    assert_catalog_exists(CATALOG_PATH)
     with contextlib.chdir(BC_DIR):
         con = duckdb.connect(":memory:")
-        attach_catalog(con, read_only=True)
+        attach_catalog(con, data_version=read_data_version(), read_only=True)
         _smoke_run(con)
 
 
 def _smoke_run(con: duckdb.DuckDBPyConnection) -> None:
     sample = con.execute(_SAMPLE_TABLES_SQL, [SMOKE_SAMPLE]).fetchall()
+    if not sample:
+        raise RuntimeError("smoke check found no published tables")
     for schema, table in sample:
+        row = con.execute(
+            f'SELECT * FROM "bc_publish"."{schema}"."{table}" LIMIT 1'
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"smoke query returned no rows for {schema}.{table}")
         cols = con.execute(f'DESCRIBE "bc_publish"."{schema}"."{table}"').fetchall()
         type_set = sorted({c[1] for c in cols})
         _log.info(
@@ -305,17 +383,15 @@ def publish() -> None:
     bc_db_abs = str(BC_DB.resolve())
 
     with contextlib.chdir(BC_DIR):
-        con = duckdb.connect(bc_db_abs)
-        # Reclaim freed pages before publish so bc.db on-disk size matches
-        # logical size (drops and overwrites accumulate stale pages until
-        # checkpoint).
-        _ = con.execute("CHECKPOINT")
+        con = duckdb.connect(":memory:")
+        attach_source_database(con, Path(bc_db_abs))
         _ = assert_estimated_tables_populated(con)
-        attach_catalog(con)
+        attach_catalog(con, data_version=data_version)
         set_catalog_options(con)
 
         for schema in PUBLISH_SCHEMAS:
             _ = con.execute(f'CREATE SCHEMA IF NOT EXISTS "bc_publish"."{schema}"')
+        reconcile_published_tables(con)
 
         n_enums = enum_type_count(con)
         _log.info(
@@ -356,12 +432,13 @@ def reset_artifacts() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--smoke-only",
         action="store_true",
         help="Skip publish; only run the re-attach smoke check on the existing catalog.",
     )
-    parser.add_argument(
+    mode.add_argument(
         "--reset",
         action="store_true",
         help="Remove the local catalog file + data path before publishing (forces a fresh first snapshot).",

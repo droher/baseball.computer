@@ -22,6 +22,6 @@ Dev work targets `bc_dev.db` + `bc/bc_state_dev.db`; prod targets `bc.db` + `bc/
 - `bc/python_models/ml/CLAUDE.md` — Keras + MLflow training pipeline conventions.
 - `bc/python_models/mcp_server/` — MCP server exposing schema retrieval + DuckDB execution. `just mcp-stdio` (Claude Desktop / Cursor / claude-cli) or `just mcp-http` (Streamable HTTP, requires `BC_MCP_TOKEN`).
 - `bc/semantic/CLAUDE.md` — BSL `SemanticTable` constraints.
-- `scripts/CLAUDE.md` — publish / upload / web-db pipeline.
+- `scripts/CLAUDE.md` — DuckLake publish/upload pipeline; `docs/ducklake-production.md` — production verification.
 - `docs/llm/lsf_1_spec.md` — LSF-1 spec (with baseball.computer profile in §17.4); `just gen-llm-context` produces `docs/llm/baseball.lsf` from `supplement.yaml` + SQLMesh metadata + the metric registry.
 - `notes/followups.md` — open follow-ups.

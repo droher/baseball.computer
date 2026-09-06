@@ -10,38 +10,25 @@ A from-scratch `just rebuild-prod` OOMs on `model_input_fielding_credit`'s audit
 
 ### Site cutover
 
-Deferred until the site team confirms parity on a test branch. Specifically:
+The DuckLake release publishes 169 tables and 1,605,595,144 rows with source/export row-count parity. All 696 public objects (694 Parquet files, catalog, and schema metadata) match local sizes and checksums. The site migration is squash-merged in [site PR 5](https://github.com/droher/baseball.computer.site/pull/5); production verification is recorded in `docs/ducklake-production.md`.
 
-- **Query parity.** For a representative sample of site queries, rows and values match between `ATTACH 'https://data.baseball.computer/baseball/v1/baseball.ducklake' (TYPE ducklake, READ_ONLY)` and the existing `ATTACH 'https://.../dbt/bc_remote.db'`.
-- **Cold-attach latency.** Single catalog fetch + lazy parquet reads acceptable vs the current single-DB-file fetch. Measure on the site's actual edge.
-- **VARCHAR-not-ENUM acceptable.** Site code that filters / joins on ENUM columns (`event_type`, `park_id`, etc.) keeps working with VARCHAR semantics. DuckLake v1.0 stores ENUMs as VARCHAR; the publish script does the cast explicitly so column metadata reflects reality.
-- **LLM-metadata bridge** is either ready to consume the DuckLake table layout, or works against both artifacts.
+The legacy `/dbt/` objects and `scripts/create_web_db.py` remain available for external consumers and rollback. They are not part of the current site publication workflow. Delete them only after confirming consumers and rollback no longer need them.
 
-When cutover lands:
+### Cloudflare metadata cache exception
 
-1. Delete `scripts/create_web_db.py`.
-2. Stop publishing the `dbt/` R2 prefix (leave a grace window for any external consumer pinned to it).
-3. Update `README.md`, `CLAUDE.md`, and the site's data-access docs to reference only the DuckLake URL.
-4. After the grace window, purge the `dbt/` R2 prefix.
-
-### Cloudflare cache-purge prerequisite
-
-`scripts/upload_ducklake.py` requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` env vars at upload time. Token needs Zone:Cache Purge scope on the `data.baseball.computer` zone.
+The active `DuckLake metadata revalidation` Cache Rule bypasses edge cache and respects origin browser TTL for DuckLake catalog and schema URLs under `/baseball/`. It overrides the old month-long cache-everything Page Rule for metadata. Preserve this exception; the origin's `max-age=0` header alone was insufficient. See `docs/ducklake-production.md` for the match and verification requirements.
 
 ### DATA_VERSION bumping
 
 `bc/data_version.txt` controls the R2 prefix (`baseball/v<DATA_VERSION>/`). Bump on schema-breaking changes (new ENUM values are not breaking; renamed / removed columns or tables are). Old prefixes stay attachable until manually purged. No automation; bump manually as part of the change that breaks the schema.
 
-### Per-table compression / row-group settings
+### Per-table compression / row-group tuning
 
-`scripts/create_web_db.py` writes `event_states_full` at `COMPRESSION GZIP, ROW_GROUP_SIZE 262144` and everything else at `ZSTD, ROW_GROUP_SIZE 1966080`. DuckLake exposes `parquet_compression` / `parquet_row_group_size` only as catalog-wide options (`ducklake_set_option`), not per-table. The publish script sets them catalog-wide to ZSTD + 1966080, so `event_states_full` doesn't get its tuned settings in the DuckLake artifact. Workarounds when DuckLake adds richer write options:
+DuckLake 1.0 supports global, schema, and table-scoped options. The publisher currently uses uniform ZSTD compression, 1966080-row groups, and a 128 MB file-size target. Further per-table tuning remains optional and should follow measured browser query behavior.
 
-- Per-table options at the DuckLake spec level.
-- COPY-then-`ducklake_add_data_files` (write parquet with desired knobs, register the file as a DuckLake data file manifest entry, bypasses normal commits).
+### R2 upload operations
 
-### R2 / Cloudflare upload concurrency
-
-`upload_ducklake.py` uploads files sequentially through boto3. Fine for the catalog file, but the data dir is many parquet files. If upload time becomes the bottleneck, switch to `concurrent.futures.ThreadPoolExecutor` around `client.upload_file`.
+The uploader now supports four workers by default, `--workers 1..16`, transient retries, and checksum-verified `--resume`. Data files publish before schema metadata and catalog. See `docs/ducklake-production.md`.
 
 ### Incremental kinds — shelved
 

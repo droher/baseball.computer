@@ -42,3 +42,23 @@ alternate DuckDB files when you need an isolated build.
 skill (model authoring, plan/apply workflow, audits, CLI). Loaded
 automatically when working on SQLMesh code, or invoked explicitly
 with `/sqlmesh`.
+
+## Production query storage
+
+The browser site queries a public DuckLake 1.0 catalog and immutable Parquet on R2.
+`uv run --group build python scripts/publish_ducklake.py` exports `bc.db` read-only
+and checks row-count parity. `uv run --group build python scripts/upload_ducklake.py`
+uploads data, schema metadata, and finally the catalog. For an existing Wrangler
+OAuth login, use `--wrangler`; a fresh version prefix can use `--skip-purge`.
+
+Attach from DuckDB with:
+
+```sql
+INSTALL ducklake;
+LOAD ducklake;
+ATTACH 'ducklake:https://data.baseball.computer/baseball/v1/baseball.ducklake'
+  AS baseball (READ_ONLY);
+USE baseball.main_models;
+```
+
+See `docs/ducklake-production.md` for publication and verification.
