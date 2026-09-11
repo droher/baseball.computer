@@ -9,7 +9,7 @@ import polars as pl
 from python_models.statistical.backtests.geometry_air_development import (
     AIR_CLASSES,
     PREDICTORS,
-    _metadata_smoke_games,
+    metadata_smoke_games,
     build_oof_predictions,
     development_decision,
     evaluate_oof_predictions,
@@ -162,13 +162,13 @@ def test_evaluation_conserves_game_scores_and_support() -> None:
 
 def test_smoke_game_selection_is_metadata_only() -> None:
     frame = _development_frame()
-    selected = _metadata_smoke_games(frame)
+    selected = metadata_smoke_games(frame)
     altered = frame.with_columns(
         pl.lit("PopUp").alias("target_class"),
         pl.lit(False).alias("known_air_evaluation_eligible"),
     )
 
-    assert _metadata_smoke_games(altered) == selected
+    assert metadata_smoke_games(altered) == selected
     selected_frame = frame.filter(pl.col("game_id").is_in(selected))
     assert selected_frame.group_by("season").agg(pl.col("game_id").n_unique()).sort(
         "season"

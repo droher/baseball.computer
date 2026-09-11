@@ -308,7 +308,7 @@ def fit_air_regime(
     )
 
 
-def _cell_id(fit: AirRegimeFit, values: tuple[str, ...]) -> str:
+def cell_identity(fit: AirRegimeFit, values: tuple[str, ...]) -> str:
     payload = json.dumps(
         [fit.experiment_id, fit.fit_id, fit.predictor, fit.concentration, values],
         ensure_ascii=True,
@@ -396,7 +396,7 @@ def predict_air_regime(fit: AirRegimeFit, frame: pl.DataFrame) -> AirRegimePredi
                 status = "result_family_missing_unsupported"
             else:
                 values = _cell_values(fit.predictor, recorded, result)
-                cell_id = _cell_id(fit, values)
+                cell_id = cell_identity(fit, values)
                 status = "posterior_cell" if values in fitted else "prior_only_cell"
                 requested[(values, regime)] = status
         event_rows.append(
@@ -416,7 +416,7 @@ def predict_air_regime(fit: AirRegimeFit, frame: pl.DataFrame) -> AirRegimePredi
         counts = np.asarray(
             cell.counts if cell else ((0, 0, 0), (0, 0, 0)), dtype=np.int64
         )
-        identity = _cell_id(fit, values)
+        identity = cell_identity(fit, values)
         cached = posterior_cache.get(values)
         if cached is None:
             if cell is None:

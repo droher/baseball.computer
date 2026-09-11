@@ -40,6 +40,8 @@ PREDICTORS: tuple[Predictor, ...] = (
 )
 PRIMARY_STRENGTH = 30.0
 SENSITIVITY_STRENGTHS = (3.0, 300.0)
+SUPPORTED_SEASON_GAMES = 30
+SUPPORTED_SEASON_EVENTS = 500
 FULL_BOOTSTRAP_REPETITIONS = 500
 FULL_BOOTSTRAP_SEED = 20260911
 SMOKE_BOOTSTRAP_REPETITIONS = 20
@@ -54,7 +56,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _metadata_smoke_games(frame: pl.DataFrame) -> list[str]:
+def metadata_smoke_games(frame: pl.DataFrame) -> list[str]:
     games = frame.select("game_id", "season").unique()
     selected: list[str] = []
     for season in sorted(DEVELOPMENT_SEASONS):
@@ -75,14 +77,14 @@ def _metadata_smoke_games(frame: pl.DataFrame) -> list[str]:
     return sorted(selected)
 
 
-def _eligible(frame: pl.DataFrame) -> pl.DataFrame:
+def eligible_rows(frame: pl.DataFrame) -> pl.DataFrame:
     eligible = frame.filter(pl.col("known_air_evaluation_eligible"))
     if eligible.is_empty() or eligible["target_class"].null_count():
         raise ValueError("eligible airborne frame is empty or has null targets")
     return eligible
 
 
-def _folds(
+def development_folds(
     frame: pl.DataFrame, family: SplitFamily
 ) -> Iterable[tuple[str, pl.DataFrame, pl.DataFrame]]:
     if family == "game" or family == "park":
@@ -139,14 +141,14 @@ def build_oof_predictions(
     checkpoint_root: Path | None = None,
     logger: logging.Logger | None = None,
 ) -> tuple[pl.DataFrame, list[dict[str, object]]]:
-    eligible_keys = set(_eligible(frame)["event_key"].to_list())
+    eligible_keys = set(eligible_rows(frame)["event_key"].to_list())
     outputs: list[pl.DataFrame] = []
     fit_records: list[dict[str, object]] = []
     for strength in prior_strengths:
         for family in cast(tuple[SplitFamily, ...], ("game", "park", "season")):
             family_keys: list[int] = []
-            for fold, training_all, evaluation_all in _folds(frame, family):
-                training = _eligible(training_all)
+            for fold, training_all, evaluation_all in development_folds(frame, family):
+                training = eligible_rows(training_all)
                 evaluation = evaluation_all.filter(
                     pl.col("known_air_evaluation_eligible")
                 )
@@ -471,8 +473,8 @@ def _strength_decision(
         overall = candidate.filter(pl.col("slice_type") == "overall")
         supported_seasons = candidate.filter(
             (pl.col("slice_type") == "season")
-            & (pl.col("games") >= 30)
-            & (pl.col("events") >= 500)
+            & (pl.col("games") >= SUPPORTED_SEASON_GAMES)
+            & (pl.col("events") >= SUPPORTED_SEASON_EVENTS)
         )
         overall_ece = float(cast(float, overall["classwise_ece_15_bin"].item()))
         overall_bias = float(
@@ -673,7 +675,7 @@ def main() -> None:
         smoke_games: list[str] = []
         analysis_frame = frame
         if smoke:
-            smoke_games = _metadata_smoke_games(frame)
+            smoke_games = metadata_smoke_games(frame)
             analysis_frame = frame.filter(pl.col("game_id").is_in(smoke_games))
         strengths = (
             (PRIMARY_STRENGTH,)
