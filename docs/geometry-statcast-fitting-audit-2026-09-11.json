@@ -1,0 +1,289 @@
+{
+  "analysis_runtime": {
+    "numpy": "2.4.6",
+    "polars": "1.40.1",
+    "pydantic": "2.13.3",
+    "python": "3.13.5"
+  },
+  "artifact_files": {
+    "acquisition.log": "b2ee22c9abf7f0b94a79155a8bf3a6ff5c8391e66e636763327f62da41d8bc80",
+    "air_standard_target_outcomes.parquet": "9509cdf8af5209345010abf5587f1ce0b3d7a58cefaba0faec154e94e2122f0e",
+    "air_standard_target_status_by_season.parquet": "35124d2c8af74aa3ac11ad6ceb52dbb4ad2621a7c1a5130f75e76b8ab054b1a1",
+    "analyze.py": "d08af6ac426fabf1d35beeb6e03ef4b09105a942488139366ea54927f126ce49",
+    "game_status.parquet": "c3d45989de8e7ceacb9d4925bcfe25523626d78a329c9007a5fcd18e38d7097a",
+    "geometry-air-standard-target-contract.md": "8ed865ddc207e278b620a12e08e25546db086d5e702aaf86f116aa0d45b87850",
+    "geometry_statcast_targets.py": "84312d57e7291485efceaa4ea709a394b3ac2c832fbaaf47c253e8b7d25275a1",
+    "observed_recorded_vs_unconditional_angle.parquet": "875a7518b312437d67dbc8b7a7db77280b57697fae734fd470d39b8e0a912cb1",
+    "recorded_vs_statcast.parquet": "21b0d4dc0189feefe6193b7b105ad9db0fcba11983b8276d540e367ade9487c6",
+    "report.json": "880f00049ce932a5fc8ed5bb3b5ea6d7e69964eb530d9bbc5fa5111555063c13",
+    "season_park_support.parquet": "cc59458e15bde76abb39dd7bbf63b28505c6242332ebfa572eb9e985ab7f8bfa",
+    "tracking_missingness.parquet": "be6dd34617f5e474eabc01f931b99192b3445aa03cef98bff0c497bef20cd547",
+    "validation.json": "be047d858d5fdc4ee6d7855180b72f3472610a1839e04a672b8ba66fff59c759"
+  },
+  "artifact_id": "geometry-statcast-fitting-audit-2026-09-11",
+  "audit_manifest_sha256": "ffa072c9b4b1a7a34841acaa1c90fc6b7ad0be0ad18567835a94177bbe593fd8",
+  "audit_root": "artifacts/statistical/backtests/geometry_reliability/20260911-statcast-fitting-audit-v1",
+  "decision": {
+    "acquisition_remedy_required": false,
+    "collection_usable_for_next_stage": true,
+    "reason": "All 373 declared fitting games and all 19,436 local batted-ball events paired one-to-one; target construction resolves 18,480 events and keeps 956 unresolved events explicit.",
+    "required_modeling_treatment": "Use only non-null trajectory values with resolved trajectory-air-standard-v1 statuses as labeled targets; retain broad conflicts, air-angle conflicts, missing-air angles, and unresolved broad types in population accounting."
+  },
+  "denominators": {
+    "failed_games": 0,
+    "launch_angle_availability": 0.9689236468409138,
+    "launch_angle_available": 18832,
+    "launch_angle_missing": 604,
+    "local_batted_ball_events": 19436,
+    "matched_events": 19436,
+    "paired_complete_games": 373,
+    "recorded_bunt_false": 19067,
+    "recorded_bunt_true": 241,
+    "recorded_bunt_unknown": 128,
+    "recorded_not_observed": 128,
+    "recorded_observed": 19308,
+    "selected_games": 373,
+    "unmatched_events": 0
+  },
+  "exposure": {
+    "confirmation_reserve_overlap": 0,
+    "modern_angle_evaluation_acquired": false,
+    "primary_fold": "TRAIN"
+  },
+  "invariants": {
+    "event_count_conserved": true,
+    "finite_ordered_bootstrap_intervals": true,
+    "game_count_conserved": true,
+    "paired_keys_unique_and_subset": true,
+    "source_hashes_match": true
+  },
+  "limits": [
+    "The selected park-by-season fitting sample does not estimate league rates.",
+    "Agreement is not physical accuracy; recorded and Statcast categories are source observations and may share upstream information.",
+    "Public Statcast numeric values may be estimated or transformed rather than direct measurements.",
+    "No result establishes historical transportability or reliability for naturally missing outcomes.",
+    "The 500-repetition intervals resample games from this selected fitting sample and do not quantify upstream source dependence or target validity.",
+    "The 121 modern-angle evaluation games and the 6,105-game confirmation reserve remained unopened."
+  ],
+  "reserve_file_sha256": "fa6e83509bec2b412781340c4e66cd940159ada4d95de8e4fe5b3fba2d325a35",
+  "selected_sample_agreement": {
+    "metrics": [
+      {
+        "agreement_events": 15928,
+        "cluster_unit": "game_id",
+        "comparable_events": 18731,
+        "estimate": 0.8503550264267792,
+        "games_in_resampling_frame": 373,
+        "interpretation": "selected-sample descriptive agreement interval",
+        "interval_95": [
+          0.8436239326022305,
+          0.8578505328254791
+        ],
+        "metric": "recorded_vs_unconditional_angle_four_class_explicit_bunt_subtype",
+        "repetitions": 500,
+        "seed": 20260911
+      },
+      {
+        "agreement_events": 17937,
+        "cluster_unit": "game_id",
+        "comparable_events": 18731,
+        "estimate": 0.9576103785168971,
+        "games_in_resampling_frame": 373,
+        "interpretation": "selected-sample descriptive agreement interval",
+        "interval_95": [
+          0.9545366422497671,
+          0.9606933727884432
+        ],
+        "metric": "recorded_vs_unconditional_angle_ground_air_explicit_bunt_subtype",
+        "repetitions": 500,
+        "seed": 20260911
+      },
+      {
+        "agreement_events": 17995,
+        "cluster_unit": "game_id",
+        "comparable_events": 19308,
+        "estimate": 0.9319970996478144,
+        "games_in_resampling_frame": 373,
+        "interpretation": "selected-sample descriptive agreement interval",
+        "interval_95": [
+          0.9247481665001237,
+          0.9396119284165606
+        ],
+        "metric": "recorded_vs_statcast_four_class_explicit_bunt_subtype",
+        "repetitions": 500,
+        "seed": 20260911
+      },
+      {
+        "agreement_events": 19227,
+        "cluster_unit": "game_id",
+        "comparable_events": 19308,
+        "estimate": 0.9958048477315102,
+        "games_in_resampling_frame": 373,
+        "interpretation": "selected-sample descriptive agreement interval",
+        "interval_95": [
+          0.9948286181064311,
+          0.996751166402109
+        ],
+        "metric": "recorded_vs_statcast_ground_air_explicit_bunt_subtype",
+        "repetitions": 500,
+        "seed": 20260911
+      },
+      {
+        "agreement_events": 15798,
+        "cluster_unit": "game_id",
+        "comparable_events": 18583,
+        "estimate": 0.8501318409298821,
+        "games_in_resampling_frame": 373,
+        "interpretation": "selected-sample descriptive agreement interval",
+        "interval_95": [
+          0.8433262498551324,
+          0.8576103040524395
+        ],
+        "metric": "recorded_vs_unconditional_angle_four_class_non_bunt",
+        "repetitions": 500,
+        "seed": 20260911
+      },
+      {
+        "agreement_events": 17802,
+        "cluster_unit": "game_id",
+        "comparable_events": 18583,
+        "estimate": 0.957972340311037,
+        "games_in_resampling_frame": 373,
+        "interpretation": "selected-sample descriptive agreement interval",
+        "interval_95": [
+          0.9549203144564111,
+          0.9610101694925409
+        ],
+        "metric": "recorded_vs_unconditional_angle_ground_air_non_bunt",
+        "repetitions": 500,
+        "seed": 20260911
+      }
+    ],
+    "repetitions": 500,
+    "seed_frozen_before_calculation": 20260911,
+    "uncertainty_scope": "game-cluster resampling within the selected fitting sample; descriptive agreement only"
+  },
+  "source_acquisition_manifest_sha256": "fb27ab4c987c587f7e273b63a0b6af8d0bde4d1475594cb9bd1b833fd4a33867",
+  "source_acquisition_root": "artifacts/statistical/backtests/geometry_reliability/20260911-statcast-fitting-v1",
+  "source_file_hashes_verified": 1504,
+  "support_by_season": [
+    {
+      "angle_available_events": 4637,
+      "games": 90,
+      "local_batted_ball_events": 4834,
+      "parks": 30,
+      "recorded_observed_events": 4811,
+      "resolved_air_standard_target_events": 4569,
+      "season": 2015
+    },
+    {
+      "angle_available_events": 4782,
+      "games": 99,
+      "local_batted_ball_events": 5161,
+      "parks": 35,
+      "recorded_observed_events": 5057,
+      "resolved_air_standard_target_events": 4754,
+      "season": 2019
+    },
+    {
+      "angle_available_events": 4734,
+      "games": 93,
+      "local_batted_ball_events": 4742,
+      "parks": 32,
+      "recorded_observed_events": 4742,
+      "resolved_air_standard_target_events": 4600,
+      "season": 2023
+    },
+    {
+      "angle_available_events": 4679,
+      "games": 91,
+      "local_batted_ball_events": 4699,
+      "parks": 31,
+      "recorded_observed_events": 4698,
+      "resolved_air_standard_target_events": 4557,
+      "season": 2025
+    }
+  ],
+  "target_contract": "trajectory-air-standard-v1",
+  "target_contract_sha256": "8ed865ddc207e278b620a12e08e25546db086d5e702aaf86f116aa0d45b87850",
+  "target_module_sha256": "84312d57e7291485efceaa4ea709a394b3ac2c832fbaaf47c253e8b7d25275a1",
+  "target_resolution": {
+    "air_standardized_bunts": 21,
+    "broad_conflict_recorded_air_statcast_ground": 58,
+    "broad_conflict_recorded_ground_statcast_air": 23,
+    "ground_preserved_with_angle": 8241,
+    "ground_preserved_with_angle_above_25": 26,
+    "ground_preserved_with_angle_at_least_10": 182,
+    "ground_preserved_without_angle": 321,
+    "resolved_events": 18480,
+    "unresolved_events": 956
+  },
+  "target_status": {
+    "air_angle_conflict": 598,
+    "air_angle_missing": 276,
+    "air_angle_standardized": 9918,
+    "broad_source_conflict": 81,
+    "broad_unresolved": 1,
+    "ground_preserved": 8562
+  },
+  "tracking_by_recorded_bunt": [
+    {
+      "angle_available_events": 101,
+      "angle_missing_events": 27,
+      "population_events": 128,
+      "recorded_bunt": null,
+      "resolved_air_standard_target_events": 94
+    },
+    {
+      "angle_available_events": 18583,
+      "angle_missing_events": 484,
+      "population_events": 19067,
+      "recorded_bunt": false,
+      "resolved_air_standard_target_events": 18150
+    },
+    {
+      "angle_available_events": 148,
+      "angle_missing_events": 93,
+      "population_events": 241,
+      "recorded_bunt": true,
+      "resolved_air_standard_target_events": 236
+    }
+  ],
+  "tracking_by_result_family": [
+    {
+      "angle_available_events": 103,
+      "angle_missing_events": 8,
+      "population_events": 111,
+      "resolved_air_standard_target_events": 111,
+      "result_family": "fielders_choice"
+    },
+    {
+      "angle_available_events": 6175,
+      "angle_missing_events": 167,
+      "population_events": 6342,
+      "resolved_air_standard_target_events": 5776,
+      "result_family": "hit"
+    },
+    {
+      "angle_available_events": 12164,
+      "angle_missing_events": 350,
+      "population_events": 12514,
+      "resolved_air_standard_target_events": 12132,
+      "result_family": "out_in_play"
+    },
+    {
+      "angle_available_events": 174,
+      "angle_missing_events": 10,
+      "population_events": 184,
+      "resolved_air_standard_target_events": 181,
+      "result_family": "reached_on_error"
+    },
+    {
+      "angle_available_events": 216,
+      "angle_missing_events": 69,
+      "population_events": 285,
+      "resolved_air_standard_target_events": 280,
+      "result_family": "sacrifice"
+    }
+  ]
+}

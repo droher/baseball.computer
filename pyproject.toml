@@ -25,6 +25,7 @@ dev = [
     "boto3>=1.34.45",
     "ruamel.yaml>=0.18.5",
     "basedpyright>=1.39.9",
+    "hypothesis>=6.168.0",
 ]
 # SQLMesh + Ibis build engine. boring-semantic-layer (in `bsl`) pins an
 # incompatible sqlglot, so the groups are mutually exclusive.

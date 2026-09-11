@@ -40,6 +40,11 @@ alternate DuckDB files when you need an isolated build.
 - [Corrected geometry refits](docs/geometry-corrected-refits-2026-09-11.md) — isolated materialization, accepted research references, and historical validation priorities
 - [Historical geometry stress test](docs/historical-geometry-stress-2026-09-11.md) — backward transfer, whole-scorer exclusion, support limits, and confirmation boundaries
 - [Scorer and Statcast findings](docs/geometry-scorer-statcast-findings-2026-09-11.md) — recording selection, separate standardized and historical targets, and the first verified modern match
+- [Statcast acquisition mechanics](docs/geometry-statcast-mechanics-results-2026-09-11.md) — stratified modern sample, audited game matching, and the gate before larger acquisition
+- [Statcast fitting audit](docs/geometry-statcast-fitting-audit-2026-09-11.md) — 373 paired games, airborne-only targets, missingness, and source-agreement limits
+- [Historical side hierarchy](docs/geometry-side-hierarchical-results-2026-09-11.md) — converged full fits that still fail historical calibration
+- [Historical fielder-clue provenance](docs/geometry-side-clue-provenance-2026-09-11.md) — shared-source dependencies and why fielder fields do not resolve naturally missing side
+- [Modern scorer identification](docs/geometry-modern-observation-identifiability-2026-09-11.md) — conflated source fields, disconnected scorer/park groups, and the supported pooled translation
 
 ## Agent skills
 

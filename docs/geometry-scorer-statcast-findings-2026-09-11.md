@@ -1,5 +1,7 @@
 # Historical scoring and the Statcast reference
 
+Subsequent user clarification: preserve ground versus air and standardize only airborne subtypes. The [airborne target contract](geometry-air-standard-target-contract.md) supersedes this investigation's initial unconditional angle-band proposal. Its empirical comparisons remain useful diagnostics.
+
 The next model must estimate two things separately: a consistently defined batted-ball trajectory and the label a historical scorer would have recorded. Improving prediction of old labels alone cannot validate the first output. The user specified current Statcast definitions as the common standard and confirmed that scorer disagreement is mainly within airborne balls. Press-box perspective and individual scorer judgment are plausible measurement effects, distinct from physical park effects.
 
 ## Recording selection
