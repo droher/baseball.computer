@@ -1,0 +1,117 @@
+{
+  "claim_limits": [
+    "Not globally virgin because legacy pretrained, deep, and Bayesian components exposed these games or labels.",
+    "No claim about unrecorded human inspection outside versioned artifacts can be proven.",
+    "Reserve validity is restricted to the frozen source snapshot and current no-learned-input model family.",
+    "The primary TEST partition has already been inspected and is development evidence only."
+  ],
+  "created_at": "2026-09-11",
+  "current_pipeline_boundary": {
+    "claim": "prospective confirmation reserve for new no-learned-input stress fits only",
+    "evidence": [
+      "artifacts/statistical/backtests/geometry_reference/20260911-global-side-full-v1/location_side/data/lineage.json",
+      "artifacts/statistical/backtests/geometry_reference/20260911-full-v1/trajectory/data/lineage.json",
+      "artifacts/statistical/backtests/trajectory_interaction/20260911-full-v2-4000draws/run_config.json"
+    ],
+    "unused_by_current_no_learned_input_reference_fits": true
+  },
+  "eligibility": {
+    "candidate_game_ids_sha256_length_prefixed_utf8": "7b78c61dbd39e17916377d7272fe5bb9cb72d7afdcaf1fa00b026c8477895f68",
+    "candidate_intersection_games": 26056,
+    "candidate_union_games": 30681,
+    "sql": "SELECT DISTINCT game_id\nFROM main_models__geometry_v2_research_20260911.model_input_geometry\nWHERE primary_fold = 'VALIDATE'\n  AND geometry_dimension IN ('location_side', 'trajectory')\n  AND is_observed_class\n  AND training_weight > 0\n  AND game_id IS NOT NULL\nORDER BY game_id",
+    "sql_sha256": "6cec02663a37f6394d041005c6d21681e901936f318ca4c85d477e2285c0ad13"
+  },
+  "historical_exposure": {
+    "by_target": {
+      "location_side": {
+        "current_validate_eligible_games": 26106,
+        "legacy_bayes_internal_score_games": 2610,
+        "legacy_bayes_not_present_games": 0,
+        "legacy_bayes_present_games": 26106,
+        "legacy_bayes_training_pool_games": 23496,
+        "legacy_pretrain_not_exposed_games": 0,
+        "legacy_pretrain_validate_label_exposed_games": 26106
+      },
+      "trajectory": {
+        "current_validate_eligible_games": 30631,
+        "legacy_bayes_internal_score_games": 3086,
+        "legacy_bayes_not_present_games": 0,
+        "legacy_bayes_present_games": 30631,
+        "legacy_bayes_training_pool_games": 27545,
+        "legacy_pretrain_not_exposed_games": 0,
+        "legacy_pretrain_validate_label_exposed_games": 30631
+      }
+    },
+    "global_never_exposed_validate_reserve_exists": false,
+    "legacy_bayes_input_artifact": "artifacts/statistical/datasets/model_input_geometry/e-v12/manifest.json",
+    "legacy_geometry_deep_manifests": [
+      "artifacts/statistical/deep/geometry_location_side/phase3-location-side-v8/manifest.json",
+      "artifacts/statistical/deep/geometry_trajectory/phase3-trajectory-v9-cv/manifest.json"
+    ],
+    "legacy_pretrain_manifest": "artifacts/statistical/deep/event_universe/phase3-pretrain-v6-ab1/manifest.json",
+    "reason": "Every current target-eligible VALIDATE game was present with a non-null corresponding target in the legacy pretrainer VALIDATE partition; legacy deep training used VALIDATE labels for early stopping. Legacy Bayesian geometry also ignored primary_fold: every current eligible VALIDATE game entered its pre-subsampling training pool or internal held-out pool, but retained fit membership is not recoverable from the manifests."
+  },
+  "label_access": {
+    "columns_used": [
+      "game_id",
+      "primary_fold",
+      "geometry_dimension",
+      "is_observed_class",
+      "training_weight",
+      "season"
+    ],
+    "scoring_performed": false,
+    "validate_target_labels_read": false
+  },
+  "reservation": {
+    "coverage": [
+      {
+        "eligible_events": 137626,
+        "era_slice": "1988_plus",
+        "games": 2626,
+        "target": "location_side"
+      },
+      {
+        "eligible_events": 11954,
+        "era_slice": "pre_1988",
+        "games": 2557,
+        "target": "location_side"
+      },
+      {
+        "eligible_events": 140860,
+        "era_slice": "1988_plus",
+        "games": 2626,
+        "target": "trajectory"
+      },
+      {
+        "eligible_events": 42106,
+        "era_slice": "pre_1988",
+        "games": 3468,
+        "target": "trajectory"
+      }
+    ],
+    "enforcement": "Every new geometry stress fit, tuning pass, masking analysis, calibration fit, and model-selection diagnostic must exclude these game IDs before reading target labels. Read labels once only in the final locked confirmation scorer. Recompute the list from the frozen source and require both the eligibility-query hash and reserve-game digest to match.",
+    "fraction_nominal": 0.2,
+    "reservation_id": "geometry-confirmation-reserve-v1",
+    "reserve_game_ids_sha256_length_prefixed_utf8": "5ac641fe78b19e98ec5cb576ebb85e652ff289e445e0f6e54e109c523a614dba",
+    "reserve_games": 6105,
+    "selection": "For each eligible candidate game_id, SHA-256 of UTF-8 `geometry-confirmation-reserve-v1:` plus game_id; interpret the first 8 digest bytes as unsigned big-endian and reserve when value modulo 5 equals 0.",
+    "target_game_counts": {
+      "location_side": 5183,
+      "trajectory": 6094
+    }
+  },
+  "source": {
+    "database_mode": "read-only filesystem artifact",
+    "database_mtime_ns": 1789137518790565652,
+    "database_path": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/research/geometry-v2-global-side-20260911/bc.db",
+    "database_size_bytes": 32242413568,
+    "materialization_evidence_path": "docs/geometry-materialization-2026-09-11.json",
+    "materialization_evidence_sha256": "37f0580195de782ab3c85b6158bcde753e1902a2fd04e6fbb94f3a7c00dee7ad",
+    "schema": "main_models__geometry_v2_research_20260911",
+    "source_snapshot_id": "geometry-v2-20260911"
+  },
+  "status": "prospective_component_local_reserve_frozen_global_virgin_claim_rejected",
+  "target_grain": "game-level reservation; event-level scoring within target"
+}

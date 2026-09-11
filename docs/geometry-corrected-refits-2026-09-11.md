@@ -2,6 +2,8 @@
 
 September 11, 2026. These are research comparisons on previously inspected TEST games. Production tables, state, published pointers, and the public DuckLake surfaces remain unchanged.
 
+Subsequent work: the [historical stress test](historical-geometry-stress-2026-09-11.md) executes the source/era checks proposed here and supplies the current decision. The results below remain the frozen within-population reference comparison.
+
 ## Corrected source materialization
 
 The corrected geometry ledger and two modeling views are materialized through SQLMesh in an APFS copy-on-write clone, using schema `main_models__geometry_v2_research_20260911`. The clone attaches no publication catalog and executes no source-initialization or publication hooks. Its directory is now read-only. The [materialization evidence](geometry-materialization-2026-09-11.json) records source identities, SQL hashes, configuration, runtime versions, execution history, and validation.

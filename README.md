@@ -38,6 +38,7 @@ alternate DuckDB files when you need an isolated build.
 - [Modeling evidence contract](docs/modeling-evidence-contract.md) — validation, artifact integrity, publication policy, and the reconstruction benchmark
 - [Geometry target correction](docs/geometry-target-correction-2026-09-11.md) — global-side provenance, dataset compatibility, and trajectory development results
 - [Corrected geometry refits](docs/geometry-corrected-refits-2026-09-11.md) — isolated materialization, accepted research references, and historical validation priorities
+- [Historical geometry stress test](docs/historical-geometry-stress-2026-09-11.md) — backward transfer, whole-scorer exclusion, support limits, and confirmation boundaries
 
 ## Agent skills
 
