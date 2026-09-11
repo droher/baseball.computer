@@ -1,0 +1,1293 @@
+{
+  "audit_date": "2026-09-11",
+  "reviewed_commit": "426b287b6db101dbfea8a88733b3a14bb719d5d3",
+  "scope": "Local read-only model audit; no refits, production mutation, or live site verification",
+  "published_artifact_metrics": [
+    {
+      "model": "assist_count",
+      "artifact": "assist-count-v1",
+      "kind": "bayes",
+      "dataset": "phase4-v1_6-fc-prep",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_cells",
+        "n_events",
+        "loglik_per_event",
+        "loglik_per_event_baseline",
+        "loglik_lift",
+        "tv_distance",
+        "tv_distance_baseline",
+        "tv_improvement"
+      ],
+      "metrics": {
+        "n_cells": 148,
+        "n_events": 385121,
+        "loglik_per_event": -0.2084499246466872,
+        "loglik_per_event_baseline": -0.3326368444410731,
+        "loglik_lift": 0.12418691979438591,
+        "tv_distance": 0.002567262183266734,
+        "tv_distance_baseline": 0.09569900316566883,
+        "tv_improvement": 0.0931317409824021
+      }
+    },
+    {
+      "model": "assist_credit_allocation",
+      "artifact": "full-10k-v3-cut1-prod",
+      "kind": "bayes",
+      "dataset": "phase4-v1_6-fc-prep",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "distribution_calibration",
+        "slice_calibration",
+        "any_assist",
+        "observed_putout_upper_bound"
+      ],
+      "metrics": {
+        "n_events": 100000,
+        "n_evaluated": 100000,
+        "putout_marginalized": true,
+        "top1_accuracy": 0.66351,
+        "top3_accuracy": 0.86514,
+        "log_loss": 1.060468829450477,
+        "pr_auc_macro": 0.2769883230011399,
+        "baseline_top1_accuracy": 0.65232
+      }
+    },
+    {
+      "model": "ball_handler_imputation",
+      "artifact": "d-noprop-10k-v2",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 1069690,
+        "n_evaluated": 1069690,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.22017967822453235,
+        "top3_accuracy": 0.592002355822715,
+        "log_loss": 1.9431455145946561,
+        "pr_auc_macro": 0.17149483855043923,
+        "baseline_top1_accuracy": 0.17092802587665584
+      }
+    },
+    {
+      "model": "ball_handler_position_observedness",
+      "artifact": "10k-v6-unseen-fix",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "roc_auc",
+        "pr_auc",
+        "baseline_pr_auc",
+        "ece_held_out",
+        "n_events_scored"
+      ],
+      "metrics": {
+        "n_events": 1199089,
+        "roc_auc": 0.9341833448856189,
+        "pr_auc": 0.9909400449469311,
+        "baseline_pr_auc": 0.89164,
+        "ece_held_out": 0.011685825999341738,
+        "n_events_scored": 100000
+      }
+    },
+    {
+      "model": "dl_proposal_location_depth",
+      "artifact": "phase3-location-depth-v8",
+      "kind": "deep",
+      "dataset": "phase3-tune-v4-prep",
+      "status": "exploratory",
+      "gate": null,
+      "heldout_keys": [],
+      "metrics": {}
+    },
+    {
+      "model": "dl_proposal_location_edge",
+      "artifact": "phase3-location-edge-v8",
+      "kind": "deep",
+      "dataset": "phase3-tune-v4-prep",
+      "status": "exploratory",
+      "gate": null,
+      "heldout_keys": [],
+      "metrics": {}
+    },
+    {
+      "model": "dl_proposal_location_side",
+      "artifact": "phase3-location-side-v8",
+      "kind": "deep",
+      "dataset": "phase3-tune-v4-prep",
+      "status": "exploratory",
+      "gate": null,
+      "heldout_keys": [],
+      "metrics": {}
+    },
+    {
+      "model": "dl_proposal_trajectory",
+      "artifact": "phase3-trajectory-v9-cv",
+      "kind": "deep",
+      "dataset": "phase3-tune-v4-prep",
+      "status": "exploratory",
+      "gate": null,
+      "heldout_keys": [],
+      "metrics": {}
+    },
+    {
+      "model": "general_location_observedness",
+      "artifact": "10k-v6-unseen-fix",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "roc_auc",
+        "pr_auc",
+        "baseline_pr_auc",
+        "ece_held_out",
+        "n_events_scored"
+      ],
+      "metrics": {
+        "n_events": 1109142,
+        "roc_auc": 0.9727836312760634,
+        "pr_auc": 0.9564238812686803,
+        "baseline_pr_auc": 0.37371,
+        "ece_held_out": 0.007568104686088865,
+        "n_events_scored": 100000
+      }
+    },
+    {
+      "model": "geometry_general_location",
+      "artifact": "e-v12-noprop-general_location-zero",
+      "kind": "bayes",
+      "dataset": "e-v12",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 505921,
+        "n_evaluated": 505921,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.18560605311896522,
+        "top3_accuracy": 0.4189784571108928,
+        "log_loss": 2.4455614374156136,
+        "pr_auc_macro": 0.08821004605362827,
+        "baseline_top1_accuracy": 0.13528001407334347
+      }
+    },
+    {
+      "model": "geometry_location_depth",
+      "artifact": "e-v12-noprop-location_depth-zero",
+      "kind": "bayes",
+      "dataset": "e-v12",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "baseline_log_loss",
+        "ece_held_out",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 505921,
+        "n_evaluated": 505921,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.5611113197515027,
+        "top3_accuracy": 0.9393324254181977,
+        "log_loss": 1.1112767615326697,
+        "pr_auc_macro": 0.28254462262191804,
+        "baseline_top1_accuracy": 0.5611113197515027,
+        "baseline_log_loss": 1.1218743700811964,
+        "ece_held_out": 0.009136513301391253
+      }
+    },
+    {
+      "model": "geometry_location_edge",
+      "artifact": "e-v12-noprop-location_edge-zero",
+      "kind": "bayes",
+      "dataset": "e-v12",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "baseline_log_loss",
+        "ece_held_out",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 505921,
+        "n_evaluated": 505921,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.6469310425936066,
+        "top3_accuracy": 0.9910598690309357,
+        "log_loss": 0.9177388960370916,
+        "pr_auc_macro": 0.28460337936501184,
+        "baseline_top1_accuracy": 0.647168233775629,
+        "baseline_log_loss": 0.9291461634652676,
+        "ece_held_out": 0.009945915077738258
+      }
+    },
+    {
+      "model": "geometry_location_side",
+      "artifact": "e-v12-noprop-location_side-zero",
+      "kind": "bayes",
+      "dataset": "e-v12",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "baseline_log_loss",
+        "ece_held_out",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 505921,
+        "n_evaluated": 505921,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.6976405407168312,
+        "top3_accuracy": 0.8919870888933252,
+        "log_loss": 1.0305850002841852,
+        "pr_auc_macro": 0.1888254839137976,
+        "baseline_top1_accuracy": 0.6976405407168312,
+        "baseline_log_loss": 1.054551554613324,
+        "ece_held_out": 0.01338960243497113
+      }
+    },
+    {
+      "model": "geometry_trajectory",
+      "artifact": "e-v12-noprop-trajectory-shrunk",
+      "kind": "bayes",
+      "dataset": "e-v12",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 616513,
+        "n_evaluated": 616513,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.4920090898326556,
+        "top3_accuracy": 0.9306389321879669,
+        "log_loss": 1.1381862224980341,
+        "pr_auc_macro": 0.46233386919046043,
+        "baseline_top1_accuracy": 0.41474389023426916
+      }
+    },
+    {
+      "model": "location_depth_observedness",
+      "artifact": "10k-v6-unseen-fix",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "roc_auc",
+        "pr_auc",
+        "baseline_pr_auc",
+        "ece_held_out",
+        "n_events_scored"
+      ],
+      "metrics": {
+        "n_events": 1109142,
+        "roc_auc": 0.9711240576261492,
+        "pr_auc": 0.9569552592262272,
+        "baseline_pr_auc": 0.37371,
+        "ece_held_out": 0.007140964372959312,
+        "n_events_scored": 100000
+      }
+    },
+    {
+      "model": "location_edge_observedness",
+      "artifact": "10k-v6-unseen-fix",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "roc_auc",
+        "pr_auc",
+        "baseline_pr_auc",
+        "ece_held_out",
+        "n_events_scored"
+      ],
+      "metrics": {
+        "n_events": 1109142,
+        "roc_auc": 0.9720632181258533,
+        "pr_auc": 0.9556123552382303,
+        "baseline_pr_auc": 0.37371,
+        "ece_held_out": 0.0049183538524613215,
+        "n_events_scored": 100000
+      }
+    },
+    {
+      "model": "location_side_observedness",
+      "artifact": "10k-v6-unseen-fix",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "roc_auc",
+        "pr_auc",
+        "baseline_pr_auc",
+        "ece_held_out",
+        "n_events_scored"
+      ],
+      "metrics": {
+        "n_events": 1109142,
+        "roc_auc": 0.9719472847650702,
+        "pr_auc": 0.9558768238819566,
+        "baseline_pr_auc": 0.37371,
+        "ece_held_out": 0.009565167781428482,
+        "n_events_scored": 100000
+      }
+    },
+    {
+      "model": "park_factor_runs",
+      "artifact": "pf-full-ar1-v4",
+      "kind": "bayes",
+      "dataset": "pf-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_games",
+        "mean_loglik",
+        "mean_loglik_baseline",
+        "loglik_lift",
+        "rmse",
+        "rmse_baseline",
+        "rmse_improvement"
+      ],
+      "metrics": {
+        "n_games": 41068,
+        "mean_loglik": -2.3362012285861833,
+        "mean_loglik_baseline": -2.341241885997534,
+        "loglik_lift": 0.005040657411350846,
+        "rmse": 3.2155753423687434,
+        "rmse_baseline": 3.2303871526060335,
+        "rmse_improvement": 0.014811810237290057
+      }
+    },
+    {
+      "model": "pitch_summary",
+      "artifact": "ps-cut1-full-v7",
+      "kind": "bayes",
+      "dataset": "ps-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_cells",
+        "n_events",
+        "loglik_per_event",
+        "loglik_per_event_baseline",
+        "loglik_lift",
+        "tv_distance",
+        "tv_distance_baseline",
+        "tv_improvement"
+      ],
+      "metrics": {
+        "n_cells": 1407,
+        "n_events": 848475,
+        "loglik_per_event": -1.8387881780807507,
+        "loglik_per_event_baseline": -1.852106595242109,
+        "loglik_lift": 0.01331841716135834,
+        "tv_distance": 0.029381198495906927,
+        "tv_distance_baseline": 0.05821554526232231,
+        "tv_improvement": 0.028834346766415383
+      }
+    },
+    {
+      "model": "putout_credit_allocation",
+      "artifact": "full-10k-v16-production-export",
+      "kind": "bayes",
+      "dataset": "phase3-pretrain-v5-fc-prep",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "n_evaluated",
+        "putout_marginalized",
+        "top1_accuracy",
+        "top3_accuracy",
+        "log_loss",
+        "pr_auc_per_position",
+        "pr_auc_macro",
+        "baseline_top1_accuracy",
+        "baseline_log_loss",
+        "ece_held_out",
+        "distribution_calibration",
+        "slice_calibration"
+      ],
+      "metrics": {
+        "n_events": 1016563,
+        "n_evaluated": 1016563,
+        "putout_marginalized": false,
+        "top1_accuracy": 0.5637466640041001,
+        "top3_accuracy": 0.7651124426130008,
+        "log_loss": 1.3574124148427364,
+        "pr_auc_macro": 0.25594677824890427,
+        "baseline_top1_accuracy": 0.3414800656722702,
+        "baseline_log_loss": 1.8462305491482411,
+        "ece_held_out": 0.02334465441088992
+      }
+    },
+    {
+      "model": "run_expectancy",
+      "artifact": "re-full-eraregime-v4",
+      "kind": "bayes",
+      "dataset": "rv-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_cells",
+        "n_events",
+        "loglik_per_event",
+        "loglik_per_event_baseline",
+        "loglik_lift",
+        "rmse",
+        "rmse_baseline",
+        "rmse_improvement"
+      ],
+      "metrics": {
+        "n_cells": 5898,
+        "n_events": 1418474,
+        "loglik_per_event": -0.01680861707379364,
+        "loglik_per_event_baseline": -0.01701533458941377,
+        "loglik_lift": 0.00020671751562013202,
+        "rmse": 0.08844100693374912,
+        "rmse_baseline": 0.09505488400028718,
+        "rmse_improvement": 0.006613877066538057
+      }
+    },
+    {
+      "model": "state_transition",
+      "artifact": "state-transition-v5",
+      "kind": "bayes",
+      "dataset": "rv-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_cells",
+        "n_events",
+        "loglik_per_event",
+        "loglik_per_event_baseline",
+        "loglik_lift",
+        "tv_distance",
+        "tv_distance_baseline",
+        "tv_improvement"
+      ],
+      "metrics": {
+        "n_cells": 5898,
+        "n_events": 1418474,
+        "loglik_per_event": -1.2334344973979166,
+        "loglik_per_event_baseline": -1.2390392907475447,
+        "loglik_lift": 0.005604793349628201,
+        "tv_distance": 0.046692321448438,
+        "tv_distance_baseline": 0.05700200879400091,
+        "tv_improvement": 0.01030968734556291
+      }
+    },
+    {
+      "model": "trajectory_observedness",
+      "artifact": "10k-v6-unseen-fix",
+      "kind": "bayes",
+      "dataset": "obs-bb-v2",
+      "status": "passed",
+      "gate": 2,
+      "heldout_keys": [
+        "n_events",
+        "roc_auc",
+        "pr_auc",
+        "baseline_pr_auc",
+        "ece_held_out",
+        "n_events_scored"
+      ],
+      "metrics": {
+        "n_events": 1061239,
+        "roc_auc": 0.8938599373216416,
+        "pr_auc": 0.9052815806595153,
+        "baseline_pr_auc": 0.44963,
+        "ece_held_out": 0.018078774490631205,
+        "n_events_scored": 100000
+      }
+    }
+  ],
+  "lineage_and_export_schema": [
+    {
+      "model": "assist_count",
+      "manifest_name": "assist_count",
+      "snapshot": "dev",
+      "input_ids": [
+        "phase4-v1_6-fc-prep"
+      ],
+      "fit_rows": 3479152,
+      "weak": false
+    },
+    {
+      "model": "assist_credit_allocation",
+      "manifest_name": "assist_credit_allocation",
+      "snapshot": "dev",
+      "input_ids": [
+        "phase4-v1_6-fc-prep"
+      ],
+      "fit_rows": 9975,
+      "weak": true
+    },
+    {
+      "model": "ball_handler_imputation",
+      "manifest_name": "ball_handler_imputation",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 9995,
+      "weak": false
+    },
+    {
+      "model": "ball_handler_position_observedness",
+      "manifest_name": "ball_handler_position_observedness",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 10000,
+      "weak": true
+    },
+    {
+      "model": "dl_proposal_location_depth",
+      "manifest_name": "geometry_location_depth",
+      "snapshot": "dev",
+      "input_ids": [],
+      "fit_rows": null,
+      "weak": null,
+      "export_rows": 5049150,
+      "export_columns": [
+        "event_key",
+        "partition",
+        "dl_p_class"
+      ],
+      "baseline_exists": false
+    },
+    {
+      "model": "dl_proposal_location_edge",
+      "manifest_name": "geometry_location_edge",
+      "snapshot": "dev",
+      "input_ids": [],
+      "fit_rows": null,
+      "weak": null,
+      "export_rows": 5049150,
+      "export_columns": [
+        "event_key",
+        "partition",
+        "dl_p_class"
+      ],
+      "baseline_exists": false
+    },
+    {
+      "model": "dl_proposal_location_side",
+      "manifest_name": "geometry_location_side",
+      "snapshot": "dev",
+      "input_ids": [],
+      "fit_rows": null,
+      "weak": null,
+      "export_rows": 5049150,
+      "export_columns": [
+        "event_key",
+        "partition",
+        "dl_p_class"
+      ],
+      "baseline_exists": false
+    },
+    {
+      "model": "dl_proposal_trajectory",
+      "manifest_name": "geometry_trajectory",
+      "snapshot": "dev",
+      "input_ids": [],
+      "fit_rows": null,
+      "weak": null,
+      "export_rows": 12038982,
+      "export_columns": [
+        "event_key",
+        "partition",
+        "fold_id",
+        "dl_p_class"
+      ],
+      "baseline_exists": false
+    },
+    {
+      "model": "general_location_observedness",
+      "manifest_name": "general_location_observedness",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 10000,
+      "weak": false
+    },
+    {
+      "model": "geometry_general_location",
+      "manifest_name": "geometry_general_location",
+      "snapshot": "dev",
+      "input_ids": [
+        "e-v12"
+      ],
+      "fit_rows": 9988,
+      "weak": false
+    },
+    {
+      "model": "geometry_location_depth",
+      "manifest_name": "geometry_location_depth",
+      "snapshot": "dev",
+      "input_ids": [
+        "e-v12"
+      ],
+      "fit_rows": 9988,
+      "weak": false
+    },
+    {
+      "model": "geometry_location_edge",
+      "manifest_name": "geometry_location_edge",
+      "snapshot": "dev",
+      "input_ids": [
+        "e-v12"
+      ],
+      "fit_rows": 9988,
+      "weak": false
+    },
+    {
+      "model": "geometry_location_side",
+      "manifest_name": "geometry_location_side",
+      "snapshot": "dev",
+      "input_ids": [
+        "e-v12"
+      ],
+      "fit_rows": 9988,
+      "weak": false
+    },
+    {
+      "model": "geometry_trajectory",
+      "manifest_name": "geometry_trajectory",
+      "snapshot": "dev",
+      "input_ids": [
+        "e-v12"
+      ],
+      "fit_rows": 9988,
+      "weak": false
+    },
+    {
+      "model": "location_depth_observedness",
+      "manifest_name": "location_depth_observedness",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 10000,
+      "weak": true
+    },
+    {
+      "model": "location_edge_observedness",
+      "manifest_name": "location_edge_observedness",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 10000,
+      "weak": true
+    },
+    {
+      "model": "location_side_observedness",
+      "manifest_name": "location_side_observedness",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 10000,
+      "weak": false
+    },
+    {
+      "model": "park_factor_runs",
+      "manifest_name": "park_factor_runs",
+      "snapshot": "dev",
+      "input_ids": [
+        "pf-v2"
+      ],
+      "fit_rows": 367780,
+      "weak": false
+    },
+    {
+      "model": "pitch_summary",
+      "manifest_name": "pitch_summary",
+      "snapshot": "dev",
+      "input_ids": [
+        "ps-v2"
+      ],
+      "fit_rows": 7646569,
+      "weak": false
+    },
+    {
+      "model": "putout_credit_allocation",
+      "manifest_name": "putout_credit_allocation",
+      "snapshot": "phase3-pretrain-v5",
+      "input_ids": [
+        "phase3-pretrain-v5-fc-prep"
+      ],
+      "fit_rows": 9972,
+      "weak": false
+    },
+    {
+      "model": "run_expectancy",
+      "manifest_name": "run_expectancy",
+      "snapshot": "dev",
+      "input_ids": [
+        "rv-v2"
+      ],
+      "fit_rows": 12827442,
+      "weak": false
+    },
+    {
+      "model": "state_transition",
+      "manifest_name": "state_transition",
+      "snapshot": "dev",
+      "input_ids": [
+        "rv-v2"
+      ],
+      "fit_rows": 12827442,
+      "weak": true
+    },
+    {
+      "model": "trajectory_observedness",
+      "manifest_name": "trajectory_observedness",
+      "snapshot": "dev",
+      "input_ids": [
+        "obs-bb-v2"
+      ],
+      "fit_rows": 10000,
+      "weak": true
+    }
+  ],
+  "gate_probes_and_stored_diagnostic_sweep": {
+    "scope": "stored diagnostics, no posterior recomputation or coverage hook",
+    "published_bayes": [
+      {
+        "model": "assist_count",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "assist_credit_allocation",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "ball_handler_imputation",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "ball_handler_position_observedness",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_post_pred_bucket_dev",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "general_location_observedness",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_post_pred_bucket_dev",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "geometry_general_location",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "geometry_location_depth",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_held_out_top1_not_beating_baseline",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "geometry_location_edge",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_held_out_top1_not_beating_baseline",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "geometry_location_side",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_held_out_top1_not_beating_baseline",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "geometry_trajectory",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "location_depth_observedness",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_post_pred_bucket_dev",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "location_edge_observedness",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_post_pred_bucket_dev",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "location_side_observedness",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_post_pred_bucket_dev",
+            "severity": "warn"
+          }
+        ]
+      },
+      {
+        "model": "park_factor_runs",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "pitch_summary",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "putout_credit_allocation",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "run_expectancy",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "state_transition",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "model": "trajectory_observedness",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_post_pred_bucket_dev",
+            "severity": "warn"
+          }
+        ]
+      }
+    ],
+    "synthetic_probes": [
+      {
+        "probe": "empty_metrics",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "probe": "nonfinite_lift",
+        "status": "passed",
+        "findings": []
+      },
+      {
+        "probe": "very_bad_calibration",
+        "status": "passed",
+        "findings": [
+          {
+            "code": "bayes_held_out_ece",
+            "severity": "warn"
+          }
+        ]
+      }
+    ],
+    "multiclass_calibration_counterexample": {
+      "max_confidence_ece": 0.0,
+      "mean_predicted_class_shares": [
+        0.5,
+        0.4900000000000001,
+        0.010000000000000002
+      ],
+      "empirical_class_shares": [
+        0.5,
+        0.0,
+        0.5
+      ]
+    },
+    "same_schema_snapshot_probe": {
+      "current_view_payload": 99,
+      "reused_frozen_payload": 10,
+      "rerun_accepted": true,
+      "query_hash_unchanged": true
+    }
+  },
+  "geometry_population_counts": {
+    "columns": [
+      "dimension",
+      "rows",
+      "directly_observed",
+      "positive_weight"
+    ],
+    "rows": [
+      [
+        "ball_handler_position",
+        12038982,
+        10737638,
+        12038982
+      ],
+      [
+        "general_location",
+        12038982,
+        5049150,
+        12038982
+      ],
+      [
+        "location_depth",
+        12038982,
+        5049150,
+        12038982
+      ],
+      [
+        "location_edge",
+        12038982,
+        5049150,
+        12038982
+      ],
+      [
+        "location_side",
+        12038982,
+        5049150,
+        12038982
+      ],
+      [
+        "pulled_opposite",
+        12038982,
+        0,
+        12038982
+      ],
+      [
+        "trajectory",
+        12038982,
+        6171273,
+        12038982
+      ]
+    ],
+    "seconds": 0.5672923331148922
+  },
+  "deep_and_split_audit": {
+    "scope": "Read-only audit evidence for deep/pretrain, split, leakage, MNAR, and transport findings",
+    "generated_at_local_date": "2026-09-11",
+    "repository": "/Users/davidroher/Repos/baseball.computer",
+    "split_evidence": {
+      "dataset_path": "artifacts/statistical/datasets/model_input_geometry/e-v12/dataset.parquet",
+      "population_filter": "geometry_dimension = 'trajectory' AND observed_status = 'observed' AND training_weight > 0",
+      "distinct_games_by_primary_fold": {
+        "TRAIN": 143670,
+        "VALIDATE": 30631,
+        "TEST": 30816
+      },
+      "rows_by_primary_fold": {
+        "TRAIN": 4325736,
+        "VALIDATE": 922725,
+        "TEST": 922812
+      },
+      "blake2s_fold_0_of_10_games_by_primary_fold": {
+        "TRAIN": 14385,
+        "VALIDATE": 3086,
+        "TEST": 3004
+      },
+      "blake2s_fold_0_share_by_primary_fold": {
+        "TRAIN": 0.1001,
+        "VALIDATE": 0.1007,
+        "TEST": 0.0975
+      },
+      "interpretation": "The BLAKE2s fold-0 holdout is disjoint from its own Bayes fit, so choosing a different holdout is not by itself leakage. The integration defect is that Bayes ignores the common primary split: about 90.25% of primary TEST games are eligible for the Bayes training side, eliminating an end-to-end untouched test. Bayes held-out rows can also carry target-supervised upstream deep/pretrain inputs built under different partitions.",
+      "reproduction_command": "env UV_CACHE_DIR=/private/tmp/bc-audit-uv uv run --group build python -c 'import duckdb,hashlib,collections; p=\"artifacts/statistical/datasets/model_input_geometry/e-v12/dataset.parquet\"; rows=duckdb.connect().execute(\"select distinct game_id, primary_fold from read_parquet(?) where geometry_dimension=? and observed_status=? and training_weight>0\",[p,\"trajectory\",\"observed\"]).fetchall(); fold=lambda g:int.from_bytes(hashlib.blake2s(g.encode(),digest_size=8).digest(),\"big\")%10; print(collections.Counter(part for g,part in rows)); print(collections.Counter(part for g,part in rows if fold(g)==0))'",
+      "source_references": [
+        "bc/models/intermediate/modeling_datasets/model_input_geometry.sql:218-222",
+        "bc/python_models/statistical/models/_geometry_data.py:915-925",
+        "bc/python_models/statistical/models/_geometry_data.py:998-1005",
+        "bc/python_models/statistical/models/_event_data.py:428-480",
+        "bc/python_models/statistical/deep/training.py:766-824",
+        "bc/python_models/statistical/deep/training.py:864-967"
+      ]
+    },
+    "retrospective_baseline": {
+      "purpose": "Bounded sanity baseline for whether known retrospective context carries material location-side information. This is not a direct comparison with the published Bayes score because it evaluates the primary TEST population, whereas the current Bayes artifact uses its own BLAKE2s holdout.",
+      "dataset_path": "artifacts/statistical/datasets/model_input_geometry/e-v12/dataset.parquet",
+      "grain": "one row per observed (event_key, geometry_dimension='location_side')",
+      "train_partition": "all primary_fold = 'TRAIN' rows passing the filter; no subsample",
+      "test_partition": "all primary_fold = 'TEST' rows passing the filter; no subsample",
+      "filter": "geometry_dimension = 'location_side' AND observed_status = 'observed' AND training_weight > 0 AND raw_value IS NOT NULL",
+      "features": [
+        "decade = FLOOR(season / 10) * 10",
+        "result_family with NULL mapped to '__unknown__'"
+      ],
+      "target": "raw_value location-side class",
+      "smoothing": "Add-one (alpha=1) over K classes observed globally in TRAIN within each decade x result_family cell. If the whole cell is unseen in TRAIN, fall back to the add-one-smoothed global TRAIN class distribution. A class absent inside a seen cell receives count zero before smoothing.",
+      "results": {
+        "test_rows": 753742,
+        "conditional_cross_entropy_nats": 0.9866768401017787,
+        "global_train_marginal_cross_entropy_nats": 1.05219857603972,
+        "improvement_nats": 0.0655217359379412
+      },
+      "sql": "WITH base AS (SELECT primary_fold, FLOOR(season / 10) * 10 AS decade, COALESCE(result_family, '__unknown__') AS result_family, raw_value AS class_label FROM read_parquet('artifacts/statistical/datasets/model_input_geometry/e-v12/dataset.parquet') WHERE geometry_dimension = 'location_side' AND observed_status = 'observed' AND training_weight > 0 AND raw_value IS NOT NULL), train_cell_class AS (SELECT decade, result_family, class_label, COUNT(*) AS n FROM base WHERE primary_fold = 'TRAIN' GROUP BY ALL), train_cell AS (SELECT decade, result_family, SUM(n) AS n FROM train_cell_class GROUP BY ALL), train_global_class AS (SELECT class_label, COUNT(*) AS n FROM base WHERE primary_fold = 'TRAIN' GROUP BY 1), train_global AS (SELECT SUM(n) AS n FROM train_global_class), class_count AS (SELECT COUNT(*) AS k FROM train_global_class), scored AS (SELECT b.*, CASE WHEN tc.n IS NOT NULL THEN (COALESCE(tcc.n, 0) + 1.0) / (tc.n + cc.k) ELSE (COALESCE(tgc.n, 0) + 1.0) / (tg.n + cc.k) END AS p_conditional, (COALESCE(tgc.n, 0) + 1.0) / (tg.n + cc.k) AS p_marginal FROM base b LEFT JOIN train_cell_class tcc USING (decade, result_family, class_label) LEFT JOIN train_cell tc USING (decade, result_family) LEFT JOIN train_global_class tgc USING (class_label) CROSS JOIN train_global tg CROSS JOIN class_count cc WHERE b.primary_fold = 'TEST') SELECT COUNT(*) AS test_rows, AVG(-LN(p_conditional)) AS conditional_ce, AVG(-LN(p_marginal)) AS marginal_ce, AVG(-LN(p_marginal)) - AVG(-LN(p_conditional)) AS improvement_nats FROM scored;"
+    },
+    "historical_transport": {
+      "trajectory_unrecorded_total": 5867709,
+      "trajectory_unrecorded_pre_1988": 5732739,
+      "pre_1988_share": 0.9769978368047905,
+      "calculation": "(pre-1950 derived 763993 + unknown 1851586 + 1950-1987 derived 1057776 + unknown 2059384) / total unrecorded 5867709",
+      "source_references": [
+        "artifacts/statistical/anchors/trajectory/bound-run/summary.json:105-124",
+        "scripts/permutation_importance_generic.py:202-230",
+        "notes/data-coverage-implementation/phase3-acceptance-gates-v6.md:11-16"
+      ]
+    },
+    "focused_tests": {
+      "command": "env UV_CACHE_DIR=/private/tmp/bc-audit-uv uv run --group build pytest -q bc/tests/statistical/test_splits.py bc/tests/statistical/deep/test_leakage_probes.py bc/tests/statistical/deep/test_export_invariants.py bc/tests/statistical/deep/test_pre_event_layout.py bc/tests/statistical/deep/test_geometry_targets.py bc/tests/statistical/test_mnar_masked_backtest.py bc/tests/statistical/test_mnar_anchor.py",
+      "result": "100 passed, 1 deselected in 1.39s",
+      "meaning": "The implemented local invariants pass; they do not test cross-stage pretrain fold isolation or enforce one common untouched end-to-end test partition."
+    }
+  },
+  "likelihood_and_uncertainty_audit": {
+    "scope": "Read-only audit of likelihoods, estimands, and uncertainty for fielding credit, park factors, run expectancy, state transitions, and linear weights.",
+    "created_date": "2026-09-11",
+    "cluster_se_check": {
+      "purpose": "Compare the event-iid standard error used by the held-out run-expectancy mean diagnostic with an inning-cluster sandwich standard error on the same held-out cells.",
+      "source_dataset": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/datasets/model_input_run_values/rv-v2/dataset.parquet",
+      "population_and_split": "Used filter_event_population from _run_values_data.py and game_hash_fold with HOLDOUT_FOLD_COUNT=10 and HOLDOUT_FOLD_ID=0. Cells required at least 25 held-out events. Cluster key was game_id, inning_start, frame_start.",
+      "working_directory": "/Users/davidroher/Repos/baseball.computer/bc",
+      "executed_command": "env UV_CACHE_DIR=/private/tmp/bc-audit-uv uv run --group build python -c 'import polars as pl, numpy as np; from python_models.statistical.models._run_values_data import filter_event_population,state_suffix_expr,HOLDOUT_FOLD_COUNT,HOLDOUT_FOLD_ID; from python_models.statistical.splits import game_hash_fold; p=\"../artifacts/statistical/datasets/model_input_run_values/rv-v2/dataset.parquet\"; q=filter_event_population(pl.scan_parquet(p),label=\"audit\").filter(pl.col(\"game_id\").is_not_null()&pl.col(\"run_expectancy_start_key\").is_not_null()&pl.col(\"runs_to_end_of_inning\").is_not_null()).select(\"game_id\",\"inning_start\",\"frame_start\",pl.col(\"season\").cast(pl.Int64),pl.col(\"league\").cast(pl.Utf8),state_suffix_expr(\"run_expectancy_start_key\").alias(\"state\"),pl.col(\"runs_to_end_of_inning\").cast(pl.Float64).alias(\"y\")).collect(); gids=q[\"game_id\"].unique().to_list(); held=[g for g in gids if game_hash_fold(str(g),fold_count=HOLDOUT_FOLD_COUNT)==HOLDOUT_FOLD_ID]; d=q.filter(pl.col(\"game_id\").is_in(held)); keys=[\"state\",\"season\",\"league\"]; stats=d.group_by(keys).agg(pl.len().alias(\"n\"),pl.col(\"y\").mean().alias(\"mean\"),pl.col(\"y\").var().alias(\"var\")).filter(pl.col(\"n\")>=25); cl=d.join(stats.select(keys+[\"mean\"]),on=keys).group_by(keys+[\"game_id\",\"inning_start\",\"frame_start\"]).agg((pl.col(\"y\").sum()-pl.len()*pl.col(\"mean\").first()).alias(\"r\")).group_by(keys).agg((pl.col(\"r\").pow(2).sum()).alias(\"ss\"),pl.len().alias(\"clusters\")); z=stats.join(cl,on=keys).with_columns((pl.col(\"var\")/pl.col(\"n\")).sqrt().alias(\"iid_se\"),(pl.col(\"ss\").sqrt()/pl.col(\"n\")).alias(\"cluster_se\")).with_columns((pl.col(\"cluster_se\")/pl.col(\"iid_se\")).alias(\"ratio\")); print(z.select(pl.col(\"ratio\").quantile(0.1).alias(\"p10\"),pl.col(\"ratio\").median().alias(\"median\"),pl.col(\"ratio\").quantile(.9).alias(\"p90\"),pl.col(\"ratio\").max().alias(\"max\"),pl.len().alias(\"cells\")).to_dicts()); print(z.sort(\"ratio\",descending=True).select(keys+[\"n\",\"clusters\",\"iid_se\",\"cluster_se\",\"ratio\"]).head(12))'",
+      "results": {
+        "cells": 5136,
+        "se_ratio_p10": 0.9779615822138685,
+        "se_ratio_median": 1.0142623973541884,
+        "se_ratio_p90": 1.1385441629376143,
+        "se_ratio_max": 1.7923821049969206,
+        "max_finite_cell": {
+          "state": "2_7",
+          "season": 2018,
+          "league": "NL",
+          "n": 95,
+          "clusters": 73,
+          "iid_se": 0.174944,
+          "cluster_se": 0.313566,
+          "ratio": 1.792382
+        }
+      },
+      "interpretation": "Within-inning dependence has little effect for the median held-out cell but materially widens some sparse-cell mean uncertainty. The current held-out-SD construction can be interpreted as a studentized mean diagnostic. Because its sampling scale comes from held-out outcomes rather than posterior phi and it uses Gaussian simulation, it does not constitute posterior-predictive validation of the fitted negative-binomial dispersion, skew, or tails."
+    },
+    "inspected_artifacts": [
+      {
+        "model": "run_expectancy",
+        "artifact_id": "re-full-eraregime-v4",
+        "manifest": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/run_expectancy/re-full-eraregime-v4/manifest.json",
+        "held_out_metrics": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/run_expectancy/re-full-eraregime-v4/validation/held_out_metrics.json",
+        "validation_report": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/run_expectancy/re-full-eraregime-v4/validation/validation_report.json",
+        "observed": {
+          "validation_status": "passed",
+          "n_cells": 5898,
+          "n_events": 1418474,
+          "loglik_lift_per_event": 0.00020671751562013202,
+          "rmse": 0.08844100693374912,
+          "rmse_baseline": 0.09505488400028718
+        }
+      },
+      {
+        "model": "state_transition",
+        "artifact_id": "state-transition-v5",
+        "manifest": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/state_transition/state-transition-v5/manifest.json",
+        "held_out_metrics": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/state_transition/state-transition-v5/validation/held_out_metrics.json",
+        "validation_report": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/state_transition/state-transition-v5/validation/validation_report.json",
+        "observed": {
+          "validation_status": "passed",
+          "n_cells": 5898,
+          "n_events": 1418474,
+          "loglik_lift_per_event": 0.005604793349628201,
+          "tv_distance": 0.046692321448438,
+          "tv_distance_baseline": 0.05700200879400091
+        }
+      },
+      {
+        "model": "park_factor_runs",
+        "artifact_id": "pf-full-ar1-v4",
+        "manifest": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/park_factor_runs/pf-full-ar1-v4/manifest.json",
+        "held_out_metrics": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/park_factor_runs/pf-full-ar1-v4/validation/held_out_metrics.json",
+        "validation_report": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/park_factor_runs/pf-full-ar1-v4/validation/validation_report.json",
+        "observed": {
+          "validation_status": "passed",
+          "n_games": 41068,
+          "loglik_lift": 0.005040657411350846,
+          "rmse": 3.2155753423687434,
+          "rmse_baseline": 3.2303871526060335
+        }
+      },
+      {
+        "model": "putout_credit_allocation",
+        "artifact_id": "full-10k-v16-production-export",
+        "manifest": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/putout_credit_allocation/full-10k-v16-production-export/manifest.json",
+        "held_out_metrics": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/putout_credit_allocation/full-10k-v16-production-export/validation/held_out_metrics.json",
+        "observed": {
+          "validation_status": "passed",
+          "n_evaluated": 1016563,
+          "top1_accuracy": 0.5637466640041001,
+          "baseline_top1_accuracy": 0.3414800656722702,
+          "ece_held_out": 0.02334465441088992
+        }
+      }
+    ],
+    "code_evidence": {
+      "heldout_mean_diagnostic": [
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/hdi_coverage.py:469",
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/hdi_coverage.py:521",
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/hdi_coverage.py:526"
+      ],
+      "run_expectancy_likelihood": "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/models/run_values.py:81",
+      "park_factor_offset": [
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/models/_park_factor_data.py:170",
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/models/park_factor.py:161",
+        "/Users/davidroher/Repos/baseball.computer/docs/estimated-models.md:292"
+      ],
+      "fielding_likelihood_ridge": [
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/models/credit.py:58",
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/models/credit.py:69"
+      ],
+      "linear_weight_factorized_uncertainty": [
+        "/Users/davidroher/Repos/baseball.computer/bc/models/intermediate/coverage/linear_weights_estimated.py:143",
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/linear_weights_estimated.py:153",
+        "/Users/davidroher/Repos/baseball.computer/bc/python_models/statistical/linear_weights_estimated.py:418"
+      ]
+    },
+    "caveats": [
+      "The fixed-effect ridge is a likelihood-identification statement. Proper priors make the posterior proper. Any recoding or two-axis constraint changes the induced prior, so compare prior predictive distributions and held-out predictions before adopting it.",
+      "The cluster-SE calculation diagnoses uncertainty in held-out cell means; it does not by itself measure bias in posterior means.",
+      "No model was refit and no production or Git state was changed."
+    ]
+  },
+  "posterior_diagnostic_refresh": {
+    "command": "UV_CACHE_DIR=/private/tmp/bc-audit-uv MPLCONFIGDIR=/private/tmp/bc-audit-mpl PYTHONPATH=bc uv run --no-sync python scripts/validate_gates.py geometry_trajectory geometry_location_depth putout_credit_allocation park_factor_runs",
+    "log": "2026-09-11 08:41:57,699 INFO arviz.preview arviz_base not installed\n2026-09-11 08:41:57,699 INFO arviz.preview arviz_stats not installed\n2026-09-11 08:41:57,700 INFO arviz.preview arviz_plots not installed\n2026-09-11 08:41:58,983 INFO validate_gates recomputed diagnostics under /Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/geometry_location_depth/e-v12-noprop-location_depth-zero: rhat_max=1.0035 ess_bulk_min=2252.7 group_level_rhat_max=1.0035 group_level_ess_bulk_min=2252.7 (6 variables, 0 excluded)\n2026-09-11 08:41:59,231 INFO validate_gates recomputed diagnostics under /Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/geometry_trajectory/e-v12-noprop-trajectory-shrunk: rhat_max=1.0037 ess_bulk_min=2391.2 group_level_rhat_max=1.0037 group_level_ess_bulk_min=2391.2 (7 variables, 0 excluded)\n/Users/davidroher/Repos/baseball.computer/.venv/lib/python3.13/site-packages/arviz/stats/diagnostics.py:596: RuntimeWarning: invalid value encountered in scalar divide\n  (between_chain_variance / within_chain_variance + num_samples - 1) / (num_samples)\n2026-09-11 08:42:48,403 INFO validate_gates recomputed diagnostics under /Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/park_factor_runs/pf-full-ar1-v4: rhat_max=1.0038 ess_bulk_min=1890.9 group_level_rhat_max=1.0023 group_level_ess_bulk_min=1890.9 (14 variables, 0 excluded)\n2026-09-11 08:42:48,848 INFO validate_gates recomputed diagnostics under /Users/davidroher/Repos/baseball.computer/artifacts/statistical/bayes/putout_credit_allocation/full-10k-v16-production-export: rhat_max=1.0052 ess_bulk_min=1534.0 group_level_rhat_max=1.0052 group_level_ess_bulk_min=1534.0 (6 variables, 0 excluded)\n2026-09-11 08:42:48,850 INFO validate_gates validate-gates swept 4 models; 0 not passed\nmodel                     artifact_id                       status  manifest_status  gate_v  hdi_cov  hdi_cov_param  weak_id  findings\n------------------------  --------------------------------  ------  ---------------  ------  -------  -------------  -------  --------\ngeometry_location_depth   e-v12-noprop-location_depth-zero  passed  passed           2       -        -              False    bayes_held_out_top1_not_beating_baseline(warn)\ngeometry_trajectory       e-v12-noprop-trajectory-shrunk    passed  passed           2       -        -              False    -\npark_factor_runs          pf-full-ar1-v4                    passed  passed           2       -        -              False    -\nputout_credit_allocation  full-10k-v16-production-export    passed  passed           2       -        -              False    -\n"
+  },
+  "focused_gate_tests": {
+    "command": "UV_CACHE_DIR=/private/tmp/bc-audit-uv MPLCONFIGDIR=/private/tmp/bc-audit-mpl uv run --no-sync pytest -q bc/tests/statistical/test_validate_held_out_gate.py bc/tests/statistical/test_validate_bayes_gate.py bc/tests/statistical/test_validate_gates.py bc/tests/statistical/deep/test_publish_manifest.py",
+    "log": "........................................................................ [ 63%]\n.........................................                                [100%]\n=============================== warnings summary ===============================\nbc/tests/statistical/test_validate_gates.py::test_evaluate_gate_write_recomputes_diagnostics_from_posterior\n  /Users/davidroher/Repos/baseball.computer/.venv/lib/python3.13/site-packages/arviz/__init__.py:50: FutureWarning: \n  ArviZ is undergoing a major refactor to improve flexibility and extensibility while maintaining a user-friendly interface.\n  Some upcoming changes may be backward incompatible.\n  For details and migration guidance, visit: https://python.arviz.org/en/latest/user_guide/migration_guide.html\n    warn(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n113 passed, 1 warning in 17.95s\n",
+    "initial_attempt": "7 failed and 106 passed; all failures were ArviZ cache-write permission failures during import. Required cache access resolved all seven."
+  },
+  "probe_protocol": {
+    "validator": "Read the existing run_expectancy/re-full-eraregime-v4 manifest. In a TemporaryDirectory, write validation/diagnostics.json with rhat_max=1.001, ess_bulk_min=1000, divergences=0, total_draws=4000. Call validate._validate_bayes(manifest, temporary_artifact_dir) separately with held_out_metrics.json equal to {}, {loglik_lift: NaN}, and {loglik_lift: 0.01, ece_held_out: 0.9}. No actual artifact is modified.",
+    "multiclass_calibration": "p = np.tile([0.5, 0.49, 0.01], (20, 1)); y = np.array([0] * 10 + [2] * 10); calibration.multiclass_expected_calibration_error(p, y) returns 0.0.",
+    "snapshot_reuse": "Create an in-memory DuckDB view main_models.audit_fixture as SELECT 1 event_key, 1 training_weight, 'dev' source_snapshot_id, 10 payload. Use DatasetSpec(name='audit_fixture',sqlmesh_table='audit_fixture',dataset_version='1',grain=('event_key',),categorical_columns=()). Call prepare_dataset(spec,artifact_id='fixed',con=c,output_root=temporary_path,artifact_versions={}). Replace the view with the same SELECT using 99 payload. Repeat prepare_dataset with identical arguments. Live payload is 99, returned frozen parquet payload is 10, and query hash is unchanged.",
+    "geometry_counts_sql": "SELECT geometry_dimension, count(*) n, count_if(is_observed_class) observed, count_if(training_weight>0) weighted FROM read_parquet('artifacts/statistical/datasets/model_input_geometry/e-v12/dataset.parquet') GROUP BY 1 ORDER BY 1"
+  }
+}
