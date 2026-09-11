@@ -39,6 +39,7 @@ alternate DuckDB files when you need an isolated build.
 - [Geometry target correction](docs/geometry-target-correction-2026-09-11.md) — global-side provenance, dataset compatibility, and trajectory development results
 - [Corrected geometry refits](docs/geometry-corrected-refits-2026-09-11.md) — isolated materialization, accepted research references, and historical validation priorities
 - [Historical geometry stress test](docs/historical-geometry-stress-2026-09-11.md) — backward transfer, whole-scorer exclusion, support limits, and confirmation boundaries
+- [Scorer and Statcast findings](docs/geometry-scorer-statcast-findings-2026-09-11.md) — recording selection, separate standardized and historical targets, and the first verified modern match
 
 ## Agent skills
 

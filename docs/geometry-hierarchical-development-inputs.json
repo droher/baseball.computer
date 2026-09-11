@@ -1,0 +1,16 @@
+{
+  "status": "frozen_before_candidate_development_scoring",
+  "targets": {
+    "trajectory": {
+      "root": "artifacts/statistical/backtests/geometry_reliability/20260911-train-v1/trajectory",
+      "report_sha256": "eea5736b48e46006957a828d4af57e6a2bf91e0548f910537f3ff525687472a9",
+      "domain_contract_sha256": "a0e66fcc47df0b484dcfc47ffe63f29f73cba44b38cbd4ef928ea1218381a566"
+    },
+    "location_side": {
+      "root": "artifacts/statistical/backtests/geometry_reliability/20260911-train-v1/location_side",
+      "report_sha256": "4c562c0eb745c10926764cdbbf00ef82a6699943a4ded1ade2b23210e6b5401e",
+      "domain_contract_sha256": "a68c7efb10b587d2c17416500dd6c4ce212647ce6d60248290ef79b99af2e67e"
+    }
+  },
+  "reserved_games_sha256": "fa6e83509bec2b412781340c4e66cd940159ada4d95de8e4fe5b3fba2d325a35"
+}
