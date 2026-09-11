@@ -2429,6 +2429,11 @@ def run_bayes_model(
     from python_models.statistical.bayes import targets as _targets  # noqa: F401  # pyright: ignore[reportUnusedImport]
 
     spec = get_target(model_name)
+    if model_name == "geometry_location_side" and (
+        gamma_dl_flavor != "gamma_dl_zero"
+        or gamma_propensity_flavor not in (None, "gamma_propensity_zero")
+    ):
+        raise ValueError("global-side contract requires zero learned-covariate flavors")
     dataset_parquet = (
         dataset_root / spec.dataset_name / dataset_artifact_id / "dataset.parquet"
     )

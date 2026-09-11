@@ -12,6 +12,10 @@ from pydantic import BaseModel
 from python_models.statistical.manifests import read_manifest
 from python_models.statistical.dataset_provenance import hash_parquet_schema
 from python_models.statistical.schemas import DatasetMetadata
+from python_models.statistical.geometry_contract import (
+    DATASET_VERSIONS,
+    require_geometry_parquet,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -80,6 +84,12 @@ def bind_artifact(
         visited[path] = identity
         fingerprints[f"{identity}/manifest.json"] = _manifest_digest(path)
         if manifest.kind == "dataset":
+            required_version = DATASET_VERSIONS.get(manifest.name)
+            if required_version is not None and manifest.version != required_version:
+                missing.append(
+                    f"{identity}: obsolete geometry target contract; "
+                    f"requires dataset version {required_version}"
+                )
             for field in (
                 "content_hash",
                 "schema_hash",
@@ -137,6 +147,20 @@ def bind_artifact(
             if fingerprints[f"{identity}/{dataset_label}"] != manifest.content_hash:
                 raise ValueError(
                     f"dataset content differs from its recorded hash: {identity}"
+                )
+
+            if (
+                manifest.name in DATASET_VERSIONS
+                and manifest.version == DATASET_VERSIONS[manifest.name]
+            ):
+                require_geometry_parquet(
+                    dataset_path,
+                    dimension_column=(
+                        "geometry_dimension"
+                        if manifest.name == "model_input_geometry"
+                        else "dimension"
+                    ),
+                    check_classes=manifest.name == "model_input_geometry",
                 )
 
             if manifest.schema_hash != hash_parquet_schema(dataset_path):

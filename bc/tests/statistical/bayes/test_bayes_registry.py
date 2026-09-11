@@ -147,11 +147,10 @@ def test_no_dl_source_restricts_default_flavors() -> None:
 
 GEOMETRY_DL_DIMENSIONS = (
     "trajectory",
-    "location_side",
     "location_depth",
     "location_edge",
 )
-GEOMETRY_ZERO_FLAVOR_DIMENSIONS = ("general_location",)
+GEOMETRY_ZERO_FLAVOR_DIMENSIONS = ("general_location", "location_side")
 
 
 def test_geometry_targets_registered() -> None:
@@ -177,12 +176,23 @@ def test_geometry_dl_dimensions_carry_both_flavors() -> None:
         assert spec.default_flavors == ("gamma_dl_zero", "gamma_dl_shrunk")
 
 
-def test_geometry_general_location_is_zero_flavor_only() -> None:
+def test_geometry_dimensions_without_validated_dl_are_zero_flavor_only() -> None:
     from python_models.statistical.bayes.registry import get_target
 
-    spec = get_target("geometry_general_location")
+    for dimension in GEOMETRY_ZERO_FLAVOR_DIMENSIONS:
+        spec = get_target(f"geometry_{dimension}")
+        assert spec.dl_proposal_dimension is None
+        assert spec.default_flavors == ("gamma_dl_zero",)
+
+
+def test_geometry_global_side_disables_learned_supplements() -> None:
+    from python_models.statistical.bayes.registry import get_target
+
+    spec = get_target("geometry_location_side")
     assert spec.dl_proposal_dimension is None
     assert spec.default_flavors == ("gamma_dl_zero",)
+    assert spec.propensity_dimension == "location_side"
+    assert spec.default_propensity_flavors == ("gamma_propensity_zero",)
 
 
 def test_five_geometry_targets_registered() -> None:
@@ -263,7 +273,7 @@ def test_propensity_offset_flavor_allowed_without_dimension() -> None:
     assert "gamma_propensity_offset" in spec.default_propensity_flavors
 
 
-def test_imputation_targets_carry_propensity_dimension_and_both_flavors() -> None:
+def test_imputation_targets_carry_configured_propensity_contract() -> None:
     imputation = [
         spec
         for spec in all_targets()
@@ -275,13 +285,16 @@ def test_imputation_targets_carry_propensity_dimension_and_both_flavors() -> Non
             f"{spec.name} propensity_dimension {spec.propensity_dimension!r} must "
             f"match dataset_dimension_filter {spec.dataset_dimension_filter!r}"
         )
-        assert spec.default_propensity_flavors == (
-            "gamma_propensity_zero",
-            "gamma_propensity_class",
-        ), (
-            f"{spec.name} must register both propensity flavors with "
-            f"gamma_propensity_zero first (the run_bayes_model default)"
-        )
+        if spec.name == "geometry_location_side":
+            assert spec.default_propensity_flavors == ("gamma_propensity_zero",)
+        else:
+            assert spec.default_propensity_flavors == (
+                "gamma_propensity_zero",
+                "gamma_propensity_class",
+            ), (
+                f"{spec.name} must register both propensity flavors with "
+                f"gamma_propensity_zero first (the run_bayes_model default)"
+            )
 
 
 def test_responsibility_name_is_reserved_not_registered() -> None:

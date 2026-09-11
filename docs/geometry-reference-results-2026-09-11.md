@@ -2,6 +2,8 @@
 
 September 11, 2026. Both four-chain fits completed, both passed sampling diagnostics, and neither passed the [frozen predictive protocol](geometry-reference-protocol.md). Retain the full-TRAIN contextual baseline as the development reference. Correct the location target's semantics and investigate trajectory's historical regression before expanding training or adding pretrained inputs. No production database, canonical artifact, or publication pointer was changed.
 
+Follow-up: the [target correction and TRAIN-only trajectory diagnosis](geometry-target-correction-2026-09-11.md) are implemented. This report and its original frozen experiment remain unchanged in meaning.
+
 ## A target-definition problem precedes further location modeling
 
 The dataset target named `location_side` is a recorded **angle modifier within a general location**, not overall left/center/right field direction. In `event_observation_geometry.sql`, its `raw_value` is `recorded_location_angle`. `calc_batted_ball_type.sql` takes that value directly from `stg_events.batted_location_angle`; its separate `location_side` calculation instead uses fielder and general-location categories. The ledger puts that separate side calculation into `deduced_value` when the angle is unavailable, mixing two different quantities within the dimension.

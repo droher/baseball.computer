@@ -1,7 +1,7 @@
 MODEL (
   name main_models.model_input_geometry,
   kind VIEW,
-  description 'Modeling dataset for the batted-ball geometry posterior. Emits one row per (event_key, geometry_dimension). Row population: event_observation_geometry filtered to observed_status IN (observed, derived, unknown_code, missing) — all four statuses kept so downstream eligibility logic can reason about coverage. DL training-label flag: is_observed_class = (observed_status = observed) — heuristic deductions (HR->Fly, OF putout->AirBall, infielder-assisted putout->GroundBall, fielder-position-derived location side/depth) are NOT treated as observed labels. class = raw_value (NULL for non-observed rows). calc_batted_ball_type and event_observation_geometry still surface the deductions for analyses / published aggregates. Target-population filter: event_level.',
+  description 'Modeling dataset for the batted-ball geometry posterior. Location-side class is the global-side taxonomy mapping of directly recorded general location. Raw source, mapped class, and deterministic fallback remain separate. The location-angle Default sentinel is retained but excluded from observed training truth. Stale side DL and propensity inputs are withheld under geometry-v2-global-side.',
   grain (event_key, geometry_dimension),
   columns (
     event_key UINTEGER,
@@ -11,7 +11,9 @@ MODEL (
     observed_status VARCHAR,
     sentinel_type VARCHAR,
     raw_value VARCHAR,
+    mapped_value VARCHAR,
     deduced_value VARCHAR,
+    value_origin VARCHAR,
     source_acquisition_status VARCHAR,
     data_error_risk VARCHAR,
     model_input_eligible BOOLEAN,
@@ -81,23 +83,27 @@ MODEL (
     ),
     primary_fold VARCHAR,
     training_weight DOUBLE,
-    source_snapshot_id VARCHAR
+    source_snapshot_id VARCHAR,
+    geometry_target_contract VARCHAR
   ),
   column_descriptions (
     event_key = @doc('event_key'),
-    geometry_dimension = 'Atomic geometry dimension (trajectory, location_side, etc.). One row per (event_key, geometry_dimension).',
-    class = 'raw_value. NULL when not recorded. Heuristic deductions (HR->Fly, OF putout->AirBall, etc.) intentionally excluded from this column so DL training labels reflect only what was actually observed.',
+    geometry_dimension = 'Atomic geometry dimension. One row per (event_key, geometry_dimension), including separate location_side and location_angle rows.',
+    class = 'Target class. Uses mapped_value for observed location_side, including broad All for the Catcher region; preserves raw_value behavior for every other dimension. Non-observed location_side is NULL.',
     is_observed_class = 'BOOLEAN. TRUE iff observed_status = observed — class was directly recorded. Heuristically-derived rows are NOT considered observed for DL training-label purposes (only for analyses / aggregates which still read calc_batted_ball_type and event_observation_geometry directly).',
     observed_status = 'event_observation_geometry.observed_status (filtered to observed / derived / unknown_code / missing).',
     sentinel_type = 'event_observation_geometry.sentinel_type.',
     raw_value = 'event_observation_geometry.raw_value.',
+    mapped_value = 'event_observation_geometry.mapped_value.',
     deduced_value = 'event_observation_geometry.deduced_value.',
+    value_origin = 'event_observation_geometry.value_origin.',
     source_acquisition_status = 'event_observation_geometry.source_acquisition_status.',
     data_error_risk = 'event_observation_geometry.data_error_risk.',
     model_input_eligible = 'event_observation_geometry.model_input_eligible.',
     primary_fold = 'Default game-hash split. HASH(game_id) mod 100 -> [0,69]=TRAIN, [70,84]=VALIDATE, [85,99]=TEST.',
     training_weight = '1.0 when data_error_risk = none else 0.0.',
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
+    geometry_target_contract = 'Stable geometry target contract marker. geometry-v2-global-side identifies location_side as the taxonomy mapping of recorded general location.',
     holdout_flags = 'STRUCT of 7 stress-test holdout BOOLEANs, NULL until DL supplements land.',
     count_balls = 'event_states_full.count_balls.',
     count_strikes = 'event_states_full.count_strikes.',
@@ -117,19 +123,19 @@ MODEL (
     runners_count_start = 'event_states_full.runners_count_start.',
     batting_team_margin_end = 'event_states_full.batting_team_margin_end.',
     fielder_chain = 'Aggregated putout/assist chain (e.g. ''6-4-3'') from stg_event_fielding_plays. NULL when no fielding plays recorded.',
-    dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id, NULL until DL supplements land.',
-    dl_p_class = 'dl_proposal_manifest.dl_p_class, NULL until DL supplements land.',
-    propensity_p_observed = 'scorer_observation_propensities.p_observed_mean — posterior mean P(observed) for this (event_key, dimension), NULL until an observation-propensity artifact publishes.',
-    propensity_artifact_id = 'scorer_observation_propensities.artifact_id, NULL until an observation-propensity artifact publishes.'
+    dl_artifact_id = 'dl_proposal_manifest.dl_artifact_id. Forced NULL for location_side until a geometry-v2-global-side dependency is validated.',
+    dl_p_class = 'dl_proposal_manifest.dl_p_class. Forced NULL for location_side until a geometry-v2-global-side dependency is validated.',
+    propensity_p_observed = 'scorer_observation_propensities.p_observed_mean. Forced NULL for location_side until a geometry-v2-global-side dependency is validated.',
+    propensity_artifact_id = 'scorer_observation_propensities.artifact_id. Forced NULL for location_side until a geometry-v2-global-side dependency is validated.'
   ),
   audits (
     not_null(columns := (event_key, geometry_dimension, observed_status, game_id, season, primary_fold, source_snapshot_id)),
     unique_grain(columns := (event_key, geometry_dimension)),
     accepted_values(column := geometry_dimension, is_in := (
-      'trajectory', 'location_side', 'location_depth', 'location_edge',
+      'trajectory', 'location_side', 'location_angle', 'location_depth', 'location_edge',
       'general_location', 'ball_handler_position', 'pulled_opposite'
     )),
-    accepted_values(column := observed_status, is_in := ('observed', 'derived', 'unknown_code', 'missing')),
+    accepted_values(column := observed_status, is_in := ('observed', 'derived', 'unknown_code', 'default_code', 'missing')),
     accepted_values(column := primary_fold, is_in := ('TRAIN', 'VALIDATE', 'TEST')),
     accepted_values(column := alignment_regime, is_in := (
       'pre_shift_era', 'shift_growth_era', 'full_shift_era', 'post_restriction'
@@ -142,12 +148,18 @@ MODEL (
 SELECT
     o.event_key,
     o.dimension AS geometry_dimension,
-    o.raw_value AS class,
+    CASE
+        WHEN o.dimension = 'location_side' AND o.observed_status = 'observed' THEN o.mapped_value
+        WHEN o.dimension = 'location_side' THEN NULL
+        ELSE o.raw_value
+    END AS class,
     (o.observed_status = 'observed') AS is_observed_class,
     o.observed_status,
     o.sentinel_type,
     o.raw_value,
+    o.mapped_value,
     o.deduced_value,
+    o.value_origin,
     o.source_acquisition_status,
     o.data_error_risk,
     o.model_input_eligible,
@@ -202,10 +214,10 @@ SELECT
     e.runners_count_start,
     e.batting_team_margin_end,
     fc.fielder_chain,
-    p.dl_artifact_id,
-    p.dl_p_class,
-    sp.p_observed_mean AS propensity_p_observed,
-    sp.artifact_id AS propensity_artifact_id,
+    CASE WHEN o.dimension = 'location_side' THEN NULL ELSE p.dl_artifact_id END AS dl_artifact_id,
+    CASE WHEN o.dimension = 'location_side' THEN NULL ELSE p.dl_p_class END AS dl_p_class,
+    CASE WHEN o.dimension = 'location_side' THEN NULL ELSE sp.p_observed_mean END AS propensity_p_observed,
+    CASE WHEN o.dimension = 'location_side' THEN NULL ELSE sp.artifact_id END AS propensity_artifact_id,
     STRUCT_PACK(
         is_heldout_scorer := s.is_heldout_scorer,
         is_heldout_park := s.is_heldout_park,
@@ -221,7 +233,8 @@ SELECT
         ELSE 'TEST'
     END AS primary_fold,
     CASE WHEN o.data_error_risk = 'none' THEN 1.0 ELSE 0.0 END AS training_weight,
-    @VAR('source_snapshot_id', 'dev') AS source_snapshot_id
+    @VAR('source_snapshot_id', 'dev') AS source_snapshot_id,
+    'geometry-v2-global-side' AS geometry_target_contract
 FROM main_models.event_observation_geometry AS o
 INNER JOIN main_models.event_observation_context AS c USING (event_key)
 LEFT JOIN main_models.event_states_full AS e USING (event_key)
@@ -239,4 +252,4 @@ LEFT JOIN main_models.scorer_observation_propensities AS sp
     ON sp.event_key = o.event_key AND sp.dimension = o.dimension
 LEFT JOIN main_models.stress_holdout_registry AS s USING (event_key)
 WHERE c.target_population_status = 'event_level'
-  AND o.observed_status IN ('observed', 'derived', 'unknown_code', 'missing')
+  AND o.observed_status IN ('observed', 'derived', 'unknown_code', 'default_code', 'missing')

@@ -5,10 +5,10 @@ class, for events whose class is unobserved. Consumes the frozen
 ``model_input_geometry`` dataset filtered to ``geometry_dimension=<dim>``;
 truth is the directly recorded class.
 
-The four DL-backed dimensions (trajectory, location_side, location_depth,
-location_edge) carry a published DL proposal whose per-event probabilities
+The three DL-backed dimensions (trajectory, location_depth, location_edge) carry a published DL proposal whose per-event probabilities
 feed the gamma_dl_shrunk flavor, so they register both flavors.
-general_location has no DL artifact and is gamma_dl_zero-only.
+general_location and corrected global location_side are gamma_dl_zero-only.
+Corrected global side also excludes propensity and handler inputs.
 """
 
 from __future__ import annotations
@@ -27,11 +27,10 @@ SAMPLE_SIZE: int = 10_000
 
 DL_DIMENSIONS: tuple[str, ...] = (
     "trajectory",
-    "location_side",
     "location_depth",
     "location_edge",
 )
-ZERO_FLAVOR_DIMENSIONS: tuple[str, ...] = ("general_location",)
+ZERO_FLAVOR_DIMENSIONS: tuple[str, ...] = ("general_location", "location_side")
 
 _DL_FLAVORS: tuple[GammaDlFlavor, ...] = ("gamma_dl_zero", "gamma_dl_shrunk")
 _ZERO_FLAVORS: tuple[GammaDlFlavor, ...] = ("gamma_dl_zero",)
@@ -60,7 +59,11 @@ def _geometry_spec(
         dl_proposal_dimension=dl_proposal_dimension,
         default_flavors=default_flavors,
         propensity_dimension=dimension,
-        default_propensity_flavors=_PROPENSITY_FLAVORS,
+        default_propensity_flavors=(
+            ("gamma_propensity_zero",)
+            if dimension == "location_side"
+            else _PROPENSITY_FLAVORS
+        ),
     )
 
 

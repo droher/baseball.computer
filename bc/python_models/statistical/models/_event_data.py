@@ -22,6 +22,7 @@ import numpy.typing as npt
 import polars as pl
 from pydantic import BaseModel, ConfigDict
 
+from python_models.statistical.geometry_contract import require_geometry_parquet
 from python_models.statistical.splits import game_hash_fold
 
 _log = logging.getLogger(__name__)
@@ -165,9 +166,7 @@ def _assert_contiguous(idx: IntArray, labels: list[str], column: str) -> None:
         )
 
 
-def _build_fixed_effect_design(
-    df: pl.DataFrame, column: str
-) -> FixedEffectDesign:
+def _build_fixed_effect_design(df: pl.DataFrame, column: str) -> FixedEffectDesign:
     codes, labels = _category_index(df, column)
     if not labels:
         raise ValueError(f"fixed-effect column {column!r} has zero levels")
@@ -348,6 +347,8 @@ def build_observation_scoring_frame(
     and continuous covariates standardize with the frozen training
     ``raw_mean`` / ``raw_std``. Rows come back sorted by ``event_key``.
     """
+    if dimension == "location_side":
+        require_geometry_parquet(parquet_path, dimension_column="dimension")
     needed_columns = sorted(
         {
             "event_key",
@@ -425,6 +426,8 @@ def prepare_event_observation_inputs(
     per-event ``p_observed_mean`` as "fully observed by construction"
     (p=1) and skip MNAR reweighting on those events.
     """
+    if dimension == "location_side":
+        require_geometry_parquet(parquet_path, dimension_column="dimension")
     df = pl.read_parquet(parquet_path)
     df = df.filter(
         (pl.col("dimension") == dimension) & (pl.col("training_weight") > 0.0)
@@ -445,15 +448,17 @@ def prepare_event_observation_inputs(
     season_counts = season_counts.with_columns(
         (pl.col("_rare_count") / pl.col("_n")).alias("_rare_rate"),
     )
-    saturated_mask = (
-        (pl.col("_rare_count") < MIN_RARE_CLASS_COUNT_PER_SEASON)
-        | (pl.col("_rare_rate") < MIN_RARE_CLASS_RATE_PER_SEASON)
+    saturated_mask = (pl.col("_rare_count") < MIN_RARE_CLASS_COUNT_PER_SEASON) | (
+        pl.col("_rare_rate") < MIN_RARE_CLASS_RATE_PER_SEASON
     )
     informative_seasons = season_counts.filter(~saturated_mask).get_column("season")
     dropped = season_counts.height - informative_seasons.len()
     if dropped:
         dropped_seasons = (
-            season_counts.filter(saturated_mask).sort("season").get_column("season").to_list()
+            season_counts.filter(saturated_mask)
+            .sort("season")
+            .get_column("season")
+            .to_list()
         )
         _log.info(
             "prepare_event_observation_inputs dropped %d saturated seasons (rare_count<%d or rare_rate<%.4f): %s",

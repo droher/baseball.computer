@@ -15,5 +15,11 @@ WHERE NOT (
   OR (sentinel_type = 'not_applicable' AND observed_status = 'not_applicable')
   OR (sentinel_type = 'null' AND observed_status IN ('missing', 'derived'))
   OR (sentinel_type = 'empty_sequence' AND observed_status = 'missing')
-  OR (sentinel_type = 'default' AND observed_status = 'observed')
+  OR (
+    sentinel_type = 'default'
+    AND (
+      (dimension = 'location_angle' AND observed_status = 'default_code')
+      OR (dimension != 'location_angle' AND observed_status = 'observed')
+    )
+  )
 )

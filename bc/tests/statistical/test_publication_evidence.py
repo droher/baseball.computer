@@ -320,3 +320,36 @@ def test_changed_manifest_settings_and_stale_gate_invalidate_evidence(
             candidate_roots=(),
             exploratory=False,
         )
+
+
+def test_obsolete_geometry_dataset_cannot_supply_publication_provenance(
+    tmp_path: Path,
+) -> None:
+    path = _dataset(tmp_path)
+    manifest = read_manifest(path).model_copy(
+        update={"name": "model_input_geometry", "version": "0.4.0"}
+    )
+    write_manifest(manifest, path)
+    binding = bind_artifact(path)
+    assert any(
+        "obsolete geometry target contract" in gap for gap in binding.missing_provenance
+    )
+
+
+def test_restamping_legacy_dataset_version_does_not_make_global_side_valid(
+    tmp_path: Path,
+) -> None:
+    from python_models.statistical.geometry_contract import DATASET_VERSIONS
+
+    path = _dataset(tmp_path)
+    write_manifest(
+        read_manifest(path).model_copy(
+            update={
+                "name": "model_input_geometry",
+                "version": DATASET_VERSIONS["model_input_geometry"],
+            }
+        ),
+        path,
+    )
+    with pytest.raises(ValueError, match="legacy datasets"):
+        bind_artifact(path)

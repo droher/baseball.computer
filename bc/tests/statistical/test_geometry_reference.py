@@ -34,6 +34,10 @@ def source() -> duckdb.DuckDBPyConnection:
             "INSERT INTO main_models.model_input_geometry VALUES (?, 'location_side', ?, TRUE, 1.0, ?, 1990, ?, 'hit', '0', '0', 'standard', NULL, 'dev', 'observed')",
             [key, label, f"game-{key}", fold],
         )
+    con.execute(
+        "ALTER TABLE main_models.model_input_geometry ADD COLUMN "
+        "geometry_target_contract VARCHAR DEFAULT 'geometry-v2-global-side'"
+    )
     return con
 
 

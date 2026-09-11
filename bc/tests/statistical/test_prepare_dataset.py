@@ -259,7 +259,8 @@ def test_geometry_spec_separates_observed_eligible_derived_and_inference_counts(
     con.execute(
         """
         CREATE VIEW main_models.model_input_geometry AS
-        SELECT * FROM (VALUES
+        SELECT *, 'trajectory' AS geometry_dimension, 'Fly' AS class,
+               'geometry-v2-global-side' AS geometry_target_contract FROM (VALUES
             (1, TRUE,  'observed',     TRUE,  1.0, 'dev'),
             (2, FALSE, 'derived',      TRUE,  1.0, 'dev'),
             (3, FALSE, 'missing',      TRUE,  1.0, 'dev'),

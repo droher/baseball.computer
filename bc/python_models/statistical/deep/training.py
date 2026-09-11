@@ -42,6 +42,7 @@ from python_models.ml.model_factory import (
     build_model,
     set_pretrained_embeddings,
 )
+from python_models.statistical.geometry_contract import require_geometry_parquet
 from python_models.statistical.config import DEEP_ROOT
 from python_models.statistical.deep.artifacts import (
     deep_artifact_dir,
@@ -102,25 +103,17 @@ def _collect_polars_stats(
 ) -> PolarsFeatureStats:
     vocabularies: dict[str, Vocabulary] = {}
     for col in layout.categorical_columns:
-        values = (
-            train_df[col].cast(pl.Utf8).drop_nulls().unique().sort().to_list()
-        )
+        values = train_df[col].cast(pl.Utf8).drop_nulls().unique().sort().to_list()
         vocabularies[col] = Vocabulary(column=col, values=tuple(str(v) for v in values))
 
     numeric_means: dict[str, float] = {}
     numeric_variances: dict[str, float] = {}
     for col in layout.numeric_columns:
         arr = (
-            train_df[col]
-            .cast(pl.Float64)
-            .fill_null(0.0)
-            .to_numpy()
-            .astype(np.float64)
+            train_df[col].cast(pl.Float64).fill_null(0.0).to_numpy().astype(np.float64)
         )
         numeric_means[col] = float(arr.mean()) if arr.size > 0 else 0.0
-        numeric_variances[col] = (
-            max(float(arr.var()), 1e-6) if arr.size > 0 else 1e-6
-        )
+        numeric_variances[col] = max(float(arr.var()), 1e-6) if arr.size > 0 else 1e-6
 
     if class_universe is None:
         labels_raw = (
@@ -146,9 +139,7 @@ def _encode_inputs(
         encoded = stats.vocabularies[col].encode(df[col]).to_numpy()
         inputs[col] = encoded.astype(np.int64).reshape(-1, 1)
     for col in layout.numeric_columns:
-        inputs[col] = (
-            df[col].cast(pl.Float32).fill_null(0.0).to_numpy().reshape(-1, 1)
-        )
+        inputs[col] = df[col].cast(pl.Float32).fill_null(0.0).to_numpy().reshape(-1, 1)
     return inputs
 
 
@@ -247,9 +238,7 @@ def _make_per_class_reporter(
             rows: list[tuple[str, float, float, float, float]] = []
             f1s: list[float] = []
             for c in range(probs.shape[1]):
-                label = (
-                    class_labels[c] if c < len(class_labels) else f"class_{c}"
-                )
+                label = class_labels[c] if c < len(class_labels) else f"class_{c}"
                 true_mask = y_e == c
                 pred_mask = pred == c
                 tp = float(w_e[true_mask & pred_mask].sum())
@@ -267,9 +256,7 @@ def _make_per_class_reporter(
                     f1 = float("nan")
                 if tp + fn > 0:
                     p_true = np.clip(p_e[true_mask, c], eps, 1.0)
-                    nll = float(
-                        -np.average(np.log(p_true), weights=w_e[true_mask])
-                    )
+                    nll = float(-np.average(np.log(p_true), weights=w_e[true_mask]))
                 else:
                     nll = float("nan")
                 rows.append((label, precision, recall, f1, nll))
@@ -303,15 +290,11 @@ def _prep_multiclass_arrays(
     class_index: dict[str, int],
 ) -> tuple[dict[str, NDArray[Any]], NDArray[np.int64], NDArray[np.float32]]:
     x = _encode_inputs(df, layout=layout, stats=stats)
-    y, valid = _encode_targets(
-        df, target_column=target_column, class_index=class_index
-    )
+    y, valid = _encode_targets(df, target_column=target_column, class_index=class_index)
     if not bool(valid.all()):
         x = {k: v[valid] for k, v in x.items()}
         y = y[valid]
-    weights = (
-        df[weight_column].cast(pl.Float32).fill_null(0.0).to_numpy()[valid]
-    )
+    weights = df[weight_column].cast(pl.Float32).fill_null(0.0).to_numpy()[valid]
     return x, y, weights.astype(np.float32)
 
 
@@ -355,7 +338,9 @@ def _maybe_load_pretrained_embeddings(
 
     artifact_name_override = os.environ.get("BC_DEEP_PRETRAIN_ARTIFACT_OVERRIDE")
     effective_artifact_name = (
-        artifact_name_override if artifact_name_override else spec.pretrained_embeddings_artifact_id
+        artifact_name_override
+        if artifact_name_override
+        else spec.pretrained_embeddings_artifact_id
     )
     if artifact_name_override:
         _log.info(
@@ -384,7 +369,9 @@ def _maybe_load_pretrained_embeddings(
     )
 
     force_freeze = os.environ.get("BC_DEEP_FORCE_FREEZE_PRETRAIN", "0") in (
-        "1", "true", "TRUE"
+        "1",
+        "true",
+        "TRUE",
     )
     if not spec.freeze_pretrained_embeddings and not force_freeze:
         return
@@ -428,9 +415,7 @@ def _maybe_load_pretrained_embeddings(
     model.compile(optimizer=optimizer, loss=loss, weighted_metrics=metrics)
 
 
-def _assert_binary_target_values(
-    fit_df: pl.DataFrame, *, target_column: str
-) -> None:
+def _assert_binary_target_values(fit_df: pl.DataFrame, *, target_column: str) -> None:
     distinct = fit_df.get_column(target_column).drop_nulls().unique().to_list()
     invalid = sorted(v for v in distinct if v not in (0, 1))
     if invalid:
@@ -539,12 +524,8 @@ def _fit_keras(
             _assert_binary_target_values(
                 validation_df, target_column=spec.target_column
             )
-        y_raw = (
-            fit_df[spec.target_column].cast(pl.Float32).fill_null(0.0).to_numpy()
-        )
-        weights = (
-            fit_df[spec.weight_column].cast(pl.Float32).fill_null(0.0).to_numpy()
-        )
+        y_raw = fit_df[spec.target_column].cast(pl.Float32).fill_null(0.0).to_numpy()
+        weights = fit_df[spec.weight_column].cast(pl.Float32).fill_null(0.0).to_numpy()
         x = _encode_inputs(fit_df, layout=layout, stats=stats)
         validation_data = None
         if validation_df is not None and validation_df.height > 0:
@@ -593,9 +574,7 @@ def _fit_keras(
     else:
         best_epoch = epochs_ran - 1 if epochs_ran > 0 else 0
         final_val_loss = None
-    final_train_loss = (
-        float(train_losses[best_epoch]) if train_losses else float("nan")
-    )
+    final_train_loss = float(train_losses[best_epoch]) if train_losses else float("nan")
     return FitOutcome(
         model=model,
         best_epoch=best_epoch,
@@ -614,9 +593,9 @@ def _predict_probabilities(
     batch_size: int = DEFAULT_PREDICT_BATCH_SIZE,
 ) -> NDArray[np.float64]:
     x = _encode_inputs(df, layout=layout, stats=stats)
-    raw = np.asarray(
-        model.predict(x, batch_size=batch_size, verbose=0)
-    ).astype(np.float64)
+    raw = np.asarray(model.predict(x, batch_size=batch_size, verbose=0)).astype(
+        np.float64
+    )
     return raw
 
 
@@ -697,24 +676,28 @@ def run_target(
     keras_batch_size: int = DEFAULT_KERAS_BATCH_SIZE,
 ) -> FoldRunResult:
     artifact_dir = deep_artifact_dir(spec.name, artifact_id, root=artifact_root)
+    if spec.name == "geometry_location_side":
+        require_geometry_parquet(
+            dataset_parquet, dimension_column="geometry_dimension", check_classes=True
+        )
     manifest_path = artifact_dir / "manifest.json"
     if manifest_path.exists():
         _log.info(
             "deep artifact %s already present; returning idempotent result",
             manifest_path,
         )
-        existing_probs = deep_exports_dir(spec.name, artifact_id, root=artifact_root) / "probabilities.parquet"
-        existing_labels = deep_exports_dir(spec.name, artifact_id, root=artifact_root) / "class_labels.json"
+        existing_probs = (
+            deep_exports_dir(spec.name, artifact_id, root=artifact_root)
+            / "probabilities.parquet"
+        )
+        existing_labels = (
+            deep_exports_dir(spec.name, artifact_id, root=artifact_root)
+            / "class_labels.json"
+        )
         existing = pl.read_parquet(existing_probs)
-        n_train = int(
-            existing.filter(pl.col("partition") == "OOF").height
-        )
-        n_val = int(
-            existing.filter(pl.col("partition") == "VALIDATE").height
-        )
-        n_test = int(
-            existing.filter(pl.col("partition") == "TEST").height
-        )
+        n_train = int(existing.filter(pl.col("partition") == "OOF").height)
+        n_val = int(existing.filter(pl.col("partition") == "VALIDATE").height)
+        n_test = int(existing.filter(pl.col("partition") == "TEST").height)
         return FoldRunResult(
             artifact_dir=artifact_dir,
             probabilities_path=existing_probs,
@@ -743,9 +726,7 @@ def run_target(
     if spec.loss_mask_predicate is not None:
         ctx = pl.SQLContext({"self": df.lazy()})
         mask_series = (
-            ctx.execute(
-                f"SELECT ({spec.loss_mask_predicate}) AS _loss_mask FROM self"
-            )
+            ctx.execute(f"SELECT ({spec.loss_mask_predicate}) AS _loss_mask FROM self")
             .collect()
             .to_series()
         )
@@ -797,7 +778,9 @@ def run_target(
 
     fit_diagnostics: list[dict[str, float | int | str]] = []
     oof_records: list[pl.DataFrame] = []
-    validation_pool: pl.DataFrame | None = validate_df if validate_df.height > 0 else None
+    validation_pool: pl.DataFrame | None = (
+        validate_df if validate_df.height > 0 else None
+    )
     fold_iter = range(spec.fold_count)
     for k in fold_iter:
         fit_subset = train_df.filter(pl.col(KFOLD_COLUMN) != k)
@@ -845,7 +828,9 @@ def run_target(
             fit_subset.height,
             fold_outcome.best_epoch,
             fold_outcome.epochs_ran,
-            f"{fold_outcome.final_val_loss:.4f}" if fold_outcome.final_val_loss is not None else "n/a",
+            f"{fold_outcome.final_val_loss:.4f}"
+            if fold_outcome.final_val_loss is not None
+            else "n/a",
             fold_elapsed,
         )
         probs = _predict_probabilities(
@@ -894,7 +879,9 @@ def run_target(
         train_df.height,
         full_outcome.best_epoch,
         full_outcome.epochs_ran,
-        f"{full_outcome.final_val_loss:.4f}" if full_outcome.final_val_loss is not None else "n/a",
+        f"{full_outcome.final_val_loss:.4f}"
+        if full_outcome.final_val_loss is not None
+        else "n/a",
         full_elapsed,
     )
     full_model = full_outcome.model
@@ -1029,9 +1016,7 @@ def _build_partition_frame(
     if partition_label == "OOF":
         fold_id = subset[KFOLD_COLUMN].cast(pl.Int32).rename(FOLD_ID_COLUMN)
     else:
-        fold_id = pl.Series(
-            FOLD_ID_COLUMN, [None] * subset.height, dtype=pl.Int32
-        )
+        fold_id = pl.Series(FOLD_ID_COLUMN, [None] * subset.height, dtype=pl.Int32)
     columns = {
         grain_column: subset[grain_column],
         "partition": pl.Series(

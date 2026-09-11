@@ -1,0 +1,51 @@
+{
+  "contract": "geometry-v2-global-side",
+  "source_database": {
+    "path": "/Users/davidroher/Repos/baseball.computer/bc.db",
+    "size": 32242413568,
+    "mtime_ns": 1788554319269011563
+  },
+  "sql_sha256": {
+    "bc/models/intermediate/coverage/event_observation_geometry.sql": "132a407c31090f8db022d7dc628952ab32f9a7d5d6b47209cd7747ff5fda0e90",
+    "bc/models/intermediate/modeling_datasets/model_input_geometry.sql": "dbbdee7b63770d01fa0b4cd24d66f9ab02ab48af5f4fe054cfefa79e52e10389",
+    "bc/models/intermediate/modeling_datasets/model_input_observation_batted_ball.sql": "db76c4b4a772add56e623c57e7b713f26ebc026bee3cdc6f65322e4b32126c6d",
+    "bc/audits/sentinel_status_consistent.sql": "6f176a7bad886076386bd63bed4eac61c524f364a801e16a582eb9797bd5514c"
+  },
+  "real_data": {
+    "location_side_rows": 12041398,
+    "location_side_status_counts": {
+      "observed": 5049435,
+      "derived": 6113640,
+      "unknown_code": 878323,
+      "missing": 0
+    },
+    "location_side_observed_class_counts": {
+      "All": 43839,
+      "Left": 1521098,
+      "Middle": 2038861,
+      "Right": 1445637
+    },
+    "location_side_unmapped_recorded_general_locations": 0,
+    "all_class_raw_tokens": {
+      "Catcher": 43839
+    },
+    "calc_side_differs_from_direct_recorded_mapping": 600593,
+    "location_angle_status_counts": {
+      "observed": 1525784,
+      "default_code": 3523651,
+      "unknown_code": 6991963,
+      "missing": 0
+    },
+    "trajectory_existing_rows": 12038982,
+    "trajectory_common_rows": 12038982,
+    "trajectory_common_value_mismatches": 0,
+    "trajectory_corrected_query_only_rows_from_upstream_freshness": 2416,
+    "trajectory_existing_only_rows": 0
+  },
+  "validation_scope": "Read-only bc.db aggregate queries and exact rendered SQL smoke; no model or production writes.",
+  "stale_production_view_guard": {
+    "rejected": true,
+    "reason": "main_models.model_input_geometry requires geometry-v2-global-side; materialize the corrected SQL models before exporting a new dataset."
+  },
+  "source_database_unchanged_after_validation": true
+}

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from python_models.statistical.geometry_contract import DATASET_VERSIONS
+
 _SQLMESH_SCHEMA: str = "main_models"
 
 
@@ -75,7 +77,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
     "model_input_observation_batted_ball": DatasetSpec(
         name="model_input_observation_batted_ball",
         sqlmesh_table="model_input_observation_batted_ball",
-        dataset_version="0.3.0",
+        dataset_version=DATASET_VERSIONS["model_input_observation_batted_ball"],
         grain=("event_key", "dimension"),
         categorical_columns=_merge(
             ("dimension", "observed_status", "sentinel_type", "data_error_risk"),
@@ -98,7 +100,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
     "model_input_geometry": DatasetSpec(
         name="model_input_geometry",
         sqlmesh_table="model_input_geometry",
-        dataset_version="0.4.0",
+        dataset_version=DATASET_VERSIONS["model_input_geometry"],
         grain=("event_key", "geometry_dimension", "class"),
         categorical_columns=_merge(
             (

@@ -16,6 +16,10 @@ import numpy.typing as npt
 import polars as pl
 
 from python_models.statistical.evidence_binding import file_digest
+from python_models.statistical.geometry_contract import (
+    GEOMETRY_TARGET_CONTRACT,
+    require_geometry_relation,
+)
 from python_models.statistical.validate import (
     compute_posterior_diagnostics,
     write_json_atomic,
@@ -68,6 +72,14 @@ def freeze_data(
 ) -> dict[str, object]:
     if target not in TARGETS:
         raise ValueError(f"unsupported target: {target}")
+    if target == "location_side":
+        require_geometry_relation(
+            con,
+            "(SELECT * FROM main_models.model_input_geometry "
+            "WHERE primary_fold IN ('TRAIN', 'TEST'))",
+            dimension_column="geometry_dimension",
+            check_classes=True,
+        )
     projection = ", ".join(
         f"COALESCE(CAST({field} AS VARCHAR), '__MISSING__') AS {field}"
         for field in FEATURES
@@ -326,9 +338,12 @@ def main() -> int:
         handlers=[logging.StreamHandler(), logging.FileHandler(root / "run.log")],
     )
     protocol_path = (
-        Path(__file__).resolve().parents[4] / "docs" / "geometry-reference-protocol.md"
+        Path(__file__).resolve().parents[4]
+        / "docs"
+        / "geometry-reference-global-side-protocol.md"
     )
     protocol: dict[str, object] = {
+        "geometry_target_contract": GEOMETRY_TARGET_CONTRACT,
         "protocol_text": protocol_path.read_text(),
         "protocol_sha256": file_digest(protocol_path),
         "seed": args.seed,

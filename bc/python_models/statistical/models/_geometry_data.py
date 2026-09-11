@@ -4,16 +4,16 @@ Reads the frozen ``model_input_geometry`` Parquet at grain
 ``(event_key, geometry_dimension)`` and shapes a single-arm per-dimension
 categorical softmax over the directly recorded geometry class. Unlike the
 ball-handler model's fixed K=9 position set, the class set is
-dimension-specific: the four DL-backed dimensions (trajectory,
-location_side, location_depth, location_edge) carry a locked ordered
-vocabulary matching the DL softmax output order, while general_location
+dimension-specific: trajectory, location_depth, and location_edge carry a locked ordered
+vocabulary matching the DL softmax output order. Global location_side uses
+a separate fixed mapped vocabulary with learned covariates disabled; general_location
 derives its vocabulary from the observed-data class frequencies.
 
 Filters to the geometry-observed rows (``geometry_dimension=<dim>,
 observed_status='observed', training_weight > 0``), applies the
 per-dimension raw→vocab remap, and maps each event's remapped label to a
-class index. Truth is the directly recorded class in ``raw_value``, one
-class per event.
+class index. Global-side truth uses the source-mapped ``class``; other dimensions use
+``raw_value``. Raw source values remain separate, one class per event.
 
 The output ``GeometryInputs`` reuses the ``FixedEffectDesign`` /
 ``HeldOutSet`` / ``ProductionScoringFrame`` types from ``_credit_data`` so
@@ -43,6 +43,10 @@ from python_models.statistical.models._event_data import _encode_codes_with_voca
 from pydantic import BaseModel, ConfigDict
 
 from python_models.statistical import config as cfg
+from python_models.statistical.geometry_contract import (
+    GLOBAL_SIDE_LABELS,
+    require_geometry_parquet,
+)
 from python_models.statistical.bayes.dl_covariate import (
     center_dl_log_probs,
     compute_dl_log_probs_per_class_with_mask,
@@ -160,9 +164,9 @@ GEOMETRY_DIMENSIONS: dict[str, GeometryDimensionSpec] = {
     ),
     "location_side": GeometryDimensionSpec(
         dimension="location_side",
-        class_labels=("Default", "Foul", "FoulLine", "Left", "Middle", "Right"),
+        class_labels=GLOBAL_SIDE_LABELS,
         remap={},
-        dl_active=True,
+        dl_active=False,
     ),
     "location_depth": GeometryDimensionSpec(
         dimension="location_depth",
@@ -301,9 +305,9 @@ def _resolve_spec(dimension: str) -> GeometryDimensionSpec:
 
 
 def _with_remapped_label_and_season_league(
-    lf: pl.LazyFrame, *, remap: dict[str, str]
+    lf: pl.LazyFrame, *, remap: dict[str, str], label_column: str = LABEL_COLUMN
 ) -> pl.LazyFrame:
-    label = pl.col(LABEL_COLUMN).cast(pl.Utf8)
+    label = pl.col(label_column).cast(pl.Utf8)
     remapped = label.replace(remap) if remap else label
     return lf.with_columns(
         remapped.alias("_label"),
@@ -798,6 +802,10 @@ def build_geometry_production_frame(
     ``gamma_dl_active`` and every production row is NULL, raises: the fit
     must publish the ``gamma_dl_zero`` flavor instead.
     """
+    if dimension == "location_side":
+        require_geometry_parquet(
+            parquet_path, dimension_column=DIMENSION_COLUMN, check_classes=True
+        )
     schema_names = set(pl.scan_parquet(parquet_path).collect_schema().names())
     select_columns = ["event_key", "dl_p_class", *FIXED_EFFECT_COLUMNS]
     has_propensity_column = PROPENSITY_COLUMN in schema_names
@@ -904,12 +912,16 @@ def prepare_geometry_inputs(
     designs.
 
     The class vocabulary is resolved per dimension: an explicit
-    ``class_labels`` override wins; otherwise the four DL dimensions use
-    their locked ordered constants and general_location derives its vocab
+    ``class_labels`` override wins; otherwise configured dimensions use
+    their ordered constants and general_location derives its vocab
     from observed-data class frequency (descending, alphabetical
     tiebreaker).
     """
     spec = _resolve_spec(dimension)
+    if dimension == "location_side":
+        require_geometry_parquet(
+            parquet_path, dimension_column=DIMENSION_COLUMN, check_classes=True
+        )
     _assert_fixed_effects_cover_production_slice(parquet_path, dimension=dimension)
 
     df = (
@@ -919,7 +931,11 @@ def prepare_geometry_inputs(
             & (pl.col("observed_status") == OBSERVED_STATUS)
             & (pl.col("training_weight") > 0.0)
         )
-        .pipe(_with_remapped_label_and_season_league, remap=spec.remap)
+        .pipe(
+            _with_remapped_label_and_season_league,
+            remap=spec.remap,
+            label_column="class" if dimension == "location_side" else LABEL_COLUMN,
+        )
         .filter(pl.col("_label").is_not_null())
         .collect()
     )
@@ -1053,7 +1069,7 @@ def prepare_geometry_inputs(
         per_event, n_classes=n_classes, dimension=dimension
     )
 
-    if PROPENSITY_COLUMN in per_event.columns:
+    if dimension != "location_side" and PROPENSITY_COLUMN in per_event.columns:
         propensity_active = True
         propensity_z, propensity_logit_mean, propensity_logit_std = (
             _standardized_propensity_logit(per_event, dimension=dimension)
@@ -1064,7 +1080,7 @@ def prepare_geometry_inputs(
         propensity_logit_mean = 0.0
         propensity_logit_std = 1.0
         _log.warning(
-            "dataset at %s carries no %s column; the propensity MNAR covariate "
+            "dataset at %s has no enabled %s input; the propensity MNAR covariate "
             "is inactive for dimension=%s",
             parquet_path,
             PROPENSITY_COLUMN,
@@ -1072,7 +1088,7 @@ def prepare_geometry_inputs(
         )
 
     handler_logit_by_event: dict[int, float] | None = None
-    if handler_covariate_enabled():
+    if dimension != "location_side" and handler_covariate_enabled():
         handler_logit_by_event = load_handler_outfield_logit()
     if handler_logit_by_event is not None:
         handler_active = True
@@ -1084,7 +1100,7 @@ def prepare_geometry_inputs(
         handler_z = np.zeros(per_event.height, dtype=np.float64)
         handler_logit_mean = 0.0
         handler_logit_std = 1.0
-        if handler_covariate_enabled():
+        if dimension != "location_side" and handler_covariate_enabled():
             _log.warning(
                 "handler covariate requested but no Model D export resolved; "
                 "the handler covariate is inactive for dimension=%s",

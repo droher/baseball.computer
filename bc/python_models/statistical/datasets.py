@@ -15,6 +15,10 @@ import pyarrow.parquet as pq
 
 from python_models.statistical.config import DATASETS_ROOT
 from python_models.statistical.dataset_registry import DatasetSpec
+from python_models.statistical.geometry_contract import (
+    DATASET_VERSIONS,
+    require_geometry_relation,
+)
 from python_models.statistical.dataset_provenance import (
     canonical_arrow_type,
     canonical_schema,
@@ -337,6 +341,15 @@ def prepare_dataset(
     source snapshot. A mismatch fails loudly instead of overwriting.
     """
     table = f"{ledger_schema}.{spec.sqlmesh_table}"
+    if spec.name in DATASET_VERSIONS:
+        require_geometry_relation(
+            con,
+            table,
+            dimension_column="geometry_dimension"
+            if spec.name == "model_input_geometry"
+            else "dimension",
+            check_classes=spec.name == "model_input_geometry",
+        )
     select_sql = f"SELECT * FROM {table}"
     qh = query_hash(select_sql)
     artifact_root = _resolve_artifact_root(

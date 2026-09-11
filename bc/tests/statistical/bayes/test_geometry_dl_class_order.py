@@ -29,11 +29,11 @@ def test_trajectory_bunt_remap_binds_to_bayes_bunt_variants() -> None:
     assert "Bunt" in TRAJECTORY_CLASS_LABELS
 
 
-def test_dl_backed_dimensions_are_exactly_the_dl_specs() -> None:
+def test_active_dl_dimensions_have_matching_proposal_specs() -> None:
     dl_active = tuple(
         name for name, spec in GEOMETRY_DIMENSIONS.items() if spec.dl_active
     )
-    assert dl_active == DL_GEOMETRY_DIMENSIONS
+    assert set(dl_active) <= set(DL_GEOMETRY_DIMENSIONS)
     by_dimension = {spec.proposal_dimension: spec for spec in GEOMETRY_SPECS}
     assert tuple(by_dimension) == DL_GEOMETRY_DIMENSIONS
     for dimension in dl_active:
@@ -49,8 +49,14 @@ def test_dl_backed_dimensions_are_exactly_the_dl_specs() -> None:
             assert bayes.remap == {}
 
 
-def test_non_dl_dimensions_carry_no_static_vocab() -> None:
-    for name, spec in GEOMETRY_DIMENSIONS.items():
-        if not spec.dl_active:
-            assert spec.class_labels is None, name
-            assert name not in DL_GEOMETRY_DIMENSIONS
+def test_global_side_has_fixed_vocab_without_legacy_dl_dependency() -> None:
+    from python_models.statistical.geometry_contract import GLOBAL_SIDE_LABELS
+    from python_models.statistical.bayes.targets.geometry import GEOMETRY_TARGETS
+
+    side = GEOMETRY_DIMENSIONS["location_side"]
+    assert not side.dl_active
+    assert side.class_labels == GLOBAL_SIDE_LABELS
+    target = next(t for t in GEOMETRY_TARGETS if t.dimension == "location_side")
+    assert target.default_flavors == ("gamma_dl_zero",)
+    assert target.default_propensity_flavors == ("gamma_propensity_zero",)
+    assert GEOMETRY_DIMENSIONS["general_location"].class_labels is None
