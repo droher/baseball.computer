@@ -44,7 +44,9 @@ alternate DuckDB files when you need an isolated build.
 - [Statcast fitting audit](docs/geometry-statcast-fitting-audit-2026-09-11.md) — 373 paired games, airborne-only targets, missingness, and source-agreement limits
 - [Historical side hierarchy](docs/geometry-side-hierarchical-results-2026-09-11.md) — converged full fits that still fail historical calibration
 - [Historical fielder-clue provenance](docs/geometry-side-clue-provenance-2026-09-11.md) — shared-source dependencies and why fielder fields do not resolve naturally missing side
-- [Modern scorer identification](docs/geometry-modern-observation-identifiability-2026-09-11.md) — conflated source fields, disconnected scorer/park groups, and the supported pooled translation
+- [Modern scorer identification](docs/geometry-modern-observation-identifiability-2026-09-11.md) — conflated source fields and limits on separating scorer and park effects
+- [Airborne translation results](docs/geometry-air-development-results-2026-09-11.md) — improved scores but failed season calibration, with a substantial change in recording conventions
+- [Scorer provenance contract](docs/scorer-provenance-contract.md) — separate official and administrative source keys, preserving legacy compatibility and the source migration boundary
 
 ## Agent skills
 

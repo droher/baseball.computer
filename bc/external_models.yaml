@@ -217,6 +217,9 @@
     losing_pitcher: PLAYER_ID
     save_pitcher: PLAYER_ID
     game_winning_rbi: PLAYER_ID
+    scorer: VARCHAR
+    official_scorer: VARCHAR
+    source_scorer: VARCHAR
     account_type: ACCOUNT_TYPE
     away_team_id: TEAM_ID
     home_team_id: TEAM_ID
@@ -466,6 +469,9 @@
     losing_pitcher: PLAYER_ID
     save_pitcher: PLAYER_ID
     game_winning_rbi: PLAYER_ID
+    scorer: VARCHAR
+    official_scorer: VARCHAR
+    source_scorer: VARCHAR
     time_of_game_minutes: USMALLINT
     account_type: ACCOUNT_TYPE
     away_team_id: TEAM_ID

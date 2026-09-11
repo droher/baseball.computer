@@ -1,7 +1,7 @@
 MODEL (
   name main_models.event_observation_context,
   kind FULL,
-  description 'Shared modeling-dataset feeder. Wide event-grain (one row per event_key) table denormalizing covariates so every model_input_* dataset INNER JOINs this rather than re-deriving the same joins. source_type/source_family/target_population_status pull from source_acquisition_ledger filtered to dimension=event, team_id IS NULL. park_episode_status is NULL in v1 pending park-renovation enrichment of entity_link_reliability. scorer/inputter/translator come direct from stg_games. affiliated_team rolls game_scorekeeping up to one row per game_id via MAX(game_share), then projects scorer_more_common_team_id. score_margin is event_states_full.batting_team_margin_start. leverage_index is win_leverage_index from leverage_index (joined on win_expectancy_start_key). hit_or_out is BOOLEAN: TRUE = batted-ball hit, FALSE = batted-ball out, NULL = non-batted-ball (walk/HBP/K/no-PA). Derived from event_offense_stats (baserunner=Batter): balls_batted=1 AND hits=1 -> TRUE; balls_batted=1 AND hits=0 -> FALSE; else NULL. personnel_confidence rolls personnel_state_reliability per event_key: low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 collapses to high/medium because the v1 upstream emits only direct + inferred. context_confidence rolls game_context_observation_ledger per game_id across its 23 atomic dimensions: low if any observed_status=missing; medium if any observed_status=unknown_code; else high (all dimensions observed/derived/not_applicable). Deterministic derived statuses (bio-derived hands, rule_era flags) are high-confidence and do not demote the rollup. exposure_status is game_exposure_ledger.completion_status joined on (game_id, batting_team_id).',
+  description 'Shared modeling-dataset feeder. Wide event-grain (one row per event_key) table denormalizing covariates so every model_input_* dataset INNER JOINs this rather than re-deriving the same joins. source_type/source_family/target_population_status pull from source_acquisition_ledger filtered to dimension=event, team_id IS NULL. park_episode_status is NULL in v1 pending park-renovation enrichment of entity_link_reliability. scorer is the legacy ambiguous compatibility field. official_scorer and source_scorer preserve raw info,oscorer and info,scorer values separately; their statuses come from game_context_observation_ledger. inputter/translator come direct from stg_games. affiliated_team rolls legacy game_scorekeeping up to one row per game_id via MAX(game_share), then projects scorer_more_common_team_id. score_margin is event_states_full.batting_team_margin_start. leverage_index is win_leverage_index from leverage_index (joined on win_expectancy_start_key). hit_or_out is BOOLEAN: TRUE = batted-ball hit, FALSE = batted-ball out, NULL = non-batted-ball (walk/HBP/K/no-PA). Derived from event_offense_stats (baserunner=Batter): balls_batted=1 AND hits=1 -> TRUE; balls_batted=1 AND hits=0 -> FALSE; else NULL. personnel_confidence rolls personnel_state_reliability per event_key: low if any reliability_class IN (synthetic, ambiguous); medium if any inferred; else high. v1 collapses to high/medium because the v1 upstream emits only direct + inferred. context_confidence preserves the pre-provenance rollup across the original 23 atomic dimensions: low if any observed_status=missing; medium if any observed_status=unknown_code; else high. The two new scorer dimensions are excluded until consumers deliberately adopt them. Deterministic derived statuses (bio-derived hands, rule_era flags) are high-confidence and do not demote the rollup. exposure_status is game_exposure_ledger.completion_status joined on (game_id, batting_team_id).',
   grain (event_key),
   columns (
     event_key UINTEGER,
@@ -15,6 +15,10 @@ MODEL (
     park_id PARK_ID,
     park_episode_status VARCHAR,
     scorer VARCHAR,
+    official_scorer VARCHAR,
+    official_scorer_status VARCHAR,
+    source_scorer VARCHAR,
+    source_scorer_status VARCHAR,
     inputter VARCHAR,
     translator VARCHAR,
     affiliated_team TEAM_ID,
@@ -50,7 +54,11 @@ MODEL (
     target_population_status = 'source_acquisition_ledger.target_population_status: event_level, aggregate_only, gamelog_only, structural_absence, coverage_within_source_sparse, out_of_scope.',
     park_id = @doc('park_id'),
     park_episode_status = 'Park-episode classification (e.g., pre/post renovation). NULL in v1 — waits on park-renovation enrichment of entity_link_reliability.',
-    scorer = 'stg_games.scorer (raw, pre-cleaning). May be NULL or include slash/comma delimited multi-scorer strings; normalized one-scorer-per-game rollup lives in affiliated_team derivation.',
+    scorer = 'Legacy ambiguous stg_games.scorer compatibility value. It may originate from info,oscorer or info,scorer depending on raw record order and must not be treated as a certified official-scorer identity.',
+    official_scorer = 'Raw stg_games.official_scorer value from info,oscorer only. NULL when absent or blank; never filled from legacy scorer or source_scorer.',
+    official_scorer_status = 'Observation status for official_scorer from game_context_observation_ledger: observed, unknown_code, or missing.',
+    source_scorer = 'Raw stg_games.source_scorer administrative value from info,scorer only. NULL when absent or blank; not an official-scorer identity.',
+    source_scorer_status = 'Observation status for source_scorer from game_context_observation_ledger: observed, unknown_code, or missing.',
     inputter = 'stg_games.inputter (raw).',
     translator = 'stg_games.translator (raw).',
     affiliated_team = 'game_scorekeeping.scorer_more_common_team_id of the dominant-game_share scorer per game. May be NULL when no scorer or no team affiliation is known.',
@@ -76,13 +84,15 @@ MODEL (
     leverage_bucket = 'Leverage bucket from win_leverage_index. low <0.8, medium 0.8-<2.0, high >=2.0. NULL when leverage_index is NULL.'
   ),
   audits (
-    not_null(columns := (event_key, game_id, season, game_type, batting_team_id, fielding_team_id, inning_start, frame_start, outs_start, base_state_start, exposure_status, source_family, source_type, target_population_status)),
+    not_null(columns := (event_key, game_id, season, game_type, batting_team_id, fielding_team_id, inning_start, frame_start, outs_start, base_state_start, exposure_status, source_family, source_type, target_population_status, official_scorer_status, source_scorer_status)),
     unique_grain(columns := (event_key)),
     accepted_values(column := source_family, is_in := ('play_by_play', 'box_score', 'gamelog', 'derived', 'absent')),
     accepted_values(column := target_population_status, is_in := ('event_level', 'aggregate_only', 'gamelog_only', 'structural_absence', 'out_of_scope', 'coverage_within_source_sparse')),
     accepted_values(column := exposure_status, is_in := ('complete', 'walk_off', 'shortened', 'suspended', 'forfeit', 'unknown')),
     accepted_values(column := personnel_confidence, is_in := ('high', 'medium', 'low')),
     accepted_values(column := context_confidence, is_in := ('high', 'medium', 'low')),
+    accepted_values(column := official_scorer_status, is_in := ('observed', 'unknown_code', 'missing')),
+    accepted_values(column := source_scorer_status, is_in := ('observed', 'unknown_code', 'missing')),
     accepted_values(column := result_family, is_in := (
       'hit', 'out_in_play', 'strikeout', 'walk', 'hbp',
       'sacrifice', 'reached_on_error', 'fielders_choice', 'interference'
@@ -130,6 +140,8 @@ gms AS (
     SELECT
         game_id,
         scorer,
+        official_scorer,
+        source_scorer,
         inputter,
         translator
     FROM main_models.stg_games
@@ -190,6 +202,21 @@ gco AS (
             ELSE 'high'
         END AS context_confidence
     FROM main_models.game_context_observation_ledger
+    WHERE context_dimension NOT IN ('official_scorer', 'source_scorer')
+    GROUP BY 1
+),
+
+gsc AS (
+    SELECT
+        game_id,
+        MAX(observed_status) FILTER (
+            WHERE context_dimension = 'official_scorer'
+        ) AS official_scorer_status,
+        MAX(observed_status) FILTER (
+            WHERE context_dimension = 'source_scorer'
+        ) AS source_scorer_status
+    FROM main_models.game_context_observation_ledger
+    WHERE context_dimension IN ('official_scorer', 'source_scorer')
     GROUP BY 1
 ),
 
@@ -213,6 +240,10 @@ SELECT
     evt.park_id,
     CAST(NULL AS VARCHAR) AS park_episode_status,
     gms.scorer,
+    gms.official_scorer,
+    gsc.official_scorer_status,
+    gms.source_scorer,
+    gsc.source_scorer_status,
     gms.inputter,
     gms.translator,
     sko.affiliated_team,
@@ -270,5 +301,6 @@ LEFT JOIN lev ON lev.win_expectancy_start_key = evt.win_expectancy_start_key
 LEFT JOIN ofs USING (event_key)
 LEFT JOIN prs USING (event_key)
 LEFT JOIN gco USING (game_id)
+LEFT JOIN gsc USING (game_id)
 LEFT JOIN gex ON gex.game_id = evt.game_id AND gex.team_id = evt.batting_team_id
 LEFT JOIN evp USING (event_key)

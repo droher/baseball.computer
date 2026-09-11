@@ -1,7 +1,7 @@
 MODEL (
   name main_models.game_context_observation_ledger,
   kind FULL,
-  description 'Per (game_id, context_dimension) observation ledger for game-level context covariates. Atomic dimensions: park_id, sky, field_condition, precipitation, temperature, wind_direction, wind_speed, time_of_day, attendance, dh_rule, extra_inning_runner_rule, game_type, scorer, inputter, translator, umpire_home, umpire_first, umpire_second, umpire_third, umpire_left, umpire_right, batter_hand, pitcher_hand. observed_status drawn from seed_observed_status: observed (source value present and not a sentinel), unknown_code (sentinel "Unknown" recorded by source for sky/field_condition/precipitation/wind_direction/time_of_day — source knew the field was uninformative, not the same as missing), derived (bio-derived hand availability, deterministic rule_era flags), missing (NULL with no sentinel), not_applicable (structurally inapplicable for era/game_type). contradicted and data_error_prone reserved for future cross-source disagreement enrichment. source_family identifies the originating registry: retrosheet_pbp / retrosheet_box for stg_games columns (split by source_type), rule_era for deterministic extra-inning runner rule by season/game_type, retrosheet_bio for hand dimensions (game-grain row stamping bio-derived availability; per-roster bio coverage refinement is a follow-up). umpire_third treats NULL as not_applicable pre-1933 (3-man crews common); umpire_left/umpire_right treat NULL as not_applicable except in postseason eras where 6-man crews are standard (WorldSeries from 1947, LeagueChampionshipSeries from 1969, DivisionSeries from 1995). extra_inning_runner_rule emits observed only for RegularSeason 2020+; doc-01 lists "umpires", "weather", and "wind" as single dimensions — split into per-slot/per-sub-field atoms here so missingness rates aggregate cleanly. Consumed by context-dependent fitted models (park, geometry, advancement, run-value) for downweighting or imputation.',
+  description 'Per (game_id, context_dimension) observation ledger for game-level context covariates. Atomic dimensions: park_id, sky, field_condition, precipitation, temperature, wind_direction, wind_speed, time_of_day, attendance, dh_rule, extra_inning_runner_rule, game_type, scorer, official_scorer, source_scorer, inputter, translator, umpire_home, umpire_first, umpire_second, umpire_third, umpire_left, umpire_right, batter_hand, pitcher_hand. scorer is the legacy ambiguous compatibility field. official_scorer and source_scorer preserve the distinct raw info,oscorer and info,scorer keys. observed_status drawn from seed_observed_status: observed (source value present and not a sentinel), unknown_code (a source sentinel such as Unknown or ?), derived (bio-derived hand availability, deterministic rule_era flags), missing (NULL or blank with no sentinel), not_applicable (structurally inapplicable for era/game_type). contradicted and data_error_prone reserved for future cross-source disagreement enrichment. source_family identifies the originating registry: retrosheet_pbp / retrosheet_box for stg_games columns (split by source_type), rule_era for deterministic extra-inning runner rule by season/game_type, retrosheet_bio for hand dimensions (game-grain row stamping bio-derived availability; per-roster bio coverage refinement is a follow-up). umpire_third treats NULL as not_applicable pre-1933 (3-man crews common); umpire_left/umpire_right treat NULL as not_applicable except in postseason eras where 6-man crews are standard (WorldSeries from 1947, LeagueChampionshipSeries from 1969, DivisionSeries from 1995). extra_inning_runner_rule emits observed only for RegularSeason 2020+; doc-01 lists "umpires", "weather", and "wind" as single dimensions — split into per-slot/per-sub-field atoms here so missingness rates aggregate cleanly. Consumed by context-dependent fitted models (park, geometry, advancement, run-value) for downweighting or imputation.',
   grain (game_id, context_dimension),
   columns (
     game_id VARCHAR,
@@ -27,7 +27,8 @@ MODEL (
     accepted_values(column := context_dimension, is_in := (
       'park_id', 'sky', 'field_condition', 'precipitation', 'temperature',
       'wind_direction', 'wind_speed', 'time_of_day', 'attendance', 'dh_rule',
-      'extra_inning_runner_rule', 'game_type', 'scorer', 'inputter', 'translator',
+      'extra_inning_runner_rule', 'game_type', 'scorer', 'official_scorer',
+      'source_scorer', 'inputter', 'translator',
       'umpire_home', 'umpire_first', 'umpire_second', 'umpire_third',
       'umpire_left', 'umpire_right', 'batter_hand', 'pitcher_hand'
     )),
@@ -64,6 +65,8 @@ WITH games_in_scope AS (
         attendance,
         use_dh,
         scorer,
+        official_scorer,
+        source_scorer,
         inputter,
         translator,
         umpire_home_id,
@@ -303,6 +306,48 @@ scorer AS (
     JOIN stg_source_family AS sf USING (game_id)
 ),
 
+official_scorer AS (
+    SELECT
+        g.game_id,
+        'official_scorer' AS context_dimension,
+        g.official_scorer AS raw_value,
+        g.official_scorer AS normalized_value,
+        CASE
+            WHEN g.official_scorer IS NULL OR TRIM(g.official_scorer) = '' THEN 'missing'
+            WHEN LOWER(TRIM(g.official_scorer)) IN ('unknown', '?') THEN 'unknown_code'
+            ELSE 'observed'
+        END AS observed_status,
+        sf.source_family,
+        CASE
+            WHEN g.official_scorer IS NULL OR TRIM(g.official_scorer) = '' THEN 'low'
+            WHEN LOWER(TRIM(g.official_scorer)) IN ('unknown', '?') THEN 'low'
+            ELSE 'high'
+        END AS context_confidence
+    FROM games_in_scope AS g
+    JOIN stg_source_family AS sf USING (game_id)
+),
+
+source_scorer AS (
+    SELECT
+        g.game_id,
+        'source_scorer' AS context_dimension,
+        g.source_scorer AS raw_value,
+        g.source_scorer AS normalized_value,
+        CASE
+            WHEN g.source_scorer IS NULL OR TRIM(g.source_scorer) = '' THEN 'missing'
+            WHEN LOWER(TRIM(g.source_scorer)) IN ('unknown', '?') THEN 'unknown_code'
+            ELSE 'observed'
+        END AS observed_status,
+        sf.source_family,
+        CASE
+            WHEN g.source_scorer IS NULL OR TRIM(g.source_scorer) = '' THEN 'low'
+            WHEN LOWER(TRIM(g.source_scorer)) IN ('unknown', '?') THEN 'low'
+            ELSE 'high'
+        END AS context_confidence
+    FROM games_in_scope AS g
+    JOIN stg_source_family AS sf USING (game_id)
+),
+
 inputter AS (
     SELECT
         g.game_id,
@@ -476,6 +521,8 @@ UNION ALL BY NAME SELECT * FROM dh_rule
 UNION ALL BY NAME SELECT * FROM extra_inning_runner_rule
 UNION ALL BY NAME SELECT * FROM game_type
 UNION ALL BY NAME SELECT * FROM scorer
+UNION ALL BY NAME SELECT * FROM official_scorer
+UNION ALL BY NAME SELECT * FROM source_scorer
 UNION ALL BY NAME SELECT * FROM inputter
 UNION ALL BY NAME SELECT * FROM translator
 UNION ALL BY NAME SELECT * FROM umpire_home
