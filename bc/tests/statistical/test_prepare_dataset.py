@@ -11,7 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from python_models.statistical.dataset_registry import DatasetSpec
+from python_models.statistical.dataset_registry import DatasetSpec, get_spec
 from python_models.statistical.datasets import _canonical_arrow_type, prepare_dataset
 from python_models.statistical.manifests import query_hash
 from python_models.statistical.schemas import DatasetMetadata
@@ -114,6 +114,11 @@ def test_prepare_dataset_writes_parquet_and_metadata(
     assert metadata.query_hash == query_hash(
         "SELECT * FROM main_models.model_input_test"
     )
+    assert metadata.schema_hash is not None
+    assert metadata.content_hash is not None
+    assert metadata.transformation_hash is not None
+    assert metadata.dependency_hash is not None
+    assert metadata.eligible_count == 4
 
     assert metadata.category_maps["dimension"] == {"location": 0, "trajectory": 1}
     assert metadata.category_maps["observed_status"] == {"observed": 0, "unknown": 1}
@@ -128,6 +133,10 @@ def test_prepare_dataset_writes_parquet_and_metadata(
     assert manifest.artifact_id == "aid-1"
     assert manifest.kind == "dataset"
     assert manifest.query_hash == metadata.query_hash
+    assert manifest.schema_hash == metadata.schema_hash
+    assert manifest.content_hash == metadata.content_hash
+    assert manifest.transformation_hash == metadata.transformation_hash
+    assert manifest.dependency_hash == metadata.dependency_hash
     assert manifest.source_snapshot_id == "dev"
     assert manifest.metadata["row_count"] == 5
     assert manifest.metadata["observed_truth_count"] == 4
@@ -161,6 +170,131 @@ def test_prepare_dataset_idempotent_rerun(
     assert first.artifact_id == second.artifact_id
     assert first.query_hash == second.query_hash
     assert parquet_path.stat().st_mtime_ns == parquet_mtime
+
+
+@pytest.mark.parametrize("snapshot", ["dev", "named-snapshot"])
+def test_prepare_dataset_rerun_rejects_same_schema_content_drift(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection, snapshot: str
+) -> None:
+    con.execute("CREATE SCHEMA main_models")
+    con.execute(
+        """
+        CREATE TABLE main_models.source_test AS
+        SELECT * FROM (VALUES
+            (1, 'trajectory', 'observed', 1.0, 'TRAIN', 'AL', 'pbp', 'dev')
+        ) AS t(event_key, dimension, observed_status, training_weight, primary_fold, league, source_family, source_snapshot_id)
+        """
+    )
+    con.execute(
+        "CREATE VIEW main_models.model_input_test AS "
+        "SELECT * FROM main_models.source_test"
+    )
+    con.execute("UPDATE main_models.source_test SET source_snapshot_id = ?", [snapshot])
+    _ = prepare_dataset(
+        _spec(),
+        artifact_id="aid-content-drift",
+        con=con,
+        output_root=tmp_path,
+        artifact_versions={"duckdb": "test"},
+    )
+    parquet_path = (
+        tmp_path / "model_input_test" / "aid-content-drift" / "dataset.parquet"
+    )
+    frozen_payload = pq.read_table(parquet_path).column("event_key").to_pylist()
+    con.execute("UPDATE main_models.source_test SET event_key = 99")
+
+    with pytest.raises(ValueError, match="current dataset content differs"):
+        _ = prepare_dataset(
+            _spec(),
+            artifact_id="aid-content-drift",
+            con=con,
+            output_root=tmp_path,
+            artifact_versions={"duckdb": "test"},
+        )
+
+    assert pq.read_table(parquet_path).column("event_key").to_pylist() == frozen_payload
+
+
+def test_prepare_dataset_rejects_legacy_metadata_without_rewriting(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    _seed_view(con)
+    _ = prepare_dataset(
+        _spec(),
+        artifact_id="aid-legacy",
+        con=con,
+        output_root=tmp_path,
+        artifact_versions={"duckdb": "test"},
+    )
+    artifact_dir = tmp_path / "model_input_test" / "aid-legacy"
+    metadata_path = artifact_dir / "dataset_metadata.json"
+    parquet_path = artifact_dir / "dataset.parquet"
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    for key in (
+        "schema_hash",
+        "content_hash",
+        "transformation_hash",
+        "dependency_hash",
+    ):
+        payload.pop(key)
+    metadata_path.write_text(json.dumps(payload), encoding="utf-8")
+    parquet_mtime = parquet_path.stat().st_mtime_ns
+
+    with pytest.raises(ValueError, match="legacy metadata"):
+        _ = prepare_dataset(
+            _spec(),
+            artifact_id="aid-legacy",
+            con=con,
+            output_root=tmp_path,
+            artifact_versions={"duckdb": "test"},
+        )
+
+    assert parquet_path.stat().st_mtime_ns == parquet_mtime
+
+
+def test_geometry_spec_separates_observed_eligible_derived_and_inference_counts(
+    tmp_path: Path, con: duckdb.DuckDBPyConnection
+) -> None:
+    con.execute("CREATE SCHEMA main_models")
+    con.execute(
+        """
+        CREATE VIEW main_models.model_input_geometry AS
+        SELECT * FROM (VALUES
+            (1, TRUE,  'observed',     TRUE,  1.0, 'dev'),
+            (2, FALSE, 'derived',      TRUE,  1.0, 'dev'),
+            (3, FALSE, 'missing',      TRUE,  1.0, 'dev'),
+            (4, FALSE, 'unknown_code', FALSE, 1.0, 'dev'),
+            (5, FALSE, 'missing',      TRUE,  0.0, 'dev')
+        ) AS t(event_key, is_observed_class, observed_status, model_input_eligible, training_weight, source_snapshot_id)
+        """
+    )
+    registered = get_spec("model_input_geometry")
+    spec = registered.model_copy(
+        update={
+            "categorical_columns": (),
+            "grain": ("event_key",),
+        }
+    )
+    _ = prepare_dataset(
+        spec,
+        artifact_id="aid-geometry-counts",
+        con=con,
+        output_root=tmp_path,
+        artifact_versions={"duckdb": "test"},
+    )
+    metadata = DatasetMetadata.model_validate_json(
+        (
+            tmp_path
+            / "model_input_geometry"
+            / "aid-geometry-counts"
+            / "dataset_metadata.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert metadata.observed_truth_count == 1
+    assert metadata.eligible_count == 3
+    assert metadata.derived_truth_count == 1
+    assert metadata.inference_count == 2
 
 
 def test_prepare_dataset_rerun_rejects_added_column(

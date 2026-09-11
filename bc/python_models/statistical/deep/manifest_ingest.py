@@ -23,8 +23,9 @@ from python_models.statistical.deep.registry import (
 from python_models.statistical.manifests import (
     find_published_manifest,
     read_manifest,
+    read_published_pointer,
 )
-from python_models.statistical.schemas import PublishedPointer
+from python_models.statistical.schemas import ArtifactManifest, PublishedPointer
 
 _log = logging.getLogger(__name__)
 
@@ -34,6 +35,49 @@ PROPOSAL_MANIFEST_SCHEMA: dict[str, pl.DataType] = {
     "dl_artifact_id": pl.Utf8(),
     "dl_p_class": pl.List(pl.Float64()),
 }
+
+
+def read_published_target_manifest(
+    pointer_path: Path, *, target_name: str
+) -> tuple[PublishedPointer, ArtifactManifest]:
+    spec = get_target(target_name)
+    pointer = read_published_pointer(pointer_path)
+    expected_alias = spec.published_manifest_name()
+    if pointer.model_name != expected_alias:
+        raise ValueError(
+            "published pointer {} names {!r}; expected {!r} for deep target {!r}".format(
+                pointer_path, pointer.model_name, expected_alias, target_name
+            )
+        )
+    manifest = read_manifest(pointer.manifest_path)
+    if manifest.kind != "deep":
+        raise ValueError(
+            "published pointer {} resolves to {!r} artifact {!r}; expected kind 'deep'".format(
+                pointer_path, manifest.kind, manifest.artifact_id
+            )
+        )
+    if manifest.name != spec.name:
+        raise ValueError(
+            "published pointer {} resolves to deep target {!r}; expected {!r}".format(
+                pointer_path, manifest.name, spec.name
+            )
+        )
+    if pointer.artifact_id != manifest.artifact_id:
+        raise ValueError(
+            "published pointer {} names artifact {!r}; manifest names {!r}".format(
+                pointer_path, pointer.artifact_id, manifest.artifact_id
+            )
+        )
+    if (
+        pointer.publication_mode is not None
+        and manifest.publication_mode != pointer.publication_mode
+    ):
+        raise ValueError(
+            "published pointer {} has publication mode {!r}; manifest has {!r}".format(
+                pointer_path, pointer.publication_mode, manifest.publication_mode
+            )
+        )
+    return pointer, manifest
 
 
 def iterate_published_target_frames(
@@ -57,10 +101,9 @@ def iterate_published_target_frames(
                 spec.published_manifest_name(),
             )
             continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
+        _, manifest = read_published_target_manifest(
+            pointer_path, target_name=spec.name
         )
-        manifest = read_manifest(pointer.manifest_path)
         probabilities_path = manifest.output_paths["probabilities"]
         df = pl.read_parquet(str(probabilities_path))
         if df.height == 0:

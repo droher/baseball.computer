@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -15,7 +17,7 @@ from python_models.statistical.manifests import (
     write_manifest,
 )
 from python_models.statistical.schemas import ArtifactManifest
-from python_models.statistical.validate import validate_artifact
+from python_models.statistical.validate import validate_artifact, validate_manifest
 
 
 def _write_probabilities(
@@ -42,6 +44,33 @@ def _write_probabilities(
     df = pl.DataFrame(columns)
     path = exports / "probabilities.parquet"
     df.write_parquet(path)
+    n_classes = len(p_class_rows[0])
+    labels = [f"class_{index}" for index in range(n_classes)]
+    (exports / "class_labels.json").write_text(
+        json.dumps({"labels": labels}), encoding="utf-8"
+    )
+    baseline_rows: list[list[float]] = []
+    target_rows: list[str] = []
+    for probabilities in p_class_rows:
+        target_index = max(range(n_classes), key=probabilities.__getitem__)
+        target_rows.append(labels[target_index])
+        alternative = 0.95 / (n_classes - 1)
+        baseline_rows.append(
+            [
+                0.05 if index == target_index else alternative
+                for index in range(n_classes)
+            ]
+        )
+    pl.DataFrame(
+        {
+            "event_key": pl.Series(grain, dtype=pl.UInt32),
+            "partition": pl.Series(parts, dtype=pl.Utf8),
+            "target_class": pl.Series(target_rows, dtype=pl.Utf8),
+            "baseline_p_class": pl.Series(
+                "baseline_p_class", baseline_rows, dtype=pl.List(pl.Float64)
+            ),
+        }
+    ).write_parquet(exports / "baseline_predictions.parquet")
     return path
 
 
@@ -64,6 +93,7 @@ def _write_deep_manifest(
         dataset_artifact_id="ds-1",
         output_paths={"artifact_dir": artifact_dir},
         package_versions=package_versions(),
+        metadata={"validation_partition": "OOF"},
     )
     write_manifest(manifest, artifact_dir / "manifest.json")
     return artifact_dir
@@ -282,3 +312,114 @@ def test_validate_unknown_artifact_raises(
     monkeypatch.setattr(cfg, "EDA_ROOT", tmp_path / "eda")
     with pytest.raises(FileNotFoundError):
         _ = validate_artifact("does-not-exist")
+
+
+def test_validate_manifest_grades_exact_path_without_rediscovery(
+    tmp_path: Path,
+) -> None:
+    artifact_dir = _write_deep_manifest(
+        tmp_path / "deep", target="geometry_trajectory", artifact_id="direct-aid"
+    )
+    _ = _write_probabilities(
+        artifact_dir,
+        p_class_rows=[[0.8, 0.2], [0.2, 0.8]],
+        partitions=["OOF", "OOF"],
+    )
+    report = validate_manifest(artifact_dir / "manifest.json")
+    assert report.artifact_id == "direct-aid"
+    assert report.status == "passed"
+
+
+def test_deep_baseline_metrics_use_aligned_truth(tmp_path: Path) -> None:
+    artifact_dir = _write_deep_manifest(
+        tmp_path / "deep", target="geometry_trajectory", artifact_id="metric-aid"
+    )
+    _ = _write_probabilities(
+        artifact_dir,
+        p_class_rows=[[0.8, 0.2], [0.3, 0.7]],
+        grain_values=[10, 20],
+        partitions=["OOF", "OOF"],
+    )
+    pl.DataFrame(
+        {
+            "event_key": pl.Series([20, 10], dtype=pl.UInt32),
+            "partition": pl.Series(["OOF", "OOF"], dtype=pl.Utf8),
+            "target_class": pl.Series(["class_1", "class_0"], dtype=pl.Utf8),
+            "baseline_p_class": pl.Series(
+                "baseline_p_class",
+                [[0.6, 0.4], [0.6, 0.4]],
+                dtype=pl.List(pl.Float64),
+            ),
+        }
+    ).write_parquet(artifact_dir / "exports" / "baseline_predictions.parquet")
+
+    report = validate_manifest(artifact_dir / "manifest.json")
+
+    assert report.status == "passed"
+    assert report.evidence.predictive == "passed"
+    assert report.evidence.calibration == "passed"
+    assert report.metrics["deep_model_log_loss"] == pytest.approx(
+        -(math.log(0.8) + math.log(0.7)) / 2
+    )
+    assert report.metrics["deep_baseline_log_loss"] == pytest.approx(
+        -(math.log(0.6) + math.log(0.4)) / 2
+    )
+    assert report.metrics["deep_model_brier_score"] == pytest.approx(0.13)
+    assert report.metrics["deep_baseline_brier_score"] == pytest.approx(0.52)
+
+
+def test_deep_baseline_requires_exact_event_partition_alignment(tmp_path: Path) -> None:
+    artifact_dir = _write_deep_manifest(
+        tmp_path / "deep", target="geometry_trajectory", artifact_id="mismatch-aid"
+    )
+    _ = _write_probabilities(
+        artifact_dir,
+        p_class_rows=[[0.8, 0.2], [0.2, 0.8]],
+        grain_values=[1, 2],
+    )
+    baseline_path = artifact_dir / "exports" / "baseline_predictions.parquet"
+    baseline = pl.read_parquet(baseline_path).with_columns(
+        pl.when(pl.col("event_key") == 2)
+        .then(pl.lit(3, dtype=pl.UInt32))
+        .otherwise(pl.col("event_key"))
+        .alias("event_key")
+    )
+    baseline.write_parquet(baseline_path)
+
+    report = validate_manifest(artifact_dir / "manifest.json")
+
+    assert report.status == "failed"
+    assert "deep_baseline_key_mismatch" in {
+        finding.code for finding in report.findings if finding.severity == "block"
+    }
+
+
+def test_deep_baseline_requires_explicit_target_truth(tmp_path: Path) -> None:
+    artifact_dir = _write_deep_manifest(
+        tmp_path / "deep", target="geometry_trajectory", artifact_id="truth-aid"
+    )
+    _ = _write_probabilities(artifact_dir, p_class_rows=[[0.8, 0.2]])
+    baseline_path = artifact_dir / "exports" / "baseline_predictions.parquet"
+    pl.read_parquet(baseline_path).drop("target_class").write_parquet(baseline_path)
+
+    report = validate_manifest(artifact_dir / "manifest.json")
+
+    assert report.status == "failed"
+    assert report.evidence.predictive == "failed"
+    assert "deep_baseline_contract_missing" in {
+        finding.code for finding in report.findings if finding.severity == "block"
+    }
+
+
+def test_deep_absent_baseline_is_not_a_scientific_pass(tmp_path: Path) -> None:
+    artifact_dir = _write_deep_manifest(
+        tmp_path / "deep", target="geometry_trajectory", artifact_id="absent-aid"
+    )
+    _ = _write_probabilities(artifact_dir, p_class_rows=[[0.8, 0.2]])
+    (artifact_dir / "exports" / "baseline_predictions.parquet").unlink()
+
+    report = validate_manifest(artifact_dir / "manifest.json")
+
+    assert report.status == "failed"
+    assert report.evidence.predictive == "failed"
+    assert report.evidence.calibration == "failed"

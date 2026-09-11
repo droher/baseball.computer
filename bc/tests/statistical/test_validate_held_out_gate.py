@@ -23,9 +23,13 @@ from python_models.statistical.validate import (
 )
 
 
-def _manifest() -> ArtifactManifest:
+def _manifest(
+    metric_family: str | None = "multinomial",
+    *,
+    model_name: str = "synthetic_target",
+) -> ArtifactManifest:
     extras = BayesArtifactExtras(
-        model_name="synthetic_target",
+        model_name=model_name,
         model_version="0.0.0",
         prior_config=BayesPriorConfig(),
         sampler_config=BayesSamplerConfig(
@@ -48,15 +52,31 @@ def _manifest() -> ArtifactManifest:
         source_snapshot_id="src-1",
         output_paths={"artifact_dir": Path(".")},
         package_versions=package_versions(),
+        metadata=(
+            {"validation_metric_family": metric_family}
+            if metric_family is not None
+            else {}
+        ),
         bayes_extras=extras,
     )
 
 
-def _write(artifact_dir: Path, *, diagnostics: dict[str, object], held_out: object | None) -> None:
+def _write(
+    artifact_dir: Path, *, diagnostics: dict[str, object], held_out: object | None
+) -> None:
     validation = artifact_dir / "validation"
     validation.mkdir(parents=True, exist_ok=True)
-    (validation / "diagnostics.json").write_text(json.dumps(diagnostics), encoding="utf-8")
+    (validation / "diagnostics.json").write_text(
+        json.dumps(diagnostics), encoding="utf-8"
+    )
     if held_out is not None:
+        if isinstance(held_out, dict) and held_out:
+            held_out = {
+                "n_events": 1000,
+                "n_evaluated": 1000,
+                "ece_held_out": 0.01,
+                **held_out,
+            }
         (validation / "held_out_metrics.json").write_text(
             json.dumps(held_out), encoding="utf-8"
         )
@@ -72,12 +92,14 @@ def _healthy_diagnostics(*, is_smoke: bool = False) -> dict[str, object]:
     }
 
 
-def _codes(artifact_dir: Path, severity: str | None = None) -> set[str]:
-    report = _validate_bayes(_manifest(), artifact_dir)
+def _codes(
+    artifact_dir: Path,
+    severity: str | None = None,
+    metric_family: str = "multinomial",
+) -> set[str]:
+    report = _validate_bayes(_manifest(metric_family), artifact_dir)
     return {
-        f.code
-        for f in report.findings
-        if severity is None or f.severity == severity
+        f.code for f in report.findings if severity is None or f.severity == severity
     }
 
 
@@ -92,7 +114,7 @@ def test_good_bernoulli_metrics_pass(tmp_path: Path) -> None:
             "ece_held_out": 0.02,
         },
     )
-    report = _validate_bayes(_manifest(), tmp_path)
+    report = _validate_bayes(_manifest("bernoulli"), tmp_path)
     assert report.status == "passed"
     assert not [f for f in report.findings if f.code.startswith("bayes_held_out")]
 
@@ -108,7 +130,7 @@ def test_high_ece_warns_but_does_not_fail(tmp_path: Path) -> None:
             "ece_held_out": 0.2,
         },
     )
-    report = _validate_bayes(_manifest(), tmp_path)
+    report = _validate_bayes(_manifest("bernoulli"), tmp_path)
     assert report.status == "passed"
     warns = {f.code for f in report.findings if f.severity == "warn"}
     assert "bayes_held_out_ece" in warns
@@ -120,9 +142,11 @@ def test_roc_below_chance_blocks_on_default(tmp_path: Path) -> None:
         diagnostics=_healthy_diagnostics(),
         held_out={"roc_auc": 0.4, "pr_auc": 0.2, "baseline_pr_auc": 0.1},
     )
-    report = _validate_bayes(_manifest(), tmp_path)
+    report = _validate_bayes(_manifest("bernoulli"), tmp_path)
     assert report.status == "failed"
-    assert "bayes_held_out_auc_not_beating_baseline" in _codes(tmp_path, "block")
+    assert "bayes_held_out_auc_not_beating_baseline" in _codes(
+        tmp_path, "block", "bernoulli"
+    )
 
 
 def test_roc_below_chance_only_warns_on_smoke(tmp_path: Path) -> None:
@@ -131,9 +155,11 @@ def test_roc_below_chance_only_warns_on_smoke(tmp_path: Path) -> None:
         diagnostics=_healthy_diagnostics(is_smoke=True),
         held_out={"roc_auc": 0.4, "pr_auc": 0.2, "baseline_pr_auc": 0.1},
     )
-    report = _validate_bayes(_manifest(), tmp_path)
+    report = _validate_bayes(_manifest("bernoulli"), tmp_path)
     assert report.status == "passed"
-    assert "bayes_held_out_auc_not_beating_baseline" in _codes(tmp_path, "warn")
+    assert "bayes_held_out_auc_not_beating_baseline" in _codes(
+        tmp_path, "warn", "bernoulli"
+    )
 
 
 def test_pr_auc_not_beating_baseline_blocks(tmp_path: Path) -> None:
@@ -142,7 +168,9 @@ def test_pr_auc_not_beating_baseline_blocks(tmp_path: Path) -> None:
         diagnostics=_healthy_diagnostics(),
         held_out={"roc_auc": 0.7, "pr_auc": 0.25, "baseline_pr_auc": 0.30},
     )
-    assert "bayes_held_out_pr_auc_not_beating_baseline" in _codes(tmp_path, "block")
+    assert "bayes_held_out_pr_auc_not_beating_baseline" in _codes(
+        tmp_path, "block", "bernoulli"
+    )
 
 
 def _distribution_calibration(shares: list[float]) -> dict[str, object]:
@@ -310,7 +338,8 @@ def test_derived_baseline_ignores_degenerate_distribution(tmp_path: Path) -> Non
         },
     )
     report = _validate_bayes(_manifest(), tmp_path)
-    assert report.status == "passed"
+    assert report.status == "failed"
+    assert "bayes_held_out_log_loss_ungradeable" in _codes(tmp_path, "block")
     assert "held_out_baseline_log_loss" not in report.metrics
 
 
@@ -327,7 +356,7 @@ def test_derived_baseline_ignores_degenerate_distribution(tmp_path: Path) -> Non
         {"per_position": {"1": {"predicted_share": 0.5}}},
     ],
 )
-def test_malformed_distribution_skips_log_loss_check(
+def test_malformed_distribution_blocks_ungradeable_log_loss(
     tmp_path: Path, distribution: object
 ) -> None:
     held_out: dict[str, object] = {"log_loss": 99.0}
@@ -335,9 +364,9 @@ def test_malformed_distribution_skips_log_loss_check(
         held_out["distribution_calibration"] = distribution
     _write(tmp_path, diagnostics=_healthy_diagnostics(), held_out=held_out)
     report = _validate_bayes(_manifest(), tmp_path)
-    assert report.status == "passed"
-    assert "bayes_held_out_log_loss_not_beating_baseline" not in {
-        f.code for f in report.findings
+    assert report.status == "failed"
+    assert "bayes_held_out_log_loss_ungradeable" in {
+        f.code for f in report.findings if f.severity == "block"
     }
     assert "held_out_baseline_log_loss" not in report.metrics
 
@@ -373,9 +402,7 @@ def test_degenerate_baseline_verdict_is_vintage_independent(tmp_path: Path) -> N
 
     assert emitted.status == derived.status
     assert {f.code for f in emitted.findings} == {f.code for f in derived.findings}
-    assert "bayes_held_out_log_loss_not_beating_baseline" not in {
-        f.code for f in emitted.findings
-    }
+    assert "bayes_held_out_log_loss_ungradeable" in {f.code for f in emitted.findings}
     assert "held_out_baseline_log_loss" not in emitted.metrics
     assert "held_out_baseline_log_loss" not in derived.metrics
 
@@ -418,17 +445,20 @@ def test_multinomial_ungradeable_log_loss_only_warns_on_smoke(
 
 
 @pytest.mark.parametrize(
-    "held_out",
+    ("metric_family", "held_out"),
     [
-        {"roc_auc": 0.9, "pr_auc": 0.9, "baseline_pr_auc": 0.3, "ece_held_out": 0.02},
-        {"loglik_lift": 0.0124, "tv_improvement": 0.02},
+        (
+            "bernoulli",
+            {"roc_auc": 0.9, "pr_auc": 0.9, "baseline_pr_auc": 0.3},
+        ),
+        ("loglik", {"loglik_lift": 0.0124, "tv_improvement": 0.02}),
     ],
 )
-def test_payloads_without_top1_are_not_graded_on_log_loss(
-    tmp_path: Path, held_out: dict[str, object]
+def test_metric_family_does_not_depend_on_top1(
+    tmp_path: Path, metric_family: str, held_out: dict[str, object]
 ) -> None:
     _write(tmp_path, diagnostics=_healthy_diagnostics(), held_out=held_out)
-    report = _validate_bayes(_manifest(), tmp_path)
+    report = _validate_bayes(_manifest(metric_family), tmp_path)
     assert report.status == "passed"
     assert "bayes_held_out_log_loss_ungradeable" not in {
         f.code for f in report.findings
@@ -478,9 +508,9 @@ def test_truncated_shares_do_not_block_a_model_beating_the_true_baseline(
         },
     )
     report = _validate_bayes(_manifest(), tmp_path)
-    assert report.status == "passed"
-    assert "bayes_held_out_log_loss_not_beating_baseline" not in {
-        f.code for f in report.findings
+    assert report.status == "failed"
+    assert "bayes_held_out_log_loss_ungradeable" in {
+        f.code for f in report.findings if f.severity == "block"
     }
     assert "held_out_baseline_log_loss" not in report.metrics
 
@@ -491,7 +521,7 @@ def test_loglik_lift_non_positive_blocks(tmp_path: Path) -> None:
         diagnostics=_healthy_diagnostics(),
         held_out={"loglik_lift": -0.01, "tv_improvement": 0.02},
     )
-    assert "bayes_held_out_no_loglik_lift" in _codes(tmp_path, "block")
+    assert "bayes_held_out_no_loglik_lift" in _codes(tmp_path, "block", "loglik")
 
 
 def test_loglik_lift_positive_passes(tmp_path: Path) -> None:
@@ -500,7 +530,7 @@ def test_loglik_lift_positive_passes(tmp_path: Path) -> None:
         diagnostics=_healthy_diagnostics(),
         held_out={"loglik_lift": 0.0124, "tv_improvement": 0.02},
     )
-    report = _validate_bayes(_manifest(), tmp_path)
+    report = _validate_bayes(_manifest("loglik"), tmp_path)
     assert report.status == "passed"
 
 
@@ -560,3 +590,87 @@ def test_smoke_declared_only_in_manifest_relaxes_absent_file(tmp_path: Path) -> 
     assert "bayes_held_out_metrics_absent" in {
         f.code for f in report.findings if f.severity == "warn"
     }
+
+
+def test_empty_held_out_payload_blocks_full_fit(tmp_path: Path) -> None:
+    _write(tmp_path, diagnostics=_healthy_diagnostics(), held_out={})
+    report = _validate_bayes(_manifest(), tmp_path)
+    assert report.status == "failed"
+    assert report.evidence.predictive == "unsupported"
+    assert "bayes_held_out_evaluated_count_invalid" in {
+        finding.code for finding in report.findings if finding.severity == "block"
+    }
+
+
+def test_nonfinite_loglik_lift_blocks_full_fit(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        diagnostics=_healthy_diagnostics(),
+        held_out={"n_events": 10, "loglik_lift": float("nan")},
+    )
+    report = _validate_bayes(_manifest("loglik"), tmp_path)
+    assert report.status == "failed"
+    assert report.evidence.predictive == "unsupported"
+    assert "bayes_held_out_loglik_ungradeable" in {
+        finding.code for finding in report.findings if finding.severity == "block"
+    }
+
+
+@pytest.mark.parametrize(
+    ("metric_family", "payload"),
+    [
+        (
+            "bernoulli",
+            {
+                "n_events": 0,
+                "roc_auc": 0.8,
+                "pr_auc": 0.5,
+                "baseline_pr_auc": 0.2,
+            },
+        ),
+        (
+            "multinomial",
+            {"n_evaluated": 0, "log_loss": 0.5, "baseline_log_loss": 0.8},
+        ),
+        ("loglik", {"n_events": 0, "loglik_lift": 0.1}),
+    ],
+)
+def test_zero_evaluated_count_blocks_each_metric_family(
+    tmp_path: Path, metric_family: str, payload: dict[str, object]
+) -> None:
+    _write(tmp_path, diagnostics=_healthy_diagnostics(), held_out=payload)
+    report = _validate_bayes(_manifest(metric_family), tmp_path)
+    assert report.status == "failed"
+    assert "bayes_held_out_evaluated_count_invalid" in {
+        finding.code for finding in report.findings if finding.severity == "block"
+    }
+
+
+def test_bernoulli_metric_outside_probability_range_blocks(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        diagnostics=_healthy_diagnostics(),
+        held_out={
+            "n_events": 100,
+            "roc_auc": 1.1,
+            "pr_auc": 0.5,
+            "baseline_pr_auc": 0.2,
+        },
+    )
+    report = _validate_bayes(_manifest("bernoulli"), tmp_path)
+    assert report.status == "failed"
+    assert "bayes_held_out_bernoulli_metrics_ungradeable" in {
+        finding.code for finding in report.findings if finding.severity == "block"
+    }
+
+
+def test_known_model_identity_selects_metric_family(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        diagnostics=_healthy_diagnostics(),
+        held_out={"n_events": 50, "loglik_lift": 0.01, "top1_accuracy": 0.0},
+    )
+    report = _validate_bayes(_manifest(None, model_name="run_expectancy"), tmp_path)
+    assert report.status == "passed"
+    assert report.evidence.predictive == "passed"
+    assert report.evidence.calibration == "unsupported"

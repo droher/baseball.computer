@@ -94,4 +94,7 @@ def test_resolvable_pointers_pass(
     _write_pointer(published, "rel", Path("bayes/rel/manifest.json"))
     monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(root))
 
-    assert script.check_pointers(published) == [absolute_manifest, relative_manifest]
+    assert script.check_pointers(published, verify_evidence=False) == [
+        absolute_manifest,
+        relative_manifest,
+    ]

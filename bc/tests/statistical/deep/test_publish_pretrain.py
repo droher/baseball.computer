@@ -52,7 +52,11 @@ def test_publish_pretrain_single_match_writes_pointer(
 ) -> None:
     _ = _fake_pretrain_manifest(deep_root, "event_universe_context", "pre-0001")
 
-    rc = _run_publish_pretrain(argparse.Namespace(artifact_id="pre-0001"))
+    rc = _run_publish_pretrain(
+        argparse.Namespace(
+            artifact_id="pre-0001", exploratory_reason="Pointer routing fixture"
+        )
+    )
 
     assert rc == 0
     pointer_path = (
@@ -77,6 +81,18 @@ def test_publish_pretrain_missing_artifact_id_raises(deep_root: Path) -> None:
         _ = _run_publish_pretrain(argparse.Namespace(artifact_id="absent"))
 
 
+def test_default_pretrain_publish_refuses_unsupported_evidence(
+    deep_root: Path,
+    tmp_path: Path,
+) -> None:
+    _fake_pretrain_manifest(deep_root, "event_universe", "incomplete")
+    with pytest.raises(ValueError, match="not validated"):
+        _run_publish_pretrain(argparse.Namespace(artifact_id="incomplete"))
+    assert not (
+        tmp_path / "published" / PRETRAIN_POINTER_SUBDIR / "event_universe.json"
+    ).exists()
+
+
 @pytest.mark.slow
 def test_load_offset_artifact_ambiguous_artifact_id_raises(tmp_path: Path) -> None:
     from python_models.statistical.deep.pretrain.training import _load_offset_artifact
@@ -86,9 +102,7 @@ def test_load_offset_artifact_ambiguous_artifact_id_raises(tmp_path: Path) -> No
         _ = _fake_pretrain_manifest(tmp_path, spec_name, shared_id)
 
     with pytest.raises(ValueError, match="ambiguous"):
-        _ = _load_offset_artifact(
-            offset_artifact_id=shared_id, artifact_root=tmp_path
-        )
+        _ = _load_offset_artifact(offset_artifact_id=shared_id, artifact_root=tmp_path)
 
 
 @pytest.mark.slow
@@ -96,6 +110,4 @@ def test_load_offset_artifact_missing_artifact_id_raises(tmp_path: Path) -> None
     from python_models.statistical.deep.pretrain.training import _load_offset_artifact
 
     with pytest.raises(FileNotFoundError, match="manifest not found"):
-        _ = _load_offset_artifact(
-            offset_artifact_id="absent", artifact_root=tmp_path
-        )
+        _ = _load_offset_artifact(offset_artifact_id="absent", artifact_root=tmp_path)

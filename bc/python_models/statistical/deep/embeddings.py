@@ -80,16 +80,13 @@ def assemble_embeddings_frame(
             raise ValueError(
                 f"embedding matrix rows for {unit!r}: got {matrix.shape[0]} but vocabulary expects {len(entity_ids)}"
             )
-        rows = [list(row) for row in matrix.astype(np.float64).tolist()]
         frames.append(
             pl.DataFrame(
                 {
-                    "entity_type": pl.Series(
-                        [unit] * len(entity_ids), dtype=pl.Utf8
-                    ),
+                    "entity_type": pl.Series([unit] * len(entity_ids), dtype=pl.Utf8),
                     "entity_id": pl.Series(entity_ids, dtype=pl.Utf8),
                     "embedding_value": pl.Series(
-                        "embedding_value", rows, dtype=pl.List(pl.Float64)
+                        "embedding_value", matrix, dtype=pl.List(pl.Float64)
                     ),
                 }
             )
@@ -136,19 +133,19 @@ def iterate_published_embedding_frames() -> Iterator[pl.DataFrame]:
     )
     from python_models.statistical.manifests import (
         find_published_manifest,
-        read_manifest,
     )
-    from python_models.statistical.schemas import PublishedPointer
+    from python_models.statistical.deep.manifest_ingest import (
+        read_published_target_manifest,
+    )
 
     for name in all_target_names():
         spec = get_target(name)
         pointer_path = find_published_manifest(spec.published_manifest_name())
         if pointer_path is None:
             continue
-        pointer = PublishedPointer.model_validate_json(
-            pointer_path.read_text(encoding="utf-8")
+        _, manifest = read_published_target_manifest(
+            pointer_path, target_name=spec.name
         )
-        manifest = read_manifest(pointer.manifest_path)
         embeddings_path = manifest.output_paths.get("embeddings")
         if embeddings_path is None:
             continue

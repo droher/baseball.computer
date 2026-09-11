@@ -35,6 +35,7 @@ alternate DuckDB files when you need an isolated build.
 - [docs.baseball.computer](https://docs.baseball.computer) — model + column docs
 - `CLAUDE.md` — present-state guide for AI agents
 - `notes/followups.md` — open operational items
+- [Modeling evidence contract](docs/modeling-evidence-contract.md) — validation, artifact integrity, publication policy, and the reconstruction benchmark
 
 ## Agent skills
 

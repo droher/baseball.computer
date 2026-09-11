@@ -55,6 +55,13 @@ def resolve_artifact_root() -> Path:
     return ARTIFACT_ROOT
 
 
+def resolve_candidate_roots() -> tuple[Path, ...]:
+    if os.environ.get(ENV_ARTIFACTS_ROOT):
+        root = resolve_artifact_root()
+        return tuple(root / name for name in ("deep", "bayes", "datasets", "eda"))
+    return DEEP_ROOT, BAYES_ROOT, DATASETS_ROOT, EDA_ROOT
+
+
 def resolve_global_published_root() -> Path:
     """Global cross-branch published root, overridable for test hermeticity.
 

@@ -22,12 +22,7 @@ class DatasetSpec(BaseModel):
     grain: tuple[str, ...]
     categorical_columns: tuple[str, ...]
     observed_truth_column: str = Field(
-        description=(
-            "Boolean-typed column whose TRUE count becomes "
-            "``observed_truth_count`` in the dataset metadata. Every "
-            "dataset in this registry carries ``training_weight``; the "
-            "default predicate is ``training_weight > 0``."
-        ),
+        description="Legacy named-column form retained for registry compatibility.",
         default="",
     )
     observed_truth_predicate: str = Field(
@@ -37,6 +32,9 @@ class DatasetSpec(BaseModel):
             "to derive ``observed_truth_count``."
         ),
     )
+    eligible_predicate: str | None = "training_weight > 0"
+    derived_truth_predicate: str | None = None
+    inference_predicate: str | None = None
     slice_columns: tuple[str, ...] = ("season", "league", "source_family")
     target_columns: tuple[str, ...] = ()
 
@@ -111,6 +109,12 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
                 "data_error_risk",
             ),
             _COMMON_CATEGORICAL,
+        ),
+        observed_truth_predicate="is_observed_class",
+        eligible_predicate="model_input_eligible AND training_weight > 0",
+        derived_truth_predicate="observed_status = 'derived'",
+        inference_predicate=(
+            "training_weight > 0 AND observed_status IN ('unknown_code', 'missing')"
         ),
         slice_columns=(
             "season",

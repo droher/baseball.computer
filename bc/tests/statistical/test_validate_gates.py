@@ -73,6 +73,7 @@ def _bayes_manifest(artifact_id: str, model: str) -> ArtifactManifest:
         source_snapshot_id="src-1",
         output_paths={"artifact_dir": Path(".")},
         package_versions=package_versions(),
+        metadata={"validation_metric_family": "bernoulli"},
         bayes_extras=extras,
     )
 
@@ -101,7 +102,7 @@ def _build_artifact(
         encoding="utf-8",
     )
     (validation / "held_out_metrics.json").write_text(
-        json.dumps(held_out), encoding="utf-8"
+        json.dumps({"n_events": 100, **held_out}), encoding="utf-8"
     )
 
     published = tmp_path / "published"
@@ -650,7 +651,7 @@ def test_evaluate_gate_write_report_status_matches_stamped_manifest_status(
     )
 
 
-def test_write_stamped_status_flows_into_confidence_status_contract(
+def test_unbound_gate_pass_remains_exploratory_in_confidence_contract(
     tmp_path: Path,
 ) -> None:
     module = _load()
@@ -677,7 +678,7 @@ def test_write_stamped_status_flows_into_confidence_status_contract(
         frame, stamped_manifest, method="hierarchical_logistic"
     )
 
-    assert out.get_column("confidence_status").to_list() == [row.status]
+    assert out.get_column("confidence_status").to_list() == ["exploratory"]
 
 
 def test_format_table_columns_and_dashes() -> None:

@@ -32,11 +32,15 @@ def _setup_deep_artifact(
             ),
         }
     ).write_parquet(exports / "probabilities.parquet")
+    (exports / "class_labels.json").write_text(
+        '{"labels":["class_0","class_1"]}', encoding="utf-8"
+    )
 
     if with_baseline:
         baseline_cols: dict[str, object] = {
             "event_key": pl.Series([1, 2, 3], dtype=pl.UInt32),
             "partition": pl.Series(["OOF", "OOF", "OOF"], dtype=pl.Utf8),
+            "target_class": pl.Series(["class_0", "class_0", "class_1"], dtype=pl.Utf8),
         }
         if baseline_has_dl_p_class:
             baseline_cols["dl_p_class"] = pl.Series(
@@ -60,13 +64,14 @@ def _setup_deep_artifact(
             dataset_artifact_id="ds-1",
             output_paths={"artifact_dir": artifact_dir},
             package_versions=package_versions(),
+            metadata={"validation_partition": "OOF"},
         ),
         artifact_dir / "manifest.json",
     )
     return artifact_dir
 
 
-def test_validate_reports_baseline_absent_as_info(
+def test_validate_blocks_when_baseline_absent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(cfg, "DEEP_ROOT", tmp_path / "deep")
@@ -74,9 +79,9 @@ def test_validate_reports_baseline_absent_as_info(
         tmp_path / "deep", with_baseline=False, baseline_has_dl_p_class=False
     )
     report = validate_artifact("aid-baseline")
-    codes = {f.code for f in report.findings if f.severity == "info"}
+    codes = {f.code for f in report.findings if f.severity == "block"}
     assert "deep_baseline_absent" in codes
-    assert report.status == "passed"
+    assert report.status == "failed"
 
 
 def test_validate_records_baseline_row_count_when_present(
@@ -88,11 +93,11 @@ def test_validate_records_baseline_row_count_when_present(
     )
     report = validate_artifact("aid-baseline")
     assert report.metrics["baseline_row_count"] == 3
-    codes = {f.code for f in report.findings if f.severity == "warn"}
-    assert "deep_baseline_missing_p_class" not in codes
+    assert report.metrics["deep_evaluated_rows"] == 3
+    assert report.status == "passed"
 
 
-def test_validate_warns_when_baseline_missing_p_class(
+def test_validate_blocks_when_baseline_missing_p_class(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(cfg, "DEEP_ROOT", tmp_path / "deep")
@@ -100,6 +105,6 @@ def test_validate_warns_when_baseline_missing_p_class(
         tmp_path / "deep", with_baseline=True, baseline_has_dl_p_class=False
     )
     report = validate_artifact("aid-baseline")
-    codes = {f.code for f in report.findings if f.severity == "warn"}
-    assert "deep_baseline_missing_p_class" in codes
-    assert report.status == "passed"
+    codes = {f.code for f in report.findings if f.severity == "block"}
+    assert "deep_baseline_contract_missing" in codes
+    assert report.status == "failed"

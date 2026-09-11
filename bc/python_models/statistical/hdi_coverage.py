@@ -5,11 +5,10 @@ coverage) is generic over an estimate table (mean / sd / HDI columns per
 cell) and a held-out realization frame (one empirical value per cell),
 joined on arbitrary keys; it reports the fraction of cells whose held-out
 realization lands inside the estimate's parameter HDI. ``compute_predictive_coverage``
-(multinomial) and ``compute_predictive_mean_coverage`` (count/mean)
-instead simulate a posterior-predictive interval per held-out cell that
-folds in finite-sample noise at the cell's own event count, so dense
-cells are no longer graded against a parameter HDI that is by
-construction much tighter than the held-out frequency's sampling spread.
+(multinomial) simulates approximate marginal predictive intervals.
+``compute_predictive_mean_coverage`` is a held-out mean diagnostic using
+held-out sample variance and a Normal approximation. It does not simulate
+the fitted count likelihood or preserve within-inning dependence.
 
 The per-model realization extractor is model-specific; this module ships
 the ``state_transition`` and ``run_expectancy`` extractors end to end
@@ -85,7 +84,9 @@ def compute_hdi_coverage(
     ]
     if missing_est:
         raise ValueError(f"estimate frame missing columns {missing_est}")
-    missing_real = [c for c in (*join_keys, realization_col) if c not in realization.columns]
+    missing_real = [
+        c for c in (*join_keys, realization_col) if c not in realization.columns
+    ]
     if missing_real:
         raise ValueError(f"realization frame missing columns {missing_real}")
 
@@ -382,11 +383,14 @@ def compute_predictive_coverage(
     multinomial.
     """
     join_keys = (*cell_keys, class_key)
-    missing_est = [c for c in (*join_keys, mean_col, sd_col) if c not in estimate.columns]
+    missing_est = [
+        c for c in (*join_keys, mean_col, sd_col) if c not in estimate.columns
+    ]
     if missing_est:
         raise ValueError(f"estimate frame missing columns {missing_est}")
     missing_real = [
-        c for c in (*join_keys, realization_col, cell_size_col)
+        c
+        for c in (*join_keys, realization_col, cell_size_col)
         if c not in realization.columns
     ]
     if missing_real:
@@ -398,7 +402,10 @@ def compute_predictive_coverage(
     n_points = int(joined.height)
     if n_points == 0:
         return _no_cells_result(
-            model_name, coverage_band, kind="predictive", code_prefix="predictive_coverage"
+            model_name,
+            coverage_band,
+            kind="predictive",
+            code_prefix="predictive_coverage",
         )
 
     rng = np.random.default_rng(seed)
@@ -448,12 +455,19 @@ def compute_predictive_coverage(
     low, high = coverage_band
     in_band = low <= coverage <= high
     finding = _coverage_finding(
-        model_name, coverage, n_points, coverage_band,
-        kind="predictive", code_prefix="predictive_coverage",
+        model_name,
+        coverage,
+        n_points,
+        coverage_band,
+        kind="predictive",
+        code_prefix="predictive_coverage",
     )
     _log.info(
         "predictive_coverage model=%s coverage=%.4f n_points=%d in_band=%s",
-        model_name, coverage, n_points, in_band,
+        model_name,
+        coverage,
+        n_points,
+        in_band,
     )
     return HdiCoverageResult(
         model_name=model_name,
@@ -482,20 +496,24 @@ def compute_predictive_mean_coverage(
     hdi_prob: float = HDI_PROB,
     coverage_band: tuple[float, float] = DEFAULT_COVERAGE_BAND,
 ) -> HdiCoverageResult:
-    """Posterior-predictive coverage of a per-cell held-out mean.
+    """Studentized diagnostic coverage of a per-cell held-out mean.
 
     Simulates the predictive distribution of the cell's held-out sample
     mean as the posterior mean (``mean_col`` / ``sd_col``) plus the
     central-limit sampling noise of a mean of ``cell_size_col`` draws whose
     per-event spread is the held-out ``sample_sd_col``. Reports the
     fraction of cells whose held-out ``realization_col`` mean lands inside
-    the ``hdi_prob`` predictive interval.
+    the approximate ``hdi_prob`` interval. The held-out variance supplies
+    its sampling scale; this is not a fitted-likelihood predictive check.
     """
-    missing_est = [c for c in (*join_keys, mean_col, sd_col) if c not in estimate.columns]
+    missing_est = [
+        c for c in (*join_keys, mean_col, sd_col) if c not in estimate.columns
+    ]
     if missing_est:
         raise ValueError(f"estimate frame missing columns {missing_est}")
     missing_real = [
-        c for c in (*join_keys, realization_col, cell_size_col, sample_sd_col)
+        c
+        for c in (*join_keys, realization_col, cell_size_col, sample_sd_col)
         if c not in realization.columns
     ]
     if missing_real:
@@ -507,7 +525,10 @@ def compute_predictive_mean_coverage(
     n_cells = int(joined.height)
     if n_cells == 0:
         return _no_cells_result(
-            model_name, coverage_band, kind="predictive", code_prefix="predictive_coverage"
+            model_name,
+            coverage_band,
+            kind="studentized_mean",
+            code_prefix="studentized_mean_coverage",
         )
 
     means = joined.get_column(mean_col).to_numpy().astype(np.float64)
@@ -534,12 +555,19 @@ def compute_predictive_mean_coverage(
     low, high = coverage_band
     in_band = low <= coverage <= high
     finding = _coverage_finding(
-        model_name, coverage, n_cells, coverage_band,
-        kind="predictive", code_prefix="predictive_coverage",
+        model_name,
+        coverage,
+        n_cells,
+        coverage_band,
+        kind="studentized_mean",
+        code_prefix="studentized_mean_coverage",
     )
     _log.info(
-        "predictive_mean_coverage model=%s coverage=%.4f n_cells=%d in_band=%s",
-        model_name, coverage, n_cells, in_band,
+        "studentized_mean_coverage model=%s coverage=%.4f n_cells=%d in_band=%s",
+        model_name,
+        coverage,
+        n_cells,
+        in_band,
     )
     return HdiCoverageResult(
         model_name=model_name,
@@ -547,7 +575,7 @@ def compute_predictive_mean_coverage(
         coverage=coverage,
         coverage_band=coverage_band,
         in_band=in_band,
-        coverage_kind="predictive",
+        coverage_kind="studentized_mean",
         finding=finding,
     )
 
@@ -620,10 +648,10 @@ def run_expectancy_coverage_pair(
     min_cell_events: int = _MIN_CELL_EVENTS,
     coverage_band: tuple[float, float] = DEFAULT_COVERAGE_BAND,
 ) -> tuple[HdiCoverageResult, HdiCoverageResult]:
-    """(predictive, parameter) coverage for ``run_expectancy_summary``.
+    """(studentized mean, parameter) diagnostics for ``run_expectancy_summary``.
 
     Builds the held-out realization once and grades the per-cell held-out
-    mean of runs-to-end against posterior-predictive intervals of the mean
+    mean of runs-to-end against approximate studentized intervals of the mean
     and against the published parameter HDIs.
     """
     estimate = pl.read_parquet(summary_parquet).with_columns(

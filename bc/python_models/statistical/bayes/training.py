@@ -3090,16 +3090,25 @@ def run_bayes_model(
         source_snapshot_id=source_snapshot_id,
         dataset_artifact_id=dataset_artifact_id,
         input_artifact_ids=(dataset_artifact_id,),
+        input_manifests=(dataset_parquet.with_name("manifest.json"),),
         output_paths={k: v for k, v in inference_files.items()},
         package_versions=package_versions(),
         random_seed=sampler.random_seed,
         metadata={
+            "validation_metric_family": (
+                "loglik"
+                if spec.outcome_kind == "count"
+                or spec.multinomial_export
+                in {"pitch_summary", "state_transition", "assist_count"}
+                else spec.outcome_kind
+            ),
             "is_smoke": smoke,
             "prior_only": prior_only,
             "smoke_limit": smoke_limit if smoke_limit is not None else 0,
             "row_count": int(inputs.n_events),
             "backend": sampler.backend,
             "source_effect_active": source_effect_active,
+            "handler_active": bool(getattr(inputs, "handler_active", False)),
         },
         bayes_extras=extras,
     )

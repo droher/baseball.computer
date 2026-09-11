@@ -7,12 +7,11 @@ a ``ValidationReport`` — Pydantic-serializable JSON — written to
 ``<artifact_dir>/validation/validation_report.json`` by callers (the CLI
 handler does this) so downstream gates can pick it up.
 
-Phase 3 PR2 ships the structural deep checks: probability normalization
-on ``dl_p_class`` LIST sums, grain-key uniqueness per partition (proxy
-for OOF group-leakage at write time), and no-argmax-published schema
-guard. Slice calibration + baseline comparison hooks are present but
-no-op unless the manifest's ``output_paths`` advertises a baseline
-parquet — PR3 wires the real Geometry baseline.
+Deep validation checks probability normalization, event-key uniqueness,
+OOF provenance, and the no-argmax publication contract. Scientific deep
+validation additionally requires aligned model and baseline predictions
+with explicit held-out truth, and computes log loss, multiclass Brier
+score, and classwise calibration from that shared evaluation population.
 """
 
 from __future__ import annotations
@@ -35,8 +34,10 @@ from python_models.statistical.manifests import read_manifest
 from python_models.statistical.schemas import (
     ArtifactManifest,
     BayesVariableDiagnostics,
+    EvidenceStatus,
     FindingSeverity,
     ValidationFinding,
+    ValidationEvidence,
     ValidationReport,
 )
 
@@ -45,7 +46,7 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-VALIDATION_GATE_VERSION: int = 2
+VALIDATION_GATE_VERSION: int = 3
 
 DIAGNOSTICS_MAX_ELEMENTS_PER_VARIABLE: int = 100_000
 GROUP_LEVEL_MAX_ELEMENTS: int = 512
@@ -78,6 +79,15 @@ def validate_artifact(
         _config.EDA_ROOT,
     )
     manifest_path = find_manifest(artifact_id, roots, model_name=model_name)
+    return validate_manifest(manifest_path, diagnostics_overrides=diagnostics_overrides)
+
+
+def validate_manifest(
+    manifest_path: Path,
+    *,
+    diagnostics_overrides: Mapping[str, object] | None = None,
+) -> ValidationReport:
+    """Grade the artifact at an exact manifest path without rediscovery."""
     manifest = read_manifest(manifest_path)
     artifact_dir = manifest_path.parent
 
@@ -105,6 +115,21 @@ def validate_artifact(
                 ),
                 generated_at=datetime.now(tz=timezone.utc),
             )
+
+
+def write_json_atomic(path: Path, payload: str) -> None:
+    _atomic_write_json(path, payload)
+
+
+def compute_posterior_diagnostics_from_file(path: Path) -> PosteriorDiagnostics:
+    import arviz as az
+
+    idata = az.from_netcdf(path)
+    try:
+        return compute_posterior_diagnostics(idata)
+    finally:
+        for group in idata.groups():
+            idata[group].close()
 
 
 def find_manifest(
@@ -147,10 +172,23 @@ def _validate_deep(manifest: ArtifactManifest, artifact_dir: Path) -> Validation
                 message=f"probabilities.parquet not found at {probabilities_path}",
             )
         )
-        return _finalize(manifest, findings, metrics)
+        return _finalize(
+            manifest,
+            findings,
+            metrics,
+            evidence=ValidationEvidence(numerical="failed"),
+        )
 
     probs = pl.read_parquet(probabilities_path)
     metrics["row_count"] = int(probs.height)
+    if probs.is_empty():
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_probabilities_empty",
+                message="probabilities.parquet has zero rows",
+            )
+        )
 
     schema_findings, schema_metrics = _check_deep_schema(probs)
     findings.extend(schema_findings)
@@ -171,23 +209,54 @@ def _validate_deep(manifest: ArtifactManifest, artifact_dir: Path) -> Validation
     baseline_path = artifact_dir / "exports" / "baseline_predictions.parquet"
     if baseline_path.exists():
         compare_findings, compare_metrics = _compare_against_baseline(
-            probs, baseline_path
+            manifest, probs, baseline_path
         )
         findings.extend(compare_findings)
         metrics.update(compare_metrics)
     else:
         findings.append(
             ValidationFinding(
-                severity="info",
+                severity="block",
                 code="deep_baseline_absent",
                 message=(
                     "no exports/baseline_predictions.parquet alongside the artifact; "
-                    "baseline comparison skipped"
+                    "predictive and calibration evidence are unsupported"
                 ),
             )
         )
 
-    return _finalize(manifest, findings, metrics)
+    numerical_failed = any(
+        finding.severity == "block"
+        and finding.code != "deep_baseline_absent"
+        and not finding.code.startswith("deep_baseline_")
+        and not finding.code.startswith("deep_predictive_")
+        and not finding.code.startswith("deep_calibration_")
+        for finding in findings
+    )
+    predictive_failed = any(
+        finding.severity == "block"
+        and (
+            finding.code == "deep_baseline_absent"
+            or finding.code.startswith("deep_baseline_")
+            or finding.code.startswith("deep_predictive_")
+        )
+        for finding in findings
+    )
+    calibration_failed = any(
+        finding.severity == "block"
+        and (
+            finding.code == "deep_baseline_absent"
+            or finding.code.startswith("deep_baseline_")
+            or finding.code.startswith("deep_calibration_")
+        )
+        for finding in findings
+    )
+    evidence = ValidationEvidence(
+        numerical="failed" if numerical_failed else "passed",
+        predictive="failed" if predictive_failed else "passed",
+        calibration="failed" if calibration_failed else "passed",
+    )
+    return _finalize(manifest, findings, metrics, evidence=evidence)
 
 
 def _check_deep_schema(
@@ -219,9 +288,25 @@ def _check_deep_schema(
     if "partition" not in columns:
         findings.append(
             ValidationFinding(
-                severity="warn",
+                severity="block",
                 code="deep_missing_partition",
                 message="probabilities.parquet has no `partition` column",
+            )
+        )
+    elif probs.schema["partition"] != pl.String:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_partition_not_string",
+                message=f"partition must be a string type; got {probs.schema['partition']}",
+            )
+        )
+    elif probs.get_column("partition").null_count() > 0:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_partition_null",
+                message="partition contains null values",
             )
         )
 
@@ -246,9 +331,10 @@ def _check_probability_normalization(
 ) -> tuple[list[ValidationFinding], dict[str, float | int]]:
     if "dl_p_class" not in probs.columns:
         return [], {}
-    sums = probs.with_columns(pl.col("dl_p_class").list.sum().alias("_p_sum"))
-    bad = sums.filter((pl.col("_p_sum") < 1.0 - tol) | (pl.col("_p_sum") > 1.0 + tol))
-    n_bad = int(bad.height)
+    n_bad = sum(
+        not _probability_vector_is_valid(row, tol=tol)
+        for row in probs.get_column("dl_p_class").to_list()
+    )
     metrics: dict[str, float | int] = {
         "probability_normalization_violations": n_bad,
     }
@@ -271,12 +357,18 @@ def _check_grain_uniqueness_per_partition(
 ) -> tuple[list[ValidationFinding], dict[str, float | int]]:
     if "partition" not in probs.columns:
         return [], {}
-    grain_candidates = [
-        c for c in probs.columns if c not in {"partition", "dl_p_class"}
-    ]
-    if not grain_candidates:
-        return [], {}
-    grain_cols = tuple(grain_candidates)
+    if "event_key" not in probs.columns:
+        return (
+            [
+                ValidationFinding(
+                    severity="block",
+                    code="deep_missing_event_key",
+                    message="probabilities.parquet has no event_key column",
+                )
+            ],
+            {},
+        )
+    grain_cols = ("event_key",)
     dup = (
         probs.group_by([*grain_cols, "partition"])
         .agg(pl.len().alias("_n"))
@@ -371,9 +463,7 @@ def _check_oof_fold_integrity(
             )
         )
 
-    grain_cols = [
-        c for c in probs.columns if c not in {"partition", "fold_id", "dl_p_class"}
-    ]
+    grain_cols = ["event_key"] if "event_key" in probs.columns else []
     if grain_cols:
         n_cross = int(
             probs.group_by(grain_cols)
@@ -398,22 +488,326 @@ def _check_oof_fold_integrity(
 
 
 def _compare_against_baseline(
-    probs: pl.DataFrame, baseline_path: Path
+    manifest: ArtifactManifest, probs: pl.DataFrame, baseline_path: Path
 ) -> tuple[list[ValidationFinding], dict[str, float | int]]:
-    baseline = pl.read_parquet(baseline_path)
+    try:
+        baseline = pl.read_parquet(baseline_path)
+    except (OSError, pl.exceptions.PolarsError) as exc:
+        return (
+            [
+                ValidationFinding(
+                    severity="block",
+                    code="deep_baseline_unreadable",
+                    message=f"cannot read baseline predictions at {baseline_path}: {exc}",
+                )
+            ],
+            {},
+        )
     metrics: dict[str, float | int] = {
         "baseline_row_count": int(baseline.height),
     }
     findings: list[ValidationFinding] = []
-    if "dl_p_class" not in baseline.columns:
+    probability_column = (
+        "baseline_p_class"
+        if "baseline_p_class" in baseline.columns
+        else "dl_p_class"
+        if "dl_p_class" in baseline.columns
+        else None
+    )
+    required = {"event_key", "partition", "target_class"}
+    missing = sorted(required - set(baseline.columns))
+    if probability_column is None:
+        missing.append("baseline_p_class")
+    missing_model = sorted(
+        {"event_key", "partition", "dl_p_class"} - set(probs.columns)
+    )
+    if missing or missing_model:
         findings.append(
             ValidationFinding(
-                severity="warn",
-                code="deep_baseline_missing_p_class",
-                message=f"baseline {baseline_path} has no dl_p_class column",
+                severity="block",
+                code="deep_baseline_contract_missing",
+                message=(
+                    f"baseline comparison requires event_key, partition, target_class, "
+                    f"and baseline probabilities; missing baseline={missing}, "
+                    f"model={missing_model}"
+                ),
+            )
+        )
+        return findings, metrics
+
+    key_columns = ["event_key", "partition"]
+    if any(
+        frame.get_column(column).null_count() > 0
+        for frame in (probs, baseline)
+        for column in key_columns
+    ):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_null_key",
+                message="model and baseline comparison keys must be non-null",
+            )
+        )
+        return findings, metrics
+    model_duplicates = int(probs.select(key_columns).is_duplicated().sum())
+    baseline_duplicates = int(baseline.select(key_columns).is_duplicated().sum())
+    metrics["baseline_model_duplicate_keys"] = model_duplicates
+    metrics["baseline_duplicate_keys"] = baseline_duplicates
+    if model_duplicates or baseline_duplicates:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_duplicate_keys",
+                message=(
+                    f"comparison keys must be unique; model duplicates={model_duplicates}, "
+                    f"baseline duplicates={baseline_duplicates}"
+                ),
+            )
+        )
+        return findings, metrics
+
+    raw_partition = manifest.metadata.get("validation_partition", "TEST")
+    evaluation_partition = (
+        raw_partition if isinstance(raw_partition, str) and raw_partition else "TEST"
+    )
+    if any(probs.schema[column] != baseline.schema[column] for column in key_columns):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_key_type_mismatch",
+                message="model and baseline event_key and partition types must match",
+            )
+        )
+        return findings, metrics
+    model_eval = probs.filter(pl.col("partition") == evaluation_partition)
+    baseline_eval = baseline.filter(pl.col("partition") == evaluation_partition)
+    metrics["baseline_evaluation_row_count"] = int(baseline_eval.height)
+    if model_eval.is_empty() or baseline_eval.is_empty():
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_evaluation_empty",
+                message=(
+                    f"baseline comparison requires non-empty {evaluation_partition} rows; "
+                    f"model={model_eval.height}, baseline={baseline_eval.height}"
+                ),
+            )
+        )
+        return findings, metrics
+
+    model_keys = model_eval.select(key_columns)
+    baseline_keys = baseline_eval.select(key_columns)
+    missing_from_baseline = int(
+        model_keys.join(baseline_keys, on=key_columns, how="anti").height
+    )
+    missing_from_model = int(
+        baseline_keys.join(model_keys, on=key_columns, how="anti").height
+    )
+    metrics["baseline_missing_model_keys"] = missing_from_model
+    metrics["baseline_missing_baseline_keys"] = missing_from_baseline
+    if missing_from_baseline or missing_from_model:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_key_mismatch",
+                message=(
+                    "model and baseline evaluation rows must align exactly on "
+                    f"event_key and partition; missing baseline={missing_from_baseline}, "
+                    f"missing model={missing_from_model}"
+                ),
+            )
+        )
+        return findings, metrics
+
+    joined = model_eval.select("event_key", "partition", "dl_p_class").join(
+        baseline_eval.select(
+            "event_key",
+            "partition",
+            "target_class",
+            pl.col(cast(str, probability_column)).alias("baseline_p_class"),
+        ),
+        on=key_columns,
+        how="inner",
+    )
+    labels_path = baseline_path.parent / "class_labels.json"
+    labels = _read_deep_class_labels(labels_path)
+    if labels is None:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_class_labels_unavailable",
+                message=f"class labels are missing or malformed at {labels_path}",
+            )
+        )
+        return findings, metrics
+
+    model_rows = joined.get_column("dl_p_class").to_list()
+    baseline_rows = joined.get_column("baseline_p_class").to_list()
+    truth_rows = joined.get_column("target_class").to_list()
+    if any(not _probability_vector_is_valid(row) for row in baseline_rows):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_probability_invalid",
+                message="baseline probabilities contain null, non-finite, negative, or unnormalized rows",
+            )
+        )
+        return findings, metrics
+    if any(not _probability_vector_is_valid(row) for row in model_rows):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_predictive_probability_invalid",
+                message="model probabilities contain null, non-finite, negative, or unnormalized rows",
+            )
+        )
+        return findings, metrics
+    if any(len(row) != len(labels) for row in [*model_rows, *baseline_rows]):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_class_count_mismatch",
+                message=(
+                    f"probability vectors must match {len(labels)} declared class labels"
+                ),
+            )
+        )
+        return findings, metrics
+
+    label_index = {label: index for index, label in enumerate(labels)}
+    if any(
+        not isinstance(value, str) or value not in label_index for value in truth_rows
+    ):
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_baseline_truth_invalid",
+                message="target_class contains null or values absent from class_labels.json",
+            )
+        )
+        return findings, metrics
+    truth = [label_index[cast(str, value)] for value in truth_rows]
+    model_vectors = [cast(list[float], row) for row in model_rows]
+    baseline_vectors = [cast(list[float], row) for row in baseline_rows]
+    model_log_loss, model_brier, model_ece = _multiclass_metrics(model_vectors, truth)
+    baseline_log_loss, baseline_brier, baseline_ece = _multiclass_metrics(
+        baseline_vectors, truth
+    )
+    metrics.update(
+        {
+            "deep_evaluated_rows": len(truth),
+            "deep_model_log_loss": model_log_loss,
+            "deep_baseline_log_loss": baseline_log_loss,
+            "deep_log_loss_improvement": baseline_log_loss - model_log_loss,
+            "deep_model_brier_score": model_brier,
+            "deep_baseline_brier_score": baseline_brier,
+            "deep_brier_improvement": baseline_brier - model_brier,
+            "deep_model_classwise_ece": model_ece,
+            "deep_baseline_classwise_ece": baseline_ece,
+        }
+    )
+    if model_log_loss >= baseline_log_loss:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_predictive_log_loss_not_beating_baseline",
+                message=(
+                    f"model log loss {model_log_loss:.6f} does not beat baseline "
+                    f"{baseline_log_loss:.6f} on aligned {evaluation_partition} rows"
+                ),
+            )
+        )
+    if model_brier >= baseline_brier:
+        findings.append(
+            ValidationFinding(
+                severity="block",
+                code="deep_predictive_brier_not_beating_baseline",
+                message=(
+                    f"model Brier score {model_brier:.6f} does not beat baseline "
+                    f"{baseline_brier:.6f} on aligned {evaluation_partition} rows"
+                ),
             )
         )
     return findings, metrics
+
+
+def _probability_vector_is_valid(value: object, *, tol: float = 1e-3) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    probabilities = [_finite_float(item) for item in value]
+    if any(item is None or item < 0.0 or item > 1.0 for item in probabilities):
+        return False
+    return math.isclose(sum(cast(list[float], probabilities)), 1.0, abs_tol=tol)
+
+
+def _read_deep_class_labels(path: Path) -> tuple[str, ...] | None:
+    if not path.exists():
+        return None
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    labels = cast(dict[str, object], loaded).get("labels")
+    if not isinstance(labels, list) or not labels:
+        return None
+    if any(not isinstance(label, str) or not label for label in labels):
+        return None
+    string_labels = cast(list[str], labels)
+    if len(set(string_labels)) != len(string_labels):
+        return None
+    return tuple(string_labels)
+
+
+def _multiclass_metrics(
+    probabilities: list[list[float]], truth: list[int], *, n_bins: int = 10
+) -> tuple[float, float, float]:
+    n_rows = len(truth)
+    n_classes = len(probabilities[0])
+    log_loss = (
+        -sum(
+            math.log(max(probabilities[row][target], 1e-15))
+            for row, target in enumerate(truth)
+        )
+        / n_rows
+    )
+    brier = (
+        sum(
+            sum(
+                (probability - (1.0 if class_index == truth[row] else 0.0)) ** 2
+                for class_index, probability in enumerate(vector)
+            )
+            for row, vector in enumerate(probabilities)
+        )
+        / n_rows
+    )
+    classwise_ece = 0.0
+    for class_index in range(n_classes):
+        class_ece = 0.0
+        for bin_index in range(n_bins):
+            lower = bin_index / n_bins
+            upper = (bin_index + 1) / n_bins
+            selected = [
+                row
+                for row, vector in enumerate(probabilities)
+                if vector[class_index] >= lower
+                and (
+                    vector[class_index] < upper
+                    or (bin_index == n_bins - 1 and vector[class_index] <= upper)
+                )
+            ]
+            if not selected:
+                continue
+            confidence = sum(probabilities[row][class_index] for row in selected) / len(
+                selected
+            )
+            observed = sum(truth[row] == class_index for row in selected) / len(
+                selected
+            )
+            class_ece += len(selected) / n_rows * abs(confidence - observed)
+        classwise_ece += class_ece
+    return log_loss, brier, classwise_ece / n_classes
 
 
 def _validate_dataset(
@@ -441,7 +835,12 @@ def _validate_dataset(
                     message="dataset.parquet has zero rows",
                 )
             )
-    return _finalize(manifest, findings, metrics)
+    evidence = ValidationEvidence(
+        numerical="failed"
+        if any(finding.severity == "block" for finding in findings)
+        else "passed"
+    )
+    return _finalize(manifest, findings, metrics, evidence=evidence)
 
 
 _BAYES_THRESHOLDS_SMOKE: dict[str, float] = {
@@ -747,35 +1146,54 @@ def _derive_baseline_log_loss(payload: dict[str, object]) -> float | None:
     return entropy if entropy > 0.0 else None
 
 
+def _bayes_metric_family(manifest: ArtifactManifest) -> str | None:
+    explicit = manifest.metadata.get("validation_metric_family")
+    if explicit in {"bernoulli", "multinomial", "loglik"}:
+        return cast(str, explicit)
+    name = manifest.bayes_extras.model_name if manifest.bayes_extras else manifest.name
+    if name.endswith("_observedness"):
+        return "bernoulli"
+    if name.startswith("geometry_") or name in {
+        "advancement",
+        "assist_credit_allocation",
+        "ball_handler_imputation",
+        "putout_credit_allocation",
+    }:
+        return "multinomial"
+    if name in {
+        "assist_count",
+        "park_factor_runs",
+        "pitch_summary",
+        "run_expectancy",
+        "state_transition",
+    }:
+        return "loglik"
+    return None
+
+
+def _positive_count(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    numeric = float(value)
+    if not math.isfinite(numeric) or numeric <= 0.0 or not numeric.is_integer():
+        return None
+    return int(numeric)
+
+
 def _grade_held_out_metrics(
+    manifest: ArtifactManifest,
     artifact_dir: Path,
     *,
     thresholds: dict[str, float],
     is_smoke: bool,
-) -> tuple[list[ValidationFinding], dict[str, float | int]]:
-    """Grade ``validation/held_out_metrics.json`` into findings + metrics.
-
-    Held-out ECE above the (smoke/default) warn threshold is a ``warn``.
-    A model whose held-out predictive metric fails to beat its own
-    baseline (ROC over chance, PR over the marginal, log-loss under the
-    marginal-entropy baseline, or a positive log-lik lift) is a ``block``
-    on a full-scale fit and a ``warn`` on a smoke fit — the
-    baseline-beating check has no numeric threshold to relax, so severity
-    is the smoke/default knob. When ``baseline_log_loss`` is absent or
-    non-positive it is derived from ``distribution_calibration``'s
-    empirical shares; when neither path yields a usable baseline — or
-    ``log_loss`` itself is absent or non-finite — a payload carrying
-    ``top1_accuracy`` is a multinomial fit that has lost its only blocking
-    held-out check, which is itself graded at ``baseline_severity``.
-    Argmax accuracy is recorded and reported at ``warn`` only: the
-    multinomial targets publish per-event class shares, so top-1 is a
-    diagnostic rather than a gate. A missing or unreadable file is graded
-    at ``baseline_severity`` too: a full-scale fit with no held-out
-    evidence cannot pass, while a smoke fit only warns.
-    """
+) -> tuple[
+    list[ValidationFinding], dict[str, float | int], EvidenceStatus, EvidenceStatus
+]:
     findings: list[ValidationFinding] = []
     metrics: dict[str, float | int] = {}
     baseline_severity: FindingSeverity = "warn" if is_smoke else "block"
+    predictive_status: EvidenceStatus = "unsupported"
+    calibration_status: EvidenceStatus = "unsupported"
     path = artifact_dir / "validation" / "held_out_metrics.json"
     if not path.exists():
         findings.append(
@@ -788,7 +1206,7 @@ def _grade_held_out_metrics(
                 ),
             )
         )
-        return findings, metrics
+        return findings, metrics, predictive_status, calibration_status
 
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -803,7 +1221,7 @@ def _grade_held_out_metrics(
                 ),
             )
         )
-        return findings, metrics
+        return findings, metrics, predictive_status, calibration_status
     if not isinstance(loaded, dict):
         findings.append(
             ValidationFinding(
@@ -815,134 +1233,216 @@ def _grade_held_out_metrics(
                 ),
             )
         )
-        return findings, metrics
+        return findings, metrics, predictive_status, calibration_status
 
     payload: dict[str, object] = cast(dict[str, object], loaded)
-
-    ece = _finite_float(payload.get("ece_held_out"))
-    if ece is not None:
-        metrics["held_out_ece"] = ece
-        if ece > thresholds["held_out_ece_warn"]:
-            findings.append(
-                ValidationFinding(
-                    severity="warn",
-                    code="bayes_held_out_ece",
-                    message=(
-                        f"ece_held_out={ece:.4f} exceeds warn threshold "
-                        f"{thresholds['held_out_ece_warn']} (smoke={is_smoke})"
-                    ),
-                )
+    family = _bayes_metric_family(manifest)
+    if family is None:
+        findings.append(
+            ValidationFinding(
+                severity=baseline_severity,
+                code="bayes_held_out_metric_family_unknown",
+                message=(
+                    f"model {manifest.name!r} has no known held-out metric family; "
+                    "set manifest metadata validation_metric_family explicitly"
+                ),
             )
-
-    roc_auc = _finite_float(payload.get("roc_auc"))
-    if roc_auc is not None:
-        metrics["held_out_roc_auc"] = roc_auc
-        if roc_auc <= 0.5:
-            findings.append(
-                ValidationFinding(
-                    severity=baseline_severity,
-                    code="bayes_held_out_auc_not_beating_baseline",
-                    message=(
-                        f"held-out roc_auc={roc_auc:.4f} does not beat the 0.5 "
-                        f"chance baseline (smoke={is_smoke})"
-                    ),
-                )
-            )
-
-    pr_auc = _finite_float(payload.get("pr_auc"))
-    baseline_pr_auc = _finite_float(payload.get("baseline_pr_auc"))
-    if pr_auc is not None and baseline_pr_auc is not None:
-        metrics["held_out_pr_auc"] = pr_auc
-        metrics["held_out_baseline_pr_auc"] = baseline_pr_auc
-        if pr_auc <= baseline_pr_auc:
-            findings.append(
-                ValidationFinding(
-                    severity=baseline_severity,
-                    code="bayes_held_out_pr_auc_not_beating_baseline",
-                    message=(
-                        f"held-out pr_auc={pr_auc:.4f} does not beat baseline_pr_auc="
-                        f"{baseline_pr_auc:.4f} (smoke={is_smoke})"
-                    ),
-                )
-            )
-
-    log_loss = _finite_float(payload.get("log_loss"))
-    baseline_log_loss = _positive_float(payload.get("baseline_log_loss"))
-    if baseline_log_loss is None:
-        baseline_log_loss = _derive_baseline_log_loss(payload)
-    if log_loss is not None and baseline_log_loss is not None:
-        metrics["held_out_log_loss"] = log_loss
-        metrics["held_out_baseline_log_loss"] = baseline_log_loss
-        if log_loss >= baseline_log_loss:
-            findings.append(
-                ValidationFinding(
-                    severity=baseline_severity,
-                    code="bayes_held_out_log_loss_not_beating_baseline",
-                    message=(
-                        f"held-out log_loss={log_loss:.4f} does not beat "
-                        f"baseline_log_loss={baseline_log_loss:.4f} (smoke={is_smoke})"
-                    ),
-                )
-            )
-    else:
-        reason = (
-            "log_loss is absent or non-finite"
-            if log_loss is None
-            else "no positive baseline_log_loss was emitted or derivable from "
-            "distribution_calibration"
         )
-        _log.debug("held-out log-loss gate not run for %s: %s", artifact_dir, reason)
-        if "top1_accuracy" in payload:
+        return findings, metrics, predictive_status, calibration_status
+    metrics["held_out_metric_family"] = {"bernoulli": 1, "multinomial": 2, "loglik": 3}[
+        family
+    ]
+
+    model_name = (
+        manifest.bayes_extras.model_name if manifest.bayes_extras else manifest.name
+    )
+    count_key = "n_evaluated" if family == "multinomial" else "n_events"
+    if family == "loglik" and model_name == "park_factor_runs":
+        count_key = "n_games"
+    elif family == "bernoulli" and "n_events_scored" in payload:
+        count_key = "n_events_scored"
+    evaluated = _positive_count(payload.get(count_key))
+    if evaluated is None:
+        findings.append(
+            ValidationFinding(
+                severity=baseline_severity,
+                code="bayes_held_out_evaluated_count_invalid",
+                message=(
+                    f"{family} held-out payload requires a positive integral {count_key}; "
+                    f"got {payload.get(count_key)!r} (smoke={is_smoke})"
+                ),
+            )
+        )
+        return findings, metrics, predictive_status, calibration_status
+    metrics["held_out_evaluated_count"] = evaluated
+    total = _positive_count(payload.get("n_events"))
+    if total is not None and evaluated > total:
+        findings.append(
+            ValidationFinding(
+                severity=baseline_severity,
+                code="bayes_held_out_evaluated_count_exceeds_total",
+                message=f"evaluated count {evaluated} exceeds n_events={total}",
+            )
+        )
+        return findings, metrics, "failed", calibration_status
+
+    if family == "bernoulli":
+        roc_auc = _finite_float(payload.get("roc_auc"))
+        pr_auc = _finite_float(payload.get("pr_auc"))
+        baseline_pr_auc = _finite_float(payload.get("baseline_pr_auc"))
+        values = {
+            "roc_auc": roc_auc,
+            "pr_auc": pr_auc,
+            "baseline_pr_auc": baseline_pr_auc,
+        }
+        if any(
+            value is None or value < 0.0 or value > 1.0 for value in values.values()
+        ):
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_bernoulli_metrics_ungradeable",
+                    message="Bernoulli held-out evidence requires finite ROC-AUC, PR-AUC, and baseline PR-AUC in [0, 1]",
+                )
+            )
+            predictive_status = "unsupported"
+        else:
+            valid_roc = cast(float, roc_auc)
+            valid_pr = cast(float, pr_auc)
+            valid_baseline_pr = cast(float, baseline_pr_auc)
+            metrics.update(
+                {
+                    "held_out_roc_auc": valid_roc,
+                    "held_out_pr_auc": valid_pr,
+                    "held_out_baseline_pr_auc": valid_baseline_pr,
+                }
+            )
+            predictive_status = "passed"
+            if valid_roc <= 0.5:
+                predictive_status = "failed"
+                findings.append(
+                    ValidationFinding(
+                        severity=baseline_severity,
+                        code="bayes_held_out_auc_not_beating_baseline",
+                        message=f"held-out roc_auc={valid_roc:.4f} does not beat 0.5 (smoke={is_smoke})",
+                    )
+                )
+            if valid_pr <= valid_baseline_pr:
+                predictive_status = "failed"
+                findings.append(
+                    ValidationFinding(
+                        severity=baseline_severity,
+                        code="bayes_held_out_pr_auc_not_beating_baseline",
+                        message=(
+                            f"held-out pr_auc={valid_pr:.4f} does not beat baseline_pr_auc="
+                            f"{valid_baseline_pr:.4f} (smoke={is_smoke})"
+                        ),
+                    )
+                )
+    elif family == "multinomial":
+        log_loss = _finite_float(payload.get("log_loss"))
+        baseline_log_loss = _positive_float(payload.get("baseline_log_loss"))
+        if baseline_log_loss is None:
+            baseline_log_loss = _derive_baseline_log_loss(payload)
+        if log_loss is None or log_loss < 0.0 or baseline_log_loss is None:
             findings.append(
                 ValidationFinding(
                     severity=baseline_severity,
                     code="bayes_held_out_log_loss_ungradeable",
                     message=(
-                        f"held-out log-loss gate could not be evaluated at {path}: "
-                        f"{reason}; top1_accuracy is present, so this is a "
-                        "multinomial payload whose only blocking held-out check is "
-                        f"log-loss against its class-entropy baseline "
-                        f"(smoke={is_smoke})"
+                        "multinomial held-out evidence requires non-negative finite log_loss "
+                        "and a positive finite baseline_log_loss"
                     ),
                 )
             )
-
-    top1 = _finite_float(payload.get("top1_accuracy"))
-    baseline_top1 = _finite_float(payload.get("baseline_top1_accuracy"))
-    if top1 is not None and baseline_top1 is not None:
-        metrics["held_out_top1_accuracy"] = top1
-        metrics["held_out_baseline_top1_accuracy"] = baseline_top1
-        if top1 <= baseline_top1:
-            findings.append(
-                ValidationFinding(
-                    severity="warn",
-                    code="bayes_held_out_top1_not_beating_baseline",
-                    message=(
-                        f"held-out top1_accuracy={top1:.4f} does not beat "
-                        f"baseline_top1_accuracy={baseline_top1:.4f} (smoke={is_smoke}); "
-                        "diagnostic only — these targets publish per-event class "
-                        "shares, and argmax accuracy on a skewed class distribution "
-                        "is dominated by the modal class"
-                    ),
+            predictive_status = "unsupported"
+        else:
+            metrics["held_out_log_loss"] = log_loss
+            metrics["held_out_baseline_log_loss"] = baseline_log_loss
+            predictive_status = "passed"
+            if log_loss >= baseline_log_loss:
+                predictive_status = "failed"
+                findings.append(
+                    ValidationFinding(
+                        severity=baseline_severity,
+                        code="bayes_held_out_log_loss_not_beating_baseline",
+                        message=(
+                            f"held-out log_loss={log_loss:.4f} does not beat "
+                            f"baseline_log_loss={baseline_log_loss:.4f} (smoke={is_smoke})"
+                        ),
+                    )
                 )
-            )
-
-    loglik_lift = _finite_float(payload.get("loglik_lift"))
-    if loglik_lift is not None:
-        metrics["held_out_loglik_lift"] = loglik_lift
-        if loglik_lift <= 0.0:
+        top1 = _finite_float(payload.get("top1_accuracy"))
+        baseline_top1 = _finite_float(payload.get("baseline_top1_accuracy"))
+        if top1 is not None and baseline_top1 is not None:
+            if 0.0 <= top1 <= 1.0 and 0.0 <= baseline_top1 <= 1.0:
+                metrics["held_out_top1_accuracy"] = top1
+                metrics["held_out_baseline_top1_accuracy"] = baseline_top1
+                if top1 <= baseline_top1:
+                    findings.append(
+                        ValidationFinding(
+                            severity="warn",
+                            code="bayes_held_out_top1_not_beating_baseline",
+                            message=(
+                                f"held-out top1_accuracy={top1:.4f} does not beat "
+                                f"baseline_top1_accuracy={baseline_top1:.4f}; diagnostic only"
+                            ),
+                        )
+                    )
+    else:
+        loglik_lift = _finite_float(payload.get("loglik_lift"))
+        if loglik_lift is None:
             findings.append(
                 ValidationFinding(
                     severity=baseline_severity,
-                    code="bayes_held_out_no_loglik_lift",
-                    message=(
-                        f"held-out loglik_lift={loglik_lift:.4f} is not positive; "
-                        f"the fit does not beat its baseline (smoke={is_smoke})"
-                    ),
+                    code="bayes_held_out_loglik_ungradeable",
+                    message="log-likelihood held-out evidence requires a finite loglik_lift",
                 )
             )
+            predictive_status = "unsupported"
+        else:
+            metrics["held_out_loglik_lift"] = loglik_lift
+            predictive_status = "passed" if loglik_lift > 0.0 else "failed"
+            if loglik_lift <= 0.0:
+                findings.append(
+                    ValidationFinding(
+                        severity=baseline_severity,
+                        code="bayes_held_out_no_loglik_lift",
+                        message=(
+                            f"held-out loglik_lift={loglik_lift:.4f} is not positive "
+                            f"(smoke={is_smoke})"
+                        ),
+                    )
+                )
 
-    return findings, metrics
+    if family in {"bernoulli", "multinomial"}:
+        ece = _finite_float(payload.get("ece_held_out"))
+        if ece is None or ece < 0.0 or ece > 1.0:
+            findings.append(
+                ValidationFinding(
+                    severity=baseline_severity,
+                    code="bayes_held_out_calibration_ungradeable",
+                    message="held-out calibration requires finite ece_held_out in [0, 1]",
+                )
+            )
+        else:
+            metrics["held_out_ece"] = ece
+            calibration_status = (
+                "passed" if ece <= thresholds["held_out_ece_warn"] else "failed"
+            )
+            if calibration_status == "failed":
+                findings.append(
+                    ValidationFinding(
+                        severity="warn",
+                        code="bayes_held_out_ece",
+                        message=(
+                            f"ece_held_out={ece:.4f} exceeds threshold "
+                            f"{thresholds['held_out_ece_warn']} (smoke={is_smoke})"
+                        ),
+                    )
+                )
+
+    return findings, metrics, predictive_status, calibration_status
 
 
 def _validate_bayes(
@@ -963,7 +1463,12 @@ def _validate_bayes(
                     message=f"diagnostics.json not found at {diagnostics_path}",
                 )
             )
-            return _finalize(manifest, findings, metrics)
+            return _finalize(
+                manifest,
+                findings,
+                metrics,
+                evidence=ValidationEvidence(numerical="failed"),
+            )
         return _grade_bayes_payload(
             manifest, artifact_dir, dict(diagnostics_overrides), findings, metrics
         )
@@ -980,7 +1485,12 @@ def _validate_bayes(
                 ),
             )
         )
-        return _finalize(manifest, findings, metrics)
+        return _finalize(
+            manifest,
+            findings,
+            metrics,
+            evidence=ValidationEvidence(numerical="failed"),
+        )
     if not isinstance(loaded, dict):
         findings.append(
             ValidationFinding(
@@ -992,7 +1502,12 @@ def _validate_bayes(
                 ),
             )
         )
-        return _finalize(manifest, findings, metrics)
+        return _finalize(
+            manifest,
+            findings,
+            metrics,
+            evidence=ValidationEvidence(numerical="failed"),
+        )
 
     payload: dict[str, object] = dict(cast(dict[str, object], loaded))
     payload.update(diagnostics_overrides or {})
@@ -1127,19 +1642,35 @@ def _grade_bayes_payload(
                 )
             )
 
-    held_out_findings, held_out_metrics = _grade_held_out_metrics(
-        artifact_dir, thresholds=thresholds, is_smoke=is_smoke
+    (
+        held_out_findings,
+        held_out_metrics,
+        predictive_status,
+        calibration_status,
+    ) = _grade_held_out_metrics(
+        manifest, artifact_dir, thresholds=thresholds, is_smoke=is_smoke
     )
     findings.extend(held_out_findings)
     metrics.update(held_out_metrics)
 
-    return _finalize(manifest, findings, metrics)
+    numerical_failed = any(
+        finding.severity == "block" and not finding.code.startswith("bayes_held_out_")
+        for finding in findings
+    )
+    evidence = ValidationEvidence(
+        numerical="failed" if numerical_failed else "passed",
+        predictive=predictive_status,
+        calibration=calibration_status,
+    )
+    return _finalize(manifest, findings, metrics, evidence=evidence)
 
 
 def _finalize(
     manifest: ArtifactManifest,
     findings: list[ValidationFinding],
     metrics: dict[str, float | int],
+    *,
+    evidence: ValidationEvidence | None = None,
 ) -> ValidationReport:
     blocking = [f for f in findings if f.severity == "block"]
     status = "passed" if not blocking else "failed"
@@ -1151,4 +1682,5 @@ def _finalize(
         findings=tuple(findings),
         metrics=metrics,
         generated_at=datetime.now(tz=timezone.utc),
+        evidence=evidence or ValidationEvidence(),
     )

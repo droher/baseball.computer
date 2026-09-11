@@ -15,6 +15,13 @@ import pyarrow.parquet as pq
 
 from python_models.statistical.config import DATASETS_ROOT
 from python_models.statistical.dataset_registry import DatasetSpec
+from python_models.statistical.dataset_provenance import (
+    canonical_arrow_type,
+    canonical_schema,
+    hash_file,
+    hash_schema,
+    relation_hashes,
+)
 from python_models.statistical.manifests import (
     package_versions as snapshot_package_versions,
     query_hash,
@@ -198,33 +205,11 @@ def _resolve_artifact_root(
 
 
 def _canonical_arrow_type(dtype: pa.DataType) -> pa.DataType:
-    if pa.types.is_large_string(dtype):
-        return pa.string()
-    if pa.types.is_list(dtype) or pa.types.is_large_list(dtype):
-        return pa.list_(_canonical_arrow_type(dtype.value_type))
-    if pa.types.is_fixed_size_list(dtype):
-        return pa.list_(_canonical_arrow_type(dtype.value_type), dtype.list_size)
-    if pa.types.is_struct(dtype):
-        return pa.struct(
-            [pa.field(field.name, _canonical_arrow_type(field.type)) for field in dtype]
-        )
-    if pa.types.is_map(dtype):
-        return pa.map_(
-            _canonical_arrow_type(dtype.key_type),
-            _canonical_arrow_type(dtype.item_type),
-        )
-    return dtype
+    return canonical_arrow_type(dtype)
 
 
 def _canonical_schema(schema: pa.Schema) -> list[tuple[str, str]]:
-    return [(field.name, str(_canonical_arrow_type(field.type))) for field in schema]
-
-
-def _live_view_schema(
-    con: duckdb.DuckDBPyConnection, *, view_sql: str
-) -> list[tuple[str, str]]:
-    schema = con.execute(f"SELECT * FROM ({view_sql}) AS d LIMIT 0").arrow().schema
-    return _canonical_schema(schema)
+    return canonical_schema(schema)
 
 
 def _verify_rerun(
@@ -234,6 +219,9 @@ def _verify_rerun(
     new_query_hash: str,
     new_source_snapshot_id: str,
     live_schema: list[tuple[str, str]],
+    new_schema_hash: str,
+    new_transformation_hash: str,
+    new_dependency_hash: str,
 ) -> DatasetMetadata:
     existing = DatasetMetadata.model_validate_json(
         existing_metadata_path.read_text(encoding="utf-8")
@@ -249,6 +237,18 @@ def _verify_rerun(
             f"source_snapshot_id is forbidden ({existing.source_snapshot_id!r} "
             f"on disk vs {new_source_snapshot_id!r} requested)."
         )
+    provenance = {
+        "schema_hash": existing.schema_hash,
+        "content_hash": existing.content_hash,
+        "transformation_hash": existing.transformation_hash,
+        "dependency_hash": existing.dependency_hash,
+    }
+    missing = [name for name, value in provenance.items() if value is None]
+    if missing:
+        raise ValueError(
+            f"existing dataset artifact_id={artifact_id!r} has legacy metadata "
+            f"without {missing}; use a new artifact_id to establish provenance."
+        )
     existing_parquet_path = existing_metadata_path.with_name("dataset.parquet")
     if not existing_parquet_path.exists():
         raise FileNotFoundError(
@@ -262,7 +262,62 @@ def _verify_rerun(
             f"schema {stored_schema!r} vs live schema {live_schema!r}. "
             "Use a new artifact_id for the changed view."
         )
+    expected_hashes = {
+        "schema_hash": new_schema_hash,
+        "transformation_hash": new_transformation_hash,
+        "dependency_hash": new_dependency_hash,
+    }
+    changed = [
+        name for name, value in expected_hashes.items() if provenance[name] != value
+    ]
+    if changed:
+        raise ValueError(
+            f"current relation differs from existing dataset artifact_id={artifact_id!r} "
+            f"in {changed}; use a new artifact_id."
+        )
     return existing
+
+
+def _verify_manifest_provenance(
+    manifest: ArtifactManifest, metadata: DatasetMetadata
+) -> None:
+    for field in (
+        "schema_hash",
+        "content_hash",
+        "transformation_hash",
+        "dependency_hash",
+    ):
+        if getattr(manifest, field) != getattr(metadata, field):
+            raise ValueError(
+                f"dataset manifest {field} does not match dataset metadata; "
+                "use a new artifact_id."
+            )
+
+
+def _verify_current_content(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    select_sql: str,
+    artifact_root: Path,
+    expected_content_hash: str,
+) -> None:
+    with tempfile.TemporaryDirectory(
+        dir=str(artifact_root.parent), prefix=f".{artifact_root.name}.candidate."
+    ) as tmp_dir:
+        candidate = Path(tmp_dir) / "dataset.parquet"
+        _copy_to_parquet_atomic(con, select_sql=select_sql, target=candidate)
+        current_content_hash = hash_file(candidate)
+    if current_content_hash != expected_content_hash:
+        raise ValueError(
+            "current dataset content differs from the immutable artifact; "
+            "use a new artifact_id."
+        )
+
+
+def _count_expression(predicate: str | None) -> str:
+    if predicate is None:
+        return "NULL::BIGINT"
+    return f"COUNT_IF(COALESCE(({predicate}), FALSE))"
 
 
 def prepare_dataset(
@@ -303,6 +358,16 @@ def prepare_dataset(
         if source_snapshot_id_override is not None
         else _resolve_source_snapshot_id(con, select_sql)
     )
+    live_arrow_schema = (
+        con.execute(f"SELECT * FROM ({select_sql}) AS d LIMIT 0").arrow().schema
+    )
+    live_schema = _canonical_schema(live_arrow_schema)
+    schema_digest = hash_schema(live_arrow_schema)
+    transformation_digest, dependency_digest = relation_hashes(
+        con,
+        schema_name=ledger_schema,
+        relation_name=spec.sqlmesh_table,
+    )
 
     if metadata_path.exists():
         existing = _verify_rerun(
@@ -310,21 +375,37 @@ def prepare_dataset(
             existing_metadata_path=metadata_path,
             new_query_hash=qh,
             new_source_snapshot_id=source_snapshot_id,
-            live_schema=_live_view_schema(con, view_sql=select_sql),
+            live_schema=live_schema,
+            new_schema_hash=schema_digest,
+            new_transformation_hash=transformation_digest,
+            new_dependency_hash=dependency_digest,
         )
         if not manifest_path.exists():
             raise FileNotFoundError(
                 f"dataset metadata present but manifest missing at {manifest_path}; "
                 "delete the artifact directory to rebuild."
             )
+        manifest = read_manifest(manifest_path)
+        _verify_manifest_provenance(manifest, existing)
+        if existing.content_hash is None:
+            raise RuntimeError("verified provenance unexpectedly lacks content_hash")
+        if hash_file(dataset_path) != existing.content_hash:
+            raise ValueError("frozen dataset content differs from its recorded hash")
+        _verify_current_content(
+            con,
+            select_sql=select_sql,
+            artifact_root=artifact_root,
+            expected_content_hash=existing.content_hash,
+        )
         _log.info(
             "prepare_dataset verified existing artifact_id=%s row_count=%d",
             artifact_id,
             existing.row_count,
         )
-        return read_manifest(manifest_path)
+        return manifest
 
     _copy_to_parquet_atomic(con, select_sql=select_sql, target=dataset_path)
+    content_digest = hash_file(dataset_path)
 
     parquet_columns = _columns_from_parquet(dataset_path)
     declared_columns = {c.name for c in parquet_columns}
@@ -346,7 +427,10 @@ def prepare_dataset(
         f"""
         SELECT
             COUNT(*) AS row_count,
-            COUNT_IF({spec.observed_truth_predicate}) AS observed_truth_count
+            {_count_expression(spec.observed_truth_predicate)} AS observed_truth_count,
+            {_count_expression(spec.eligible_predicate)} AS eligible_count,
+            {_count_expression(spec.derived_truth_predicate)} AS derived_truth_count,
+            {_count_expression(spec.inference_predicate)} AS inference_count
         FROM ({select_sql}) AS d
         """
     ).fetchone()
@@ -354,6 +438,9 @@ def prepare_dataset(
         raise RuntimeError("count query returned no rows; expected exactly one.")
     row_count = int(counts[0])
     observed_truth_count = int(counts[1])
+    eligible_count = None if counts[2] is None else int(counts[2])
+    derived_truth_count = None if counts[3] is None else int(counts[3])
+    inference_count = None if counts[4] is None else int(counts[4])
 
     metadata = DatasetMetadata(
         dataset_name=spec.name,
@@ -367,6 +454,13 @@ def prepare_dataset(
         columns=parquet_columns,
         split_policy="game_hash_70_15_15",
         category_maps=category_maps,
+        content_hash=content_digest,
+        transformation_hash=transformation_digest,
+        dependency_hash=dependency_digest,
+        schema_hash=schema_digest,
+        eligible_count=eligible_count,
+        derived_truth_count=derived_truth_count,
+        inference_count=inference_count,
     )
     _write_metadata_atomic(metadata, metadata_path)
 
@@ -378,6 +472,10 @@ def prepare_dataset(
         created_at=utc_now(),
         source_snapshot_id=source_snapshot_id,
         query_hash=qh,
+        schema_hash=schema_digest,
+        content_hash=content_digest,
+        transformation_hash=transformation_digest,
+        dependency_hash=dependency_digest,
         output_paths={"dataset": dataset_path, "metadata": metadata_path},
         package_versions=artifact_versions
         if artifact_versions is not None

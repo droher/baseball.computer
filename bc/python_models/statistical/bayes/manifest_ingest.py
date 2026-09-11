@@ -75,9 +75,7 @@ def stamp_estimated_contract(
         pl.lit(manifest.artifact_id, dtype=pl.Utf8).alias("artifact_id"),
         pl.lit(extras.model_name, dtype=pl.Utf8).alias("model_name"),
         pl.lit(extras.model_version, dtype=pl.Utf8).alias("model_version"),
-        pl.lit(manifest.source_snapshot_id, dtype=pl.Utf8).alias(
-            "source_snapshot_id"
-        ),
+        pl.lit(manifest.source_snapshot_id, dtype=pl.Utf8).alias("source_snapshot_id"),
         pl.lit(method, dtype=pl.Utf8).alias("method"),
         pl.lit(observed_status, dtype=pl.Utf8).alias("observed_status"),
         pl.lit(confidence_status_for(manifest), dtype=pl.Utf8).alias(
@@ -93,11 +91,22 @@ def confidence_status_for(manifest: ArtifactManifest) -> str:
     status = str(manifest.validation_status)
     if status != "passed":
         return status
-    if manifest.validation_gate_version == VALIDATION_GATE_VERSION:
+    evidence = manifest.validation_evidence
+    if (
+        manifest.validation_gate_version == VALIDATION_GATE_VERSION
+        and manifest.publication_mode == "validated"
+        and manifest.validation_binding
+        and evidence is not None
+        and all(
+            getattr(evidence, field) == "passed"
+            for field in ("numerical", "predictive", "calibration", "provenance")
+        )
+    ):
         return status
     _log.warning(
         "bayes.manifest_ingest: artifact %s (%s) passed under gate version %s, "
-        "current is %s; publishing confidence_status=exploratory until re-validated",
+        "current is %s; evidence must also be bound and complete; "
+        "publishing confidence_status=exploratory until re-validated",
         manifest.artifact_id,
         manifest.name,
         manifest.validation_gate_version,
@@ -358,9 +367,7 @@ OBSERVATION_PROPENSITY_DATASET: str = "model_input_observation_batted_ball"
 PITCH_COVERAGE_DATASET: str = "model_input_pitch_summary"
 
 
-FrameBuilder = Callable[
-    [pl.DataFrame, ArtifactManifest, BayesTargetSpec], pl.DataFrame
-]
+FrameBuilder = Callable[[pl.DataFrame, ArtifactManifest, BayesTargetSpec], pl.DataFrame]
 
 
 def _iterate_published_export_frames(
@@ -389,6 +396,9 @@ def _iterate_published_export_frames(
             continue
         pointer = read_published_pointer(pointer_path)
         manifest = read_manifest(pointer.manifest_path)
+        manifest = manifest.model_copy(
+            update={"publication_mode": pointer.publication_mode}
+        )
         extras = manifest.bayes_extras
         if extras is None or extras.model_name != spec.name:
             raise ValueError(
@@ -448,9 +458,7 @@ def _build_propensity_frame(
         pl.col("dimension").cast(pl.Utf8),
         pl.col("p_observed_mean").cast(pl.Float64),
     )
-    out = stamp_estimated_contract(
-        out, manifest, method=METHOD_HIERARCHICAL_LOGISTIC
-    )
+    out = stamp_estimated_contract(out, manifest, method=METHOD_HIERARCHICAL_LOGISTIC)
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
         out.height,
@@ -767,9 +775,7 @@ def _build_park_factor_frame(
         pl.col("theta_hdi_upper").cast(pl.Float64),
         pl.col("park_factor_mean").cast(pl.Float64),
     )
-    out = stamp_estimated_contract(
-        out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB
-    )
+    out = stamp_estimated_contract(out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB)
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
         out.height,
@@ -813,9 +819,7 @@ def _build_run_expectancy_frame(
         pl.col("re_value_hdi_lower").cast(pl.Float64),
         pl.col("re_value_hdi_upper").cast(pl.Float64),
     )
-    out = stamp_estimated_contract(
-        out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB
-    )
+    out = stamp_estimated_contract(out, manifest, method=METHOD_HIERARCHICAL_BAYES_NB)
     _log.info(
         "bayes.manifest_ingest: %d rows from %s (dimension=%s)",
         out.height,
@@ -860,9 +864,7 @@ def _build_pitch_summary_frame(
         pl.col("prob_hdi_lower").cast(pl.Float64),
         pl.col("prob_hdi_upper").cast(pl.Float64),
     )
-    assert_shares_sum_to_one(
-        out, ("result_family", "season", "league"), ("prob_mean",)
-    )
+    assert_shares_sum_to_one(out, ("result_family", "season", "league"), ("prob_mean",))
     out = stamp_estimated_contract(
         out, manifest, method=METHOD_HIERARCHICAL_BAYES_SOFTMAX
     )

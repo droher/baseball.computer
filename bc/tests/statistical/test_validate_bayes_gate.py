@@ -57,6 +57,7 @@ def _bayes_manifest(artifact_id: str) -> ArtifactManifest:
         source_snapshot_id="src-1",
         output_paths={"artifact_dir": Path(".")},
         package_versions=package_versions(),
+        metadata={"validation_metric_family": "bernoulli"},
         bayes_extras=extras,
     )
 
@@ -72,7 +73,13 @@ def _write_healthy_held_out(artifact_dir: Path) -> None:
     validation.mkdir(parents=True, exist_ok=True)
     (validation / "held_out_metrics.json").write_text(
         json.dumps(
-            {"roc_auc": 0.9, "pr_auc": 0.9, "baseline_pr_auc": 0.3, "ece_held_out": 0.02}
+            {
+                "n_events": 1000,
+                "roc_auc": 0.9,
+                "pr_auc": 0.9,
+                "baseline_pr_auc": 0.3,
+                "ece_held_out": 0.02,
+            }
         ),
         encoding="utf-8",
     )
@@ -275,7 +282,9 @@ def _past(threshold: float, *, direction: float) -> float:
     return math.nextafter(threshold, direction)
 
 
-def _convergence_cases() -> list[tuple[str, str, bool, dict[str, object], dict[str, object]]]:
+def _convergence_cases() -> list[
+    tuple[str, str, bool, dict[str, object], dict[str, object]]
+]:
     cases: list[tuple[str, str, bool, dict[str, object], dict[str, object]]] = []
     for is_smoke in (False, True):
         thresholds = _thresholds(is_smoke)
@@ -294,7 +303,11 @@ def _convergence_cases() -> list[tuple[str, str, bool, dict[str, object], dict[s
                 "bayes_low_ess",
                 "block",
                 is_smoke,
-                {"ess_bulk_min": _past(thresholds["ess_bulk_min"], direction=-math.inf)},
+                {
+                    "ess_bulk_min": _past(
+                        thresholds["ess_bulk_min"], direction=-math.inf
+                    )
+                },
                 {"ess_bulk_min": thresholds["ess_bulk_min"]},
             )
         )

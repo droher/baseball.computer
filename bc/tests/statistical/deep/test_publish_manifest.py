@@ -92,9 +92,39 @@ def _fake_manifest(
 
 def _publish(model_name: str, artifact_id: str, *, relative: bool = False) -> int:
     args = argparse.Namespace(
-        model=model_name, artifact_id=artifact_id, relative=relative
+        model=model_name,
+        artifact_id=artifact_id,
+        relative=relative,
+        exploratory_reason="Pointer routing fixture without fitted evidence",
     )
     return _run_publish_manifest(args)
+
+
+def test_default_publish_refuses_unvalidated_artifact_without_writing_pointer(
+    roots: dict[str, Path],
+) -> None:
+    _fake_manifest(
+        roots["BAYES_ROOT"], "geometry_trajectory", "incomplete", kind="bayes"
+    )
+    with pytest.raises(ValueError, match="not validated"):
+        _run_publish_manifest(
+            argparse.Namespace(
+                model="geometry_trajectory", artifact_id="incomplete", relative=False
+            )
+        )
+    assert not (roots["published"] / "geometry_trajectory.json").exists()
+
+
+def test_publish_rejects_wrong_manifest_name(roots: dict[str, Path]) -> None:
+    path = _fake_manifest(
+        roots["BAYES_ROOT"], "geometry_trajectory", "wrong-name", kind="bayes"
+    )
+    raw = json.loads(path.read_text())
+    raw["name"] = "geometry_location_side"
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="differs from manifest name"):
+        _publish("geometry_trajectory", "wrong-name")
+    assert not (roots["published"] / "geometry_trajectory.json").exists()
 
 
 def _registered_deep_target() -> tuple[str, str]:
@@ -221,7 +251,13 @@ def _smoke_manifest(
         validation = manifest_path.parent / "validation"
         validation.mkdir(parents=True, exist_ok=True)
         (validation / "diagnostics.json").write_text(
-            json.dumps({"rhat_max": 1.0, "ess_bulk_min": 10.0, "is_smoke": diagnostics_is_smoke}),
+            json.dumps(
+                {
+                    "rhat_max": 1.0,
+                    "ess_bulk_min": 10.0,
+                    "is_smoke": diagnostics_is_smoke,
+                }
+            ),
             encoding="utf-8",
         )
     return manifest_path
@@ -257,7 +293,11 @@ def test_publish_manifest_accepts_full_fit_with_smoke_false_everywhere(
     target_name, _ = _registered_deep_target()
     artifact_id = "bayes-full-0001"
     _ = _smoke_manifest(
-        roots["BAYES_ROOT"], target_name, artifact_id, kind="bayes", diagnostics_is_smoke=False
+        roots["BAYES_ROOT"],
+        target_name,
+        artifact_id,
+        kind="bayes",
+        diagnostics_is_smoke=False,
     )
 
     assert _publish(target_name, artifact_id) == 0
@@ -268,7 +308,11 @@ def test_publish_manifest_refuses_smoke_deep_artifact(roots: dict[str, Path]) ->
     target_name, pointer_name = _registered_deep_target()
     artifact_id = "deep-smoke-0001"
     _ = _smoke_manifest(
-        roots["DEEP_ROOT"], target_name, artifact_id, kind="deep", metadata_is_smoke=True
+        roots["DEEP_ROOT"],
+        target_name,
+        artifact_id,
+        kind="deep",
+        metadata_is_smoke=True,
     )
 
     with pytest.raises(ValueError, match="smoke fit"):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from importlib import import_module
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,6 @@ import pytest
 
 from python_models.ml.features import FeatureLayout, Vocabulary
 from python_models.statistical import config as cfg
-from python_models.statistical.deep import targets as _targets  # noqa: F401
 from python_models.statistical.deep.embeddings import (
     aggregate_embedding_frames,
     assemble_embeddings_frame,
@@ -22,6 +22,8 @@ from python_models.statistical.manifests import (
     write_published_pointer,
 )
 from python_models.statistical.schemas import ArtifactManifest, PublishedPointer
+
+_ = import_module("python_models.statistical.deep.targets")
 
 
 def _layout() -> FeatureLayout:
@@ -125,3 +127,34 @@ def test_aggregates_published_embeddings(
     assert df["dl_artifact_id"].unique().to_list() == [artifact_id]
     assert df["source_target"].unique().to_list() == [target]
     assert set(df["entity_type"].unique().to_list()) == {"batter_id"}
+
+
+def test_embedding_reader_resolves_relative_pointer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifacts_root = tmp_path / "artifacts"
+    deep_root = artifacts_root / "deep"
+    published_root = tmp_path / "published"
+    monkeypatch.setattr(cfg, "DEEP_ROOT", deep_root)
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(artifacts_root))
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+
+    target = "geometry_trajectory"
+    spec = get_target(target)
+    artifact_id = "aid-emb-relative"
+    manifest_path = _write_embedding_artifact(
+        deep_root, target_name=target, artifact_id=artifact_id
+    )
+    _ = write_published_pointer(
+        PublishedPointer(
+            model_name=spec.published_manifest_name(),
+            artifact_id=artifact_id,
+            published_at=datetime.now(tz=timezone.utc),
+            manifest_path=manifest_path,
+        ),
+        root=published_root,
+        relative=True,
+    )
+
+    frames = list(aggregate_embedding_frames())
+    assert frames[0]["dl_artifact_id"].to_list() == [artifact_id, artifact_id]

@@ -1,0 +1,310 @@
+{
+  "benchmark": "categorical_reconstruction_baselines",
+  "status": "development_evidence",
+  "full_run": true,
+  "source_relation": "main_models.model_input_geometry",
+  "targets": [
+    "location_side",
+    "trajectory"
+  ],
+  "pretraining": "none",
+  "upstream_model_artifacts": [],
+  "run": {
+    "seed": 20260911,
+    "bootstrap_repetitions": 500,
+    "arguments": {
+      "db": "bc.db",
+      "output": "docs/modeling-reconstruction-benchmark-2026-09-11.json",
+      "checkpoint_log": "/private/tmp/modeling-reconstruction-full.log",
+      "full": true
+    },
+    "runtime": {
+      "python": "3.13.5",
+      "python_implementation": "cpython",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "packages": {
+        "duckdb": "1.5.2",
+        "numpy": "2.4.6"
+      }
+    }
+  },
+  "truth_policy": "is_observed_class AND training_weight > 0; trajectory bunt variants remapped to Bunt; duplicate event-target rows deduplicated; derived labels excluded",
+  "feature_policy": "decade from season and result_family, both available before target reconstruction when their source fields are present",
+  "split": {
+    "definition": "main_models.model_input_geometry.primary_fold; TRAIN fits, TEST evaluates, VALIDATE is untouched; primary_fold is HASH(game_id) mod 100 with TRAIN=[0,69], VALIDATE=[70,84], TEST=[85,99]",
+    "group": "game_id",
+    "train_game_count": 143851,
+    "test_game_count": 30862,
+    "train_game_sha256": "f8e488f90b4514ef9db4d18a990a3cc0c43d0e0305e763466539d05003578940",
+    "test_game_sha256": "fb41d63729d602162d0261fa3d75c57625c428366e1af50f7b3ebac9120322f4",
+    "train_test_game_overlap": 0
+  },
+  "smoothing": {
+    "method": "Laplace add-one",
+    "conditional_cell": "decade x result_family",
+    "unseen_cell_policy": "uniform over train-observed target classes"
+  },
+  "metric_definitions": {
+    "log_loss": "mean negative log probability assigned to the observed class",
+    "brier": "mean sum of squared class-probability errors per event-target",
+    "calibration": "classwise 15-bin ECE weighted across all class-event pairs",
+    "improvement": "marginal metric minus era-result-family metric; positive is better"
+  },
+  "query_sha256": "3a6ccf7e38d3344428c9b1962f26e1608457b423ec1b3f19adc710667d039d12",
+  "regeneration_query_sha256": "0988377f2c55ebc18d64d588444eb86c8d1c68216e539572db8ee50175ed03af",
+  "query_provenance_note": "query_sha256 identifies the full run actually executed. The regeneration script subsequently factored the equivalent Bunt label expression into a reusable query. Its new query hash is recorded separately; the full real-data benchmark was not rerun after that refactor.",
+  "source_view_sql_sha256": "57b0d49e2a21037c249b15c5d409e40c1a0f28b90d0126c826103263d03adb56",
+  "data_fingerprints": [
+    {
+      "target": "location_side",
+      "primary_fold": "TEST",
+      "row_count": 753742,
+      "game_count": 26260,
+      "min_season": 1910,
+      "max_season": 2025,
+      "duckdb_row_hash_xor64": "afa13fa332549d13"
+    },
+    {
+      "target": "location_side",
+      "primary_fold": "TRAIN",
+      "row_count": 3539235,
+      "game_count": 122385,
+      "min_season": 1910,
+      "max_season": 2025,
+      "duckdb_row_hash_xor64": "7c7f8a96fdf40e16"
+    },
+    {
+      "target": "trajectory",
+      "primary_fold": "TEST",
+      "row_count": 922812,
+      "game_count": 30816,
+      "min_season": 1910,
+      "max_season": 2025,
+      "duckdb_row_hash_xor64": "943f5673f86e08f6"
+    },
+    {
+      "target": "trajectory",
+      "primary_fold": "TRAIN",
+      "row_count": 4325736,
+      "game_count": 143670,
+      "min_season": 1910,
+      "max_season": 2025,
+      "duckdb_row_hash_xor64": "bebf06c22240f2bc"
+    }
+  ],
+  "invariants": {
+    "test_labels_absent_from_train": 0,
+    "max_probability_sum_deviation": 2.220446049250313e-16,
+    "score_alignment": [
+      {
+        "target": "location_side",
+        "observed_test_rows": 753742,
+        "scored_test_rows": 753742
+      },
+      {
+        "target": "trajectory",
+        "observed_test_rows": 922812,
+        "scored_test_rows": 922812
+      }
+    ]
+  },
+  "metrics": [
+    {
+      "target": "location_side",
+      "slice": "all_test",
+      "observed_test_rows": 753742,
+      "observed_test_games": 26260,
+      "marginal_log_loss": 1.052198576039253,
+      "conditional_log_loss": 0.9866768401014494,
+      "conditional_log_loss_improvement": 0.06552173593780353,
+      "marginal_brier": 0.48775179251213496,
+      "conditional_brier": 0.47131659307383567,
+      "conditional_brier_improvement": 0.016435199438299297,
+      "conditional_cell_support_rate": 1.0
+    },
+    {
+      "target": "location_side",
+      "slice": "pre_1988_observed_test",
+      "observed_test_rows": 59759,
+      "observed_test_games": 12997,
+      "marginal_log_loss": 0.5251938930179009,
+      "conditional_log_loss": 0.3048299878690233,
+      "conditional_log_loss_improvement": 0.22036390514887755,
+      "marginal_brier": 0.2055824781703268,
+      "conditional_brier": 0.1364973635172288,
+      "conditional_brier_improvement": 0.069085114653098,
+      "conditional_cell_support_rate": 1.0
+    },
+    {
+      "target": "trajectory",
+      "slice": "all_test",
+      "observed_test_rows": 922812,
+      "observed_test_games": 30816,
+      "marginal_log_loss": 1.35465541837623,
+      "conditional_log_loss": 1.2011237887455268,
+      "conditional_log_loss_improvement": 0.15353162963070321,
+      "marginal_brier": 0.7085871475801806,
+      "conditional_brier": 0.6523618966913974,
+      "conditional_brier_improvement": 0.05622525088878316,
+      "conditional_cell_support_rate": 1.0
+    },
+    {
+      "target": "trajectory",
+      "slice": "pre_1988_observed_test",
+      "observed_test_rows": 211340,
+      "observed_test_games": 17540,
+      "marginal_log_loss": 1.552365693756895,
+      "conditional_log_loss": 1.3642774853095951,
+      "conditional_log_loss_improvement": 0.1880882084472999,
+      "marginal_brier": 0.776038678686924,
+      "conditional_brier": 0.7084191103269729,
+      "conditional_brier_improvement": 0.06761956835995109,
+      "conditional_cell_support_rate": 1.0
+    }
+  ],
+  "calibration": [
+    {
+      "target": "location_side",
+      "slice": "all_test",
+      "baseline": "era_result_family",
+      "classwise_ece_15_bin": 0.0005581645553978493,
+      "populated_class_bins": 21
+    },
+    {
+      "target": "location_side",
+      "slice": "all_test",
+      "baseline": "marginal",
+      "classwise_ece_15_bin": 0.0006217871023537694,
+      "populated_class_bins": 6
+    },
+    {
+      "target": "location_side",
+      "slice": "pre_1988_observed_test",
+      "baseline": "era_result_family",
+      "classwise_ece_15_bin": 0.003749387909209705,
+      "populated_class_bins": 10
+    },
+    {
+      "target": "location_side",
+      "slice": "pre_1988_observed_test",
+      "baseline": "marginal",
+      "classwise_ece_15_bin": 0.07653448504428417,
+      "populated_class_bins": 6
+    },
+    {
+      "target": "trajectory",
+      "slice": "all_test",
+      "baseline": "era_result_family",
+      "classwise_ece_15_bin": 0.001148410198685672,
+      "populated_class_bins": 47
+    },
+    {
+      "target": "trajectory",
+      "slice": "all_test",
+      "baseline": "marginal",
+      "classwise_ece_15_bin": 0.0007490891373784552,
+      "populated_class_bins": 5
+    },
+    {
+      "target": "trajectory",
+      "slice": "pre_1988_observed_test",
+      "baseline": "era_result_family",
+      "classwise_ece_15_bin": 0.005687867511864434,
+      "populated_class_bins": 42
+    },
+    {
+      "target": "trajectory",
+      "slice": "pre_1988_observed_test",
+      "baseline": "marginal",
+      "classwise_ece_15_bin": 0.05232729049712336,
+      "populated_class_bins": 5
+    }
+  ],
+  "cluster_bootstrap": [
+    {
+      "target": "location_side",
+      "slice": "all_test",
+      "cluster_unit": "game_id",
+      "repetitions": 500,
+      "train_fit_during_bootstrap": "fixed",
+      "conditional_log_loss_improvement_ci95": [
+        0.06452481636943304,
+        0.06651863738973483
+      ],
+      "conditional_brier_improvement_ci95": [
+        0.016139127749619824,
+        0.016757831813590623
+      ]
+    },
+    {
+      "target": "location_side",
+      "slice": "pre_1988_observed_test",
+      "cluster_unit": "game_id",
+      "repetitions": 500,
+      "train_fit_during_bootstrap": "fixed",
+      "conditional_log_loss_improvement_ci95": [
+        0.21692022782541687,
+        0.22361279268924328
+      ],
+      "conditional_brier_improvement_ci95": [
+        0.0675262943957048,
+        0.07058492771560884
+      ]
+    },
+    {
+      "target": "trajectory",
+      "slice": "all_test",
+      "cluster_unit": "game_id",
+      "repetitions": 500,
+      "train_fit_during_bootstrap": "fixed",
+      "conditional_log_loss_improvement_ci95": [
+        0.15210494188215948,
+        0.15484555286574278
+      ],
+      "conditional_brier_improvement_ci95": [
+        0.055623680001787745,
+        0.056786262563126196
+      ]
+    },
+    {
+      "target": "trajectory",
+      "slice": "pre_1988_observed_test",
+      "cluster_unit": "game_id",
+      "repetitions": 500,
+      "train_fit_during_bootstrap": "fixed",
+      "conditional_log_loss_improvement_ci95": [
+        0.18348491519389432,
+        0.19254298277321397
+      ],
+      "conditional_brier_improvement_ci95": [
+        0.06601490019559021,
+        0.0694926729093139
+      ]
+    }
+  ],
+  "inference_feature_coverage": [
+    {
+      "target": "location_side",
+      "inference_rows": 878050,
+      "season_coverage": 1.0,
+      "result_family_coverage": 1.0,
+      "joint_feature_coverage": 1.0,
+      "fitted_cell_coverage": 1.0
+    },
+    {
+      "target": "trajectory",
+      "inference_rows": 3992018,
+      "season_coverage": 1.0,
+      "result_family_coverage": 1.0,
+      "joint_feature_coverage": 1.0,
+      "fitted_cell_coverage": 1.0
+    }
+  ],
+  "limitations": [
+    "The pre-1988 result is evaluated only where labels were recorded and is not representative of unrecorded historical events.",
+    "This benchmark does not identify the MNAR reconstruction distribution or validate transport into games absent from play-by-play.",
+    "It does not compare a fitted hierarchy because no fitted model currently shares this untouched split and dependency boundary.",
+    "Result-family availability can share source-acquisition mechanisms with geometry labels; coverage is reported rather than assumed.",
+    "The 64-bit row fingerprint is an integrity aid, not a cryptographic digest of the full source relation."
+  ]
+}

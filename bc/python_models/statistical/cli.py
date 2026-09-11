@@ -297,6 +297,11 @@ def build_parser() -> argparse.ArgumentParser:
     _ = publish.add_argument("--model", required=True, help="Model name to publish.")
     _add_artifact_id_arg(publish)
     _ = publish.add_argument(
+        "--exploratory-reason",
+        default=None,
+        help="Explicitly publish research output without validated predictive evidence; record the reason.",
+    )
+    _ = publish.add_argument(
         "--relative",
         action="store_true",
         help=(
@@ -368,6 +373,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     _add_artifact_id_arg(publish_pretrain)
+    _ = publish_pretrain.add_argument("--exploratory-reason", default=None)
 
     return parser
 
@@ -643,6 +649,7 @@ def _run_validate(args: argparse.Namespace) -> int:
     import tempfile
 
     from python_models.statistical.validate import find_manifest, validate_artifact
+    from python_models.statistical.publication_evidence import bind_validation_report
 
     artifact_id = str(args.artifact_id)
     model_name = getattr(args, "model", None)
@@ -653,6 +660,11 @@ def _run_validate(args: argparse.Namespace) -> int:
     artifact_dir = find_manifest(
         artifact_id, candidate_roots, model_name=model_name
     ).parent
+    report = bind_validation_report(
+        report,
+        artifact_dir / "manifest.json",
+        candidate_roots=candidate_roots,
+    )
     output_path = (
         Path(args.output_path)
         if args.output_path
@@ -688,36 +700,29 @@ def _run_validate(args: argparse.Namespace) -> int:
 
 
 def _build_candidate_roots() -> tuple[Path, ...]:
-    from python_models.statistical.config import (
-        BAYES_ROOT,
-        DATASETS_ROOT,
-        DEEP_ROOT,
-        EDA_ROOT,
-    )
+    from python_models.statistical.config import resolve_candidate_roots
 
-    return (DEEP_ROOT, BAYES_ROOT, DATASETS_ROOT, EDA_ROOT)
+    return resolve_candidate_roots()
 
 
 def _run_publish_manifest(args: argparse.Namespace) -> int:
     from datetime import datetime, timezone
 
-    from python_models.statistical.config import (
-        BAYES_ROOT,
-        DATASETS_ROOT,
-        DEEP_ROOT,
-        EDA_ROOT,
-    )
     from python_models.statistical.manifests import (
         read_manifest,
         write_published_pointer,
     )
     from python_models.statistical.schemas import PublishedPointer
     from python_models.statistical.validate import manifest_is_smoke
+    from python_models.statistical.publication_evidence import (
+        assess_publication,
+        save_publication_evidence,
+    )
 
     artifact_id = str(args.artifact_id)
     model_name = str(args.model)
 
-    candidate_roots: list[Path] = [DEEP_ROOT, BAYES_ROOT, DATASETS_ROOT, EDA_ROOT]
+    candidate_roots = _build_candidate_roots()
     found: Path | None = None
     for root in candidate_roots:
         for candidate in root.rglob(f"{artifact_id}/manifest.json"):
@@ -733,6 +738,10 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
         )
 
     manifest = read_manifest(found)
+    if manifest.name != model_name:
+        raise ValueError(
+            f"requested model {model_name!r} differs from manifest name {manifest.name!r}"
+        )
     if manifest.artifact_id != artifact_id:
         raise ValueError(
             f"manifest.json at {found} reports artifact_id={manifest.artifact_id!r}, expected {artifact_id!r}"
@@ -759,11 +768,23 @@ def _run_publish_manifest(args: argparse.Namespace) -> int:
                 "a registered deep target; cannot resolve its published pointer name"
             ) from exc
         pointer_name = spec.published_manifest_name()
+    exploratory_reason = getattr(args, "exploratory_reason", None)
+    report = assess_publication(
+        found,
+        candidate_roots=tuple(candidate_roots),
+        exploratory_reason=exploratory_reason,
+    )
+    save_publication_evidence(report, found, exploratory=exploratory_reason is not None)
     pointer = PublishedPointer(
         model_name=pointer_name,
         artifact_id=artifact_id,
         published_at=datetime.now(tz=timezone.utc),
         manifest_path=found,
+        publication_mode="exploratory"
+        if exploratory_reason is not None
+        else "validated",
+        notes=exploratory_reason,
+        validation_binding=report.artifact_binding,
     )
     relative = bool(args.relative)
     target = write_published_pointer(pointer, relative=relative)
@@ -849,24 +870,30 @@ def _run_fit_pretrain(args: argparse.Namespace) -> int:
 def _run_publish_pretrain(args: argparse.Namespace) -> int:
     from datetime import datetime, timezone
 
-    from python_models.statistical.config import DEEP_ROOT, resolve_published_roots
+    from python_models.statistical.config import resolve_published_roots
     from python_models.statistical.manifests import (
         PRETRAIN_POINTER_SUBDIR,
         read_manifest,
         write_published_pointer,
     )
     from python_models.statistical.schemas import PublishedPointer
+    from python_models.statistical.publication_evidence import (
+        assess_publication,
+        save_publication_evidence,
+    )
+    from python_models.statistical.validate import manifest_is_smoke
 
     artifact_id = str(args.artifact_id)
-    matches = list(DEEP_ROOT.rglob(f"{artifact_id}/manifest.json"))
+    deep_root = _build_candidate_roots()[0]
+    matches = list(deep_root.rglob(f"{artifact_id}/manifest.json"))
     if not matches:
         raise FileNotFoundError(
-            f"no manifest.json for pretrain artifact_id={artifact_id!r} under {DEEP_ROOT}"
+            f"no manifest.json for pretrain artifact_id={artifact_id!r} under {deep_root}"
         )
     if len(matches) > 1:
         models = sorted({p.parent.parent.name for p in matches})
         raise ValueError(
-            f"pretrain artifact_id={artifact_id!r} is ambiguous under {DEEP_ROOT} "
+            f"pretrain artifact_id={artifact_id!r} is ambiguous under {deep_root} "
             f"(matches under models {models}); artifact ids must be unique per model"
         )
     found = matches[0]
@@ -880,6 +907,16 @@ def _run_publish_pretrain(args: argparse.Namespace) -> int:
             f"manifest at {found} reports artifact_id={manifest.artifact_id!r}, expected {artifact_id!r}"
         )
 
+    if manifest_is_smoke(manifest, found.parent):
+        raise ValueError("smoke pretrain artifacts cannot be published")
+    exploratory_reason = getattr(args, "exploratory_reason", None)
+    report = assess_publication(
+        found,
+        candidate_roots=_build_candidate_roots(),
+        exploratory_reason=exploratory_reason,
+    )
+    save_publication_evidence(report, found, exploratory=exploratory_reason is not None)
+
     branch_root, _ = resolve_published_roots()
     pretrain_root = branch_root / PRETRAIN_POINTER_SUBDIR
     pointer = PublishedPointer(
@@ -887,6 +924,11 @@ def _run_publish_pretrain(args: argparse.Namespace) -> int:
         artifact_id=artifact_id,
         published_at=datetime.now(tz=timezone.utc),
         manifest_path=found,
+        publication_mode="exploratory"
+        if exploratory_reason is not None
+        else "validated",
+        notes=exploratory_reason,
+        validation_binding=report.artifact_binding,
     )
     target = write_published_pointer(pointer, root=pretrain_root)
     _log.info(

@@ -1,5 +1,7 @@
 # statistical/ — data-coverage statistical pipeline
 
+Current policy: [modeling evidence contract](../../../docs/modeling-evidence-contract.md). Its gate-v3 and publication requirements supersede older operating-point and gate descriptions below. Default publication requires numerical, predictive, calibration, and content-bound provenance passes; `--exploratory-reason` records an explicitly exploratory research pointer and preserves failed validation. Smoke fits remain unpublishable. The pointer sweep resolves exact manifest paths, including deep aliases; `--write` additionally binds dependency evidence and can be stricter than the quick read-only sweep. `--json-output` exposes all six evidence dimensions. Run-expectancy mean coverage is a studentized diagnostic, not fitted-likelihood predictive coverage. Existing canonical artifacts were not automatically migrated.
+
 Owns Phase 0–5 of the data-coverage initiative (`notes/data-coverage-implementation/`). The Phase-3 deep package (`deep/`) is the most recently expanded surface.
 
 ## Layout

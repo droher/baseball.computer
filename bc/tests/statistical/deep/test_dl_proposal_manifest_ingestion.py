@@ -11,16 +11,18 @@ not exercised — its `execute` body is a thin wrapper that delegates to
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from importlib import import_module
 from pathlib import Path
+from typing import Literal
 
 import polars as pl
 import pytest
 
 from python_models.statistical import config as cfg
-from python_models.statistical.deep import targets as _targets  # noqa: F401
 from python_models.statistical.deep.manifest_ingest import (
     PROPOSAL_MANIFEST_SCHEMA,
     aggregate_proposal_manifest_frames,
+    read_published_target_manifest,
 )
 from python_models.statistical.deep.registry import get_target
 from python_models.statistical.manifests import (
@@ -30,6 +32,8 @@ from python_models.statistical.manifests import (
 )
 from python_models.statistical.schemas import ArtifactManifest, PublishedPointer
 
+_ = import_module("python_models.statistical.deep.targets")
+
 
 def _write_artifact(
     deep_root: Path,
@@ -38,6 +42,8 @@ def _write_artifact(
     artifact_id: str,
     event_keys: list[int],
     dl_p_class: list[list[float]],
+    manifest_name: str | None = None,
+    publication_mode: Literal["validated", "exploratory"] | None = None,
 ) -> Path:
     artifact_dir = deep_root / target_name / artifact_id
     exports = artifact_dir / "exports"
@@ -58,7 +64,7 @@ def _write_artifact(
         ArtifactManifest(
             artifact_id=artifact_id,
             kind="deep",
-            name=target_name,
+            name=manifest_name or target_name,
             version="0.2.0",
             created_at=datetime.now(tz=timezone.utc),
             source_snapshot_id="src-ingest-1",
@@ -69,6 +75,7 @@ def _write_artifact(
                 "probabilities": probabilities,
             },
             package_versions=package_versions(),
+            publication_mode=publication_mode,
         ),
         manifest_path,
     )
@@ -81,6 +88,8 @@ def _publish_pointer(
     target: str,
     artifact_id: str,
     manifest_path: Path,
+    publication_mode: Literal["validated", "exploratory"] | None = None,
+    relative: bool = False,
 ) -> Path:
     spec = get_target(target)
     pointer = PublishedPointer(
@@ -88,8 +97,9 @@ def _publish_pointer(
         artifact_id=artifact_id,
         published_at=datetime.now(tz=timezone.utc),
         manifest_path=manifest_path,
+        publication_mode=publication_mode,
     )
-    return write_published_pointer(pointer, root=published_root)
+    return write_published_pointer(pointer, root=published_root, relative=relative)
 
 
 def test_empty_when_no_targets_published(
@@ -119,12 +129,14 @@ def test_aggregates_published_target(
         artifact_id="aid-traj-1",
         event_keys=[10, 11, 12],
         dl_p_class=[[0.7, 0.2, 0.1], [0.4, 0.4, 0.2], [0.1, 0.1, 0.8]],
+        publication_mode="exploratory",
     )
     _ = _publish_pointer(
         published_root,
         target="geometry_trajectory",
         artifact_id="aid-traj-1",
         manifest_path=manifest_path,
+        publication_mode="exploratory",
     )
 
     frames = list(aggregate_proposal_manifest_frames("dl_proposal_manifest"))
@@ -174,3 +186,120 @@ def test_credit_manifest_yields_empty(
     frames = list(aggregate_proposal_manifest_frames("dl_credit_proposal_manifest"))
     assert len(frames) == 1
     assert frames[0].height == 0
+
+
+def test_relative_pointer_resolves_from_artifacts_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifacts_root = tmp_path / "artifacts"
+    deep_root = artifacts_root / "deep"
+    published_root = tmp_path / "published"
+    monkeypatch.setattr(cfg, "DEEP_ROOT", deep_root)
+    monkeypatch.setenv(cfg.ENV_ARTIFACTS_ROOT, str(artifacts_root))
+    monkeypatch.setenv(cfg.ENV_PUBLISHED_ROOT, str(published_root))
+
+    manifest_path = _write_artifact(
+        deep_root,
+        target_name="geometry_trajectory",
+        artifact_id="aid-relative-1",
+        event_keys=[42],
+        dl_p_class=[[0.8, 0.1, 0.1]],
+    )
+    _ = _publish_pointer(
+        published_root,
+        target="geometry_trajectory",
+        artifact_id="aid-relative-1",
+        manifest_path=manifest_path,
+        relative=True,
+    )
+
+    frames = list(aggregate_proposal_manifest_frames("dl_proposal_manifest"))
+    assert frames[0]["dl_artifact_id"].to_list() == ["aid-relative-1"]
+
+
+def test_reader_rejects_pointer_artifact_id_mismatch(tmp_path: Path) -> None:
+    target = "geometry_trajectory"
+    manifest_path = _write_artifact(
+        tmp_path / "deep",
+        target_name=target,
+        artifact_id="aid-manifest",
+        event_keys=[1],
+        dl_p_class=[[1.0]],
+    )
+    pointer_path = _publish_pointer(
+        tmp_path / "published",
+        target=target,
+        artifact_id="aid-pointer",
+        manifest_path=manifest_path,
+    )
+
+    with pytest.raises(
+        ValueError, match="pointer.*aid-pointer.*manifest.*aid-manifest"
+    ):
+        _ = read_published_target_manifest(pointer_path, target_name=target)
+
+
+def test_reader_rejects_pointer_alias_mismatch(tmp_path: Path) -> None:
+    target = "geometry_trajectory"
+    manifest_path = _write_artifact(
+        tmp_path / "deep",
+        target_name=target,
+        artifact_id="aid-alias",
+        event_keys=[1],
+        dl_p_class=[[1.0]],
+    )
+    pointer_path = write_published_pointer(
+        PublishedPointer(
+            model_name="geometry_trajectory",
+            artifact_id="aid-alias",
+            published_at=datetime.now(tz=timezone.utc),
+            manifest_path=manifest_path,
+        ),
+        root=tmp_path / "published",
+    )
+
+    with pytest.raises(ValueError, match="geometry_trajectory.*dl_proposal_trajectory"):
+        _ = read_published_target_manifest(pointer_path, target_name=target)
+
+
+def test_reader_rejects_manifest_target_mismatch(tmp_path: Path) -> None:
+    target = "geometry_trajectory"
+    manifest_path = _write_artifact(
+        tmp_path / "deep",
+        target_name=target,
+        manifest_name="geometry_location_edge",
+        artifact_id="aid-wrong-target",
+        event_keys=[1],
+        dl_p_class=[[1.0]],
+    )
+    pointer_path = _publish_pointer(
+        tmp_path / "published",
+        target=target,
+        artifact_id="aid-wrong-target",
+        manifest_path=manifest_path,
+    )
+
+    with pytest.raises(ValueError, match="geometry_location_edge.*geometry_trajectory"):
+        _ = read_published_target_manifest(pointer_path, target_name=target)
+
+
+def test_reader_rejects_explicit_publication_mode_mismatch(tmp_path: Path) -> None:
+    target = "geometry_trajectory"
+    manifest_path = _write_artifact(
+        tmp_path / "deep",
+        target_name=target,
+        artifact_id="aid-mode",
+        event_keys=[1],
+        dl_p_class=[[1.0]],
+        publication_mode="exploratory",
+    )
+    pointer_path = _publish_pointer(
+        tmp_path / "published",
+        target=target,
+        artifact_id="aid-mode",
+        manifest_path=manifest_path,
+        publication_mode="validated",
+    )
+
+    with pytest.raises(ValueError, match="publication mode.*validated.*exploratory"):
+        _ = read_published_target_manifest(pointer_path, target_name=target)

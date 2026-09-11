@@ -12,6 +12,7 @@ ArtifactKind = Literal["dataset", "deep", "bayes", "sql_export", "eda", "pretrai
 ValidationStatus = Literal["passed", "failed", "exploratory"]
 DiagnosticStatus = Literal["passed", "warn", "failed"]
 FindingSeverity = Literal["block", "warn", "info"]
+EvidenceStatus = Literal["passed", "failed", "unsupported"]
 BlockingCode = Literal[
     "dominant_single_scorer_park_team",
     "no_connected_component_for_effect",
@@ -113,7 +114,17 @@ class BayesArtifactExtras(BaseModel):
     weak_identification_flag: bool = False
 
 
+class ValidationEvidence(BaseModel):
+    numerical: EvidenceStatus = "unsupported"
+    predictive: EvidenceStatus = "unsupported"
+    calibration: EvidenceStatus = "unsupported"
+    transport: EvidenceStatus = "unsupported"
+    identification: EvidenceStatus = "unsupported"
+    provenance: EvidenceStatus = "unsupported"
+
+
 class ArtifactManifest(BaseModel):
+    publication_mode: Literal["validated", "exploratory"] | None = None
     artifact_id: str
     kind: ArtifactKind
     name: str
@@ -122,14 +133,20 @@ class ArtifactManifest(BaseModel):
     source_snapshot_id: str
     query_hash: str | None = None
     schema_hash: str | None = None
+    content_hash: str | None = None
+    transformation_hash: str | None = None
+    dependency_hash: str | None = None
     dataset_artifact_id: str | None = None
     input_artifact_ids: tuple[str, ...] = ()
+    input_manifests: tuple[Path, ...] = ()
     output_paths: dict[str, Path]
     package_versions: dict[str, str]
     random_seed: int | None = None
     validation_status: ValidationStatus = "exploratory"
     validation_gate_version: int | None = None
     validated_at: datetime | None = None
+    validation_evidence: ValidationEvidence | None = None
+    validation_binding: str | None = None
     blocking_findings: tuple[str, ...] = ()
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
     bayes_extras: BayesArtifactExtras | None = None
@@ -159,6 +176,13 @@ class DatasetMetadata(BaseModel):
     columns: tuple[DatasetColumn, ...]
     split_policy: str
     category_maps: dict[str, dict[str, int]]
+    content_hash: str | None = None
+    transformation_hash: str | None = None
+    dependency_hash: str | None = None
+    schema_hash: str | None = None
+    eligible_count: int | None = None
+    derived_truth_count: int | None = None
+    inference_count: int | None = None
 
 
 class SplitAssignment(BaseModel):
@@ -223,6 +247,8 @@ class PublishedPointer(BaseModel):
     published_at: datetime
     manifest_path: Path
     notes: str | None = None
+    publication_mode: Literal["validated", "exploratory"] | None = None
+    validation_binding: str | None = None
 
 
 class ValidationReport(BaseModel):
@@ -235,6 +261,9 @@ class ValidationReport(BaseModel):
     metrics: dict[str, float | int] = Field(default_factory=dict)
     metadata: dict[str, str | int | float | bool] = Field(default_factory=dict)
     generated_at: datetime
+    evidence: ValidationEvidence = Field(default_factory=ValidationEvidence)
+    artifact_binding: str | None = None
+    gate_version: int | None = None
 
 
 _ = BayesDiagnosticsSummary.model_rebuild()

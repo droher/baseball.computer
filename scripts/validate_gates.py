@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "bc"))
@@ -54,6 +54,7 @@ from python_models.statistical.schemas import (  # noqa: E402
     ValidationFinding,
     ValidationReport,
     ValidationStatus,
+    ValidationEvidence,
 )
 from python_models.statistical.validate import (  # noqa: E402
     VALIDATION_GATE_VERSION,
@@ -61,9 +62,8 @@ from python_models.statistical.validate import (  # noqa: E402
     _atomic_write_json,
     compute_posterior_diagnostics,
     diagnostics_indicate_weak_identification,
-    find_manifest,
     manifest_is_smoke,
-    validate_artifact,
+    validate_manifest,
     write_diagnostics_by_variable,
 )
 
@@ -122,8 +122,10 @@ class GateRow(BaseModel):
     manifest_gate_version: int | None = None
     hdi_coverage: float | None = None
     hdi_coverage_param: float | None = None
+    coverage_kind: str | None = None
     weak_identification_flag: bool | None = None
     findings: tuple[str, ...] = ()
+    evidence: ValidationEvidence = Field(default_factory=ValidationEvidence)
 
 
 def discover_pointers(
@@ -273,6 +275,8 @@ def _stamp_manifest_gate_result(
     validated_at: datetime | None = None,
     weak_identification_flag: bool | None = None,
     diagnostics: PosteriorDiagnostics | None = None,
+    evidence: ValidationEvidence | None = None,
+    artifact_binding: str | None = None,
 ) -> bool:
     """Stamp the gate verdict and its provenance into the manifest JSON.
 
@@ -287,6 +291,9 @@ def _stamp_manifest_gate_result(
     updated: dict[str, object] = dict(payload)
     updated["validation_status"] = status
     updated["validation_gate_version"] = gate_version
+    if evidence is not None:
+        updated["validation_evidence"] = evidence.model_dump()
+    updated["validation_binding"] = artifact_binding
     extras_raw = updated.get("bayes_extras")
     if isinstance(extras_raw, dict):
         extras = dict(cast(dict[str, object], extras_raw))
@@ -324,17 +331,19 @@ def evaluate_gate(
     write: bool,
     candidate_roots: tuple[Path, ...] = _CANDIDATE_ROOTS,
     datasets_root: Path | None = None,
+    bind_evidence: bool = False,
 ) -> GateRow:
     datasets_root = datasets_root or cfg.DATASETS_ROOT
     pointer = read_published_pointer(pointer_path)
     artifact_id = pointer.artifact_id
-    try:
-        manifest_path = find_manifest(artifact_id, candidate_roots, model_name=model)
-    except FileNotFoundError:
+    manifest_path = pointer.manifest_path
+    if not manifest_path.is_file():
         log.warning("artifact %s for model %s not found on disk", artifact_id, model)
         return GateRow(model=model, artifact_id=artifact_id, status="missing")
     artifact_dir = manifest_path.parent
     manifest = read_manifest(manifest_path)
+    if manifest.artifact_id != artifact_id:
+        raise ValueError(f"pointer artifact identity does not match {manifest_path}")
     weak_identification_flag: bool | None = (
         manifest.bayes_extras.weak_identification_flag
         if manifest.bayes_extras is not None
@@ -366,10 +375,8 @@ def evaluate_gate(
                 manifest, artifact_dir, diagnostics
             )
 
-    report = validate_artifact(
-        artifact_id,
-        model_name=model,
-        candidate_roots=candidate_roots,
+    report = validate_manifest(
+        manifest_path,
         diagnostics_overrides=diagnostics_overrides(diagnostics),
     )
 
@@ -394,6 +401,15 @@ def evaluate_gate(
     if parameter is not None:
         hdi_coverage_param = parameter.coverage
 
+    if bind_evidence:
+        from python_models.statistical.publication_evidence import (
+            bind_validation_report,
+        )
+
+        report = bind_validation_report(
+            report, manifest_path, candidate_roots=candidate_roots
+        )
+
     manifest_status: str = str(manifest.validation_status)
     manifest_gate_version: int | None = manifest.validation_gate_version
     row_status: str = report.status
@@ -416,6 +432,8 @@ def evaluate_gate(
                         weak_identification_flag if diagnostics is not None else None
                     ),
                     diagnostics=diagnostics,
+                    evidence=report.evidence,
+                    artifact_binding=report.artifact_binding,
                 )
                 if stamped:
                     log.info(
@@ -448,9 +466,11 @@ def evaluate_gate(
         manifest_status=manifest_status,
         manifest_gate_version=manifest_gate_version,
         hdi_coverage=hdi_coverage,
+        coverage_kind=predictive.coverage_kind if predictive is not None else None,
         hdi_coverage_param=hdi_coverage_param,
         weak_identification_flag=weak_identification_flag,
         findings=(*codes, *extra_codes),
+        evidence=report.evidence,
     )
 
 
@@ -464,9 +484,10 @@ def format_table(rows: list[GateRow]) -> str:
         "hdi_cov",
         "hdi_cov_param",
         "weak_id",
+        "coverage_kind",
         "findings",
     )
-    n_fixed = 8
+    n_fixed = 9
     body: list[tuple[str, ...]] = []
     for r in rows:
         manifest_status = r.manifest_status or "-"
@@ -493,6 +514,7 @@ def format_table(rows: list[GateRow]) -> str:
                 cov,
                 cov_param,
                 weak,
+                r.coverage_kind or "-",
                 fired,
             )
         )
@@ -524,11 +546,12 @@ def main(argv: list[str] | None = None) -> int:
             "persist the Bayes diagnostics recomputed from inference/posterior.nc, "
             "persist validation_report.json, and stamp validation_status, "
             "validation_gate_version, validated_at, and "
-            "weak_identification_flag into each manifest (default off; the "
-            "verdict is the same either way)"
+            "weak_identification_flag into each manifest, including content-bound "
+            "dependency evidence (default off)"
         ),
     )
     _ = parser.add_argument("--log-level", default="INFO")
+    _ = parser.add_argument("--json-output", type=Path)
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -545,7 +568,16 @@ def main(argv: list[str] | None = None) -> int:
     rows: list[GateRow] = []
     for model, pointer_path in sorted(pointers.items()):
         try:
-            rows.append(evaluate_gate(model, pointer_path, write=bool(args.write)))
+            rows.append(
+                evaluate_gate(
+                    model,
+                    pointer_path,
+                    write=bool(args.write),
+                    bind_evidence=bool(args.write),
+                    candidate_roots=cfg.resolve_candidate_roots(),
+                    datasets_root=cfg.resolve_artifact_root() / "datasets",
+                )
+            )
         except Exception as exc:
             log.exception("gate evaluation failed for %s: %s", model, exc)
             rows.append(
@@ -555,9 +587,14 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     print(format_table(rows))
-    n_failed = sum(1 for r in rows if r.status in ("failed", "error", "missing"))
+    if args.json_output:
+        _atomic_write_json(
+            args.json_output,
+            json.dumps([r.model_dump(mode="json") for r in rows], indent=2),
+        )
+    n_failed = sum(1 for r in rows if r.status != "passed")
     log.info("validate-gates swept %d models; %d not passed", len(rows), n_failed)
-    return 0
+    return 1 if n_failed else 0
 
 
 if __name__ == "__main__":

@@ -39,12 +39,12 @@ def artifacts_root_from_env(environ: dict[str, str]) -> Path:
     return root
 
 
-def check_pointers(published_root: Path) -> list[Path]:
+def check_pointers(published_root: Path, *, verify_evidence: bool = True) -> list[Path]:
     """Return the manifest paths behind every pointer under ``published_root``.
 
     Raises ``SystemExit`` when there are no pointers or any manifest is missing.
     """
-    pointer_paths = sorted(published_root.glob("*.json"))
+    pointer_paths = sorted(published_root.rglob("*.json"))
     if not pointer_paths:
         raise SystemExit(f"no published pointers under {published_root}")
     missing: list[str] = []
@@ -53,6 +53,37 @@ def check_pointers(published_root: Path) -> list[Path]:
         pointer = read_published_pointer(pointer_path)
         manifests.append(pointer.manifest_path)
         if pointer.manifest_path.is_file():
+            if verify_evidence:
+                from python_models.statistical.publication_evidence import (
+                    verify_published_evidence,
+                )
+
+                if pointer.publication_mode is None:
+                    raise SystemExit(
+                        f"pointer has no publication evidence policy: {pointer_path}"
+                    )
+                if (
+                    pointer.publication_mode == "exploratory"
+                    and not (pointer.notes or "").strip()
+                ):
+                    raise SystemExit(
+                        f"exploratory pointer has no reason: {pointer_path}"
+                    )
+                root = published_root.parent
+                try:
+                    verify_published_evidence(
+                        pointer.manifest_path,
+                        expected_binding=pointer.validation_binding,
+                        expected_artifact_id=pointer.artifact_id,
+                        candidate_roots=tuple(
+                            root / name for name in ("deep", "bayes", "datasets", "eda")
+                        ),
+                        exploratory=pointer.publication_mode == "exploratory",
+                    )
+                except (ValueError, OSError) as exc:
+                    raise SystemExit(
+                        f"invalid publication evidence for {pointer_path}: {exc}"
+                    ) from exc
             _log.info(
                 "pointer %s -> %s (%s)",
                 pointer.model_name,

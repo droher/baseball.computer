@@ -342,6 +342,7 @@ def test_predictive_mean_coverage_same_model_is_nominal() -> None:
         sd_col="re_value_sd",
     )
     assert res.coverage is not None
+    assert res.coverage_kind == "studentized_mean"
     assert 0.90 <= res.coverage <= 0.98
     assert res.in_band
     assert res.finding is None
@@ -351,7 +352,9 @@ def test_predictive_mean_coverage_shifted_collapses() -> None:
     est, real = _mean_predictive_frames(
         100, re_mean=0.5, re_sd=0.01, sample_sd=1.0, n_events=300, gen_seed=5
     )
-    shifted = real.with_columns((pl.col("held_out_mean") + 100.0).alias("held_out_mean"))
+    shifted = real.with_columns(
+        (pl.col("held_out_mean") + 100.0).alias("held_out_mean")
+    )
     res = compute_predictive_mean_coverage(
         est,
         shifted,
@@ -366,4 +369,4 @@ def test_predictive_mean_coverage_shifted_collapses() -> None:
     assert res.coverage == pytest.approx(0.0)
     assert not res.in_band
     assert res.finding is not None
-    assert res.finding.code == "predictive_coverage_out_of_band"
+    assert res.finding.code == "studentized_mean_coverage_out_of_band"
