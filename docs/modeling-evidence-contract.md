@@ -55,7 +55,7 @@ The [reconstruction benchmark](modeling-reconstruction-benchmark-2026-09-11.json
 
 Both also improve Brier score. The bootstrap holds the fitted TRAIN baseline fixed and resamples TEST games; it does not measure training-fit uncertainty. Full aggregate ECE is low, but the trajectory contextual baseline has slightly higher ECE than the marginal baseline despite better predictive scores. Calibration and discrimination should remain separate judgments.
 
-Season and result family are available in every inspected eligible inference cell for these targets. This establishes computability, not transport validity: the pre-1988 observed subset is selected, and games absent from acquired play-by-play are outside the frame. There is no head-to-head comparison against an existing Bayesian fit because those fits use a different holdout and training budget.
+Season and result family are available in every inspected eligible inference cell for these targets. This establishes computability, not transport validity: the pre-1988 observed subset is selected, and games absent from acquired play-by-play are outside the frame. There is no head-to-head comparison against an existing Bayesian fit because those fits use a different holdout and training budget. The subsequent [shared-split reference experiment](geometry-reference-results-2026-09-11.md) compares a new Bayesian variant on matched training events and documents a target-definition defect: the field named `location_side` actually supplies within-zone angle modifiers, including ambiguous `Default` values. Its scores here do not establish global field-side reconstruction.
 
 Regenerate after a smoke run, choosing separate output paths:
 
@@ -69,7 +69,7 @@ uv run --no-sync python scripts/modeling_reconstruction_benchmark.py \
   --checkpoint-log /private/tmp/reconstruction-full.log
 ```
 
-The next fitting decision is a geometry model without pretrained inputs on this same benchmark, with a frozen training budget and contextual comparator. Use a separate untouched outer holdout for final confirmation; fit all supervised stages strictly inside it. Before historical claims, add scorer/source-block and era masking with a declared target population. Before aggregate publication, generate likelihood-based posterior predictive draws and propagate within-inning and shared-data dependence. More deep pretraining and additional model families should wait for those comparisons.
+The no-pretraining geometry reference comparison is now complete: both targets pass numerical diagnostics but fail the frozen predictive criteria; trajectory also regresses on the pre-1988 observed slice. Retain the contextual baseline, correct and version the location target contract, and diagnose trajectory interactions within development data before another fit. Use a separate untouched outer holdout for final confirmation; fit all supervised stages strictly inside it. Before historical claims, add scorer/source-block and era masking with a declared target population. Before aggregate publication, generate likelihood-based posterior predictive draws and propagate within-inning and shared-data dependence. More deep pretraining and additional model families should wait for those comparisons.
 
 ## Verification
 

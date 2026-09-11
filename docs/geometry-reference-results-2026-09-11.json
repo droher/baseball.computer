@@ -1,0 +1,810 @@
+{
+  "run_id": "20260911-full-v1",
+  "artifact_root": "artifacts/statistical/backtests/geometry_reference/20260911-full-v1",
+  "status": "development_evidence",
+  "publication_mode": "research_only",
+  "transport": "unsupported",
+  "identification": "unsupported",
+  "protocol": {
+    "protocol_text": "# Shared-split geometry reference protocol\n\nFrozen before fitting on September 11, 2026. This is a development comparison on the already-inspected primary TEST partition, not untouched confirmation or evidence of historical MNAR identification.\n\n- Targets: location side and trajectory; recorded classes only, positive training weight, one event per target. Use the existing benchmark's Bunt remapping and exact primary TRAIN/TEST game split. No VALIDATE labels are used.\n- Fit budget: 100,000 TRAIN events per target, selected by SHA-256 of event key plus fixed seed, with event key as tie-breaker. Fit label and feature vocabularies on that selected TRAIN frame only.\n- Model: additive categorical logit, with global class intercept and terms for decade, result family, base state, outs, alignment regime, and batter hand. Intercepts have zero-sum Normal scale 1.5; feature effects have zero sums across both levels and classes and Normal scale 0.5. This is a regularized Bayesian reference in the existing geometry model family, with an explicit era term and removal of redundant additive parameter directions; it is not an exact refit of an existing artifact.\n- Exclude all pretrained representations, deep proposals, propensity estimates, and handler posterior inputs. Preserve missing recorded features as explicit categories; unseen TEST categories contribute the zero centered feature effect.\n- Fit the multinomial likelihood to counts aggregated over identical feature vectors. This has the same parameter-dependent likelihood as fitting the selected individual categorical observations. Conditional event independence remains a modeling assumption, including within games.\n- NUTS budget: four chains, 1,000 warmup and 1,000 saved draws per chain, target acceptance 0.95, maximum tree depth 12, seed 20260911. Smoke: 3,000 TRAIN events, up to 5,000 TEST events, two chains and 50 warmup/50 saved draws. Prior predictive checks precede posterior sampling. Sampling repair may depend on diagnostics, never on TEST performance.\n- Predict using the posterior mean of softmax probabilities, not softmax of mean coefficients. Score every original TEST event for each target; preserve event IDs, truth, and aligned probability vectors in Parquet.\n- Comparators: add-one marginal and decade \u00d7 result baseline on exactly the model's selected TRAIN events; additionally the original full-TRAIN decade \u00d7 result baseline. No TEST labels enter these fits.\n- Report log loss, multiclass Brier, classwise 15-bin ECE, reliability bins, and the pre-1988 observed-only slice. Paired 95% intervals resample TEST games 500 times, event-weighted with fitted TRAIN models fixed. They do not integrate training-sample uncertainty.\n- A useful matched-budget result requires positive lower confidence bounds for both log-loss and Brier improvement over the matched contextual baseline, ECE \u2264 0.05, no observed pre-1988 log-loss regression, R-hat \u2264 1.05, bulk and tail ESS \u2265 100, and zero divergences. Report the full-data comparator separately even if it changes the practical decision.\n- Freeze source extracts, selected training rows, full-TRAIN baseline counts, encoders, code hashes, package versions, priors, posterior draws, diagnostics, and scores under a new isolated research artifact directory. Never overwrite an existing run. No publication or production database writes.\n\nThe reference measures predictive performance on recorded events. Source/scorer effects, selection bias, causal effect identification, missing games, and historical transport are outside this experiment. A favorable result advances a candidate to historical masking tests; it does not authorize publication.\n\nImplementation references: [PyMC ZeroSumNormal](https://www.pymc.io/projects/docs/en/v5.7.0/api/distributions/generated/pymc.ZeroSumNormal.html) supports constraints across multiple axes; [PyMC Multinomial](https://www.pymc.io/projects/docs/en/v5.24.0/api/distributions/generated/pymc.Multinomial.html) supplies the aggregated categorical likelihood.\n",
+    "protocol_sha256": "aa94a6976dfa90af9e27ece4b927f39b2c3d0f8fcfc4e0ccffaf4105140321fb",
+    "seed": 20260911,
+    "smoke": false,
+    "targets": [
+      "location_side",
+      "trajectory"
+    ],
+    "packages": {
+      "numpy": "2.4.6",
+      "polars": "1.40.1",
+      "duckdb": "1.5.2",
+      "pymc": "5.25.1",
+      "arviz": "0.23.4",
+      "nutpie": "0.16.10"
+    },
+    "python": "3.13.5",
+    "implementation_hashes": {
+      "geometry_reference.py": "bbab0f4e94e0ffd03fdc56b04f72903e54f71ba11505d0e01aaffbaeefd76946",
+      "geometry_reference_model.py": "92e1ee59d25c5b0b4fd4adbf44d8964cbcba9bf4c5a8ec0125daf1e7ab919e52",
+      "geometry_reference_evaluation.py": "8d67e081a29e6b257f04c9f05c8243424ceed6aeb09bbf44709fec80092edd8a"
+    }
+  },
+  "targets": [
+    {
+      "target": "location_side",
+      "status": "development_evidence",
+      "created_at": "2026-09-11T13:46:08.599365+00:00",
+      "class_labels": [
+        "Default",
+        "Foul",
+        "FoulLine",
+        "Left",
+        "Middle",
+        "Right"
+      ],
+      "feature_levels": {
+        "era": [
+          "1910",
+          "1920",
+          "1930",
+          "1940",
+          "1950",
+          "1960",
+          "1970",
+          "1980",
+          "1990",
+          "2000",
+          "2010",
+          "2020"
+        ],
+        "result_family": [
+          "fielders_choice",
+          "hit",
+          "out_in_play",
+          "reached_on_error",
+          "sacrifice"
+        ],
+        "base_state_start": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "outs_start": [
+          "0",
+          "1",
+          "2"
+        ],
+        "alignment_regime": [
+          "full_shift_era",
+          "post_restriction",
+          "pre_shift_era",
+          "shift_growth_era"
+        ],
+        "batter_hand": [
+          "L",
+          "R",
+          "__MISSING__"
+        ]
+      },
+      "unseen_test_feature_rows": {
+        "era": 0,
+        "result_family": 0,
+        "base_state_start": 0,
+        "outs_start": 0,
+        "alignment_regime": 0,
+        "batter_hand": 0
+      },
+      "lineage": {
+        "target": "location_side",
+        "source_query": "SELECT event_key, game_id, season, primary_fold,\n        CASE WHEN geometry_dimension = 'trajectory'\nAND class IN ('FoulBunt', 'GroundBallBunt', 'LineDriveBunt', 'PopUpBunt', 'UnspecifiedBunt')\nTHEN 'Bunt' ELSE class END AS target_class,\n        CAST(CAST(FLOOR(season / 10) * 10 AS INTEGER) AS VARCHAR) AS era,\n        COALESCE(CAST(result_family AS VARCHAR), '__MISSING__') AS result_family, COALESCE(CAST(base_state_start AS VARCHAR), '__MISSING__') AS base_state_start, COALESCE(CAST(outs_start AS VARCHAR), '__MISSING__') AS outs_start, COALESCE(CAST(alignment_regime AS VARCHAR), '__MISSING__') AS alignment_regime, COALESCE(CAST(batter_hand AS VARCHAR), '__MISSING__') AS batter_hand\n        FROM main_models.model_input_geometry\n        WHERE geometry_dimension = 'location_side' AND is_observed_class\n        AND training_weight > 0 AND game_id IS NOT NULL\n        AND primary_fold IN ('TRAIN', 'TEST')",
+        "source_query_sha256": "290fefbac46ae5a88bdf509b01406abc9d831f18cf0d1dbc067b42038fc7071d",
+        "source_snapshot_labels": [
+          {
+            "source_snapshot_id": "dev"
+          }
+        ],
+        "full_populations": [
+          {
+            "primary_fold": "TEST",
+            "rows": 753742,
+            "games": 26260
+          },
+          {
+            "primary_fold": "TRAIN",
+            "rows": 3539235,
+            "games": 122385
+          }
+        ],
+        "selected_populations": [
+          {
+            "primary_fold": "TEST",
+            "rows": 753742,
+            "games": 26260
+          },
+          {
+            "primary_fold": "TRAIN",
+            "rows": 100000,
+            "games": 54103
+          }
+        ],
+        "requested_train_budget": 100000,
+        "train_test_game_overlap": 0,
+        "full_train_games_sha256": "4e769e44b6c0c82e11f729706d1df6aab867d8542b7fd131b7772caaf4a023ee",
+        "full_test_games_sha256": "c0f900376ae9bd652be03101bf5aaf42aa6210033440a1de1980068c612fae18",
+        "selected_train_games_sha256": "f7a99112acbbf3cdeee965edf255ea7bb2caa14bf764629c045ad16e9a415075",
+        "selected_test_games_sha256": "c0f900376ae9bd652be03101bf5aaf42aa6210033440a1de1980068c612fae18",
+        "inference_feature_missingness": [
+          {
+            "rows": 878050,
+            "result_family_null": 0,
+            "base_state_start_null": 0,
+            "outs_start_null": 0,
+            "alignment_regime_null": 0,
+            "batter_hand_null": 7189
+          }
+        ],
+        "snapshot_files": {
+          "train.parquet": "0f1992a2910043636b60f6c5b3d2c5b9f81b23826844174b1c959dc188d1af84",
+          "test.parquet": "6d919d468f950da8bc1fec7fa118cc90ddc369895c53f4c8af5abf151b0e12bb",
+          "full_train_counts.parquet": "81f9ad59384c87594d72df28b6417436dfdd17a00b6a511a828a190f7fb40bdb"
+        },
+        "learned_inputs": [],
+        "uses_validate_partition": false
+      },
+      "numerical_pass": true,
+      "publication_mode": "research_only",
+      "transport": "unsupported",
+      "identification": "unsupported",
+      "artifact_files": {
+        "test_predictions.parquet": "fdeba9ab253ba91c8a6b9ece837d53df60eac959b4f7adb4a10c48abe7fbb24f",
+        "diagnostics.json": "568ed4a8254e8878cbaa6f514bb9143c0bd9b229b68a49056b19d78a12ef560a",
+        "fit_config.json": "ecdc563b85ee535466262b1b4f75c1dd045fa437c11f1c7d5152f2af80ac70c4",
+        "posterior.nc": "cdce1d7f3dd344d06ae03a2df8517afb85db2731c0a71dee45f7827653b021fe",
+        "prior_check.json": "4260123467db2fb372202233436e51d19263295acb5d29b06177fb7125d8045b",
+        "sampling.log": "69e2c0012ccf1cf9228cf669c888185c2120ffb8828e66a6f3a51e89d3c3aedd",
+        "data/train.parquet": "0f1992a2910043636b60f6c5b3d2c5b9f81b23826844174b1c959dc188d1af84",
+        "data/test.parquet": "6d919d468f950da8bc1fec7fa118cc90ddc369895c53f4c8af5abf151b0e12bb",
+        "data/full_train_counts.parquet": "81f9ad59384c87594d72df28b6417436dfdd17a00b6a511a828a190f7fb40bdb",
+        "data/lineage.json": "ff52d43dcb8c93b1d5bb8817b9a13dd964b50bcc6dcacb0cc9f6e190d79b055d"
+      },
+      "diagnostics": {
+        "rhat_max": 1.0033642609006745,
+        "ess_bulk_min": 1216.6325266161364,
+        "ess_tail_min": 1698.4972884105998,
+        "group_level_rhat_max": 1.0033642609006745,
+        "group_level_ess_bulk_min": 1216.6325266161364,
+        "divergences": 0,
+        "total_draws": 4000,
+        "group_level_max_elements": 512
+      },
+      "evaluation": {
+        "status": "development_evidence",
+        "class_labels": [
+          "Default",
+          "Foul",
+          "FoulLine",
+          "Left",
+          "Middle",
+          "Right"
+        ],
+        "row_count": 753742,
+        "game_count": 26260,
+        "seed": 20260911,
+        "bootstrap_repetitions": 500,
+        "bootstrap_policy": "resample held-out games with replacement while all TRAIN fits remain fixed",
+        "historical_slice_policy": "pre-1988 directly observed labels only; no historical transport or MNAR identification claim",
+        "metrics": {
+          "overall": {
+            "model": {
+              "row_count": 753742,
+              "log_loss": 0.9884861269362625,
+              "brier": 0.47164857911119723,
+              "classwise_ece_15_bin": 0.0010492936215318748
+            },
+            "budget_marginal": {
+              "row_count": 753742,
+              "log_loss": 1.0522105920797553,
+              "brier": 0.48775116138033586,
+              "classwise_ece_15_bin": 0.0006813614556843174
+            },
+            "budget_contextual": {
+              "row_count": 753742,
+              "log_loss": 0.9885160101442463,
+              "brier": 0.47169971077138095,
+              "classwise_ece_15_bin": 0.0009960751506478223
+            },
+            "full_contextual": {
+              "row_count": 753742,
+              "log_loss": 0.9866768401014254,
+              "brier": 0.47131659307381785,
+              "classwise_ece_15_bin": 0.000558164555094592
+            }
+          },
+          "pre_1988_observed_only": {
+            "model": {
+              "row_count": 59759,
+              "log_loss": 0.3149646157690008,
+              "brier": 0.13757510029501982,
+              "classwise_ece_15_bin": 0.005633427954551407
+            },
+            "budget_marginal": {
+              "row_count": 59759,
+              "log_loss": 0.5243026480008272,
+              "brier": 0.2052630915072275,
+              "classwise_ece_15_bin": 0.07633072044635641
+            },
+            "budget_contextual": {
+              "row_count": 59759,
+              "log_loss": 0.31905571755717976,
+              "brier": 0.13999487480106748,
+              "classwise_ece_15_bin": 0.009755621641684819
+            },
+            "full_contextual": {
+              "row_count": 59759,
+              "log_loss": 0.30482998786901694,
+              "brier": 0.13649736351722835,
+              "classwise_ece_15_bin": 0.0037493879092380202
+            }
+          }
+        },
+        "paired_game_bootstrap": [
+          {
+            "slice": "overall",
+            "model": "model",
+            "comparator": "budget_marginal",
+            "cluster_unit": "game_id",
+            "game_count": 26260,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              0.06275662756117086,
+              0.06474406314417319
+            ],
+            "brier_gain_ci95": [
+              0.015816068728713505,
+              0.016414279580097526
+            ]
+          },
+          {
+            "slice": "overall",
+            "model": "model",
+            "comparator": "budget_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 26260,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.000135998457956619,
+              0.00019788474060696937
+            ],
+            "brier_gain_ci95": [
+              5.9809079140562255e-06,
+              0.00010101108271324642
+            ]
+          },
+          {
+            "slice": "overall",
+            "model": "model",
+            "comparator": "full_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 26260,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.0019527235994766733,
+              -0.0016736806607000436
+            ],
+            "brier_gain_ci95": [
+              -0.0003744981891465155,
+              -0.00029319803681635156
+            ]
+          },
+          {
+            "slice": "pre_1988_observed_only",
+            "model": "model",
+            "comparator": "budget_marginal",
+            "cluster_unit": "game_id",
+            "game_count": 12997,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              0.20567481740626156,
+              0.21288318406007292
+            ],
+            "brier_gain_ci95": [
+              0.06600156209532482,
+              0.06921119781880038
+            ]
+          },
+          {
+            "slice": "pre_1988_observed_only",
+            "model": "model",
+            "comparator": "budget_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 12997,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              0.0028317831359195005,
+              0.0053281962544394455
+            ],
+            "brier_gain_ci95": [
+              0.0021027977200798243,
+              0.002720319403342407
+            ]
+          },
+          {
+            "slice": "pre_1988_observed_only",
+            "model": "model",
+            "comparator": "full_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 12997,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.011211045195253897,
+              -0.009069919671049963
+            ],
+            "brier_gain_ci95": [
+              -0.0012514155943657206,
+              -0.0009170773107650388
+            ]
+          }
+        ],
+        "decision_flags": {
+          "log_loss_improvement_ci_lower_above_zero_vs_budget_contextual": false,
+          "brier_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+          "model_classwise_ece_at_most_0_05": true,
+          "no_pre_1988_observed_only_log_loss_regression": true,
+          "passed": false
+        }
+      },
+      "protocol_pass": false,
+      "verification": {
+        "all_recorded_file_hashes_match": true,
+        "archived_implementation_hashes_match": true,
+        "prediction_truth_alignment": true,
+        "train_test_game_overlap": 0,
+        "recomputed_log_loss_matches": true,
+        "full_contextual_matches_previous_benchmark": true,
+        "max_probability_sum_deviation": 4.6629367034256575e-15,
+        "test_class_counts": [
+          {
+            "target_class": "Default",
+            "len": 526835
+          },
+          {
+            "target_class": "Foul",
+            "len": 15401
+          },
+          {
+            "target_class": "FoulLine",
+            "len": 47247
+          },
+          {
+            "target_class": "Left",
+            "len": 38392
+          },
+          {
+            "target_class": "Middle",
+            "len": 91258
+          },
+          {
+            "target_class": "Right",
+            "len": 34609
+          }
+        ]
+      },
+      "report_sha256": "8d345c48614c12c95f8dd47dc2225e59d42b67c8da354cddb4b00f02b4506e43"
+    },
+    {
+      "target": "trajectory",
+      "status": "development_evidence",
+      "created_at": "2026-09-11T13:53:08.152929+00:00",
+      "class_labels": [
+        "Bunt",
+        "Fly",
+        "GroundBall",
+        "LineDrive",
+        "PopUp"
+      ],
+      "feature_levels": {
+        "era": [
+          "1910",
+          "1920",
+          "1930",
+          "1940",
+          "1950",
+          "1960",
+          "1970",
+          "1980",
+          "1990",
+          "2000",
+          "2010",
+          "2020"
+        ],
+        "result_family": [
+          "fielders_choice",
+          "hit",
+          "out_in_play",
+          "reached_on_error",
+          "sacrifice"
+        ],
+        "base_state_start": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "outs_start": [
+          "0",
+          "1",
+          "2"
+        ],
+        "alignment_regime": [
+          "full_shift_era",
+          "post_restriction",
+          "pre_shift_era",
+          "shift_growth_era"
+        ],
+        "batter_hand": [
+          "L",
+          "R",
+          "__MISSING__"
+        ]
+      },
+      "unseen_test_feature_rows": {
+        "era": 0,
+        "result_family": 0,
+        "base_state_start": 0,
+        "outs_start": 0,
+        "alignment_regime": 0,
+        "batter_hand": 0
+      },
+      "lineage": {
+        "target": "trajectory",
+        "source_query": "SELECT event_key, game_id, season, primary_fold,\n        CASE WHEN geometry_dimension = 'trajectory'\nAND class IN ('FoulBunt', 'GroundBallBunt', 'LineDriveBunt', 'PopUpBunt', 'UnspecifiedBunt')\nTHEN 'Bunt' ELSE class END AS target_class,\n        CAST(CAST(FLOOR(season / 10) * 10 AS INTEGER) AS VARCHAR) AS era,\n        COALESCE(CAST(result_family AS VARCHAR), '__MISSING__') AS result_family, COALESCE(CAST(base_state_start AS VARCHAR), '__MISSING__') AS base_state_start, COALESCE(CAST(outs_start AS VARCHAR), '__MISSING__') AS outs_start, COALESCE(CAST(alignment_regime AS VARCHAR), '__MISSING__') AS alignment_regime, COALESCE(CAST(batter_hand AS VARCHAR), '__MISSING__') AS batter_hand\n        FROM main_models.model_input_geometry\n        WHERE geometry_dimension = 'trajectory' AND is_observed_class\n        AND training_weight > 0 AND game_id IS NOT NULL\n        AND primary_fold IN ('TRAIN', 'TEST')",
+        "source_query_sha256": "4591a06e48b10693904472ede560110c711ea0c57f1f69d5fdbcc4d91f5b9688",
+        "source_snapshot_labels": [
+          {
+            "source_snapshot_id": "dev"
+          }
+        ],
+        "full_populations": [
+          {
+            "primary_fold": "TEST",
+            "rows": 922812,
+            "games": 30816
+          },
+          {
+            "primary_fold": "TRAIN",
+            "rows": 4325736,
+            "games": 143670
+          }
+        ],
+        "selected_populations": [
+          {
+            "primary_fold": "TEST",
+            "rows": 922812,
+            "games": 30816
+          },
+          {
+            "primary_fold": "TRAIN",
+            "rows": 100000,
+            "games": 62928
+          }
+        ],
+        "requested_train_budget": 100000,
+        "train_test_game_overlap": 0,
+        "full_train_games_sha256": "ca28c6dd5274b404552131ec491fb8b17032bcacb86cb29b15b7fd85fdcc84e4",
+        "full_test_games_sha256": "345a6dd5b25c5e4bbfe3c62e2818d932d241d7c4e15eb33cc78cc988e7704440",
+        "selected_train_games_sha256": "29a7cac9a451e37f833ed6355e717f11a7b5dc0ef5fbc0542816e0763359f7cb",
+        "selected_test_games_sha256": "345a6dd5b25c5e4bbfe3c62e2818d932d241d7c4e15eb33cc78cc988e7704440",
+        "inference_feature_missingness": [
+          {
+            "rows": 3992018,
+            "result_family_null": 0,
+            "base_state_start_null": 0,
+            "outs_start_null": 0,
+            "alignment_regime_null": 0,
+            "batter_hand_null": 7959
+          }
+        ],
+        "snapshot_files": {
+          "train.parquet": "19a3d255e71972c8d791be9e834a9981e320ae0f73bc4781d631da8f50eabb0e",
+          "test.parquet": "582e4851abbc27007630f288b6cd01aca7d8b7606b2d5cfb45caab9e7e2aaba1",
+          "full_train_counts.parquet": "49bccad5a3b9620b24413c4aaeb773bfd250998f64a83c49c54f206982df849a"
+        },
+        "learned_inputs": [],
+        "uses_validate_partition": false
+      },
+      "numerical_pass": true,
+      "publication_mode": "research_only",
+      "transport": "unsupported",
+      "identification": "unsupported",
+      "artifact_files": {
+        "test_predictions.parquet": "f974921b24198f0b62efee31213b8726b471eb122f2c731e6013a6d438992f61",
+        "diagnostics.json": "9d055bba16dbd6225a62762c248ee59d086badc2b31eae3e98e48e213379e504",
+        "fit_config.json": "a0e66fcc47df0b484dcfc47ffe63f29f73cba44b38cbd4ef928ea1218381a566",
+        "posterior.nc": "656ba522e9992815e81db317d7079b4e6aef8d0177a77708da0c452a4712b6f0",
+        "prior_check.json": "3fc2dccda4da7e93a119eea8635e905a72c84936c9612f1a81da845f94d2bc53",
+        "sampling.log": "8b8cc27cc9e38fec5c56c19941e2a573862c8e5072f0900937c5d10ca56e741a",
+        "data/train.parquet": "19a3d255e71972c8d791be9e834a9981e320ae0f73bc4781d631da8f50eabb0e",
+        "data/test.parquet": "582e4851abbc27007630f288b6cd01aca7d8b7606b2d5cfb45caab9e7e2aaba1",
+        "data/full_train_counts.parquet": "49bccad5a3b9620b24413c4aaeb773bfd250998f64a83c49c54f206982df849a",
+        "data/lineage.json": "4e18b8e26542b49ce6cc6064bc4b22aba9072e3d75fb9e88401c382031fe7981"
+      },
+      "diagnostics": {
+        "rhat_max": 1.0058370756424295,
+        "ess_bulk_min": 1172.6047398539602,
+        "ess_tail_min": 1622.4291189984335,
+        "group_level_rhat_max": 1.0058370756424295,
+        "group_level_ess_bulk_min": 1172.6047398539602,
+        "divergences": 0,
+        "total_draws": 4000,
+        "group_level_max_elements": 512
+      },
+      "evaluation": {
+        "status": "development_evidence",
+        "class_labels": [
+          "Bunt",
+          "Fly",
+          "GroundBall",
+          "LineDrive",
+          "PopUp"
+        ],
+        "row_count": 922812,
+        "game_count": 30816,
+        "seed": 20260911,
+        "bootstrap_repetitions": 500,
+        "bootstrap_policy": "resample held-out games with replacement while all TRAIN fits remain fixed",
+        "historical_slice_policy": "pre-1988 directly observed labels only; no historical transport or MNAR identification claim",
+        "metrics": {
+          "overall": {
+            "model": {
+              "row_count": 922812,
+              "log_loss": 1.2026183746861947,
+              "brier": 0.6518522662920754,
+              "classwise_ece_15_bin": 0.011677890598628544
+            },
+            "budget_marginal": {
+              "row_count": 922812,
+              "log_loss": 1.3547130621284726,
+              "brier": 0.7086107123034893,
+              "classwise_ece_15_bin": 0.002006609308267306
+            },
+            "budget_contextual": {
+              "row_count": 922812,
+              "log_loss": 1.2024058681367475,
+              "brier": 0.6527195124921147,
+              "classwise_ece_15_bin": 0.0025528777329280206
+            },
+            "full_contextual": {
+              "row_count": 922812,
+              "log_loss": 1.20112378874521,
+              "brier": 0.6523618966912548,
+              "classwise_ece_15_bin": 0.0011484101988233067
+            }
+          },
+          "pre_1988_observed_only": {
+            "model": {
+              "row_count": 211340,
+              "log_loss": 1.3859313755389573,
+              "brier": 0.7189863931949215,
+              "classwise_ece_15_bin": 0.03450084957758233
+            },
+            "budget_marginal": {
+              "row_count": 211340,
+              "log_loss": 1.5500898034270427,
+              "brier": 0.7754124328879822,
+              "classwise_ece_15_bin": 0.050651655929136466
+            },
+            "budget_contextual": {
+              "row_count": 211340,
+              "log_loss": 1.3665568639274865,
+              "brier": 0.7092598323805409,
+              "classwise_ece_15_bin": 0.007076254011810277
+            },
+            "full_contextual": {
+              "row_count": 211340,
+              "log_loss": 1.3642774853095772,
+              "brier": 0.7084191103269246,
+              "classwise_ece_15_bin": 0.005687867511812095
+            }
+          }
+        },
+        "paired_game_bootstrap": [
+          {
+            "slice": "overall",
+            "model": "model",
+            "comparator": "budget_marginal",
+            "cluster_unit": "game_id",
+            "game_count": 30816,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              0.1507861170277521,
+              0.1534398207494286
+            ],
+            "brier_gain_ci95": [
+              0.056149983152376494,
+              0.05736798592474741
+            ]
+          },
+          {
+            "slice": "overall",
+            "model": "model",
+            "comparator": "budget_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 30816,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.0007476641161822147,
+              0.0003602324911414874
+            ],
+            "brier_gain_ci95": [
+              0.000595106560966226,
+              0.0011595778028196915
+            ]
+          },
+          {
+            "slice": "overall",
+            "model": "model",
+            "comparator": "full_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 30816,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.001981694106525775,
+              -0.0009390955690414053
+            ],
+            "brier_gain_ci95": [
+              0.00023595196253977434,
+              0.000775095329444368
+            ]
+          },
+          {
+            "slice": "pre_1988_observed_only",
+            "model": "model",
+            "comparator": "budget_marginal",
+            "cluster_unit": "game_id",
+            "game_count": 17540,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              0.15946373387308427,
+              0.1688139594190026
+            ],
+            "brier_gain_ci95": [
+              0.05450916112769015,
+              0.05829279217727044
+            ]
+          },
+          {
+            "slice": "pre_1988_observed_only",
+            "model": "model",
+            "comparator": "budget_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 17540,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.0214460720358524,
+              -0.01769090509829589
+            ],
+            "brier_gain_ci95": [
+              -0.01064703424486035,
+              -0.00894602239787719
+            ]
+          },
+          {
+            "slice": "pre_1988_observed_only",
+            "model": "model",
+            "comparator": "full_contextual",
+            "cluster_unit": "game_id",
+            "game_count": 17540,
+            "repetitions": 500,
+            "train_fit_during_bootstrap": "fixed",
+            "log_loss_gain_ci95": [
+              -0.023722333038543746,
+              -0.01979651224426349
+            ],
+            "brier_gain_ci95": [
+              -0.011555669603155688,
+              -0.009643287747115167
+            ]
+          }
+        ],
+        "decision_flags": {
+          "log_loss_improvement_ci_lower_above_zero_vs_budget_contextual": false,
+          "brier_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+          "model_classwise_ece_at_most_0_05": true,
+          "no_pre_1988_observed_only_log_loss_regression": false,
+          "passed": false
+        }
+      },
+      "protocol_pass": false,
+      "verification": {
+        "all_recorded_file_hashes_match": true,
+        "archived_implementation_hashes_match": true,
+        "prediction_truth_alignment": true,
+        "train_test_game_overlap": 0,
+        "recomputed_log_loss_matches": true,
+        "full_contextual_matches_previous_benchmark": true,
+        "max_probability_sum_deviation": 4.884981308350689e-15,
+        "test_class_counts": [
+          {
+            "target_class": "Bunt",
+            "len": 23624
+          },
+          {
+            "target_class": "Fly",
+            "len": 243584
+          },
+          {
+            "target_class": "GroundBall",
+            "len": 379720
+          },
+          {
+            "target_class": "LineDrive",
+            "len": 192858
+          },
+          {
+            "target_class": "PopUp",
+            "len": 83026
+          }
+        ]
+      },
+      "report_sha256": "cecc07c3a000ea81dd7a619958614d417b518cf6989f9f9495079fbd89db2388"
+    }
+  ],
+  "executed_source_note": "The implementation archive matches the hashes recorded before full fitting. Subsequent working-source changes add reporting of combined protocol_pass, automatic implementation archiving, and evaluator typing casts; they do not change fitted predictions. Original executed reports and hashes are preserved. The combined verdict here is derived from numerical_pass AND evaluation.decision_flags.passed.",
+  "source_flag_check": {
+    "scope": "is_observed_class AND training_weight > 0 AND primary_fold IN (TRAIN, TEST)",
+    "rows": [
+      {
+        "target": "location_side",
+        "observed_status": "observed",
+        "data_error_risk": "none",
+        "model_input_eligible": true,
+        "rows": 4292977
+      },
+      {
+        "target": "trajectory",
+        "observed_status": "observed",
+        "data_error_risk": "none",
+        "model_input_eligible": true,
+        "rows": 5248548
+      }
+    ],
+    "limitation": "Geometry has no mapped source-error field in the current ledger, so none is not evidence of error-free labels."
+  },
+  "target_semantics": {
+    "location_side": {
+      "measured_quantity": "recorded within-general-location angle modifier",
+      "global_field_side_validity": "failed",
+      "ambiguous_default_test_count": 526835,
+      "test_count": 753742,
+      "evidence": [
+        "bc/models/intermediate/coverage/event_observation_geometry.sql:120",
+        "bc/models/intermediate/event_level/calc_batted_ball_type.sql:98",
+        "bc/models/doc_global_cols.md:315"
+      ],
+      "action": "Correct and version observed global-side truth separately from angle modifiers and fielder-derived side before refitting."
+    },
+    "trajectory": {
+      "location_angle_mismatch_applies": false
+    }
+  }
+}
