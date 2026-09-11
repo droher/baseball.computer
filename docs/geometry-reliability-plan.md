@@ -27,6 +27,8 @@ The existing hierarchy is a recorded-label control, not a solution to standardiz
 
 ## Current implementation step
 
+The airborne regime posterior now has a [frozen development protocol](geometry-air-regime-posterior-protocol.md) and [passing computational recovery checks](geometry-air-regime-computation-2026-09-11.md). This replaces fixed smoothing with shared posterior uncertainty within recorded-label/result cells and between represented recording regimes. Real-data predictive acceptance, aggregate calibration, and the broader historical reliability gates remain outstanding.
+
 The exchangeable hierarchical control with persistent result effects is implemented and tested. Its full side results reject the claim that pooling alone fixes historical reconstruction. The [handler-clue provenance diagnostic](geometry-side-clue-provenance-2026-09-11.md) also rejects a refit that simply adds fielder fields: all 4,279,727 derived-side rows already use a known batted-to fielder, while none of the 615,501 naturally unknown rows has one. Only nine unknown rows have any known position elsewhere in a fielding chain. These are correlated outputs of the same play record and must be jointly removed under source-block masking. A new side model requires an independent anchor or an explicit, testable observation model.
 
 For trajectory, use the modern paired fitting data to develop a standardized reference model under the airborne-only contract, with explicit prediction-time broad constraints and realistic feature masking before modern evaluation. Distinguish translation of an available recorded subtype from reconstruction with that subtype absent; success on one task does not validate the other.

@@ -2,6 +2,8 @@
 
 This design follows the failed [pooled development experiment](geometry-air-development-results-2026-09-11.md). It specifies the next scientific questions; it is not an executed model or an independent evaluation protocol. The 121 deferred angle outcomes and the historical confirmation reserve remain sealed.
 
+The next revision now has a separate [frozen development protocol](geometry-air-regime-posterior-protocol.md) and [computational validation](geometry-air-regime-computation-2026-09-11.md). Its hierarchical posterior shares translation uncertainty within cells and between represented regimes. Simulation recovery passes its necessary screen; real-data predictive acceptance remains outstanding.
+
 ## Quantities to keep separate
 
 For each documented batted ball, retain the original source classification, its broad Ground/Air grouping, the standardized reference category, and the provenance of the numerical measurement used to construct that reference. The [airborne target contract](geometry-air-standard-target-contract.md) remains authoritative: preserve known Ground/Air, standardize airborne subtypes, and retain bunt separately.
