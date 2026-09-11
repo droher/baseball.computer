@@ -4,6 +4,8 @@ Reviewed code: `426b287b6db101dbfea8a88733b3a14bb719d5d3`. Local artifacts and `
 
 Subsequent work: the [evidence contract](modeling-evidence-contract.md) and [shared-split reference comparison](geometry-reference-results-2026-09-11.md) are complete. The latter found an additional target-definition defect: observed `location_side` labels are local angle modifiers, including ambiguous `Default` values. Earlier location scores below measure that recorded field, not global field direction. Correcting this contract precedes further side fitting; trajectory's reference also failed the frozen predictive criteria and regressed on its historical observed subset.
 
+The [corrected geometry refits](geometry-corrected-refits-2026-09-11.md) subsequently repaired that target and completed passing research comparisons for global side and an era-by-result trajectory interaction. Historical masking, calibration, and aggregate uncertainty remain the next evidence gaps; the audit findings below retain their original review scope.
+
 ## Judgment
 
 Keep the modeling system, but change what earns confidence. The project has useful probability estimates, a sound separation between recorded facts and estimates, and substantial infrastructure for offline fitting. Its present evidence is strongest for prediction on held-out recorded games. That evidence does not establish accurate reconstruction of unrecorded historical events, identification of individual effects, or calibrated uncertainty for downstream quantities.

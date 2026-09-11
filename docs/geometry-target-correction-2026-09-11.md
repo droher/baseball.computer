@@ -2,6 +2,8 @@
 
 September 11, 2026. The location target correction is implemented and verified against real source data. A separate TRAIN-only trajectory experiment supports testing decade × result interactions. Production tables and published artifacts remain unchanged; this work does not claim a new validated posterior.
 
+Subsequent work: [corrected geometry refits](geometry-corrected-refits-2026-09-11.md) completed isolated SQLMesh materialization and passing development comparisons for corrected side and the trajectory interaction. The experiment and verification descriptions below record the earlier correction stage.
+
 ## Location contract
 
 The ledger now distinguishes three quantities:

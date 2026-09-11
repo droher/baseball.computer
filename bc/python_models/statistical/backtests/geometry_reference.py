@@ -5,6 +5,8 @@ import hashlib
 import json
 import logging
 import platform
+import re
+import subprocess
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
@@ -69,14 +71,17 @@ def freeze_data(
     *,
     smoke: bool,
     seed: int,
+    ledger_schema: str = "main_models",
 ) -> dict[str, object]:
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", ledger_schema) is None:
+        raise ValueError("ledger schema must be a SQL identifier")
+    table = f"{ledger_schema}.model_input_geometry"
     if target not in TARGETS:
         raise ValueError(f"unsupported target: {target}")
     if target == "location_side":
         require_geometry_relation(
             con,
-            "(SELECT * FROM main_models.model_input_geometry "
-            "WHERE primary_fold IN ('TRAIN', 'TEST'))",
+            f"(SELECT * FROM {table} WHERE primary_fold IN ('TRAIN', 'TEST'))",
             dimension_column="geometry_dimension",
             check_classes=True,
         )
@@ -89,7 +94,7 @@ def freeze_data(
         {LABEL_SQL} AS target_class,
         CAST(CAST(FLOOR(season / 10) * 10 AS INTEGER) AS VARCHAR) AS era,
         {projection}
-        FROM main_models.model_input_geometry
+        FROM {table}
         WHERE geometry_dimension = '{target}' AND is_observed_class
         AND training_weight > 0 AND game_id IS NOT NULL
         AND primary_fold IN ('TRAIN', 'TEST')"""
@@ -149,7 +154,7 @@ def freeze_data(
     )
     coverage = rows(
         con,
-        f"SELECT COUNT(*) AS rows, {coverage_projection} FROM main_models.model_input_geometry WHERE geometry_dimension='{target}' AND NOT is_observed_class AND training_weight>0 AND observed_status IN ('missing','unknown_code')",
+        f"SELECT COUNT(*) AS rows, {coverage_projection} FROM {table} WHERE geometry_dimension='{target}' AND NOT is_observed_class AND training_weight>0 AND observed_status IN ('missing','unknown_code')",
     )
     record: dict[str, object] = {
         "target": target,
@@ -157,7 +162,7 @@ def freeze_data(
         "source_query_sha256": hashlib.sha256(query.encode()).hexdigest(),
         "source_snapshot_labels": rows(
             con,
-            f"SELECT DISTINCT source_snapshot_id FROM main_models.model_input_geometry WHERE geometry_dimension='{target}'",
+            f"SELECT DISTINCT source_snapshot_id FROM {table} WHERE geometry_dimension='{target}'",
         ),
         "full_populations": populations,
         "selected_populations": selected,
@@ -246,7 +251,13 @@ def make_prediction_frame(
 
 
 def run_target(
-    con: duckdb.DuckDBPyConnection, target: str, root: Path, *, smoke: bool, seed: int
+    con: duckdb.DuckDBPyConnection,
+    target: str,
+    root: Path,
+    *,
+    smoke: bool,
+    seed: int,
+    ledger_schema: str = "main_models",
 ) -> dict[str, object]:
     from python_models.statistical.backtests.geometry_reference_model import (
         fit_reference,
@@ -259,7 +270,14 @@ def run_target(
     output_dir = root / target
     if output_dir.exists():
         raise FileExistsError(f"refusing to overwrite {output_dir}")
-    lineage = freeze_data(con, target, output_dir / "data", smoke=smoke, seed=seed)
+    lineage = freeze_data(
+        con,
+        target,
+        output_dir / "data",
+        smoke=smoke,
+        seed=seed,
+        ledger_schema=ledger_schema,
+    )
     train = pl.read_parquet(output_dir / "data" / "train.parquet")
     test = pl.read_parquet(output_dir / "data" / "test.parquet")
     full_counts = pl.read_parquet(output_dir / "data" / "full_train_counts.parquet")
@@ -326,6 +344,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", type=Path, default=Path("bc.db"))
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--ledger-schema", default="main_models")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--target", choices=TARGETS, action="append")
     parser.add_argument("--seed", type=int, default=SEED)
@@ -343,6 +362,13 @@ def main() -> int:
         / "geometry-reference-global-side-protocol.md"
     )
     protocol: dict[str, object] = {
+        "source_database": str(cast(Path, args.db).resolve()),
+        "ledger_schema": args.ledger_schema,
+        "repository_revision": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+            cwd=Path(__file__).resolve().parents[4],
+        ).strip(),
         "geometry_target_contract": GEOMETRY_TARGET_CONTRACT,
         "protocol_text": protocol_path.read_text(),
         "protocol_sha256": file_digest(protocol_path),
@@ -378,7 +404,14 @@ def main() -> int:
     con = duckdb.connect(str(args.db), read_only=True)
     try:
         reports = [
-            run_target(con, target, root, smoke=bool(args.smoke), seed=int(args.seed))
+            run_target(
+                con,
+                target,
+                root,
+                smoke=bool(args.smoke),
+                seed=int(args.seed),
+                ledger_schema=str(args.ledger_schema),
+            )
             for target in args.target or TARGETS
         ]
         write_json(root / "results.json", {"protocol": protocol, "targets": reports})

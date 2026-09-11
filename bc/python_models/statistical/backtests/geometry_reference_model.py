@@ -37,6 +37,7 @@ class ReferenceTrainingData(NamedTuple):
     feature_codes: dict[str, IntArray]
     feature_levels: dict[str, tuple[str, ...]]
     class_labels: tuple[str, ...]
+    feature_columns: tuple[str, ...]
 
 
 def _require_columns(frame: pl.DataFrame, columns: tuple[str, ...]) -> None:
@@ -52,8 +53,14 @@ def _require_columns(frame: pl.DataFrame, columns: tuple[str, ...]) -> None:
             )
 
 
-def _prepare_training_data(train: pl.DataFrame) -> ReferenceTrainingData:
-    _require_columns(train, (*FEATURE_COLUMNS, TARGET_COLUMN))
+def _prepare_training_data(
+    train: pl.DataFrame, *, feature_columns: tuple[str, ...] = FEATURE_COLUMNS
+) -> ReferenceTrainingData:
+    if not feature_columns or len(set(feature_columns)) != len(feature_columns):
+        raise ValueError("feature_columns must be non-empty and unique")
+    if TARGET_COLUMN in feature_columns:
+        raise ValueError(f"{TARGET_COLUMN!r} cannot be a feature column")
+    _require_columns(train, (*feature_columns, TARGET_COLUMN))
     if train.height == 0:
         raise ValueError("training frame is empty")
 
@@ -68,22 +75,22 @@ def _prepare_training_data(train: pl.DataFrame) -> ReferenceTrainingData:
         column: tuple(
             sorted(str(value) for value in train.get_column(column).unique().to_list())
         )
-        for column in FEATURE_COLUMNS
+        for column in feature_columns
     }
 
     grouped = (
-        train.group_by([*FEATURE_COLUMNS, TARGET_COLUMN], maintain_order=False)
+        train.group_by([*feature_columns, TARGET_COLUMN], maintain_order=False)
         .len(name="count")
-        .sort([*FEATURE_COLUMNS, TARGET_COLUMN])
+        .sort([*feature_columns, TARGET_COLUMN])
     )
-    cell_rows = grouped.select(FEATURE_COLUMNS).unique(maintain_order=True).rows()
+    cell_rows = grouped.select(feature_columns).unique(maintain_order=True).rows()
     cell_index = {
         tuple(str(value) for value in row): i for i, row in enumerate(cell_rows)
     }
     class_index = {label: i for i, label in enumerate(class_labels)}
     counts = np.zeros((len(cell_rows), len(class_labels)), dtype=np.int64)
     for row in grouped.iter_rows(named=True):
-        key = tuple(str(row[column]) for column in FEATURE_COLUMNS)
+        key = tuple(str(row[column]) for column in feature_columns)
         counts[cell_index[key], class_index[str(row[TARGET_COLUMN])]] = int(
             row["count"]
         )
@@ -91,7 +98,7 @@ def _prepare_training_data(train: pl.DataFrame) -> ReferenceTrainingData:
         raise AssertionError("aggregated counts do not conserve training rows")
 
     feature_codes: dict[str, IntArray] = {}
-    for position, column in enumerate(FEATURE_COLUMNS):
+    for position, column in enumerate(feature_columns):
         mapping = {level: i for i, level in enumerate(feature_levels[column])}
         feature_codes[column] = np.asarray(
             [mapping[str(row[position])] for row in cell_rows], dtype=np.int64
@@ -101,6 +108,7 @@ def _prepare_training_data(train: pl.DataFrame) -> ReferenceTrainingData:
         feature_codes=feature_codes,
         feature_levels=feature_levels,
         class_labels=class_labels,
+        feature_columns=feature_columns,
     )
 
 
@@ -117,7 +125,7 @@ def _build_reference_model(
     with pm.Model(coords=coords) as model:
         alpha = pm.ZeroSumNormal("alpha_class", sigma=1.5, dims="class")
         eta = alpha[None, :]
-        for column in FEATURE_COLUMNS:
+        for column in data.feature_columns:
             levels = data.feature_levels[column]
             if len(levels) <= 1:
                 continue
@@ -217,8 +225,10 @@ def fit_reference(
     output_dir: Path,
     smoke: bool,
     seed: int = 20260911,
+    feature_columns: tuple[str, ...] = FEATURE_COLUMNS,
+    sampling_config: SamplingConfig | None = None,
 ) -> tuple[az.InferenceData, dict[str, tuple[str, ...]], tuple[str, ...]]:
-    data = _prepare_training_data(train)
+    data = _prepare_training_data(train, feature_columns=feature_columns)
     output_dir.mkdir(parents=True, exist_ok=True)
     posterior_path = output_dir / "posterior.nc"
     prior_check_path = output_dir / "prior_check.json"
@@ -231,12 +241,16 @@ def fit_reference(
     prior_check_path.write_text(
         json.dumps(prior_payload, indent=2, sort_keys=True), encoding="utf-8"
     )
-    sampler = _sampling_config(smoke=smoke, seed=seed)
+    sampler = (
+        _sampling_config(smoke=smoke, seed=seed)
+        if sampling_config is None
+        else sampling_config
+    )
     fit_config_path.write_text(
         json.dumps(
             {
                 "class_labels": list(data.class_labels),
-                "feature_columns": list(FEATURE_COLUMNS),
+                "feature_columns": list(data.feature_columns),
                 "feature_levels": {
                     column: list(levels)
                     for column, levels in data.feature_levels.items()
@@ -281,10 +295,17 @@ def predict_reference(
     frame: pl.DataFrame,
     feature_levels: dict[str, tuple[str, ...]],
     class_labels: tuple[str, ...],
+    *,
+    feature_columns: tuple[str, ...] | None = None,
 ) -> FloatArray:
-    _require_columns(frame, FEATURE_COLUMNS)
-    if tuple(feature_levels) != FEATURE_COLUMNS:
-        raise ValueError(f"feature_levels keys must equal {FEATURE_COLUMNS}")
+    selected_columns = (
+        tuple(feature_levels) if feature_columns is None else feature_columns
+    )
+    if not selected_columns or len(set(selected_columns)) != len(selected_columns):
+        raise ValueError("feature_columns must be non-empty and unique")
+    _require_columns(frame, selected_columns)
+    if tuple(feature_levels) != selected_columns:
+        raise ValueError(f"feature_levels keys must equal {selected_columns}")
     if not class_labels:
         raise ValueError("class_labels must not be empty")
     if frame.height == 0:
@@ -292,21 +313,21 @@ def predict_reference(
 
     rows = [
         tuple(str(value) for value in row)
-        for row in frame.select(FEATURE_COLUMNS).rows()
+        for row in frame.select(selected_columns).rows()
     ]
     unique_rows = tuple(dict.fromkeys(rows))
     unique_index = {row: i for i, row in enumerate(unique_rows)}
     inverse = np.asarray([unique_index[row] for row in rows], dtype=np.int64)
     mappings = {
         column: {level: i for i, level in enumerate(feature_levels[column])}
-        for column in FEATURE_COLUMNS
+        for column in selected_columns
     }
     codes = {
         column: np.asarray(
             [mappings[column].get(row[position], -1) for row in unique_rows],
             dtype=np.int64,
         )
-        for position, column in enumerate(FEATURE_COLUMNS)
+        for position, column in enumerate(selected_columns)
     }
 
     posterior = getattr(idata, "posterior")
@@ -316,7 +337,7 @@ def predict_reference(
     sample_count = alpha.shape[0] * alpha.shape[1]
     alpha_samples = alpha.reshape(sample_count, len(class_labels))
     deltas: dict[str, FloatArray] = {}
-    for column in FEATURE_COLUMNS:
+    for column in selected_columns:
         variable = f"delta_{column}"
         if variable in posterior.data_vars:
             raw = np.asarray(posterior[variable].values, dtype=np.float64)

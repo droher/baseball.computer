@@ -8,6 +8,10 @@
 - The production site attaches the public DuckLake catalog read-only. `catalog.json` is generated from that same DuckLake for the schema sidebar. The legacy `/dbt/` objects remain for external consumers and rollback; no new site publication depends on them.
 - `preload_sources.py` is the only ad-hoc script allowed to write `bc.db` directly (only `CREATE TABLE IF NOT EXISTS`). Everything else goes through SQLMesh.
 
+# Research materialization
+
+- `materialize_geometry_research.py` creates an APFS copy-on-write clone of the production database and SQLMesh state, then builds the corrected geometry ledger and its two modeling views in an isolated development schema. It attaches only the clone, disables source initialization and publication hooks, and records production identities before and after the build. Use a new output directory and environment for each research snapshot; `--resume` is only for an interrupted isolated build. See [corrected geometry refits](../docs/geometry-corrected-refits-2026-09-11.md) for the completed run and fitting commands.
+
 # Pretrain orchestration
 
 - `run_pretrain_residual.sh STAGE1_ID STAGE2_ID` — residual-decomposition pretrain orchestrator. Prep dataset → stage-1 fit on context-only spec → emit per-head logit offsets → stage-2 fit on full spec with `BC_PRETRAIN_OFFSET_ARTIFACT` → publish branch-scoped pointer. Env: `BC_PRETRAIN_DATASET_ARTIFACT`, `BC_PRETRAIN_STAGE1_EPOCHS`, `BC_PRETRAIN_STAGE2_EPOCHS`, `BC_PRETRAIN_SKIP_PUBLISH`, `BC_PRETRAIN_DATASET_LIMIT` (smoke), plus `BC_PRETRAIN_LOSS=focal`, `BC_PRETRAIN_USE_HARD_HEAD_ES=1`, `BC_PRETRAIN_HARD_HEADS=...`. Architecture in [[pretrain-architecture]].

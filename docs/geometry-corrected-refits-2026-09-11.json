@@ -1,0 +1,1044 @@
+{
+  "status": "development_evidence",
+  "production_changed": false,
+  "publication_performed": false,
+  "historical_transport": "unsupported",
+  "mnar_identification": "unsupported",
+  "materialization_evidence": {
+    "path": "docs/geometry-materialization-2026-09-11.json",
+    "sha256": "37f0580195de782ab3c85b6158bcde753e1902a2fd04e6fbb94f3a7c00dee7ad"
+  },
+  "side": {
+    "artifact_root": "artifacts/statistical/backtests/geometry_reference/20260911-global-side-full-v1",
+    "report_sha256": "8b45030d6cfe63f50f840dd2c317988f8f3dc0dad89b6cc73e6fa4c09902555f",
+    "numerical_pass": true,
+    "protocol_pass": true,
+    "diagnostics": {
+      "rhat_max": 1.01260583529745,
+      "ess_bulk_min": 435.4911149840571,
+      "ess_tail_min": 833.1926997149812,
+      "group_level_rhat_max": 1.01260583529745,
+      "group_level_ess_bulk_min": 435.4911149840571,
+      "divergences": 0,
+      "total_draws": 4000,
+      "by_variable": [
+        {
+          "name": "alpha_class",
+          "n_elements": 4,
+          "diagnosed": true,
+          "rhat_max": 1.01260583529745,
+          "ess_bulk_min": 435.4911149840571,
+          "ess_tail_min": 833.1926997149812
+        },
+        {
+          "name": "delta_era",
+          "n_elements": 48,
+          "diagnosed": true,
+          "rhat_max": 1.0078325704217008,
+          "ess_bulk_min": 501.3823272329575,
+          "ess_tail_min": 841.0005743536341
+        },
+        {
+          "name": "delta_result_family",
+          "n_elements": 20,
+          "diagnosed": true,
+          "rhat_max": 1.002450356996197,
+          "ess_bulk_min": 3909.4508242566985,
+          "ess_tail_min": 2312.701573692516
+        },
+        {
+          "name": "delta_base_state_start",
+          "n_elements": 32,
+          "diagnosed": true,
+          "rhat_max": 1.0032886914011772,
+          "ess_bulk_min": 3199.589966007594,
+          "ess_tail_min": 2752.041682260414
+        },
+        {
+          "name": "delta_outs_start",
+          "n_elements": 12,
+          "diagnosed": true,
+          "rhat_max": 1.0019904704160936,
+          "ess_bulk_min": 4700.482128516701,
+          "ess_tail_min": 3198.069149518825
+        },
+        {
+          "name": "delta_alignment_regime",
+          "n_elements": 16,
+          "diagnosed": true,
+          "rhat_max": 1.0084858519760203,
+          "ess_bulk_min": 497.7519347071997,
+          "ess_tail_min": 856.1466437727325
+        },
+        {
+          "name": "delta_batter_hand",
+          "n_elements": 12,
+          "diagnosed": true,
+          "rhat_max": 1.0067129861989903,
+          "ess_bulk_min": 566.9797378542477,
+          "ess_tail_min": 863.1546048000805
+        }
+      ],
+      "group_level_max_elements": 512
+    },
+    "evaluation": {
+      "status": "development_evidence",
+      "class_labels": [
+        "All",
+        "Left",
+        "Middle",
+        "Right"
+      ],
+      "row_count": 753742,
+      "game_count": 26260,
+      "seed": 20260911,
+      "bootstrap_repetitions": 500,
+      "bootstrap_policy": "resample held-out games with replacement while all TRAIN fits remain fixed",
+      "historical_slice_policy": "pre-1988 directly observed labels only; no historical transport or MNAR identification claim",
+      "metrics": {
+        "overall": {
+          "model": {
+            "row_count": 753742,
+            "log_loss": 1.0945950176512975,
+            "brier": 0.6448280362538507,
+            "classwise_ece_15_bin": 0.013936700046028117
+          },
+          "budget_marginal": {
+            "row_count": 753742,
+            "log_loss": 1.1268061525926647,
+            "brier": 0.6642586546223286,
+            "classwise_ece_15_bin": 0.0004506362961470079
+          },
+          "budget_contextual": {
+            "row_count": 753742,
+            "log_loss": 1.1035899096736146,
+            "brier": 0.6512445559514071,
+            "classwise_ece_15_bin": 0.0014302597252630193
+          },
+          "full_contextual": {
+            "row_count": 753742,
+            "log_loss": 1.1028600197781528,
+            "brier": 0.6509300909951874,
+            "classwise_ece_15_bin": 0.0007984691735267154
+          }
+        },
+        "pre_1988_observed_only": {
+          "model": {
+            "row_count": 59759,
+            "log_loss": 1.0295421666871387,
+            "brier": 0.6061852664073528,
+            "classwise_ece_15_bin": 0.04705315544552539
+          },
+          "budget_marginal": {
+            "row_count": 59759,
+            "log_loss": 1.1785605130179735,
+            "brier": 0.7004553427322827,
+            "classwise_ece_15_bin": 0.08452296825050563
+          },
+          "budget_contextual": {
+            "row_count": 59759,
+            "log_loss": 1.0512773772231845,
+            "brier": 0.6277304479571391,
+            "classwise_ece_15_bin": 0.007918538798381641
+          },
+          "full_contextual": {
+            "row_count": 59759,
+            "log_loss": 1.0470313948570056,
+            "brier": 0.625873258514707,
+            "classwise_ece_15_bin": 0.003866419211766018
+          }
+        }
+      },
+      "paired_game_bootstrap": [
+        {
+          "slice": "overall",
+          "model": "model",
+          "comparator": "budget_marginal",
+          "cluster_unit": "game_id",
+          "game_count": 26260,
+          "repetitions": 500,
+          "train_fit_during_bootstrap": "fixed",
+          "log_loss_gain_ci95": [
+            0.031545346021065186,
+            0.03284666185724781
+          ],
+          "brier_gain_ci95": [
+            0.019027249936396352,
+            0.019832239362861093
+          ]
+        },
+        {
+          "slice": "overall",
+          "model": "model",
+          "comparator": "budget_contextual",
+          "cluster_unit": "game_id",
+          "game_count": 26260,
+          "repetitions": 500,
+          "train_fit_during_bootstrap": "fixed",
+          "log_loss_gain_ci95": [
+            0.00861617788453968,
+            0.00937847677235288
+          ],
+          "brier_gain_ci95": [
+            0.006186020520649804,
+            0.006661714587214473
+          ]
+        },
+        {
+          "slice": "overall",
+          "model": "model",
+          "comparator": "full_contextual",
+          "cluster_unit": "game_id",
+          "game_count": 26260,
+          "repetitions": 500,
+          "train_fit_during_bootstrap": "fixed",
+          "log_loss_gain_ci95": [
+            0.007876936869566196,
+            0.008681920404234803
+          ],
+          "brier_gain_ci95": [
+            0.005886372994082,
+            0.006345927450348827
+          ]
+        },
+        {
+          "slice": "pre_1988_observed_only",
+          "model": "model",
+          "comparator": "budget_marginal",
+          "cluster_unit": "game_id",
+          "game_count": 12997,
+          "repetitions": 500,
+          "train_fit_during_bootstrap": "fixed",
+          "log_loss_gain_ci95": [
+            0.14451749539500458,
+            0.1541762182969549
+          ],
+          "brier_gain_ci95": [
+            0.09146194451524246,
+            0.09753652799938883
+          ]
+        },
+        {
+          "slice": "pre_1988_observed_only",
+          "model": "model",
+          "comparator": "budget_contextual",
+          "cluster_unit": "game_id",
+          "game_count": 12997,
+          "repetitions": 500,
+          "train_fit_during_bootstrap": "fixed",
+          "log_loss_gain_ci95": [
+            0.01973655554978243,
+            0.023750233645265184
+          ],
+          "brier_gain_ci95": [
+            0.020174390861827343,
+            0.022928043965859842
+          ]
+        },
+        {
+          "slice": "pre_1988_observed_only",
+          "model": "model",
+          "comparator": "full_contextual",
+          "cluster_unit": "game_id",
+          "game_count": 12997,
+          "repetitions": 500,
+          "train_fit_during_bootstrap": "fixed",
+          "log_loss_gain_ci95": [
+            0.01539182095664548,
+            0.019713005122581846
+          ],
+          "brier_gain_ci95": [
+            0.018199892161219346,
+            0.021201676760616704
+          ]
+        }
+      ],
+      "decision_flags": {
+        "log_loss_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+        "brier_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+        "model_classwise_ece_at_most_0_05": true,
+        "no_pre_1988_observed_only_log_loss_regression": true,
+        "passed": true
+      }
+    },
+    "aggregate_calibration": {
+      "overall": [
+        {
+          "class": "All",
+          "observed_share": 0.008598432885523163,
+          "model_mean_probability": 0.008616241717390923,
+          "model_share_error": 1.7808831867759806e-05,
+          "full_contextual_mean_probability": 0.00871539135490553,
+          "full_contextual_share_error": 0.00011695846938236665
+        },
+        {
+          "class": "Left",
+          "observed_share": 0.30201448240910017,
+          "model_mean_probability": 0.30206511972487377,
+          "model_share_error": 5.063731577359398e-05,
+          "full_contextual_mean_probability": 0.3008595055358321,
+          "full_contextual_share_error": -0.0011549768732680987
+        },
+        {
+          "class": "Middle",
+          "observed_share": 0.4031260033273985,
+          "model_mean_probability": 0.40375218224766696,
+          "model_share_error": 0.0006261789202684498,
+          "full_contextual_mean_probability": 0.4039633899985264,
+          "full_contextual_share_error": 0.000837386671127871
+        },
+        {
+          "class": "Right",
+          "observed_share": 0.2862610813779781,
+          "model_mean_probability": 0.2855664563100684,
+          "model_share_error": -0.0006946250679097377,
+          "full_contextual_mean_probability": 0.28646171311073604,
+          "full_contextual_share_error": 0.00020063173275791657
+        }
+      ],
+      "pre_1988_observed_only": [
+        {
+          "class": "All",
+          "observed_share": 0.008433876068876654,
+          "model_mean_probability": 0.007868102222473557,
+          "model_share_error": -0.0005657738464030972,
+          "full_contextual_mean_probability": 0.008252180156190234,
+          "full_contextual_share_error": -0.0001816959126864203
+        },
+        {
+          "class": "Left",
+          "observed_share": 0.40808915811844243,
+          "model_mean_probability": 0.398382947354312,
+          "model_share_error": -0.009706210764130419,
+          "full_contextual_mean_probability": 0.4047710385652571,
+          "full_contextual_share_error": -0.003318119553185339
+        },
+        {
+          "class": "Middle",
+          "observed_share": 0.2349436904901354,
+          "model_mean_probability": 0.23947609729858885,
+          "model_share_error": 0.00453240680845346,
+          "full_contextual_mean_probability": 0.23854728491365312,
+          "full_contextual_share_error": 0.0036035944235177364
+        },
+        {
+          "class": "Right",
+          "observed_share": 0.3485332753225456,
+          "model_mean_probability": 0.3542728531246257,
+          "model_share_error": 0.00573957780208012,
+          "full_contextual_mean_probability": 0.34842949636489945,
+          "full_contextual_share_error": -0.00010377895764612788
+        }
+      ]
+    },
+    "integrity": {
+      "artifact_files_verified": [
+        "test_predictions.parquet",
+        "diagnostics.json",
+        "fit_config.json",
+        "posterior.nc",
+        "prior_check.json",
+        "sampling.log",
+        "data/train.parquet",
+        "data/test.parquet",
+        "data/full_train_counts.parquet",
+        "data/lineage.json"
+      ],
+      "archived_implementation_verified": [
+        "geometry_reference.py",
+        "geometry_reference_model.py",
+        "geometry_reference_evaluation.py"
+      ],
+      "protocol_verified": true,
+      "report_sha256": "8b45030d6cfe63f50f840dd2c317988f8f3dc0dad89b6cc73e6fa4c09902555f",
+      "protocol_sha256": "c78f219308040aa6a8a49e6be869cc067a69e0a97f341a59b5027870739fabd2"
+    }
+  },
+  "trajectory_first_fit": {
+    "artifact_root": "artifacts/statistical/backtests/trajectory_interaction/20260911-full-v1",
+    "report_sha256": "c442eccb6109cb85a086dea6c4fa5231b4ddeee385ec30ffb2a70b217a7fcba9",
+    "numerical_pass": false,
+    "diagnostics": {
+      "by_variable": [
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 93.73302399980398,
+          "ess_tail_min": 133.46147349053686,
+          "n_elements": 5,
+          "name": "alpha_class",
+          "rhat_max": 1.0708974241543474
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 125.76413098103119,
+          "ess_tail_min": 215.64413936683093,
+          "n_elements": 300,
+          "name": "delta_era_result",
+          "rhat_max": 1.025912671579931
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 538.9204639863116,
+          "ess_tail_min": 1101.7159151121564,
+          "n_elements": 40,
+          "name": "delta_base_state_start",
+          "rhat_max": 1.0037773304268158
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 2474.62221583004,
+          "ess_tail_min": 2577.6184227324056,
+          "n_elements": 15,
+          "name": "delta_outs_start",
+          "rhat_max": 1.0016769678341957
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 114.1748748726584,
+          "ess_tail_min": 198.23957296902233,
+          "n_elements": 20,
+          "name": "delta_alignment_regime",
+          "rhat_max": 1.0298079619743
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 83.8094034321733,
+          "ess_tail_min": 120.8649927123767,
+          "n_elements": 15,
+          "name": "delta_batter_hand",
+          "rhat_max": 1.0727717236712875
+        }
+      ],
+      "divergences": 0,
+      "ess_bulk_min": 83.8094034321733,
+      "ess_tail_min": 120.8649927123767,
+      "group_level_ess_bulk_min": 83.8094034321733,
+      "group_level_max_elements": 512,
+      "group_level_rhat_max": 1.0727717236712875,
+      "rhat_max": 1.0727717236712875,
+      "total_draws": 4000
+    },
+    "evaluation": {
+      "bootstrap_policy": "resample held-out games with replacement while all TRAIN fits remain fixed",
+      "bootstrap_repetitions": 500,
+      "class_labels": [
+        "Bunt",
+        "Fly",
+        "GroundBall",
+        "LineDrive",
+        "PopUp"
+      ],
+      "decision_flags": {
+        "brier_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+        "log_loss_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+        "model_classwise_ece_at_most_0_05": true,
+        "no_pre_1988_observed_only_log_loss_regression": true,
+        "passed": true
+      },
+      "game_count": 30816,
+      "historical_slice_policy": "pre-1988 directly observed labels only; no historical transport or MNAR identification claim",
+      "metrics": {
+        "overall": {
+          "budget_contextual": {
+            "brier": 0.6527195124921147,
+            "classwise_ece_15_bin": 0.0025528777329280206,
+            "log_loss": 1.2024058681367475,
+            "row_count": 922812
+          },
+          "budget_marginal": {
+            "brier": 0.7086107123034893,
+            "classwise_ece_15_bin": 0.002006609308267306,
+            "log_loss": 1.3547130621284726,
+            "row_count": 922812
+          },
+          "full_contextual": {
+            "brier": 0.6523618966912548,
+            "classwise_ece_15_bin": 0.0011484101988233067,
+            "log_loss": 1.20112378874521,
+            "row_count": 922812
+          },
+          "model": {
+            "brier": 0.6467270633330798,
+            "classwise_ece_15_bin": 0.007074449856634424,
+            "log_loss": 1.1915224364077,
+            "row_count": 922812
+          }
+        },
+        "pre_1988_observed_only": {
+          "budget_contextual": {
+            "brier": 0.7092598323805409,
+            "classwise_ece_15_bin": 0.007076254011810277,
+            "log_loss": 1.3665568639274865,
+            "row_count": 211340
+          },
+          "budget_marginal": {
+            "brier": 0.7754124328879822,
+            "classwise_ece_15_bin": 0.050651655929136466,
+            "log_loss": 1.5500898034270427,
+            "row_count": 211340
+          },
+          "full_contextual": {
+            "brier": 0.7084191103269246,
+            "classwise_ece_15_bin": 0.005687867511812095,
+            "log_loss": 1.3642774853095772,
+            "row_count": 211340
+          },
+          "model": {
+            "brier": 0.6989093606743206,
+            "classwise_ece_15_bin": 0.01684431323655398,
+            "log_loss": 1.3438100398539188,
+            "row_count": 211340
+          }
+        }
+      },
+      "paired_game_bootstrap": [
+        {
+          "brier_gain_ci95": [
+            0.061258827725033785,
+            0.06248450018395465
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_marginal",
+          "game_count": 30816,
+          "log_loss_gain_ci95": [
+            0.16175329414769393,
+            0.1646843728519871
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "overall",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.005843625702124268,
+            0.0061217628443752305
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_contextual",
+          "game_count": 30816,
+          "log_loss_gain_ci95": [
+            0.010555897752468828,
+            0.011245067824670184
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "overall",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.005478051700380423,
+            0.005795523280824064
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "full_contextual",
+          "game_count": 30816,
+          "log_loss_gain_ci95": [
+            0.00924018117858049,
+            0.009954848245217099
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "overall",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.0748909247749988,
+            0.07820842735635875
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_marginal",
+          "game_count": 17540,
+          "log_loss_gain_ci95": [
+            0.20202936457863266,
+            0.21063136516182832
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "pre_1988_observed_only",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.010055604369594264,
+            0.010640347403133516
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_contextual",
+          "game_count": 17540,
+          "log_loss_gain_ci95": [
+            0.021826852183268044,
+            0.02369170040910121
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "pre_1988_observed_only",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.009083253779717686,
+            0.009911859913883485
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "full_contextual",
+          "game_count": 17540,
+          "log_loss_gain_ci95": [
+            0.01936660969267002,
+            0.02160433905170213
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "pre_1988_observed_only",
+          "train_fit_during_bootstrap": "fixed"
+        }
+      ],
+      "row_count": 922812,
+      "seed": 20260911,
+      "status": "development_evidence"
+    },
+    "paired_comparison": {
+      "cluster_unit": "game_id",
+      "positive_gain_favors_interaction": true,
+      "repetitions": 500,
+      "slices": {
+        "overall": {
+          "additive_brier": 0.6518522662920754,
+          "additive_log_loss": 1.2026183746861947,
+          "brier_gain": 0.005125202958995537,
+          "brier_gain_ci95": [
+            0.004863702100777424,
+            0.005365608454716576
+          ],
+          "game_count": 30816,
+          "interaction_brier": 0.6467270633330798,
+          "interaction_log_loss": 1.1915224364077,
+          "log_loss_gain": 0.011095938278494722,
+          "log_loss_gain_ci95": [
+            0.010594604424025569,
+            0.011591126153805852
+          ],
+          "row_count": 922812
+        },
+        "pre_1988_observed_only": {
+          "additive_brier": 0.7189863931949215,
+          "additive_log_loss": 1.3859313755389573,
+          "brier_gain": 0.020077032520600974,
+          "brier_gain_ci95": [
+            0.019082206373761092,
+            0.0209068507102001
+          ],
+          "game_count": 17540,
+          "interaction_brier": 0.6989093606743206,
+          "interaction_log_loss": 1.3438100398539188,
+          "log_loss_gain": 0.04212133568503781,
+          "log_loss_gain_ci95": [
+            0.04028990366936335,
+            0.043874140971982764
+          ],
+          "row_count": 211340
+        }
+      },
+      "train_fit_during_bootstrap": "fixed"
+    },
+    "original_implementation_archive_complete": false
+  },
+  "trajectory_repair": {
+    "artifact_root": "artifacts/statistical/backtests/trajectory_interaction/20260911-full-v2-4000draws",
+    "report_sha256": "c392f504a3acaa916a55e5d5cafc436edafa2e0f90bd017636ee5df31cb6bf8b",
+    "run_config_sha256": "d0f44c8f27f0639fa1b7f2b6851634a1cb6ba6aadc403b821524af43639e7d70",
+    "numerical_pass": true,
+    "diagnostics": {
+      "by_variable": [
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 351.9987571326811,
+          "ess_tail_min": 482.2136548034701,
+          "n_elements": 5,
+          "name": "alpha_class",
+          "rhat_max": 1.0198745912629223
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 515.4186430668329,
+          "ess_tail_min": 1024.2380631035066,
+          "n_elements": 300,
+          "name": "delta_era_result",
+          "rhat_max": 1.0064262370231178
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 2641.7929370563165,
+          "ess_tail_min": 5460.652783939687,
+          "n_elements": 40,
+          "name": "delta_base_state_start",
+          "rhat_max": 1.0013079802550289
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 11307.273806835865,
+          "ess_tail_min": 10852.815120508327,
+          "n_elements": 15,
+          "name": "delta_outs_start",
+          "rhat_max": 1.0004655000421883
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 468.208315328441,
+          "ess_tail_min": 871.8130418881217,
+          "n_elements": 20,
+          "name": "delta_alignment_regime",
+          "rhat_max": 1.006408478267164
+        },
+        {
+          "diagnosed": true,
+          "ess_bulk_min": 307.23808709133573,
+          "ess_tail_min": 478.89910295872005,
+          "n_elements": 15,
+          "name": "delta_batter_hand",
+          "rhat_max": 1.020353537405576
+        }
+      ],
+      "divergences": 0,
+      "ess_bulk_min": 307.23808709133573,
+      "ess_tail_min": 478.89910295872005,
+      "group_level_ess_bulk_min": 307.23808709133573,
+      "group_level_max_elements": 512,
+      "group_level_rhat_max": 1.020353537405576,
+      "rhat_max": 1.020353537405576,
+      "total_draws": 16000
+    },
+    "evaluation": {
+      "bootstrap_policy": "resample held-out games with replacement while all TRAIN fits remain fixed",
+      "bootstrap_repetitions": 500,
+      "class_labels": [
+        "Bunt",
+        "Fly",
+        "GroundBall",
+        "LineDrive",
+        "PopUp"
+      ],
+      "decision_flags": {
+        "brier_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+        "log_loss_improvement_ci_lower_above_zero_vs_budget_contextual": true,
+        "model_classwise_ece_at_most_0_05": true,
+        "no_pre_1988_observed_only_log_loss_regression": true,
+        "passed": true
+      },
+      "game_count": 30816,
+      "historical_slice_policy": "pre-1988 directly observed labels only; no historical transport or MNAR identification claim",
+      "metrics": {
+        "overall": {
+          "budget_contextual": {
+            "brier": 0.6527195124921147,
+            "classwise_ece_15_bin": 0.0025528777329280206,
+            "log_loss": 1.2024058681367475,
+            "row_count": 922812
+          },
+          "budget_marginal": {
+            "brier": 0.7086107123034893,
+            "classwise_ece_15_bin": 0.002006609308267306,
+            "log_loss": 1.3547130621284726,
+            "row_count": 922812
+          },
+          "full_contextual": {
+            "brier": 0.6523618966912548,
+            "classwise_ece_15_bin": 0.0011484101988233067,
+            "log_loss": 1.20112378874521,
+            "row_count": 922812
+          },
+          "model": {
+            "brier": 0.6467285144544345,
+            "classwise_ece_15_bin": 0.007104811755150811,
+            "log_loss": 1.1915232771837088,
+            "row_count": 922812
+          }
+        },
+        "pre_1988_observed_only": {
+          "budget_contextual": {
+            "brier": 0.7092598323805409,
+            "classwise_ece_15_bin": 0.007076254011810277,
+            "log_loss": 1.3665568639274865,
+            "row_count": 211340
+          },
+          "budget_marginal": {
+            "brier": 0.7754124328879822,
+            "classwise_ece_15_bin": 0.050651655929136466,
+            "log_loss": 1.5500898034270427,
+            "row_count": 211340
+          },
+          "full_contextual": {
+            "brier": 0.7084191103269246,
+            "classwise_ece_15_bin": 0.005687867511812095,
+            "log_loss": 1.3642774853095772,
+            "row_count": 211340
+          },
+          "model": {
+            "brier": 0.6988991011390348,
+            "classwise_ece_15_bin": 0.01697497747697394,
+            "log_loss": 1.34378439629812,
+            "row_count": 211340
+          }
+        }
+      },
+      "paired_game_bootstrap": [
+        {
+          "brier_gain_ci95": [
+            0.06125724721587951,
+            0.06248309468732241
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_marginal",
+          "game_count": 30816,
+          "log_loss_gain_ci95": [
+            0.16175245802315918,
+            0.1646833194750047
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "overall",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.005842063574489804,
+            0.00612009280099118
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_contextual",
+          "game_count": 30816,
+          "log_loss_gain_ci95": [
+            0.010554348809510321,
+            0.011245297266788934
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "overall",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.005476438602394063,
+            0.005794306069641413
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "full_contextual",
+          "game_count": 30816,
+          "log_loss_gain_ci95": [
+            0.009239638323708227,
+            0.009953281450587811
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "overall",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.07490181246928987,
+            0.07821876941043879
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_marginal",
+          "game_count": 17540,
+          "log_loss_gain_ci95": [
+            0.20205490399433448,
+            0.2106579312304466
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "pre_1988_observed_only",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.010065660559694168,
+            0.01065061340838911
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "budget_contextual",
+          "game_count": 17540,
+          "log_loss_gain_ci95": [
+            0.021852456367869817,
+            0.023718349781093374
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "pre_1988_observed_only",
+          "train_fit_during_bootstrap": "fixed"
+        },
+        {
+          "brier_gain_ci95": [
+            0.009093355069785038,
+            0.009921965614985909
+          ],
+          "cluster_unit": "game_id",
+          "comparator": "full_contextual",
+          "game_count": 17540,
+          "log_loss_gain_ci95": [
+            0.01939397609093594,
+            0.02163017538927399
+          ],
+          "model": "model",
+          "repetitions": 500,
+          "slice": "pre_1988_observed_only",
+          "train_fit_during_bootstrap": "fixed"
+        }
+      ],
+      "row_count": 922812,
+      "seed": 20260911,
+      "status": "development_evidence"
+    },
+    "paired_comparison": {
+      "cluster_unit": "game_id",
+      "positive_gain_favors_interaction": true,
+      "repetitions": 500,
+      "slices": {
+        "overall": {
+          "additive_brier": 0.6518522662920754,
+          "additive_log_loss": 1.2026183746861947,
+          "brier_gain": 0.005123751837640974,
+          "brier_gain_ci95": [
+            0.004862012915073412,
+            0.00536399422312516
+          ],
+          "game_count": 30816,
+          "interaction_brier": 0.6467285144544345,
+          "interaction_log_loss": 1.1915232771837088,
+          "log_loss_gain": 0.011095097502486072,
+          "log_loss_gain_ci95": [
+            0.010594098767501007,
+            0.01159051784401987
+          ],
+          "row_count": 922812
+        },
+        "pre_1988_observed_only": {
+          "additive_brier": 0.7189863931949215,
+          "additive_log_loss": 1.3859313755389573,
+          "brier_gain": 0.020087292055886687,
+          "brier_gain_ci95": [
+            0.019093728452326143,
+            0.02091780394849787
+          ],
+          "game_count": 17540,
+          "interaction_brier": 0.6988991011390348,
+          "interaction_log_loss": 1.34378439629812,
+          "log_loss_gain": 0.04214697924083687,
+          "log_loss_gain_ci95": [
+            0.040316065528178256,
+            0.0438976684935012
+          ],
+          "row_count": 211340
+        }
+      },
+      "train_fit_during_bootstrap": "fixed"
+    },
+    "source_record": {
+      "class_labels": [
+        "Bunt",
+        "Fly",
+        "GroundBall",
+        "LineDrive",
+        "PopUp"
+      ],
+      "lineage": {
+        "full_populations": [
+          {
+            "games": 30816,
+            "primary_fold": "TEST",
+            "rows": 922812
+          },
+          {
+            "games": 143670,
+            "primary_fold": "TRAIN",
+            "rows": 4325736
+          }
+        ],
+        "full_test_games_sha256": "345a6dd5b25c5e4bbfe3c62e2818d932d241d7c4e15eb33cc78cc988e7704440",
+        "full_train_games_sha256": "ca28c6dd5274b404552131ec491fb8b17032bcacb86cb29b15b7fd85fdcc84e4",
+        "inference_feature_missingness": [
+          {
+            "alignment_regime_null": 0,
+            "base_state_start_null": 0,
+            "batter_hand_null": 7959,
+            "outs_start_null": 0,
+            "result_family_null": 0,
+            "rows": 3992018
+          }
+        ],
+        "learned_inputs": [],
+        "requested_train_budget": 100000,
+        "selected_populations": [
+          {
+            "games": 30816,
+            "primary_fold": "TEST",
+            "rows": 922812
+          },
+          {
+            "games": 62928,
+            "primary_fold": "TRAIN",
+            "rows": 100000
+          }
+        ],
+        "selected_test_games_sha256": "345a6dd5b25c5e4bbfe3c62e2818d932d241d7c4e15eb33cc78cc988e7704440",
+        "selected_train_games_sha256": "29a7cac9a451e37f833ed6355e717f11a7b5dc0ef5fbc0542816e0763359f7cb",
+        "snapshot_files": {
+          "full_train_counts.parquet": "49bccad5a3b9620b24413c4aaeb773bfd250998f64a83c49c54f206982df849a",
+          "test.parquet": "582e4851abbc27007630f288b6cd01aca7d8b7606b2d5cfb45caab9e7e2aaba1",
+          "train.parquet": "19a3d255e71972c8d791be9e834a9981e320ae0f73bc4781d631da8f50eabb0e"
+        },
+        "source_query": "SELECT event_key, game_id, season, primary_fold,\n        CASE WHEN geometry_dimension = 'trajectory'\nAND class IN ('FoulBunt', 'GroundBallBunt', 'LineDriveBunt', 'PopUpBunt', 'UnspecifiedBunt')\nTHEN 'Bunt' ELSE class END AS target_class,\n        CAST(CAST(FLOOR(season / 10) * 10 AS INTEGER) AS VARCHAR) AS era,\n        COALESCE(CAST(result_family AS VARCHAR), '__MISSING__') AS result_family, COALESCE(CAST(base_state_start AS VARCHAR), '__MISSING__') AS base_state_start, COALESCE(CAST(outs_start AS VARCHAR), '__MISSING__') AS outs_start, COALESCE(CAST(alignment_regime AS VARCHAR), '__MISSING__') AS alignment_regime, COALESCE(CAST(batter_hand AS VARCHAR), '__MISSING__') AS batter_hand\n        FROM main_models.model_input_geometry\n        WHERE geometry_dimension = 'trajectory' AND is_observed_class\n        AND training_weight > 0 AND game_id IS NOT NULL\n        AND primary_fold IN ('TRAIN', 'TEST')",
+        "source_query_sha256": "4591a06e48b10693904472ede560110c711ea0c57f1f69d5fdbcc4d91f5b9688",
+        "source_snapshot_labels": [
+          {
+            "source_snapshot_id": "dev"
+          }
+        ],
+        "target": "trajectory",
+        "train_test_game_overlap": 0,
+        "uses_validate_partition": false
+      },
+      "report_bound_artifact_sha256": {
+        "data/full_train_counts.parquet": "49bccad5a3b9620b24413c4aaeb773bfd250998f64a83c49c54f206982df849a",
+        "data/lineage.json": "4e18b8e26542b49ce6cc6064bc4b22aba9072e3d75fb9e88401c382031fe7981",
+        "data/test.parquet": "582e4851abbc27007630f288b6cd01aca7d8b7606b2d5cfb45caab9e7e2aaba1",
+        "data/train.parquet": "19a3d255e71972c8d791be9e834a9981e320ae0f73bc4781d631da8f50eabb0e",
+        "diagnostics.json": "9d055bba16dbd6225a62762c248ee59d086badc2b31eae3e98e48e213379e504",
+        "fit_config.json": "a0e66fcc47df0b484dcfc47ffe63f29f73cba44b38cbd4ef928ea1218381a566",
+        "posterior.nc": "656ba522e9992815e81db317d7079b4e6aef8d0177a77708da0c452a4712b6f0",
+        "prior_check.json": "3fc2dccda4da7e93a119eea8635e905a72c84936c9612f1a81da845f94d2bc53",
+        "sampling.log": "8b8cc27cc9e38fec5c56c19941e2a573862c8e5072f0900937c5d10ca56e741a",
+        "test_predictions.parquet": "f974921b24198f0b62efee31213b8726b471eb122f2c731e6013a6d438992f61"
+      },
+      "source_file_sha256": {
+        "data/full_train_counts.parquet": "49bccad5a3b9620b24413c4aaeb773bfd250998f64a83c49c54f206982df849a",
+        "data/lineage.json": "4e18b8e26542b49ce6cc6064bc4b22aba9072e3d75fb9e88401c382031fe7981",
+        "data/test.parquet": "582e4851abbc27007630f288b6cd01aca7d8b7606b2d5cfb45caab9e7e2aaba1",
+        "data/train.parquet": "19a3d255e71972c8d791be9e834a9981e320ae0f73bc4781d631da8f50eabb0e",
+        "diagnostics.json": "9d055bba16dbd6225a62762c248ee59d086badc2b31eae3e98e48e213379e504",
+        "fit_config.json": "a0e66fcc47df0b484dcfc47ffe63f29f73cba44b38cbd4ef928ea1218381a566",
+        "posterior.nc": "656ba522e9992815e81db317d7079b4e6aef8d0177a77708da0c452a4712b6f0",
+        "report.json": "cecc07c3a000ea81dd7a619958614d417b518cf6989f9f9495079fbd89db2388",
+        "test_predictions.parquet": "f974921b24198f0b62efee31213b8726b471eb122f2c731e6013a6d438992f61"
+      }
+    },
+    "sampling_repair": {
+      "only_change": "saved draws per chain increased from 1000 to 4000",
+      "predecessor": "/Users/davidroher/Repos/baseball.computer/artifacts/statistical/backtests/trajectory_interaction/20260911-full-v1",
+      "predecessor_limitation": "the first full run stored pre-fit implementation hashes but did not copy its exact code into the artifact",
+      "predecessor_numerical_pass": false,
+      "predecessor_original_code_archive_complete": false,
+      "reason": "slow mixing in the correlated alpha_class and missing batter-hand direction with otherwise healthy NUTS geometry"
+    },
+    "artifact_files_verified": 16,
+    "archived_implementation_verified": [
+      "code/geometry_reference_evaluation.py",
+      "code/geometry_reference_model.py",
+      "code/trajectory_interaction.py",
+      "trajectory-interaction-repair-2026-09-11.md"
+    ]
+  },
+  "next_decision": "Advance corrected side and trajectory interaction to source/era masking and calibration evaluation; retain contextual baselines; no publication."
+}

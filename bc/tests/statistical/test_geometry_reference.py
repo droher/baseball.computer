@@ -106,3 +106,32 @@ def test_prediction_frame_rejects_misaligned_scores(tmp_path: Path) -> None:
         train, test, counts, np.asarray([[0.6, 0.4]]), ("Left", "Right")
     )
     assert predicted["event_key"].to_list() == test["event_key"].to_list()
+
+
+def test_freeze_targets_named_development_schema(tmp_path: Path) -> None:
+    with source() as con:
+        con.execute("CREATE SCHEMA isolated")
+        con.execute(
+            "CREATE VIEW isolated.model_input_geometry AS SELECT * FROM main_models.model_input_geometry"
+        )
+        lineage = freeze_data(
+            con,
+            "location_side",
+            tmp_path / "named",
+            smoke=True,
+            seed=31,
+            ledger_schema="isolated",
+        )
+        assert "FROM isolated.model_input_geometry" in str(lineage["source_query"])
+        assert pl.read_parquet(tmp_path / "named/test.parquet")[
+            "event_key"
+        ].to_list() == [3]
+        with pytest.raises(ValueError, match="SQL identifier"):
+            freeze_data(
+                con,
+                "location_side",
+                tmp_path / "bad",
+                smoke=True,
+                seed=31,
+                ledger_schema="isolated; DROP SCHEMA main_models",
+            )

@@ -54,6 +54,25 @@ def test_reference_model_aggregates_multinomial_and_constrains_both_effect_axes(
     np.testing.assert_allclose(draw.sum(axis=1), 0.0, atol=1e-8)
 
 
+def test_custom_feature_columns_replace_additive_factors() -> None:
+    train = _training_frame().with_columns(
+        (pl.col("era") + pl.lit(":") + pl.col("result_family")).alias("era_result")
+    )
+    feature_columns = (
+        "era_result",
+        "base_state_start",
+        "outs_start",
+        "alignment_regime",
+        "batter_hand",
+    )
+    data = _prepare_training_data(train, feature_columns=feature_columns)
+    model = _build_reference_model(data)
+    assert data.feature_columns == feature_columns
+    assert "delta_era_result" in model.named_vars
+    assert "delta_era" not in model.named_vars
+    assert "delta_result_family" not in model.named_vars
+
+
 def test_prior_model_exposes_cell_prob_without_changing_likelihood() -> None:
     data = _prepare_training_data(_training_frame())
     model = _build_reference_model(data, include_cell_prob=True)
@@ -116,3 +135,31 @@ def test_invalid_frames_fail_before_fit_or_prediction() -> None:
             {column: ("known",) for column in FEATURE_COLUMNS},
             ("Left", "Right"),
         )
+
+
+def test_custom_prediction_uses_zero_effect_for_unseen_interaction() -> None:
+    posterior = az.from_dict(
+        posterior={
+            "alpha_class": np.array([[[0.2, -0.2], [0.4, -0.4]]]),
+            "delta_era_result": np.array(
+                [[[[0.5, -0.5], [-0.5, 0.5]], [[0.3, -0.3], [-0.3, 0.3]]]]
+            ),
+        }
+    )
+    columns = ("era_result",)
+    frame = pl.DataFrame(
+        {"era_result": ["known", "unseen", "known"]},
+        schema={"era_result": pl.String},
+    )
+    result = predict_reference(
+        posterior,
+        frame,
+        {"era_result": ("known", "other")},
+        ("Left", "Right"),
+        feature_columns=columns,
+    )
+    np.testing.assert_allclose(result[0], result[2], atol=1e-12)
+    alpha = np.array([[0.2, -0.2], [0.4, -0.4]])
+    expected = np.exp(alpha - alpha.max(axis=1, keepdims=True))
+    expected /= expected.sum(axis=1, keepdims=True)
+    np.testing.assert_allclose(result[1], expected.mean(axis=0), atol=1e-12)
