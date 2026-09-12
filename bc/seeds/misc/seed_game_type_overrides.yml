@@ -1,0 +1,32 @@
+version: 2
+seeds:
+  - name: seed_game_type_overrides
+    description: >-
+      Corrections to the game type Retrosheet records in a file's info,gametype
+      line. stg_games applies them by game_id. Add a row here instead of
+      editing source data; source_game_type records what the file says so a
+      corrected upstream file is easy to spot.
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: game_id
+        description: Retrosheet game id the override applies to.
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: game_type
+        description: Corrected game type; a value of seed_game_types.game_type.
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: source_game_type
+        description: Game type the Retrosheet file records.
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: reason
+        description: Why the file's label is wrong.
+        data_type: varchar
+        constraints:
+          - type: not_null

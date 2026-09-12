@@ -2,6 +2,12 @@
 
 Operational items that don't block deployment but deserve a home.
 
+## Seed corrections — 2026-09-11
+
+**Franchise seed and game-type overrides await a prod restate.** The Guardians row, the 1925/1927 Memphis, 1929 American Negro League, and 1931 Louisville league spans in `seed_franchises`, and the new `seed_game_type_overrides` seed (ten 1941 to 1942 barnstorming and all-star games Retrosheet labels regular season) are merged but not in `bc.db`. Seed edits do not change fingerprints, so promote with `just promote-prod` naming `stg_games` and the 24 models that read `seed_franchises`, then republish the DuckLake catalog. This waits on the game-source reload above, which blocks every `stg_games` plan.
+
+**Two league gaps left alone:** the 1932 Washington Pilots vs Pittsburgh Crawfords game (Crawfords independent that year) and the 1946 Indianapolis Clowns vs Cincinnati Crescents game are labeled regular season with one side having no league. Neither classification is certain enough to override; report to Retrosheet or resolve with a source.
+
 ## Modeling audit — 2026-09-11
 
 **Airborne recording-regime development:** the validation runner and reporter are repaired and the predeclared experiment ran once. The screen did not pass: the primary concentration fails only the leave-one-season-out 2015 class-share limit by 0.0003, and the verdict flips with prior strength. See [the results](../docs/geometry-air-regime-development-results-2026-09-11.md) and [the handoff](../docs/geometry-modeling-handoff.md). Next is a frozen protocol revision deciding whether a season level belongs inside each regime; do not relax thresholds or pick a sensitivity, and do not open sealed evaluation data.

@@ -83,6 +83,9 @@ leagues:
   NSL:
     name: Negro Southern League
     aliases: []
+  ANL:
+    name: American Negro League
+    aliases: []
 
 ambiguities:
   - term: HR

@@ -119,11 +119,13 @@ renamed AS (
         start_time,
         doubleheader_status,
         time_of_day,
-        -- TODO: Fix all-star games without game type in raw data
-        CASE WHEN REGEXP_FULL_MATCH(filename, '\d{4}AS.EVE')
-                THEN 'AllStarGame'::GAME_TYPE
-            ELSE game_type
-        END AS game_type,
+        COALESCE(
+            override.game_type::GAME_TYPE,
+            CASE WHEN REGEXP_FULL_MATCH(filename, '\d{4}AS.EVE')
+                    THEN 'AllStarGame'::GAME_TYPE
+                ELSE unioned.game_type
+            END
+        ) AS game_type,
         bat_first_side,
         sky,
         field_condition,
@@ -167,6 +169,7 @@ renamed AS (
         umpire_right_id,
         EXTRACT(YEAR FROM date)::INT2 AS season,
     FROM unioned
+    LEFT JOIN main_seeds.seed_game_type_overrides AS override USING (game_id)
 )
 
 SELECT * FROM renamed

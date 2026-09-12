@@ -100,7 +100,9 @@
 
 {% docs game_type %}
     The context in which a game took place, such as the regular season,
-    a specific playoff round, or an all-star game.
+    a specific playoff round, or an all-star game. Comes from the Retrosheet
+    file's info,gametype line, corrected by main_seeds.seed_game_type_overrides
+    for the few files that label a barnstorming or all-star game as regular season.
 {% enddocs %}
 
 {% docs side %}
