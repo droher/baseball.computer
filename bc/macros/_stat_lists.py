@@ -4,6 +4,11 @@ Each macro returns a list of column-name strings; callers loop with
 SQLMesh's built-in `@EACH` operator. The pitching list is derived from
 the offense list (extras prepended, non-pitching items removed) at module
 load — no runtime set logic.
+
+The normalized pitch counters are the stats that only exist when an
+event's pitch-sequence history resolved. Event-level models leave them
+NULL instead of zero-filling, and the sum blocks null a group's total
+whenever any contributing row is Unavailable or Unresolved.
 """
 
 from __future__ import annotations
@@ -147,6 +152,33 @@ EVENT_LEVEL_OFFENSE_STATS: list[str] = [
     "left_on_base_with_two_outs",
 ]
 
+NORMALIZED_PITCH_COUNTERS: list[str] = [
+    "pitches",
+    "swings",
+    "swings_with_contact",
+    "strikes",
+    "strikes_called",
+    "strikes_swinging",
+    "strikes_foul",
+    "strikes_foul_tip",
+    "strikes_in_play",
+    "strikes_unknown",
+    "balls",
+    "balls_called",
+    "balls_intentional",
+    "balls_automatic",
+    "unknown_pitches",
+    "pitchouts",
+    "pitcher_pickoff_attempts",
+    "catcher_pickoff_attempts",
+    "pitches_blocked_by_catcher",
+    "pitches_with_runners_going",
+]
+
+EVENT_LEVEL_OFFENSE_ZERO_FILLED_STATS: list[str] = [
+    s for s in EVENT_LEVEL_OFFENSE_STATS if s not in NORMALIZED_PITCH_COUNTERS
+]
+
 _NON_PITCHING_STATS: frozenset[str] = frozenset(
     {
         "runs_batted_in",
@@ -171,6 +203,10 @@ _EXTRA_PITCHING_STATS: list[str] = [
 
 EVENT_LEVEL_PITCHING_STATS: list[str] = _EXTRA_PITCHING_STATS + [
     s for s in EVENT_LEVEL_OFFENSE_STATS if s not in _NON_PITCHING_STATS
+]
+
+EVENT_LEVEL_PITCHING_ZERO_FILLED_STATS: list[str] = [
+    s for s in EVENT_LEVEL_PITCHING_STATS if s not in NORMALIZED_PITCH_COUNTERS
 ]
 
 GAME_LEVEL_PITCHING_STATS: list[str] = [
@@ -287,6 +323,21 @@ def event_level_pitching_stats(_evaluator: MacroEvaluator) -> list[str]:
 
 
 @macro()
+def normalized_pitch_counters(_evaluator: MacroEvaluator) -> list[str]:
+    return NORMALIZED_PITCH_COUNTERS
+
+
+@macro()
+def event_level_offense_zero_filled_stats(_evaluator: MacroEvaluator) -> list[str]:
+    return EVENT_LEVEL_OFFENSE_ZERO_FILLED_STATS
+
+
+@macro()
+def event_level_pitching_zero_filled_stats(_evaluator: MacroEvaluator) -> list[str]:
+    return EVENT_LEVEL_PITCHING_ZERO_FILLED_STATS
+
+
+@macro()
 def game_level_pitching_stats(_evaluator: MacroEvaluator) -> list[str]:
     return GAME_LEVEL_PITCHING_STATS
 
@@ -311,17 +362,64 @@ def combined_pitching_stats(_evaluator: MacroEvaluator) -> list[str]:
     return _COMBINED_PITCHING_STATS
 
 
-def _sum_cast_block(stats: list[str], default_cast: str) -> list[str]:
-    """One SUM(stat)::TYPE AS stat per stat, with INT1 for surplus_*."""
+_UNKNOWN_STATUS_PREDICATE = (
+    "BOOL_OR(pitch_sequence_resolution_status IN ('Unavailable', 'Unresolved'))"
+)
+
+PITCH_SEQUENCE_RESOLUTION_STATUS_AGG: str = (
+    "CASE"
+    " WHEN BOOL_OR(pitch_sequence_resolution_status = 'Unresolved') THEN 'Unresolved'"
+    " WHEN BOOL_OR(pitch_sequence_resolution_status = 'Unavailable') THEN 'Unavailable'"
+    " WHEN BOOL_OR(pitch_sequence_resolution_status = 'Resolved') THEN 'Resolved'"
+    " END::VARCHAR AS pitch_sequence_resolution_status"
+)
+
+
+def _sum_expr(s: str, fill_zero: bool) -> str:
+    """SUM(stat), or for a normalized pitch counter the status-guarded total.
+
+    `fill_zero` applies only to normalized counters and only makes sense
+    when every input row is an event row: a group with no status rows
+    (a runner who never batted) then gets 0 rather than NULL. Grains fed
+    by box-score or databank rows must leave it False so games without
+    pitch data stay NULL.
+    """
+    if s not in NORMALIZED_PITCH_COUNTERS:
+        return f"SUM({s})"
+    total = f"COALESCE(SUM({s}), 0)" if fill_zero else f"SUM({s})"
+    return f"CASE WHEN {_UNKNOWN_STATUS_PREDICATE} THEN NULL ELSE {total} END"
+
+
+def _stat_cast(s: str, default_cast: str) -> str:
+    if s.startswith("surplus") and default_cast not in (
+        "INT1",
+        "SMALLINT",
+        "INT",
+        "BIGINT",
+    ):
+        return "INT1"
+    return default_cast
+
+
+def _sum_cast_block(
+    stats: list[str], default_cast: str, fill_zero: bool = False
+) -> list[str]:
+    """One SUM(stat)::TYPE AS stat per stat; surplus_* stats are signed, so
+    they take INT1 whenever the default cast is unsigned."""
     return [
-        f"SUM({s})::{('INT1' if s.startswith('surplus') else default_cast)} AS {s}"
+        f"{_sum_expr(s, fill_zero)}::{_stat_cast(s, default_cast)} AS {s}"
         for s in stats
     ]
 
 
 @macro()
+def pitch_sequence_resolution_status_agg(_evaluator: MacroEvaluator) -> str:
+    return PITCH_SEQUENCE_RESOLUTION_STATUS_AGG
+
+
+@macro()
 def offense_sum_utinyint(_evaluator: MacroEvaluator) -> list[str]:
-    return _sum_cast_block(EVENT_LEVEL_OFFENSE_STATS, "UTINYINT")
+    return _sum_cast_block(EVENT_LEVEL_OFFENSE_STATS, "UTINYINT", fill_zero=True)
 
 
 @macro()
@@ -330,8 +428,18 @@ def offense_sum_usmallint(_evaluator: MacroEvaluator) -> list[str]:
 
 
 @macro()
+def offense_sum_smallint(_evaluator: MacroEvaluator) -> list[str]:
+    return _sum_cast_block(EVENT_LEVEL_OFFENSE_STATS, "SMALLINT")
+
+
+@macro()
 def pitching_combined_sum_usmallint(_evaluator: MacroEvaluator) -> list[str]:
     return _sum_cast_block(_COMBINED_PITCHING_STATS, "USMALLINT")
+
+
+@macro()
+def pitching_combined_sum_int(_evaluator: MacroEvaluator) -> list[str]:
+    return _sum_cast_block(_COMBINED_PITCHING_STATS, "INT")
 
 
 def _player_pitching_dtype(s: str) -> str:
@@ -350,6 +458,6 @@ def _player_pitching_dtype(s: str) -> str:
 @macro()
 def player_pitching_sum_block(_evaluator: MacroEvaluator) -> list[str]:
     return [
-        f"SUM({s})::{_player_pitching_dtype(s)} AS {s}"
+        f"{_sum_expr(s, fill_zero=True)}::{_player_pitching_dtype(s)} AS {s}"
         for s in EVENT_LEVEL_PITCHING_STATS
     ]

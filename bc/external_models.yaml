@@ -374,6 +374,25 @@
     runners_going_flag: boolean
     blocked_by_catcher_flag: boolean
     catcher_pickoff_attempt_at_base: BASE
+- name: event.event_pitch_sequence_status
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    appearance_start_event_id: UTINYINT
+    status: varchar
+    raw_pitch_sequence: varchar
+- name: event.event_pitch_sequence_issues
+  columns:
+    game_id: GAME_ID
+    event_id: UTINYINT
+    event_key: UINTEGER
+    appearance_start_event_id: UTINYINT
+    sequence_id: UTINYINT
+    reason: varchar
+    prior_event_id: UTINYINT
+    prior_raw_pitch_sequence: varchar
+    current_raw_pitch_sequence: varchar
 - name: event.events
   columns:
     game_id: GAME_ID

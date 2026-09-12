@@ -85,6 +85,7 @@ CACHE_RULE_ACTION_PARAMETERS: dict[str, Any] = {
     "browser_ttl": {"mode": "respect_origin"},
 }
 EDGE_CACHE_STATUS_HEADER = "cf-cache-status"
+VERIFY_USER_AGENT = "baseball.computer-upload-verify/1.0"
 WRANGLER_VERSION = "4.128.0"
 WRANGLER_MAX_UPLOAD_BYTES = 300 * 1024 * 1024
 
@@ -687,9 +688,15 @@ class HeadRequest(Protocol):
     def __call__(self, url: str) -> dict[str, str]: ...
 
 
-def http_head(url: str) -> dict[str, str]:
-    req = urllib.request.Request(url, method="HEAD")
-    with urllib.request.urlopen(req, timeout=30) as resp:
+def http_head(
+    url: str, opener: Callable[..., Any] = urllib.request.urlopen
+) -> dict[str, str]:
+    """HEAD the public URL with a named user agent; Cloudflare answers 403
+    to the default urllib one."""
+    req = urllib.request.Request(
+        url, method="HEAD", headers={"User-Agent": VERIFY_USER_AGENT}
+    )
+    with opener(req, timeout=30) as resp:
         return {k.lower(): v for k, v in resp.headers.items()}
 
 

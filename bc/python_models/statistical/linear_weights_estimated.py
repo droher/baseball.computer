@@ -150,32 +150,6 @@ def _cell_generator(season: int, league: str, base_seed: int) -> np.random.Gener
     return np.random.default_rng(seed)
 
 
-def _dirichlet_weight_matrix(
-    raw_weights: np.ndarray,
-    sl_codes: np.ndarray,
-    sl_cells: list[tuple[int, str]],
-    n_draws: int,
-    alpha: float,
-    base_seed: int,
-) -> np.ndarray:
-    """Per-(row, draw) transition weights from per-cell Dirichlet draws.
-
-    Within each (season, league) cell the combo rows are one multinomial over
-    the cell's play-transition types; ``weights ~ Dirichlet(n + alpha)`` draws
-    one frequency vector per RE-posterior draw (Jeffreys ``alpha``). Sparse
-    cells spread mass widely, dense cells concentrate on ``n / total`` to first
-    order. Row order within a cell is stable (order of appearance), so the
-    per-cell generator makes the draws reproducible.
-    """
-    out = np.empty((raw_weights.shape[0], n_draws), dtype=np.float64)
-    for code, (season, league) in enumerate(sl_cells):
-        rows = np.flatnonzero(sl_codes == code)
-        rng = _cell_generator(season, league, base_seed)
-        concentration = raw_weights[rows] + alpha
-        out[rows, :] = rng.dirichlet(concentration, size=n_draws).T
-    return out
-
-
 def _key_positions(
     keys: pl.DataFrame, counts: pl.DataFrame, key_column: str
 ) -> np.ndarray:
@@ -320,8 +294,6 @@ def propagate_linear_weights_draws(
     raw_weights = counts.get_column("n").to_numpy().astype(np.float64)
     runs_on_play = counts.get_column("runs_on_play").to_numpy()
 
-    erc = runs_on_play[:, None] + end_matrix[end_idx, :] - start_matrix[start_idx, :]
-
     season = counts.get_column("season").to_numpy()
     league = counts.get_column("league").to_list()
     play = counts.get_column("play").to_list()
@@ -353,45 +325,56 @@ def propagate_linear_weights_draws(
     n_sl = len(sl_index)
     n_slp = len(slp_index)
     n_play = len(play_index)
-
-    if dirichlet_alpha is None:
-        weight_matrix = np.broadcast_to(
-            raw_weights[:, None], (raw_weights.shape[0], n_draws)
-        )
-    else:
-        sl_cells: list[tuple[int, str]] = [(0, "")] * n_sl
-        for cell, code in sl_index.items():
-            sl_cells[code] = cell
-        weight_matrix = _dirichlet_weight_matrix(
-            raw_weights, sl_codes, sl_cells, n_draws, dirichlet_alpha, base_seed
-        )
-
-    weighted = erc * weight_matrix
+    sl_cells: list[tuple[int, str]] = [(0, "")] * n_sl
+    for cell, code in sl_index.items():
+        sl_cells[code] = cell
 
     slp_weighted_sum = np.zeros((n_slp, n_draws), dtype=np.float64)
     slp_weight = np.zeros((n_slp, n_draws), dtype=np.float64)
-    np.add.at(slp_weighted_sum, slp_codes, weighted)
-    np.add.at(slp_weight, slp_codes, weight_matrix)
-
     sl_weighted_sum = np.zeros((n_sl, n_draws), dtype=np.float64)
     sl_weight = np.zeros((n_sl, n_draws), dtype=np.float64)
-    np.add.at(sl_weighted_sum, sl_codes, weighted)
-    np.add.at(sl_weight, sl_codes, weight_matrix)
-
     slp_count = np.zeros(n_slp, dtype=np.float64)
     np.add.at(slp_count, slp_codes, raw_weights)
-
-    pooled = erc * raw_weights[:, None]
     play_pooled_sum = np.zeros((n_play, n_draws), dtype=np.float64)
     play_pooled_weight = np.zeros(n_play, dtype=np.float64)
-    np.add.at(play_pooled_sum, play_codes, pooled)
     np.add.at(play_pooled_weight, play_codes, raw_weights)
-    all_pooled_mean = pooled.sum(axis=0) / raw_weights.sum()
+    all_pooled_sum = np.zeros(n_draws, dtype=np.float64)
+
+    for code, (cell_season, cell_league) in enumerate(sl_cells):
+        rows = np.flatnonzero(sl_codes == code)
+        erc = (
+            runs_on_play[rows, None]
+            + end_matrix[end_idx[rows], :]
+            - start_matrix[start_idx[rows], :]
+        )
+        if dirichlet_alpha is None:
+            weights = np.broadcast_to(raw_weights[rows, None], erc.shape)
+        else:
+            rng = _cell_generator(cell_season, cell_league, base_seed)
+            weights = rng.dirichlet(raw_weights[rows] + dirichlet_alpha, size=n_draws).T
+        weighted = erc * weights
+        pooled = erc * raw_weights[rows, None]
+        group_starts = np.concatenate(
+            ([0], np.flatnonzero(np.diff(slp_codes[rows]) != 0) + 1)
+        )
+        group_slp = slp_codes[rows][group_starts]
+        slp_weighted_sum[group_slp, :] += np.add.reduceat(
+            weighted, group_starts, axis=0
+        )
+        slp_weight[group_slp, :] += np.add.reduceat(weights, group_starts, axis=0)
+        sl_weighted_sum[code, :] = weighted.sum(axis=0)
+        sl_weight[code, :] = weights.sum(axis=0)
+        np.add.at(
+            play_pooled_sum,
+            play_codes[rows][group_starts],
+            np.add.reduceat(pooled, group_starts, axis=0),
+        )
+        all_pooled_sum += pooled.sum(axis=0)
+
+    all_pooled_mean = all_pooled_sum / raw_weights.sum()
     play_pooled_centered = (
         play_pooled_sum / play_pooled_weight[:, None] - all_pooled_mean[None, :]
     )
-
-    del erc, weighted, pooled
 
     slp_mean = slp_weighted_sum / slp_weight
     sl_mean = sl_weighted_sum / sl_weight

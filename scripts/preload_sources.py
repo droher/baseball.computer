@@ -14,6 +14,12 @@ the script drops project ENUMs first (so dependent columns clear), then
 issues CREATE OR REPLACE TABLE.
 
 Concurrency: `--workers N` (default 8) or `BC_INIT_DB_PARALLELISM`.
+
+Source roots default to R2. `BC_SOURCE_ROOT_<SCHEMA>` (for example
+`BC_SOURCE_ROOT_EVENT=file:///path/to/parquet`) points one schema at
+another location and is also read by bc/config.py, so exporting it once
+keeps this script and `sqlmesh plan` on the same roots. `--source-root
+schema=root` (repeatable) overrides the environment for one run.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
 
 import duckdb
@@ -75,6 +82,31 @@ _ENUM_DROP_ORDER: list[str] = [
 ]
 
 logger = logging.getLogger("preload_sources")
+
+
+def source_roots_from_env(
+    environ: Mapping[str, str], defaults: dict[str, str] = DEFAULT_SOURCE_ROOTS
+) -> dict[str, str]:
+    return {
+        schema: environ.get(f"BC_SOURCE_ROOT_{schema.upper()}", default).rstrip("/")
+        for schema, default in defaults.items()
+    }
+
+
+def source_roots_from_overrides(
+    overrides: list[str], defaults: dict[str, str] = DEFAULT_SOURCE_ROOTS
+) -> dict[str, str]:
+    roots = dict(defaults)
+    for override in overrides:
+        schema, separator, root = override.partition("=")
+        if not separator or not schema or not root:
+            raise ValueError(f"expected schema=root, got {override!r}")
+        if schema not in roots:
+            raise ValueError(
+                f"unknown source schema {schema!r}; known: {sorted(roots)}"
+            )
+        roots[schema] = root.rstrip("/")
+    return roots
 
 
 def _no_quote(s: str, label: str) -> None:
@@ -215,6 +247,13 @@ def main(argv: list[str] | None = None) -> int:
         help="DROP TYPE the ENUMs and CREATE OR REPLACE every source table.",
     )
     p.add_argument(
+        "--source-root",
+        action="append",
+        default=[],
+        metavar="SCHEMA=ROOT",
+        help="Override one schema's source root (repeatable), e.g. event=file:///data/parquet.",
+    )
+    p.add_argument(
         "--log-level",
         default="INFO",
         help="stdlib logging level (DEBUG, INFO, WARNING, ERROR).",
@@ -229,7 +268,9 @@ def main(argv: list[str] | None = None) -> int:
     preload(
         workers=max(1, args.workers),
         force_reload=args.force_reload,
-        roots=DEFAULT_SOURCE_ROOTS,
+        roots=source_roots_from_overrides(
+            args.source_root, source_roots_from_env(os.environ)
+        ),
     )
     return 0
 

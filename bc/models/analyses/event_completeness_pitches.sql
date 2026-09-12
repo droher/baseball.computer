@@ -29,17 +29,27 @@ pitch_agg AS (
     GROUP BY 1
 ),
 
+resolution AS (
+    SELECT
+        event_key,
+        pitch_sequence_resolution_status,
+        pitch_sequence_resolution_status = 'Resolved' AS is_resolved
+    FROM main_models.stg_event_pitch_sequence_status
+),
+
 final AS (
     SELECT
         event_key,
         counts.has_count_balls,
         counts.has_count_strikes,
         counts.has_count,
-        COALESCE(pitch_agg.event_key IS NOT NULL) AS has_pitches,
-        COALESCE(pitch_agg.has_pitch_results, FALSE) AS has_pitch_results,
-        COALESCE(pitch_agg.has_strike_types, FALSE) AS has_strike_types
+        COALESCE(pitch_agg.event_key IS NOT NULL AND resolution.is_resolved, FALSE) AS has_pitches,
+        COALESCE(pitch_agg.has_pitch_results AND resolution.is_resolved, FALSE) AS has_pitch_results,
+        COALESCE(pitch_agg.has_strike_types AND resolution.is_resolved, FALSE) AS has_strike_types,
+        resolution.pitch_sequence_resolution_status
     FROM counts
     LEFT JOIN pitch_agg USING (event_key)
+    LEFT JOIN resolution USING (event_key)
     WHERE counts.has_plate_appearance
         OR pitch_agg.event_key IS NOT NULL
 )

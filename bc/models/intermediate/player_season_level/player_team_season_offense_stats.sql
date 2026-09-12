@@ -140,14 +140,17 @@ MODEL (
     picked_off_second = @doc('picked_off_second'),
     picked_off_third = @doc('picked_off_third'),
     extra_base_chances = @doc('extra_base_chances'),
-    extra_bases_taken = @doc('extra_bases_taken')
+    extra_bases_taken = @doc('extra_bases_taken'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status')
   ),
   audits (
     not_null(columns := (season, team_id, player_id, game_type)),
     unique_grain(columns := (season, team_id, player_id, game_type)),
     valid_baseball_season(column := season),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_totals_match_resolution_status()
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_team_season_offense_stats.parquet'
@@ -214,7 +217,8 @@ retrosheet AS (
         stats.player_id,
         games.game_type,
         COUNT(*)::SMALLINT AS games,
-        @EACH(@event_level_offense_stats(), s -> SUM(@s)::SMALLINT AS @s)
+        @offense_sum_smallint(),
+        @pitch_sequence_resolution_status_agg()
     FROM main_models.stg_games AS games
     INNER JOIN main_models.player_game_offense_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4

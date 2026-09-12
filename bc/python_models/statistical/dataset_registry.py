@@ -188,7 +188,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
     "model_input_pitch_summary": DatasetSpec(
         name="model_input_pitch_summary",
         sqlmesh_table="model_input_pitch_summary",
-        dataset_version="0.2.0",
+        dataset_version="0.3.0",
         grain=("event_key",),
         categorical_columns=_merge(
             (
@@ -198,6 +198,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
                 "pitch_results_status",
                 "strike_types_status",
                 "pitch_count_total_status",
+                "pitch_sequence_resolution_status",
             ),
             _COMMON_CATEGORICAL,
         ),

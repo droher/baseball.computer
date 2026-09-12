@@ -157,7 +157,8 @@ MODEL (
     picked_off_third USMALLINT,
     extra_base_chances USMALLINT,
     extra_bases_taken USMALLINT,
-    plate_appearances USMALLINT
+    plate_appearances USMALLINT,
+    pitch_sequence_resolution_status VARCHAR
   ),
   column_descriptions (
     game_id = @doc('game_id'),
@@ -313,7 +314,8 @@ MODEL (
     picked_off_third = @doc('picked_off_third'),
     extra_base_chances = @doc('extra_base_chances'),
     extra_bases_taken = @doc('extra_bases_taken'),
-    plate_appearances = @doc('plate_appearances')
+    plate_appearances = @doc('plate_appearances'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status')
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_team_game_pitching_stats.parquet'
@@ -322,7 +324,9 @@ MODEL (
     not_null(columns := (game_id, team_id)),
     unique_grain(columns := (game_id, team_id)),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_totals_match_resolution_status()
   ),
 );
 
@@ -336,7 +340,8 @@ WITH initial_sum AS (
     SELECT
         game_id,
         team_id,
-        @pitching_combined_sum_usmallint()
+        @pitching_combined_sum_usmallint(),
+        @pitch_sequence_resolution_status_agg()
     FROM main_models.player_game_pitching_stats
     GROUP BY 1, 2
 ),

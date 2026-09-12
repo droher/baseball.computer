@@ -159,14 +159,17 @@ MODEL (
     picked_off_third = @doc('picked_off_third'),
     extra_base_chances = @doc('extra_base_chances'),
     extra_bases_taken = @doc('extra_bases_taken'),
-    plate_appearances = @doc('plate_appearances')
+    plate_appearances = @doc('plate_appearances'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status')
   ),
   audits (
     not_null(columns := (season, team_id, player_id, game_type)),
     unique_grain(columns := (season, team_id, player_id, game_type)),
     valid_baseball_season(column := season),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_totals_match_resolution_status()
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_team_season_pitching_stats.parquet'
@@ -220,7 +223,8 @@ retrosheet AS (
         stats.player_id,
         games.game_type,
         COUNT(*)::INT AS games,
-        @EACH(@combined_pitching_stats(), s -> SUM(@s)::INT AS @s)
+        @pitching_combined_sum_int(),
+        @pitch_sequence_resolution_status_agg()
     FROM main_models.stg_games AS games
     INNER JOIN main_models.player_game_pitching_stats AS stats USING (game_id)
     GROUP BY 1, 2, 3, 4

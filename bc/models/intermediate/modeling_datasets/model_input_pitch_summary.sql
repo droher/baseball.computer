@@ -1,7 +1,7 @@
 MODEL (
   name main_models.model_input_pitch_summary,
   kind VIEW,
-  description 'Modeling dataset for the pitch-context / pitch-sequence model. One row per event_level event. Pivots event_observation_pitch per dimension into per-event raw_value columns and carries source_acquisition_status per dim for missingness diagnostics. has_count and has_pitch_sequence are coarse observation flags. Filtered to target_population_status = event_level.',
+  description 'Modeling dataset for the pitch-context / pitch-sequence model. One row per event_level event. Pivots event_observation_pitch per dimension into per-event raw_value columns and carries source_acquisition_status per dim for missingness diagnostics. has_count and has_pitch_sequence are coarse observation flags. pitch_sequence_resolution_status carries the appearance-level pitch history status; an Unresolved event has has_pitch_sequence FALSE and contradicted sequence-dimension statuses. Filtered to target_population_status = event_level.',
   grain (event_key),
   columns (
     event_key UINTEGER,
@@ -19,6 +19,7 @@ MODEL (
     pitch_count_total_status VARCHAR,
     has_count BOOLEAN,
     has_pitch_sequence BOOLEAN,
+    pitch_sequence_resolution_status VARCHAR,
     game_id VARCHAR,
     season SMALLINT,
     league VARCHAR,
@@ -82,7 +83,8 @@ MODEL (
     pitch_count_total_raw = 'event_observation_pitch.raw_value where dimension = pitch_count_total.',
     pitch_count_total_status = 'event_observation_pitch.source_acquisition_status where dimension = pitch_count_total.',
     has_count = 'BOOL_OR(dimension IN (count_balls, count_strikes) AND observed_status = observed).',
-    has_pitch_sequence = 'BOOL_OR(dimension = pitch_sequence AND observed_status = observed).',
+    has_pitch_sequence = 'BOOL_OR(dimension = pitch_sequence AND observed_status = observed). FALSE for Unavailable and Unresolved appearances.',
+    pitch_sequence_resolution_status = 'event_observation_pitch.pitch_sequence_resolution_status: Resolved, Unavailable, or Unresolved. NULL only when the event has no observation rows.',
     primary_fold = 'Default game-hash split. HASH(game_id) mod 100 -> [0,69]=TRAIN, [70,84]=VALIDATE, [85,99]=TEST.',
     training_weight = '1.0 universally.',
     source_snapshot_id = 'Stamp from the source_snapshot_id var.',
@@ -98,6 +100,7 @@ MODEL (
       'pre_shift_era', 'shift_growth_era', 'full_shift_era', 'post_restriction'
     )),
     accepted_values(column := leverage_bucket, is_in := ('low', 'medium', 'high')),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
     relationships(column := event_key, to_model := main_models.event_observation_context, to_column := event_key)
   )
 );
@@ -118,7 +121,8 @@ WITH pivoted AS (
         MAX(CASE WHEN dimension = 'pitch_count_total' THEN raw_value END) AS pitch_count_total_raw,
         MAX(CASE WHEN dimension = 'pitch_count_total' THEN source_acquisition_status END) AS pitch_count_total_status,
         BOOL_OR(dimension IN ('count_balls', 'count_strikes') AND observed_status = 'observed') AS has_count,
-        BOOL_OR(dimension = 'pitch_sequence' AND observed_status = 'observed') AS has_pitch_sequence
+        BOOL_OR(dimension = 'pitch_sequence' AND observed_status = 'observed') AS has_pitch_sequence,
+        ANY_VALUE(pitch_sequence_resolution_status) AS pitch_sequence_resolution_status
     FROM main_models.event_observation_pitch
     GROUP BY event_key
 )
@@ -139,6 +143,7 @@ SELECT
     pv.pitch_count_total_status,
     COALESCE(pv.has_count, FALSE) AS has_count,
     COALESCE(pv.has_pitch_sequence, FALSE) AS has_pitch_sequence,
+    pv.pitch_sequence_resolution_status,
     c.game_id,
     c.season,
     c.league,

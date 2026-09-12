@@ -1,0 +1,40 @@
+test_event_pitch_sequence_stats_status_driven:
+  model: main_models.event_pitch_sequence_stats
+  inputs:
+    main_models.stg_event_pitch_sequence_status:
+      rows:
+        - {game_id: TEST202601010, event_id: 1, event_key: 1, appearance_start_event_id: 1, pitch_sequence_resolution_status: Resolved, raw_pitch_sequence: "BCSX", date: 2026-01-01, season: 2026}
+        - {game_id: TEST202601010, event_id: 2, event_key: 2, appearance_start_event_id: 2, pitch_sequence_resolution_status: Resolved, raw_pitch_sequence: "", date: 2026-01-01, season: 2026}
+        - {game_id: TEST202601010, event_id: 3, event_key: 3, appearance_start_event_id: 3, pitch_sequence_resolution_status: Unavailable, raw_pitch_sequence: "", date: 2026-01-01, season: 2026}
+        - {game_id: TEST202601010, event_id: 4, event_key: 4, appearance_start_event_id: 4, pitch_sequence_resolution_status: Unresolved, raw_pitch_sequence: "BB", date: 2026-01-01, season: 2026}
+    main_models.stg_event_pitch_sequences:
+      columns:
+        sequence_item: VARCHAR
+        catcher_pickoff_attempt_at_base: VARCHAR
+      rows:
+        - {game_id: TEST202601010, event_id: 1, event_key: 1, sequence_id: 1, sequence_item: Ball, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2026-01-01, season: 2026}
+        - {game_id: TEST202601010, event_id: 1, event_key: 1, sequence_id: 2, sequence_item: CalledStrike, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2026-01-01, season: 2026}
+        - {game_id: TEST202601010, event_id: 1, event_key: 1, sequence_id: 3, sequence_item: SwingingStrike, runners_going_flag: true, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2026-01-01, season: 2026}
+        - {game_id: TEST202601010, event_id: 1, event_key: 1, sequence_id: 4, sequence_item: InPlay, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2026-01-01, season: 2026}
+    main_seeds.seed_pitch_types:
+      rows:
+        - {sequence_item: Ball, is_pitch: true, is_strike: false, is_in_play: false, can_be_strike_three: false, is_swing: false, is_contact: false, category: Ball}
+        - {sequence_item: CalledStrike, is_pitch: true, is_strike: true, is_in_play: false, can_be_strike_three: true, is_swing: false, is_contact: false, category: Strike}
+        - {sequence_item: SwingingStrike, is_pitch: true, is_strike: true, is_in_play: false, can_be_strike_three: true, is_swing: true, is_contact: false, category: Strike}
+        - {sequence_item: InPlay, is_pitch: true, is_strike: true, is_in_play: true, can_be_strike_three: false, is_swing: true, is_contact: true, category: InPlay}
+    main_models.stg_event_baserunners:
+      columns:
+        baserunner: VARCHAR
+        attempted_advance_to_base: VARCHAR
+        baserunning_play_type: VARCHAR
+        base_end: VARCHAR
+      rows:
+        - {event_key: 4, baserunning_play_type: WildPitch}
+        - {event_key: 2, baserunning_play_type: Balk}
+  outputs:
+    query:
+      rows:
+        - {event_key: 1, pitch_sequence_resolution_status: Resolved, pitches: 4, swings: 2, swings_with_contact: 1, strikes: 3, strikes_called: 1, strikes_swinging: 1, strikes_foul: 0, strikes_foul_tip: 0, strikes_in_play: 1, strikes_unknown: 0, balls: 1, balls_called: 1, balls_intentional: 0, balls_automatic: 0, unknown_pitches: 0, pitchouts: 0, pitcher_pickoff_attempts: 0, catcher_pickoff_attempts: 0, pitches_blocked_by_catcher: 0, pitches_with_runners_going: 1, passed_balls: 0, wild_pitches: 0, balks: 0}
+        - {event_key: 2, pitch_sequence_resolution_status: Resolved, pitches: 0, swings: 0, swings_with_contact: 0, strikes: 0, strikes_called: 0, strikes_swinging: 0, strikes_foul: 0, strikes_foul_tip: 0, strikes_in_play: 0, strikes_unknown: 0, balls: 0, balls_called: 0, balls_intentional: 0, balls_automatic: 0, unknown_pitches: 0, pitchouts: 0, pitcher_pickoff_attempts: 0, catcher_pickoff_attempts: 0, pitches_blocked_by_catcher: 0, pitches_with_runners_going: 0, passed_balls: 0, wild_pitches: 0, balks: 1}
+        - {event_key: 3, pitch_sequence_resolution_status: Unavailable, pitches: null, swings: null, swings_with_contact: null, strikes: null, strikes_called: null, strikes_swinging: null, strikes_foul: null, strikes_foul_tip: null, strikes_in_play: null, strikes_unknown: null, balls: null, balls_called: null, balls_intentional: null, balls_automatic: null, unknown_pitches: null, pitchouts: null, pitcher_pickoff_attempts: null, catcher_pickoff_attempts: null, pitches_blocked_by_catcher: null, pitches_with_runners_going: null, passed_balls: 0, wild_pitches: 0, balks: 0}
+        - {event_key: 4, pitch_sequence_resolution_status: Unresolved, pitches: null, swings: null, swings_with_contact: null, strikes: null, strikes_called: null, strikes_swinging: null, strikes_foul: null, strikes_foul_tip: null, strikes_in_play: null, strikes_unknown: null, balls: null, balls_called: null, balls_intentional: null, balls_automatic: null, unknown_pitches: null, pitchouts: null, pitcher_pickoff_attempts: null, catcher_pickoff_attempts: null, pitches_blocked_by_catcher: null, pitches_with_runners_going: null, passed_balls: 0, wild_pitches: 1, balks: 0}

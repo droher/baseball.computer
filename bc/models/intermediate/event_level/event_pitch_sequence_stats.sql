@@ -1,9 +1,11 @@
 MODEL (
   name main_models.event_pitch_sequence_stats,
   kind FULL,
+  description 'Per-event pitch-sequence counting stats for every play-by-play event. The normalized counters are real counts (zero allowed) only when the event''s pitch-sequence history resolved; they are NULL when the source carried no sequence (Unavailable) or the sequence contradicted itself and was quarantined (Unresolved). Passed balls, wild pitches, and balks are derived from baserunning plays and are populated for every event.',
   grain (event_key),
   columns (
     event_key UINTEGER,
+    pitch_sequence_resolution_status VARCHAR,
     pitches UTINYINT,
     swings UTINYINT,
     swings_with_contact UTINYINT,
@@ -30,6 +32,7 @@ MODEL (
   ),
   column_descriptions (
     event_key = @doc('event_key'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status'),
     pitches = @doc('pitches'),
     swings = @doc('swings'),
     swings_with_contact = @doc('swings_with_contact'),
@@ -55,9 +58,13 @@ MODEL (
     balks = @doc('balks')
   ),
   audits (
-    not_null(columns := (event_key)),
+    not_null(columns := (event_key, pitch_sequence_resolution_status, passed_balls, wild_pitches, balks)),
     unique_values(columns := (event_key)),
-    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key)
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_counters_null_unless_resolved(),
+    pitch_rows_only_for_resolved_events(),
+    relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
+    relationships(column := event_key, to_model := main_models.stg_event_pitch_sequence_status, to_column := event_key)
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_pitch_sequence_stats.parquet'
@@ -129,11 +136,19 @@ grouped_sequence AS (
 
 final AS (
     SELECT
-        grouped_sequence.*,
+        status.event_key,
+        status.pitch_sequence_resolution_status,
+        @EACH(
+            @normalized_pitch_counters(),
+            c -> CASE
+                WHEN status.pitch_sequence_resolution_status = 'Resolved' THEN COALESCE(@c, 0)
+            END::UTINYINT AS @c
+        ),
         COALESCE(other_events.passed_balls, 0)::UTINYINT AS passed_balls,
         COALESCE(other_events.wild_pitches, 0)::UTINYINT AS wild_pitches,
         COALESCE(other_events.balks, 0)::UTINYINT AS balks
-    FROM grouped_sequence
+    FROM main_models.stg_event_pitch_sequence_status AS status
+    LEFT JOIN grouped_sequence USING (event_key)
     LEFT JOIN other_events USING (event_key)
 )
 

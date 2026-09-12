@@ -34,8 +34,10 @@ pitches AS (
         BOOL_AND(p.has_pitches) AS has_pitches,
         BOOL_AND(p.has_pitch_results) AS has_pitch_results,
         BOOL_AND(p.has_strike_types) AS has_pitch_strike_types,
+        BOOL_OR(status.pitch_sequence_resolution_status = 'Unresolved') AS has_unresolved_pitch_appearance,
     FROM main_models.stg_events AS events
     LEFT JOIN main_models.event_completeness_pitches AS p USING (event_key)
+    LEFT JOIN main_models.stg_event_pitch_sequence_status AS status USING (event_key)
     GROUP BY 1
 ),
 
@@ -58,7 +60,8 @@ joined AS (
         COALESCE(pitches.has_count, FALSE) AS has_count,
         COALESCE(pitches.has_pitches, FALSE) AS has_pitches,
         COALESCE(pitches.has_pitch_results, FALSE) AS has_pitch_results,
-        COALESCE(pitches.has_pitch_strike_types, FALSE) AS has_pitch_strike_types
+        COALESCE(pitches.has_pitch_strike_types, FALSE) AS has_pitch_strike_types,
+        COALESCE(pitches.has_unresolved_pitch_appearance, FALSE) AS has_unresolved_pitch_appearance
     FROM main_models.game_start_info AS game_start_info
     LEFT JOIN batted_balls USING (game_id)
     LEFT JOIN fielding_credit USING (game_id)

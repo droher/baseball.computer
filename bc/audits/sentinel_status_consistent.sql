@@ -13,7 +13,7 @@ WHERE NOT (
   OR (sentinel_type = 'unknown' AND observed_status IN ('unknown_code', 'derived'))
   OR (sentinel_type = 'zero' AND observed_status = 'unknown_code')
   OR (sentinel_type = 'not_applicable' AND observed_status = 'not_applicable')
-  OR (sentinel_type = 'null' AND observed_status IN ('missing', 'derived'))
+  OR (sentinel_type = 'null' AND observed_status IN ('missing', 'derived', 'contradicted'))
   OR (sentinel_type = 'empty_sequence' AND observed_status = 'missing')
   OR (
     sentinel_type = 'default'

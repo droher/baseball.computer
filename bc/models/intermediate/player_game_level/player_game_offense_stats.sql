@@ -138,7 +138,8 @@ MODEL (
     times_lead_runner = @doc('times_lead_runner'),
     times_next_base_empty = @doc('times_next_base_empty'),
     extra_base_chances = @doc('extra_base_chances'),
-    extra_bases_taken = @doc('extra_bases_taken')
+    extra_bases_taken = @doc('extra_bases_taken'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status')
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_game_offense_stats.parquet'
@@ -154,7 +155,9 @@ MODEL (
     bounded_range(column := caught_stealing, min_v := 0, max_v := stolen_base_opportunities, condition := stolen_base_opportunities IS NOT NULL),
     bounded_excluding_data_issues(column := hits, min_v := 0, max_v := at_bats, issue_type := 'hits_gt_at_bats'),
     bounded_excluding_data_issues(column := strikeouts, min_v := 0, max_v := plate_appearances, issue_type := 'strikeouts_gt_plate_appearances', condition := plate_appearances IS NOT NULL),
-    bounded_excluding_data_issues(column := (COALESCE(doubles, 0) + COALESCE(triples, 0) + COALESCE(home_runs, 0)), min_v := 0, max_v := hits, issue_type := 'extra_base_hits_gt_hits')
+    bounded_excluding_data_issues(column := (COALESCE(doubles, 0) + COALESCE(triples, 0) + COALESCE(home_runs, 0)), min_v := 0, max_v := hits, issue_type := 'extra_base_hits_gt_hits'),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_totals_match_resolution_status()
   ),
 );
 
@@ -180,7 +183,8 @@ final AS (
         game_id,
         team_id,
         player_id,
-        @offense_sum_utinyint()
+        @offense_sum_utinyint(),
+        @pitch_sequence_resolution_status_agg()
     FROM main_models.event_offense_stats
     GROUP BY 1, 2, 3
     UNION ALL BY NAME

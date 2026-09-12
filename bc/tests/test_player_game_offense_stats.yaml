@@ -1,0 +1,37 @@
+test_player_game_offense_stats_pitch_totals_follow_status:
+  model: main_models.player_game_offense_stats
+  inputs:
+    main_models.event_offense_stats:
+      columns:
+        game_id: VARCHAR
+        team_id: VARCHAR
+        player_id: VARCHAR
+        baserunner: VARCHAR
+      rows:
+        - {game_id: TEST202601010, event_key: 1, team_id: TST, player_id: all_resolved, baserunner: Batter, plate_appearances: 1, pitches: 4, strikes: 3, balls: 1, wild_pitches: 0, pitch_sequence_resolution_status: Resolved}
+        - {game_id: TEST202601010, event_key: 2, team_id: TST, player_id: all_resolved, baserunner: Batter, plate_appearances: 1, pitches: 0, strikes: 0, balls: 0, wild_pitches: 1, pitch_sequence_resolution_status: Resolved}
+        - {game_id: TEST202601010, event_key: 3, team_id: TST, player_id: all_resolved, baserunner: First, plate_appearances: 0, pitches: null, strikes: null, balls: null, wild_pitches: 0, pitch_sequence_resolution_status: null}
+        - {game_id: TEST202601010, event_key: 3, team_id: TST, player_id: mixed, baserunner: Batter, plate_appearances: 1, pitches: 3, strikes: 2, balls: 1, wild_pitches: 0, pitch_sequence_resolution_status: Resolved}
+        - {game_id: TEST202601010, event_key: 4, team_id: TST, player_id: mixed, baserunner: Batter, plate_appearances: 1, pitches: null, strikes: null, balls: null, wild_pitches: 1, pitch_sequence_resolution_status: Unavailable}
+        - {game_id: TEST202601010, event_key: 5, team_id: TST, player_id: quarantined, baserunner: Batter, plate_appearances: 1, pitches: null, strikes: null, balls: null, wild_pitches: 0, pitch_sequence_resolution_status: Unresolved}
+        - {game_id: TEST202601010, event_key: 6, team_id: TST, player_id: quarantined, baserunner: Batter, plate_appearances: 1, pitches: null, strikes: null, balls: null, wild_pitches: 0, pitch_sequence_resolution_status: Unavailable}
+        - {game_id: TEST202601010, event_key: 7, team_id: TST, player_id: runner_only, baserunner: Second, plate_appearances: 0, pitches: null, strikes: null, balls: null, wild_pitches: 0, pitch_sequence_resolution_status: null}
+    main_models.stg_box_score_batting_lines:
+      columns:
+        side: VARCHAR
+      rows: []
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        home_team_id: VARCHAR
+        away_team_id: VARCHAR
+        source_type: VARCHAR
+      rows: []
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: TEST202601010, team_id: TST, player_id: all_resolved, plate_appearances: 2, pitches: 4, strikes: 3, balls: 1, wild_pitches: 1, pitch_sequence_resolution_status: Resolved}
+        - {game_id: TEST202601010, team_id: TST, player_id: mixed, plate_appearances: 2, pitches: null, strikes: null, balls: null, wild_pitches: 1, pitch_sequence_resolution_status: Unavailable}
+        - {game_id: TEST202601010, team_id: TST, player_id: quarantined, plate_appearances: 2, pitches: null, strikes: null, balls: null, wild_pitches: 0, pitch_sequence_resolution_status: Unresolved}
+        - {game_id: TEST202601010, team_id: TST, player_id: runner_only, plate_appearances: 0, pitches: 0, strikes: 0, balls: 0, wild_pitches: 0, pitch_sequence_resolution_status: null}

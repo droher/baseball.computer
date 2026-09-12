@@ -542,3 +542,27 @@ def test_edge_cache_check_fails_only_on_hit() -> None:
         script.assert_metadata_not_edge_cached(
             ["https://x/hit"], lambda url: {"cf-cache-status": "hit"}
         )
+
+
+def test_head_sends_a_named_user_agent_and_lowercases_headers() -> None:
+    script = _load_script()
+    seen: list[Any] = []
+
+    class _Response:
+        headers = {"CF-Cache-Status": "DYNAMIC", "Content-Length": "3"}
+
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    def opener(req: Any, timeout: float) -> _Response:
+        seen.append(req)
+        return _Response()
+
+    headers = script.http_head("https://x/baseball.ducklake", opener)
+    assert headers == {"cf-cache-status": "DYNAMIC", "content-length": "3"}
+    assert seen[0].get_method() == "HEAD"
+    assert seen[0].get_header("User-agent") == script.VERIFY_USER_AGENT
+    assert "urllib" not in script.VERIFY_USER_AGENT

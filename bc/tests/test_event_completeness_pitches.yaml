@@ -1,0 +1,53 @@
+test_event_completeness_pitches_resolution_status:
+  model: main_models.event_completeness_pitches
+  inputs:
+    main_models.stg_events:
+      columns:
+        batting_side: VARCHAR
+        frame: VARCHAR
+        batting_team_id: VARCHAR
+        fielding_team_id: VARCHAR
+        specified_batter_hand: VARCHAR
+        specified_pitcher_hand: VARCHAR
+        plate_appearance_result: VARCHAR
+        batted_trajectory: VARCHAR
+        batted_location_general: VARCHAR
+        batted_location_depth: VARCHAR
+        batted_location_angle: VARCHAR
+      rows:
+        - {event_key: 1, plate_appearance_result: Single, count_balls: 1, count_strikes: 1}
+        - {event_key: 2, plate_appearance_result: Single, count_balls: 0, count_strikes: 0}
+        - {event_key: 3, plate_appearance_result: Single, count_balls: null, count_strikes: null}
+        - {event_key: 4, plate_appearance_result: Single, count_balls: 1, count_strikes: 1}
+        - {event_key: 5, plate_appearance_result: Strikeout, count_balls: 0, count_strikes: 2}
+    main_models.stg_event_pitch_sequence_status:
+      rows:
+        - {game_id: G1, event_id: 1, event_key: 1, appearance_start_event_id: 1, pitch_sequence_resolution_status: Resolved, raw_pitch_sequence: BCX, date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 2, event_key: 2, appearance_start_event_id: 2, pitch_sequence_resolution_status: Resolved, raw_pitch_sequence: "", date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 3, event_key: 3, appearance_start_event_id: 3, pitch_sequence_resolution_status: Unavailable, raw_pitch_sequence: "", date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 4, event_key: 4, appearance_start_event_id: 4, pitch_sequence_resolution_status: Unresolved, raw_pitch_sequence: BBB, date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 5, event_key: 5, appearance_start_event_id: 5, pitch_sequence_resolution_status: Resolved, raw_pitch_sequence: CK, date: 2000-05-01, season: 2000}
+    main_models.stg_event_pitch_sequences:
+      columns:
+        sequence_item: VARCHAR
+        catcher_pickoff_attempt_at_base: VARCHAR
+      rows:
+        - {game_id: G1, event_id: 1, event_key: 1, sequence_id: 0, sequence_item: Ball, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 1, event_key: 1, sequence_id: 1, sequence_item: CalledStrike, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 1, event_key: 1, sequence_id: 2, sequence_item: InPlay, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 5, event_key: 5, sequence_id: 0, sequence_item: CalledStrike, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2000-05-01, season: 2000}
+        - {game_id: G1, event_id: 5, event_key: 5, sequence_id: 1, sequence_item: StrikeUnknownType, runners_going_flag: false, blocked_by_catcher_flag: false, catcher_pickoff_attempt_at_base: null, date: 2000-05-01, season: 2000}
+    main_seeds.seed_pitch_types:
+      rows:
+        - {sequence_item: Ball, is_pitch: true, is_strike: false, is_in_play: false, can_be_strike_three: false, is_swing: false, is_contact: false, category: Ball}
+        - {sequence_item: CalledStrike, is_pitch: true, is_strike: true, is_in_play: false, can_be_strike_three: true, is_swing: false, is_contact: false, category: Strike}
+        - {sequence_item: InPlay, is_pitch: true, is_strike: true, is_in_play: true, can_be_strike_three: false, is_swing: true, is_contact: true, category: InPlay}
+        - {sequence_item: StrikeUnknownType, is_pitch: true, is_strike: true, is_in_play: false, can_be_strike_three: true, is_swing: false, is_contact: false, category: Strike}
+  outputs:
+    query:
+      rows:
+        - {event_key: 1, has_count_balls: true, has_count_strikes: true, has_count: true, has_pitches: true, has_pitch_results: true, has_strike_types: true, pitch_sequence_resolution_status: Resolved}
+        - {event_key: 2, has_count_balls: true, has_count_strikes: true, has_count: true, has_pitches: false, has_pitch_results: false, has_strike_types: false, pitch_sequence_resolution_status: Resolved}
+        - {event_key: 3, has_count_balls: false, has_count_strikes: false, has_count: false, has_pitches: false, has_pitch_results: false, has_strike_types: false, pitch_sequence_resolution_status: Unavailable}
+        - {event_key: 4, has_count_balls: true, has_count_strikes: true, has_count: true, has_pitches: false, has_pitch_results: false, has_strike_types: false, pitch_sequence_resolution_status: Unresolved}
+        - {event_key: 5, has_count_balls: true, has_count_strikes: true, has_count: true, has_pitches: true, has_pitch_results: true, has_strike_types: false, pitch_sequence_resolution_status: Resolved}

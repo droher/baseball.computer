@@ -1,7 +1,7 @@
 MODEL (
   name main_models.source_acquisition_ledger,
   kind FULL,
-  description 'Per (game_id, team_id, dimension) provenance ledger classifying which source family covers each modeling dimension and what each row can be used for. Side-dependent dimensions (box_batting, box_pitching, box_fielding, line_score) carry a team_id; game-wide dimensions (event, pitch_sequence, batted_ball, gamelog) have team_id IS NULL. Joined by every downstream Phase 1 ledger and every modeling dataset for target_population_status, source_block_status, usable_for_event_imputation, usable_as_aggregate_constraint, and authority_rank.',
+  description 'Per (game_id, team_id, dimension) provenance ledger classifying which source family covers each modeling dimension and what each row can be used for. Side-dependent dimensions (box_batting, box_pitching, box_fielding, line_score) carry a team_id; game-wide dimensions (event, pitch_sequence, batted_ball, gamelog) have team_id IS NULL. Joined by every downstream Phase 1 ledger and every modeling dataset for target_population_status, source_block_status, usable_for_event_imputation, usable_as_aggregate_constraint, and authority_rank. A play-by-play game containing any Unresolved pitch appearance (game_data_completeness.has_unresolved_pitch_appearance) has its pitch_sequence row classified as contradicted rather than ordinary sparse coverage, and neither usable flag is set for it.',
   grain (game_id, team_id, dimension),
   columns (
     game_id VARCHAR,
@@ -23,10 +23,10 @@ MODEL (
     source_family = 'Coarsest source family observed at this game/dimension: play_by_play, box_score, gamelog, derived, absent.',
     source_type = 'Raw game_start_info.source_type when known: PlayByPlay, BoxScore, GameLog. NULL when no source covers the game.',
     target_population_status = 'Whether and how this dimension can populate target rows: event_level, aggregate_only, gamelog_only, structural_absence, coverage_within_source_sparse, out_of_scope.',
-    source_block_status = 'Whether the source block backing this dimension exists and is fully populated: present_fully_populated, present_partial_coverage, coverage_within_source_sparse, block_missing, not_applicable.',
-    source_availability_status = 'Whether the source was acquired and is usable: observed, not_acquired, not_applicable, contradicted, data_error_prone.',
-    usable_for_event_imputation = 'TRUE only for event-level dimensions with non-sparse, non-missing source coverage.',
-    usable_as_aggregate_constraint = 'TRUE when the source can constrain an aggregate target (event_level or aggregate_only).',
+    source_block_status = 'Whether the source block backing this dimension exists and is fully populated: present_fully_populated, present_partial_coverage, coverage_within_source_sparse, block_missing, not_applicable. present_partial_coverage on pitch_sequence marks a game whose quarantined Unresolved appearance removed part of the pitch block.',
+    source_availability_status = 'Whether the source was acquired and is usable: observed, not_acquired, not_applicable, contradicted, data_error_prone. contradicted on pitch_sequence when the game has any Unresolved pitch appearance.',
+    usable_for_event_imputation = 'TRUE only for event-level dimensions with non-sparse, non-missing, non-contradicted source coverage.',
+    usable_as_aggregate_constraint = 'TRUE when the source can constrain an aggregate target (event_level or aggregate_only) and is not contradicted.',
     authority_rank = 'Lower rank wins when multiple source families can populate the same target. play_by_play=1, box_score=2, gamelog=3, otherwise 9.'
   ),
   audits (
@@ -84,6 +84,7 @@ coverage AS (
         game_id,
         has_pitches,
         has_count,
+        has_unresolved_pitch_appearance,
         (has_trajectory OR has_location OR has_batted_to_fielder) AS has_batted_ball
     FROM main_models.game_data_completeness
 ),
@@ -137,6 +138,7 @@ game_wide_dims AS (
         gs.source_type,
         CASE
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'event' THEN 'event_level'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_unresolved_pitch_appearance, FALSE) THEN 'event_level'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_pitches, FALSE) THEN 'event_level'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' THEN 'coverage_within_source_sparse'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' AND COALESCE(c.has_batted_ball, FALSE) THEN 'event_level'
@@ -147,6 +149,7 @@ game_wide_dims AS (
         CASE
             WHEN gs.source_type IS NULL THEN 'block_missing'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'event' THEN 'present_fully_populated'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_unresolved_pitch_appearance, FALSE) THEN 'present_partial_coverage'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_pitches, FALSE) THEN 'present_fully_populated'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' THEN 'coverage_within_source_sparse'
             WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'batted_ball' AND COALESCE(c.has_batted_ball, FALSE) THEN 'present_partial_coverage'
@@ -156,6 +159,7 @@ game_wide_dims AS (
         END AS source_block_status,
         CASE
             WHEN gs.source_type IS NULL THEN 'not_acquired'
+            WHEN gs.source_type = 'PlayByPlay' AND d.dimension = 'pitch_sequence' AND COALESCE(c.has_unresolved_pitch_appearance, FALSE) THEN 'contradicted'
             WHEN gs.source_type IN ('PlayByPlay', 'BoxScore', 'GameLog') THEN 'observed'
             ELSE 'contradicted'
         END AS source_availability_status
@@ -173,8 +177,10 @@ classified AS (
 SELECT
     *,
     target_population_status = 'event_level'
-        AND source_block_status NOT IN ('coverage_within_source_sparse', 'block_missing') AS usable_for_event_imputation,
-    target_population_status IN ('event_level', 'aggregate_only') AS usable_as_aggregate_constraint,
+        AND source_block_status NOT IN ('coverage_within_source_sparse', 'block_missing')
+        AND source_availability_status != 'contradicted' AS usable_for_event_imputation,
+    target_population_status IN ('event_level', 'aggregate_only')
+        AND source_availability_status != 'contradicted' AS usable_as_aggregate_constraint,
     CAST(CASE source_family
         WHEN 'play_by_play' THEN 1
         WHEN 'box_score' THEN 2

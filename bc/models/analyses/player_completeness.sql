@@ -15,7 +15,8 @@ SELECT
     COUNT_IF(has_count) AS count,
     COUNT_IF(has_pitches) AS pitches,
     COUNT_IF(has_pitch_results) AS pitch_results,
-    COUNT_IF(has_pitch_strike_types) AS pitch_strike_types
+    COUNT_IF(has_pitch_strike_types) AS pitch_strike_types,
+    BOOL_OR(has_unresolved_pitch_appearance) AS has_unresolved_pitch_appearance
 FROM main_models.player_game_data_completeness
 GROUP BY 1, 2
 ORDER BY total_games DESC

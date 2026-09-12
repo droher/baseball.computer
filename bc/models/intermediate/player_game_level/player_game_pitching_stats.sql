@@ -157,7 +157,8 @@ MODEL (
     perfect_games = @doc('perfect_games'),
     extra_base_chances = @doc('extra_base_chances'),
     extra_bases_taken = @doc('extra_bases_taken'),
-    plate_appearances = @doc('plate_appearances')
+    plate_appearances = @doc('plate_appearances'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status')
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_game_pitching_stats.parquet'
@@ -174,7 +175,9 @@ MODEL (
     bounded_range(column := perfect_games, min_v := 0, max_v := no_hitters),
     bounded_excluding_data_issues(column := hits, min_v := 0, max_v := batters_faced, issue_type := 'hits_gt_batters_faced', condition := batters_faced IS NOT NULL),
     bounded_excluding_data_issues(column := strikeouts, min_v := 0, max_v := batters_faced, issue_type := 'strikeouts_gt_batters_faced', condition := batters_faced IS NOT NULL),
-    bounded_excluding_data_issues(column := home_runs, min_v := 0, max_v := hits, issue_type := 'home_runs_gt_hits')
+    bounded_excluding_data_issues(column := home_runs, min_v := 0, max_v := hits, issue_type := 'home_runs_gt_hits'),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_totals_match_resolution_status()
   ),
 );
 
@@ -189,7 +192,8 @@ WITH event_agg AS (
         game_id,
         player_id,
         MIN(team_id) AS team_id,
-        @player_pitching_sum_block()
+        @player_pitching_sum_block(),
+        @pitch_sequence_resolution_status_agg()
     FROM main_models.event_pitching_stats
     GROUP BY 1, 2
 ),

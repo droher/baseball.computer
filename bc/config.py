@@ -38,13 +38,30 @@ _STATE_DB_PATH = Path(
 
 _DUCKDB_THREADS = int(os.environ.get("BC_DUCKDB_THREADS", "14"))
 
+_DEFAULT_SOURCE_ROOTS: dict[str, str] = {
+    "event": "https://data.baseball.computer/event",
+    "game": "https://data.baseball.computer/event",
+    "box_score": "https://data.baseball.computer/event",
+    "misc": "https://data.baseball.computer/misc",
+    "baseballdatabank": "https://data.baseball.computer/baseballdatabank",
+    "biodata": "https://data.baseball.computer/biodata",
+}
+
+
+def _source_roots() -> dict[str, str]:
+    return {
+        schema: os.environ.get(f"BC_SOURCE_ROOT_{schema.upper()}", default).rstrip("/")
+        for schema, default in _DEFAULT_SOURCE_ROOTS.items()
+    }
+
+
 _DUCKDB_SETTINGS: dict[str, object] = {
     "enable_fsst_vectors": True,
     "enable_http_metadata_cache": True,
     "preserve_insertion_order": False,
     "parquet_metadata_cache": True,
     "checkpoint_threshold": "1GB",
-    "memory_limit": "48GB",
+    "memory_limit": os.environ.get("BC_DUCKDB_MEMORY_LIMIT", "48GB"),
     "threads": _DUCKDB_THREADS,
 }
 
@@ -105,14 +122,7 @@ config = Config(
         "@load_seeds()",
     ],
     variables={
-        "source_roots": {
-            "event": "https://data.baseball.computer/event",
-            "game": "https://data.baseball.computer/event",
-            "box_score": "https://data.baseball.computer/event",
-            "misc": "https://data.baseball.computer/misc",
-            "baseballdatabank": "https://data.baseball.computer/baseballdatabank",
-            "biodata": "https://data.baseball.computer/biodata",
-        },
+        "source_roots": _source_roots(),
         "force_reload": False,
         "start_season": 1910,
         "end_season": 2025,

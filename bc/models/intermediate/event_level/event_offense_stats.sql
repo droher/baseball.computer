@@ -141,7 +141,8 @@ MODEL (
     times_lead_runner = @doc('times_lead_runner'),
     times_next_base_empty = @doc('times_next_base_empty'),
     extra_base_chances = @doc('extra_base_chances'),
-    extra_bases_taken = @doc('extra_bases_taken')
+    extra_bases_taken = @doc('extra_bases_taken'),
+    pitch_sequence_resolution_status = @doc('pitch_sequence_resolution_status')
   ),
   audits (
     not_null(columns := (event_key, baserunner)),
@@ -149,7 +150,9 @@ MODEL (
     relationships(column := event_key, to_model := main_models.stg_events, to_column := event_key),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
+    pitch_counters_null_unless_resolved()
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_event_offense_stats.parquet'
@@ -212,7 +215,9 @@ final AS (
         COALESCE(team_id, batting_team_id)::TEAM_ID AS team_id,
         COALESCE(player_id, runner_id)::PLAYER_ID AS player_id,
         baserunner,
-        @EACH(@event_level_offense_stats(), stat -> COALESCE(@stat, 0)::INT1 AS @stat)
+        @EACH(@event_level_offense_zero_filled_stats(), stat -> COALESCE(@stat, 0)::INT1 AS @stat),
+        @EACH(@normalized_pitch_counters(), stat -> @stat::INT1 AS @stat),
+        pitch_sequence_resolution_status::VARCHAR AS pitch_sequence_resolution_status
     FROM unioned
 )
 

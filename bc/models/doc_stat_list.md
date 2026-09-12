@@ -632,6 +632,21 @@ The descriptions for the official stats here are in part adapted from MLB's offi
     (as part of a steal or hit-and-run).
 {% enddocs %}
 
+{% docs pitch_sequence_resolution_status %}
+    Whether the pitch-sequence history behind this row's normalized pitch counters
+    (pitches, swings, strikes, balls, pickoff attempts, and the other per-pitch counts)
+    could be trusted. Resolved: the history reconciled and the counters are real counts,
+    including real zeros. Unavailable: the source carried no pitch sequence and the
+    counters are NULL. Unresolved: the source pitch sequence contradicted itself across
+    the plate appearance, the parser quarantined it, and the counters are NULL.
+    At aggregate grains this is the worst status among the contributing rows
+    (Unresolved over Unavailable over Resolved) and any Unavailable or Unresolved
+    contribution makes every normalized counter NULL rather than a partial total.
+    NULL when no contributing row carries a status: baserunner-only rows at the event
+    level, box-score or databank rows, or an aggregate built only from those.
+    Passed balls, wild pitches, and balks come from baserunning plays and are unaffected.
+{% enddocs %}
+
 {% docs passed_balls %}
     (PB) Number of passed balls.
 {% enddocs %}
