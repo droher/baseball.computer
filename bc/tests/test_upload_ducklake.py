@@ -522,9 +522,180 @@ def test_ensure_cache_rule_refuses_duplicate_named_rules() -> None:
 def test_purge_posts_urls_to_zone() -> None:
     script = _load_script()
     api = _FakeCloudflare([])
-    script.cloudflare_purge(["https://x/a", "https://x/b"], "zone", api)
+    script.cloudflare_purge(["https://x/a", "https://x/b"], "zone", api, [])
     assert api.writes == [
         ("POST", "/zones/zone/purge_cache", {"files": ["https://x/a", "https://x/b"]})
+    ]
+
+
+def test_purge_sends_one_entry_per_origin_after_each_plain_url() -> None:
+    script = _load_script()
+    api = _FakeCloudflare([])
+
+    script.cloudflare_purge(
+        ["https://x/a", "https://x/b"],
+        "zone",
+        api,
+        ["https://baseball.computer", "http://localhost:4173"],
+    )
+
+    assert api.writes == [
+        (
+            "POST",
+            "/zones/zone/purge_cache",
+            {
+                "files": [
+                    "https://x/a",
+                    {
+                        "url": "https://x/a",
+                        "headers": {"Origin": "https://baseball.computer"},
+                    },
+                    {
+                        "url": "https://x/a",
+                        "headers": {"Origin": "http://localhost:4173"},
+                    },
+                    "https://x/b",
+                    {
+                        "url": "https://x/b",
+                        "headers": {"Origin": "https://baseball.computer"},
+                    },
+                    {
+                        "url": "https://x/b",
+                        "headers": {"Origin": "http://localhost:4173"},
+                    },
+                ]
+            },
+        )
+    ]
+
+
+def test_purge_origins_default_to_the_site_and_local_preview() -> None:
+    script = _load_script()
+
+    assert script.parse_args([]).purge_origins == [
+        "https://baseball.computer",
+        "http://localhost:4173",
+    ]
+    assert script.parse_args(["--purge-origin", "https://x"]).purge_origins == [
+        "https://x"
+    ]
+    assert script.DEFAULT_PURGE_ORIGINS == (
+        "https://baseball.computer",
+        "http://localhost:4173",
+    )
+
+
+def test_credentials_file_fills_only_absent_or_empty_variables(tmp_path: Path) -> None:
+    script = _load_script()
+    credentials = tmp_path / "cloudflare.env"
+    credentials.write_text(
+        "# Cloudflare\n"
+        "\n"
+        "CLOUDFLARE_API_TOKEN=from-file\n"
+        "export CLOUDFLARE_ZONE_ID='quoted-zone'\n"
+        '  R2_ACCOUNT_ID = "spaced"  \n'
+        "R2_ACCESS_KEY_ID=already-set\n"
+        "R2_SECRET_ACCESS_KEY=\n"
+        "not an assignment\n",
+        encoding="utf-8",
+    )
+    environ = {"CLOUDFLARE_API_TOKEN": "", "R2_ACCESS_KEY_ID": "from-environment"}
+
+    loaded = script.load_credentials_file(credentials, environ)
+
+    assert loaded == ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ZONE_ID", "R2_ACCOUNT_ID"]
+    assert environ == {
+        "CLOUDFLARE_API_TOKEN": "from-file",
+        "CLOUDFLARE_ZONE_ID": "quoted-zone",
+        "R2_ACCOUNT_ID": "spaced",
+        "R2_ACCESS_KEY_ID": "from-environment",
+    }
+
+
+def test_credentials_file_missing_is_not_an_error(tmp_path: Path) -> None:
+    script = _load_script()
+    environ: dict[str, str] = {}
+
+    assert script.load_credentials_file(tmp_path / "absent.env", environ) == []
+    assert environ == {}
+
+
+def test_credentials_file_path_prefers_the_environment_override(
+    tmp_path: Path,
+) -> None:
+    script = _load_script()
+    override = tmp_path / "other.env"
+
+    assert script.credentials_file_path({}) == script.DEFAULT_CREDENTIALS_FILE
+    assert script.DEFAULT_CREDENTIALS_FILE.name == "cloudflare.env"
+    assert (
+        script.credentials_file_path({script.CREDENTIALS_FILE_VAR: str(override)})
+        == override
+    )
+
+
+def test_metadata_cache_only_fixes_the_rule_and_purges_without_uploading(
+    tmp_path: Path,
+) -> None:
+    script = _load_script()
+    version_file = tmp_path / "data_version.txt"
+    version_file.write_text("9\n", encoding="utf-8")
+    script.DATA_VERSION_FILE = version_file
+    api = _FakeCloudflare([])
+    headed: list[str] = []
+
+    def head(url: str) -> dict[str, str]:
+        headed.append(url)
+        return {"cf-cache-status": "DYNAMIC"}
+
+    def uploader_factory(args: Any, prefix: str) -> Any:
+        raise AssertionError(f"built an uploader for {prefix}")
+
+    exit_code = script.run(
+        script.parse_args(["--metadata-cache-only"]),
+        lambda: ("zone", api),
+        head,
+        uploader_factory,
+    )
+
+    urls = script.metadata_urls("baseball/v9")
+    assert exit_code == 0
+    assert len(urls) == 3
+    assert headed == urls
+    assert api.writes == [
+        (
+            "POST",
+            "/zones/zone/rulesets/rs1/rules",
+            script.desired_metadata_cache_rule(),
+        ),
+        (
+            "POST",
+            "/zones/zone/purge_cache",
+            {"files": script.purge_files(urls, list(script.DEFAULT_PURGE_ORIGINS))},
+        ),
+    ]
+
+
+def test_metadata_urls_match_the_objects_the_upload_publishes(tmp_path: Path) -> None:
+    script = _load_script()
+    catalog_path = tmp_path / "bc_publish.ducklake"
+    data_path = tmp_path / "bc_publish_data"
+    _create_catalog(catalog_path, data_path)
+    packet = tmp_path / "baseball.lsf"
+    packet.write_text(MINIMAL_PACKET, encoding="utf-8")
+    script.CATALOG_PATH = catalog_path
+    script.DATA_PATH = data_path
+    script.PACKET_PATH = packet
+    script.CATALOG_METADATA_PATH = tmp_path / "catalog.json"
+
+    catalog_url, metadata_url, packet_url, _ = script.upload_artifact(
+        "baseball/v9", _HeaderRecordingUploader(), workers=1
+    )
+
+    assert script.metadata_urls("baseball/v9") == [
+        catalog_url,
+        metadata_url,
+        packet_url,
     ]
 
 

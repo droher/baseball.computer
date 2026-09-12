@@ -247,6 +247,16 @@ sensitivity-ribbon *ARGS:
 gen-llm-context *ARGS:
     uv run --group build python scripts/generate_llm_context.py --validate "$@"
 
+# --- Publish ---
+
+# Upload the built DuckLake artifact to R2, ensure the cache rule, and purge metadata URLs.
+upload *ARGS:
+    uv run --group build python scripts/upload_ducklake.py "$@"
+
+# Ensure the Cloudflare metadata cache rule and purge the metadata URLs; uploads nothing.
+metadata-cache *ARGS:
+    uv run --group build python scripts/upload_ducklake.py --metadata-cache-only "$@"
+
 # --- Tests ---
 
 # pytest under bc/tests (dev DB env). Fast tier by default (pyproject addopts deselect `slow`); `just test -m slow` runs the slow tier.

@@ -19,15 +19,23 @@ Required env vars:
   Cloudflare cache rule + purge: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID
     (the token needs Cache Rules edit and Cache Purge on the zone)
 
+Variables absent or empty in the environment are read from the credentials
+file at BC_CREDENTIALS_FILE, defaulting to
+~/.config/baseball.computer/cloudflare.env; a missing file is not an error.
+
 Before uploading, the script makes sure the zone's "DuckLake metadata
 revalidation" cache rule covers every metadata object it is about to
 publish, so the catalog, schema, and packet are never edge-cached under
 the legacy month-long page rule. After the purge it HEADs each metadata
-URL and fails if Cloudflare reports a cache HIT.
+URL and fails if Cloudflare reports a cache HIT. Cloudflare keys cached
+responses by request Origin, so the purge sends the plain URL plus one
+variant per `--purge-origin`.
 
 `--wrangler` uses the active Cloudflare OAuth login instead of R2 credentials.
 For a fresh version prefix, `--skip-purge` also avoids cache-purge credentials;
 `--skip-cache-rule` skips the rule check when no Cloudflare token is available.
+`--metadata-cache-only` uploads nothing and only repairs the cache rule and
+purges the metadata URLs of the current data version.
 """
 
 from __future__ import annotations
@@ -46,7 +54,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, MutableMapping
 from typing import Any, Protocol, cast
 
 import duckdb
@@ -88,6 +96,11 @@ EDGE_CACHE_STATUS_HEADER = "cf-cache-status"
 VERIFY_USER_AGENT = "baseball.computer-upload-verify/1.0"
 WRANGLER_VERSION = "4.128.0"
 WRANGLER_MAX_UPLOAD_BYTES = 300 * 1024 * 1024
+CREDENTIALS_FILE_VAR = "BC_CREDENTIALS_FILE"
+DEFAULT_CREDENTIALS_FILE = (
+    Path.home() / ".config" / "baseball.computer" / "cloudflare.env"
+)
+DEFAULT_PURGE_ORIGINS = ("https://baseball.computer", "http://localhost:4173")
 
 _log = logging.getLogger("upload_ducklake")
 
@@ -97,6 +110,42 @@ def env(name: str) -> str:
     if not val:
         raise SystemExit(f"missing required env var: {name}")
     return val
+
+
+def credentials_file_path(environ: Mapping[str, str]) -> Path:
+    override = environ.get(CREDENTIALS_FILE_VAR)
+    return Path(override).expanduser() if override else DEFAULT_CREDENTIALS_FILE
+
+
+def _unquote(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
+def load_credentials_file(path: Path, environ: MutableMapping[str, str]) -> list[str]:
+    """Fill empty variables from a KEY=value file; return the names set.
+
+    Placeholder lines with no value are ignored, so an unfilled credentials
+    file still fails with the missing-variable error rather than an empty one.
+    """
+    if not path.is_file():
+        return []
+    loaded: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            continue
+        if entry.startswith("export "):
+            entry = entry.removeprefix("export ").strip()
+        name, separator, value = entry.partition("=")
+        name = name.strip()
+        setting = _unquote(value.strip())
+        if not separator or not name or not setting or environ.get(name):
+            continue
+        environ[name] = setting
+        loaded.append(name)
+    return loaded
 
 
 def read_data_version() -> str:
@@ -429,6 +478,18 @@ def assert_packet_valid(packet_path: Path = PACKET_PATH) -> None:
         raise SystemExit(f"packet {packet_path} fails LSF-1 validation:\n  {listing}")
 
 
+def metadata_keys(prefix: str) -> tuple[str, str, str]:
+    return (
+        f"{prefix}/{CATALOG_OBJECT_NAME}",
+        f"{prefix}/{CATALOG_METADATA_OBJECT_NAME}",
+        f"{prefix}/{PACKET_OBJECT_NAME}",
+    )
+
+
+def metadata_urls(prefix: str) -> list[str]:
+    return [f"https://{PUBLIC_HOST}/{key}" for key in metadata_keys(prefix)]
+
+
 def upload_artifact(
     prefix: str,
     uploader: ObjectUploader,
@@ -454,9 +515,7 @@ def upload_artifact(
         for file in data_files
     ]
     metadata_path = write_catalog_metadata()
-    metadata_key = f"{prefix}/{CATALOG_METADATA_OBJECT_NAME}"
-    packet_key = f"{prefix}/{PACKET_OBJECT_NAME}"
-    catalog_key = f"{prefix}/{CATALOG_OBJECT_NAME}"
+    catalog_key, metadata_key, packet_key = metadata_keys(prefix)
     preflight_uploads(
         uploader,
         data_uploads
@@ -490,9 +549,7 @@ def upload_artifact(
         "application/octet-stream",
     )
 
-    catalog_url = f"https://{PUBLIC_HOST}/{catalog_key}"
-    metadata_url = f"https://{PUBLIC_HOST}/{metadata_key}"
-    packet_url = f"https://{PUBLIC_HOST}/{packet_key}"
+    catalog_url, metadata_url, packet_url = metadata_urls(prefix)
     _log.info(
         "upload summary: data=%.1f MB across %d files, catalog=%.1f MB, packet=%.1f MB",
         total_data_bytes / 1e6,
@@ -714,12 +771,79 @@ def assert_metadata_not_edge_cached(
             )
 
 
-def cloudflare_purge(urls: list[str], zone_id: str, request: CloudflareRequest) -> None:
-    _ = request("POST", f"/zones/{zone_id}/purge_cache", {"files": urls})
-    _log.info("Cloudflare purged %s", ", ".join(urls))
+def purge_files(urls: list[str], origins: list[str]) -> list[str | dict[str, Any]]:
+    """Cloudflare caches per request Origin, so purge one entry per origin."""
+    files: list[str | dict[str, Any]] = []
+    for url in urls:
+        files.append(url)
+        files.extend({"url": url, "headers": {"Origin": origin}} for origin in origins)
+    return files
 
 
-def main(argv: list[str] | None = None) -> int:
+def cloudflare_purge(
+    urls: list[str],
+    zone_id: str,
+    request: CloudflareRequest,
+    origins: list[str],
+) -> None:
+    files = purge_files(urls, origins)
+    _ = request("POST", f"/zones/{zone_id}/purge_cache", {"files": files})
+    _log.info(
+        "Cloudflare purged %d entries for %s across origins %s",
+        len(files),
+        ", ".join(urls),
+        ", ".join(origins) or "none",
+    )
+
+
+CredentialsProvider = Callable[[], tuple[str, CloudflareRequest]]
+UploaderFactory = Callable[[argparse.Namespace, str], ObjectUploader]
+
+
+def build_uploader(args: argparse.Namespace, prefix: str) -> ObjectUploader:
+    uploader: ObjectUploader = WranglerUploader() if args.wrangler else r2_client()
+    if args.resume:
+        uploader = ResumeUploader(uploader, prefix)
+    return uploader
+
+
+def run(
+    args: argparse.Namespace,
+    credentials: CredentialsProvider = cloudflare_credentials,
+    head: HeadRequest = http_head,
+    uploader_factory: UploaderFactory = build_uploader,
+) -> int:
+    prefix = f"baseball/v{read_data_version()}"
+    urls = metadata_urls(prefix)
+
+    if args.skip_cache_rule:
+        _log.info("--skip-cache-rule set; not checking the Cloudflare cache rule")
+    else:
+        zone_id, request = credentials()
+        _ = ensure_metadata_cache_rule(zone_id, request)
+
+    if args.metadata_cache_only:
+        _log.info(
+            "--metadata-cache-only set; uploading nothing under s3://%s/%s/",
+            R2_BUCKET,
+            prefix,
+        )
+    else:
+        _log.info("uploading DuckLake artifact under s3://%s/%s/", R2_BUCKET, prefix)
+        _ = upload_artifact(prefix, uploader_factory(args, prefix), args.workers)
+
+    if args.skip_purge:
+        _log.info("--skip-purge set; not calling Cloudflare API")
+    else:
+        zone_id, request = credentials()
+        cloudflare_purge(urls, zone_id, request, args.purge_origins)
+    assert_metadata_not_edge_cached(urls, head)
+
+    _log.info("attach URL: ducklake:%s", urls[0])
+    return 0
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--skip-purge",
@@ -747,41 +871,42 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip matching immutable data files already present at the public URL.",
     )
+    parser.add_argument(
+        "--metadata-cache-only",
+        action="store_true",
+        help="Upload nothing; only fix the cache rule and purge the metadata URLs.",
+    )
+    parser.add_argument(
+        "--purge-origin",
+        metavar="ORIGIN",
+        action="append",
+        dest="purge_origins",
+        help=(
+            "Also purge the metadata URLs as seen from this Origin (repeatable; "
+            f"default {' '.join(DEFAULT_PURGE_ORIGINS)})."
+        ),
+    )
     parser.add_argument("-v", "--verbose", action="count", default=0)
     args = parser.parse_args(argv)
+    if not args.purge_origins:
+        args.purge_origins = list(DEFAULT_PURGE_ORIGINS)
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
-    data_version = read_data_version()
-    prefix = f"baseball/v{data_version}"
-    _log.info("uploading DuckLake artifact under s3://%s/%s/", R2_BUCKET, prefix)
+    path = credentials_file_path(os.environ)
+    loaded = load_credentials_file(path, os.environ)
+    if loaded:
+        _log.info("loaded %s from %s", ", ".join(loaded), path)
 
-    if args.skip_cache_rule:
-        _log.info("--skip-cache-rule set; not checking the Cloudflare cache rule")
-    else:
-        zone_id, request = cloudflare_credentials()
-        _ = ensure_metadata_cache_rule(zone_id, request)
-
-    uploader: ObjectUploader = WranglerUploader() if args.wrangler else r2_client()
-    if args.resume:
-        uploader = ResumeUploader(uploader, prefix)
-    catalog_url, metadata_url, packet_url, _ = upload_artifact(
-        prefix, uploader, args.workers
-    )
-    metadata_urls = [catalog_url, metadata_url, packet_url]
-
-    if args.skip_purge:
-        _log.info("--skip-purge set; not calling Cloudflare API")
-    else:
-        zone_id, request = cloudflare_credentials()
-        cloudflare_purge(metadata_urls, zone_id, request)
-    assert_metadata_not_edge_cached(metadata_urls)
-
-    _log.info("attach URL: ducklake:%s", catalog_url)
-    return 0
+    return run(args)
 
 
 if __name__ == "__main__":

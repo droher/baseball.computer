@@ -20,6 +20,8 @@ The `DuckLake metadata revalidation` cache rule bypasses edge caching and respec
 
 The `CLOUDFLARE_API_TOKEN` used by the workflow and by local runs therefore needs the zone's Cache Rules edit permission in addition to Cache Purge. The rule's settings live in the script as `CACHE_RULE_ACTION_PARAMETERS`; change them there, not in the dashboard, or the next upload will put them back.
 
+Locally the script fills any missing or empty variable from `~/.config/baseball.computer/cloudflare.env` (override the path with `BC_CREDENTIALS_FILE`); the file holds `KEY=value` or `export KEY=value` lines, the environment always wins, and a missing file is not an error. The token needs Zone → Cache Rules Edit, Cache Purge, and Zone Read on the `baseball.computer` zone, alongside `CLOUDFLARE_ZONE_ID`. `just metadata-cache` repairs the rule and purges the current version's catalog, `catalog.json`, and packet URLs without uploading anything, which is how an upload that ran without Cloudflare credentials gets fixed. Cloudflare keys cached responses by request `Origin`, so each purge sends the plain URL plus one entry per origin: `https://baseball.computer` and `http://localhost:4173` by default, and repeated `--purge-origin` flags replace that default list. `--skip-purge` and `--skip-cache-rule` still apply.
+
 ## Semantic views and metric macros
 
 The catalog carries two schemas beyond `main_models` and `main_seeds`:
