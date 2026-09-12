@@ -407,3 +407,138 @@ def test_upload_artifact_ships_packet_with_revalidating_headers_before_catalog(
         f"https://{script.PUBLIC_HOST}/baseball/v9/{name}"
         for name in ("baseball.ducklake", "catalog.json", "baseball.lsf")
     }
+
+
+class _FakeCloudflare:
+    def __init__(
+        self,
+        rules: list[dict[str, Any]] | None,
+        ruleset_id: str = "rs1",
+        not_found: type[Exception] = KeyError,
+    ) -> None:
+        self.rules = rules
+        self.ruleset_id = ruleset_id
+        self.not_found = not_found
+        self.writes: list[tuple[str, str, dict[str, Any] | None]] = []
+
+    def __call__(
+        self, method: str, path: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        if method == "GET":
+            if self.rules is None:
+                raise self.not_found("no entrypoint ruleset")
+            return {
+                "success": True,
+                "result": {"id": self.ruleset_id, "rules": self.rules},
+            }
+        self.writes.append((method, path, body))
+        return {"success": True, "result": {}}
+
+
+def test_cache_rule_expression_covers_every_metadata_object() -> None:
+    script = _load_script()
+    expression = script.metadata_cache_rule_expression()
+    assert f'http.host eq "{script.PUBLIC_HOST}"' in expression
+    assert 'starts_with(http.request.uri.path, "/baseball/")' in expression
+    for name in (
+        script.CATALOG_OBJECT_NAME,
+        script.CATALOG_METADATA_OBJECT_NAME,
+        script.PACKET_OBJECT_NAME,
+    ):
+        assert any(
+            name.endswith(suffix.lstrip("/"))
+            for suffix in script.metadata_path_suffixes()
+        ), name
+    assert 'ends_with(http.request.uri.path, ".lsf")' in expression
+    assert ".parquet" not in expression
+
+
+def test_ensure_cache_rule_leaves_matching_rule_alone() -> None:
+    script = _load_script()
+    desired = script.desired_metadata_cache_rule()
+    other = {"id": "r0", "description": "something else", "expression": "true"}
+    api = _FakeCloudflare([other, {"id": "r1", **desired}])
+    assert script.ensure_metadata_cache_rule("zone", api) == "unchanged"
+    assert api.writes == []
+
+
+def test_ensure_cache_rule_patches_only_the_named_rule_when_it_differs() -> None:
+    script = _load_script()
+    desired = script.desired_metadata_cache_rule()
+    stale = {
+        "id": "r1",
+        **desired,
+        "expression": desired["expression"].replace(
+            ' or ends_with(http.request.uri.path, ".lsf")', ""
+        ),
+    }
+    other = {"id": "r0", "description": "something else", "expression": "true"}
+    api = _FakeCloudflare([other, stale])
+    assert script.ensure_metadata_cache_rule("zone", api) == "updated"
+    assert api.writes == [("PATCH", "/zones/zone/rulesets/rs1/rules/r1", desired)]
+
+
+def test_ensure_cache_rule_updates_a_disabled_rule() -> None:
+    script = _load_script()
+    desired = script.desired_metadata_cache_rule()
+    api = _FakeCloudflare([{"id": "r1", **desired, "enabled": False}])
+    assert script.ensure_metadata_cache_rule("zone", api) == "updated"
+    assert [w[0] for w in api.writes] == ["PATCH"]
+
+
+def test_ensure_cache_rule_creates_missing_rule_in_existing_ruleset() -> None:
+    script = _load_script()
+    api = _FakeCloudflare(
+        [{"id": "r0", "description": "something else", "expression": "true"}]
+    )
+    assert script.ensure_metadata_cache_rule("zone", api) == "created"
+    assert api.writes == [
+        ("POST", "/zones/zone/rulesets/rs1/rules", script.desired_metadata_cache_rule())
+    ]
+
+
+def test_ensure_cache_rule_creates_ruleset_when_zone_has_none() -> None:
+    script = _load_script()
+    api = _FakeCloudflare(None, not_found=script.CloudflareNotFound)
+    assert script.ensure_metadata_cache_rule("zone", api) == "created"
+    assert api.writes == [
+        (
+            "PUT",
+            f"/zones/zone/rulesets/phases/{script.CACHE_RULE_PHASE}/entrypoint",
+            {"rules": [script.desired_metadata_cache_rule()]},
+        )
+    ]
+
+
+def test_ensure_cache_rule_refuses_duplicate_named_rules() -> None:
+    script = _load_script()
+    desired = script.desired_metadata_cache_rule()
+    api = _FakeCloudflare([{"id": "r1", **desired}, {"id": "r2", **desired}])
+    with pytest.raises(SystemExit, match="2 cache rules named"):
+        script.ensure_metadata_cache_rule("zone", api)
+    assert api.writes == []
+
+
+def test_purge_posts_urls_to_zone() -> None:
+    script = _load_script()
+    api = _FakeCloudflare([])
+    script.cloudflare_purge(["https://x/a", "https://x/b"], "zone", api)
+    assert api.writes == [
+        ("POST", "/zones/zone/purge_cache", {"files": ["https://x/a", "https://x/b"]})
+    ]
+
+
+def test_edge_cache_check_fails_only_on_hit() -> None:
+    script = _load_script()
+    statuses = {
+        "https://x/ok": "DYNAMIC",
+        "https://x/miss": "MISS",
+        "https://x/none": "",
+    }
+    script.assert_metadata_not_edge_cached(
+        list(statuses), lambda url: {"cf-cache-status": statuses[url]}
+    )
+    with pytest.raises(SystemExit, match="served from the Cloudflare edge cache"):
+        script.assert_metadata_not_edge_cached(
+            ["https://x/hit"], lambda url: {"cf-cache-status": "hit"}
+        )

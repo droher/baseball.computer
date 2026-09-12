@@ -16,10 +16,18 @@ R2 prefix: s3://timeball/baseball/v<DATA_VERSION>/
 
 Required env vars:
   boto3: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
-  cache purge: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID
+  Cloudflare cache rule + purge: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID
+    (the token needs Cache Rules edit and Cache Purge on the zone)
+
+Before uploading, the script makes sure the zone's "DuckLake metadata
+revalidation" cache rule covers every metadata object it is about to
+publish, so the catalog, schema, and packet are never edge-cached under
+the legacy month-long page rule. After the purge it HEADs each metadata
+URL and fails if Cloudflare reports a cache HIT.
 
 `--wrangler` uses the active Cloudflare OAuth login instead of R2 credentials.
-For a fresh version prefix, `--skip-purge` also avoids cache-purge credentials.
+For a fresh version prefix, `--skip-purge` also avoids cache-purge credentials;
+`--skip-cache-rule` skips the rule check when no Cloudflare token is available.
 """
 
 from __future__ import annotations
@@ -39,7 +47,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from collections.abc import Callable
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
 import duckdb
 
@@ -67,6 +75,16 @@ DATA_UPLOAD_WORKERS = 4
 MIN_DATA_UPLOAD_WORKERS = 1
 MAX_DATA_UPLOAD_WORKERS = 16
 UPLOAD_ATTEMPTS = 3
+CLOUDFLARE_API = "https://api.cloudflare.com/client/v4"
+PUBLIC_PATH_ROOT = "/baseball/"
+CACHE_RULE_DESCRIPTION = "DuckLake metadata revalidation"
+CACHE_RULE_PHASE = "http_request_cache_settings"
+CACHE_RULE_ACTION = "set_cache_settings"
+CACHE_RULE_ACTION_PARAMETERS: dict[str, Any] = {
+    "cache": False,
+    "browser_ttl": {"mode": "respect_origin"},
+}
+EDGE_CACHE_STATUS_HEADER = "cf-cache-status"
 WRANGLER_VERSION = "4.128.0"
 WRANGLER_MAX_UPLOAD_BYTES = 300 * 1024 * 1024
 
@@ -529,27 +547,168 @@ def upload_data_files(
     return total
 
 
-def cloudflare_purge(urls: list[str]) -> None:
-    zone_id = env("CLOUDFLARE_ZONE_ID")
-    token = env("CLOUDFLARE_API_TOKEN")
-    req = urllib.request.Request(
-        f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache",
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        data=json.dumps({"files": urls}).encode("utf-8"),
+class CloudflareNotFound(Exception):
+    pass
+
+
+class CloudflareRequest(Protocol):
+    def __call__(
+        self, method: str, path: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]: ...
+
+
+def cloudflare_api(token: str) -> CloudflareRequest:
+    """Bind a bearer token to a JSON request function against the v4 API."""
+
+    def request(
+        method: str, path: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        req = urllib.request.Request(
+            f"{CLOUDFLARE_API}{path}",
+            method=method,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            data=None if body is None else json.dumps(body).encode("utf-8"),
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                payload = cast(dict[str, Any], json.loads(resp.read().decode("utf-8")))
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")
+            if e.code == 404:
+                raise CloudflareNotFound(detail) from e
+            raise SystemExit(
+                f"Cloudflare {method} {path} failed: status={e.code} body={detail}"
+            ) from e
+        if not payload.get("success"):
+            raise SystemExit(f"Cloudflare {method} {path} failed: body={payload}")
+        return payload
+
+    return request
+
+
+def cloudflare_credentials() -> tuple[str, CloudflareRequest]:
+    return env("CLOUDFLARE_ZONE_ID"), cloudflare_api(env("CLOUDFLARE_API_TOKEN"))
+
+
+def metadata_path_suffixes() -> tuple[str, ...]:
+    """Path endings of every revalidating object the upload publishes."""
+    return (
+        Path(CATALOG_OBJECT_NAME).suffix,
+        f"/{CATALOG_METADATA_OBJECT_NAME}",
+        Path(PACKET_OBJECT_NAME).suffix,
     )
+
+
+def metadata_cache_rule_expression() -> str:
+    endings = " or ".join(
+        f'ends_with(http.request.uri.path, "{suffix}")'
+        for suffix in metadata_path_suffixes()
+    )
+    return (
+        f'(http.host eq "{PUBLIC_HOST}" and '
+        f'starts_with(http.request.uri.path, "{PUBLIC_PATH_ROOT}") and ({endings}))'
+    )
+
+
+def desired_metadata_cache_rule() -> dict[str, Any]:
+    return {
+        "description": CACHE_RULE_DESCRIPTION,
+        "expression": metadata_cache_rule_expression(),
+        "action": CACHE_RULE_ACTION,
+        "action_parameters": CACHE_RULE_ACTION_PARAMETERS,
+        "enabled": True,
+    }
+
+
+def _rule_matches(rule: dict[str, Any], desired: dict[str, Any]) -> bool:
+    return (
+        rule.get("expression") == desired["expression"]
+        and rule.get("action") == desired["action"]
+        and rule.get("action_parameters") == desired["action_parameters"]
+        and bool(rule.get("enabled", True))
+    )
+
+
+def ensure_metadata_cache_rule(zone_id: str, request: CloudflareRequest) -> str:
+    """Create or update the zone's metadata cache rule; return what happened.
+
+    Only the rule named CACHE_RULE_DESCRIPTION is ever written. Every other
+    rule in the cache-settings ruleset is left exactly as it is.
+    """
+    desired = desired_metadata_cache_rule()
+    entrypoint = f"/zones/{zone_id}/rulesets/phases/{CACHE_RULE_PHASE}/entrypoint"
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
+        result = cast(dict[str, Any], request("GET", entrypoint)["result"])
+    except CloudflareNotFound:
+        _ = request("PUT", entrypoint, {"rules": [desired]})
+        _log.info("created cache ruleset with rule %r", CACHE_RULE_DESCRIPTION)
+        return "created"
+    ruleset_id = str(result["id"])
+    rules = cast(list[dict[str, Any]], result.get("rules") or [])
+    matches = [r for r in rules if r.get("description") == CACHE_RULE_DESCRIPTION]
+    if len(matches) > 1:
         raise SystemExit(
-            f"Cloudflare purge failed: status={e.code} body={e.read().decode('utf-8', 'replace')}"
-        ) from e
-    if not body.get("success"):
-        raise SystemExit(f"Cloudflare purge failed: body={body}")
+            f"zone has {len(matches)} cache rules named {CACHE_RULE_DESCRIPTION!r}; "
+            "remove the duplicates in the Cloudflare dashboard first"
+        )
+    if not matches:
+        _ = request("POST", f"/zones/{zone_id}/rulesets/{ruleset_id}/rules", desired)
+        _log.info(
+            "created cache rule %r: %s", CACHE_RULE_DESCRIPTION, desired["expression"]
+        )
+        return "created"
+    rule = matches[0]
+    if _rule_matches(rule, desired):
+        _log.info(
+            "cache rule %r already covers %s",
+            CACHE_RULE_DESCRIPTION,
+            metadata_path_suffixes(),
+        )
+        return "unchanged"
+    _log.info(
+        "updating cache rule %r\n  was: expression=%s action_parameters=%s enabled=%s\n  now: expression=%s action_parameters=%s",
+        CACHE_RULE_DESCRIPTION,
+        rule.get("expression"),
+        rule.get("action_parameters"),
+        rule.get("enabled", True),
+        desired["expression"],
+        desired["action_parameters"],
+    )
+    _ = request(
+        "PATCH", f"/zones/{zone_id}/rulesets/{ruleset_id}/rules/{rule['id']}", desired
+    )
+    return "updated"
+
+
+class HeadRequest(Protocol):
+    def __call__(self, url: str) -> dict[str, str]: ...
+
+
+def http_head(url: str) -> dict[str, str]:
+    req = urllib.request.Request(url, method="HEAD")
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return {k.lower(): v for k, v in resp.headers.items()}
+
+
+def assert_metadata_not_edge_cached(
+    urls: list[str], head: HeadRequest = http_head
+) -> None:
+    """Fail when Cloudflare served a metadata object from its edge cache."""
+    for url in urls:
+        status = head(url).get(EDGE_CACHE_STATUS_HEADER, "")
+        _log.info("%s %s=%s", url, EDGE_CACHE_STATUS_HEADER, status or "absent")
+        if status.upper() == "HIT":
+            raise SystemExit(
+                f"{url} was served from the Cloudflare edge cache; the "
+                f"{CACHE_RULE_DESCRIPTION!r} rule is not covering it"
+            )
+
+
+def cloudflare_purge(urls: list[str], zone_id: str, request: CloudflareRequest) -> None:
+    _ = request("POST", f"/zones/{zone_id}/purge_cache", {"files": urls})
     _log.info("Cloudflare purged %s", ", ".join(urls))
 
 
@@ -559,6 +718,11 @@ def main(argv: list[str] | None = None) -> int:
         "--skip-purge",
         action="store_true",
         help="Upload but skip the Cloudflare cache-purge step (useful in dry-run).",
+    )
+    parser.add_argument(
+        "--skip-cache-rule",
+        action="store_true",
+        help="Do not check or update the Cloudflare metadata cache rule before uploading.",
     )
     parser.add_argument(
         "--wrangler",
@@ -588,17 +752,26 @@ def main(argv: list[str] | None = None) -> int:
     prefix = f"baseball/v{data_version}"
     _log.info("uploading DuckLake artifact under s3://%s/%s/", R2_BUCKET, prefix)
 
+    if args.skip_cache_rule:
+        _log.info("--skip-cache-rule set; not checking the Cloudflare cache rule")
+    else:
+        zone_id, request = cloudflare_credentials()
+        _ = ensure_metadata_cache_rule(zone_id, request)
+
     uploader: ObjectUploader = WranglerUploader() if args.wrangler else r2_client()
     if args.resume:
         uploader = ResumeUploader(uploader, prefix)
     catalog_url, metadata_url, packet_url, _ = upload_artifact(
         prefix, uploader, args.workers
     )
+    metadata_urls = [catalog_url, metadata_url, packet_url]
 
     if args.skip_purge:
         _log.info("--skip-purge set; not calling Cloudflare API")
     else:
-        cloudflare_purge([catalog_url, metadata_url, packet_url])
+        zone_id, request = cloudflare_credentials()
+        cloudflare_purge(metadata_urls, zone_id, request)
+    assert_metadata_not_edge_cached(metadata_urls)
 
     _log.info("attach URL: ducklake:%s", catalog_url)
     return 0

@@ -14,9 +14,11 @@ The GitHub workflow requires a configured self-hosted runner, R2 secrets, cache-
 
 ## Cloudflare metadata caching
 
-The active `DuckLake metadata revalidation` cache rule bypasses edge caching and respects the origin browser TTL for `data.baseball.computer` paths under `/baseball/` ending in `.ducklake`, `/catalog.json`, or `.lsf`. It overrides the legacy month-long cache-everything page rule for metadata only. Keep this exception when changing Cloudflare configuration; otherwise even `max-age=0` can become a month-long browser cache lifetime. Public metadata responses must retain `max-age=0, must-revalidate`, CORS, and range support. Parquet keeps immutable caching.
+The `DuckLake metadata revalidation` cache rule bypasses edge caching and respects the origin browser TTL for `data.baseball.computer` paths under `/baseball/` ending in `.ducklake`, `/catalog.json`, or `.lsf`. It overrides the legacy month-long cache-everything page rule for metadata only. Without it even `max-age=0` can become a month-long browser cache lifetime. Public metadata responses must retain `max-age=0, must-revalidate`, CORS, and range support. Parquet keeps immutable caching.
 
-The `.lsf` suffix is part of that rule's path expression; the rule lives in the Cloudflare dashboard, not in this repository, so extending it is a manual step the first time a packet is published. Until the rule covers `.lsf`, a `GET` of `baseball.lsf` can be cached for a month at the edge even though the object carries `max-age=0, must-revalidate`.
+`upload_ducklake.py` owns that rule. Before uploading anything it reads the zone's cache-settings ruleset through the Cloudflare API, finds the rule by name, and creates or updates it so its expression lists every metadata object the script publishes. The expression is built from the same object names the uploader uses, so a new metadata object extends the rule on the next run. Only that one rule is written; other rules in the ruleset are untouched, and two rules with that name stop the run. After the purge the script HEADs each metadata URL and fails on a `cf-cache-status` of `HIT`. `--skip-cache-rule` skips the check when no Cloudflare token is available, for example with `--skip-purge` on a fresh prefix from a machine without credentials.
+
+The `CLOUDFLARE_API_TOKEN` used by the workflow and by local runs therefore needs the zone's Cache Rules edit permission in addition to Cache Purge. The rule's settings live in the script as `CACHE_RULE_ACTION_PARAMETERS`; change them there, not in the dashboard, or the next upload will put them back.
 
 ## Semantic views and metric macros
 
