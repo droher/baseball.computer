@@ -85,7 +85,7 @@ ESTIMATED_ROW_COUNT_FLOORS: dict[str, int] = {
 }
 COMPRESSION = "zstd"
 ROW_GROUP_SIZE = "1966080"
-KEEP_LAST_N_SNAPSHOTS = 5
+KEEP_LAST_N_SNAPSHOTS = 1
 SMOKE_SAMPLE = 5
 # Force every row to land in parquet files so R2 has the full artifact.
 # Default inlining keeps small tables inside the catalog DuckDB; we want
@@ -445,6 +445,10 @@ def expire_snapshots(con: duckdb.DuckDBPyConnection) -> None:
         KEEP_LAST_N_SNAPSHOTS,
         len(all_ids),
     )
+    removed = con.execute(
+        "CALL ducklake_cleanup_old_files('bc_publish', cleanup_all => true)"
+    ).fetchall()
+    _log.info("removed %d data files no live snapshot references", len(removed))
 
 
 def report_sizes() -> tuple[int, int]:
