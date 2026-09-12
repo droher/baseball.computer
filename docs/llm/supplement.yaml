@@ -11,16 +11,76 @@ coverage: >-
   with the supplement. Negro Leagues data integrated where available.
 
 table_synonyms:
-  main_models.player_offense_season_stats: [batters, hitters, hitting]
-  main_models.player_team_season_pitching_stats: [pitching season, pitcher seasons]
-  main_models.player_position_team_season_fielding_stats: [fielding, defense]
-  main_seeds.seed_franchises: [franchises, teams, team history]
+  offense_seasons: [batting seasons, hitting seasons, batters, hitters, player batting by season and team]
+  offense_events: [batting events, plate appearances by game, hitting game logs]
+  pitching_seasons: [pitching seasons, pitcher seasons, pitchers]
+  pitching_events: [pitching events, pitching game logs, pitcher outings]
+  fielding_seasons: [fielding seasons, defense by season and position, fielders]
+  fielding_events: [fielding events, defensive game logs, fielding by game]
+  main_models.metrics_player_season_league_offense: [player batting stats by season and league, batting rate stats, stored OPS by season]
+  main_models.metrics_player_season_league_pitching: [player pitching stats by season and league, stored ERA by season, pitching rate stats]
+  main_models.metrics_player_season_league_fielding: [player fielding stats by season and league, stored fielding percentage]
+  main_models.metrics_player_career_offense: [career batting, career hitting totals, all-time batting leaders]
+  main_models.metrics_player_career_pitching: [career pitching, all-time pitching leaders, career ERA]
+  main_models.metrics_player_career_fielding: [career fielding, career defensive totals]
+  main_models.metrics_team_season_offense: [team batting by season, team offense, team OPS]
+  main_models.metrics_team_season_pitching: [team pitching by season, team ERA, runs allowed by team]
+  main_models.metrics_team_season_fielding: [team fielding by season, team defense, team errors]
+  main_models.game_results: [game scores, final scores, winners and losers, game length]
+  main_models.game_start_info: [game conditions, attendance, weather, umpires, ballpark by game]
+  main_models.game_line_scores: [line scores, runs by inning]
+  main_models.game_starting_lineups: [starting lineups, batting orders, defensive alignments]
+  main_models.standings: [standings, win-loss records, team records, games behind, pennant races]
+  main_models.people: [players, player names, biographical data, birthplace, handedness]
+  main_models.stg_parks: [ballparks, stadiums, park names]
+  main_seeds.seed_franchises: [franchises, teams, team history, team names, relocations]
   main_seeds.seed_game_types: [game type, postseason flag]
   main_models.park_factor_summary: [estimated park factor, modeled park factor, park factor uncertainty]
   main_models.run_expectancy_summary: [estimated run expectancy, modeled run expectancy, run value uncertainty]
   main_models.imputed_batted_ball_geometry: [imputed trajectory, imputed batted-ball location, estimated hit type]
   main_models.state_transition_summary: [base-out transition matrix, base-out transition probabilities, estimated state transition]
   main_models.linear_weights_estimated: [estimated linear weights, linear weights uncertainty, run value uncertainty]
+
+leagues:
+  AL:
+    name: American League
+    aliases: [American, junior circuit]
+  NL:
+    name: National League
+    aliases: [National, senior circuit]
+  AA:
+    name: American Association
+    aliases: [Association]
+  NA:
+    name: National Association
+    aliases: [National Association of Professional Base Ball Players]
+  FL:
+    name: Federal League
+    aliases: [Feds]
+  PL:
+    name: Players' League
+    aliases: [Brotherhood]
+  UA:
+    name: Union Association
+    aliases: []
+  NN1:
+    name: Negro National League (first)
+    aliases: [Negro National League 1920-1931, NNL I]
+  NN2:
+    name: Negro National League (second)
+    aliases: [Negro National League 1933-1948, NNL II]
+  ECL:
+    name: Eastern Colored League
+    aliases: []
+  NAL:
+    name: Negro American League
+    aliases: []
+  EW:
+    name: East-West League
+    aliases: []
+  NSL:
+    name: Negro Southern League
+    aliases: []
 
 ambiguities:
   - term: HR
@@ -34,7 +94,7 @@ ambiguities:
       - metric.batting_average_offense_season
       - arithmetic mean
     default: metric.batting_average_offense_season
-    clarify_when: subject is not a hitting context (salary, attendance, etc.).
+    clarify_when: subject is not a hitting context (salary, attendance, etc.), or the subject is pitchers without saying whether their own hitting or batting average against is meant.
   - term: AVG
     meanings:
       - metric.batting_average_offense_season
@@ -51,7 +111,7 @@ ambiguities:
       - table.main_seeds_seed_franchises.team_id
       - franchise (multi-era)
     default: table.main_seeds_seed_franchises.team_id
-    clarify_when: question concerns franchise history rather than a single team-era.
+    clarify_when: question concerns franchise history rather than a single team-era, or a nickname maps to more than one team_id (Senators → WS1, WS2, WS9, WSN; Athletics → PHA, KC1, OAK).
   - term: park factor
     meanings:
       - table.main_models_park_factors
@@ -80,19 +140,28 @@ rules:
     text: Do not use columns not present in DB_CONTEXT.
   - severity: should
     scope: global
-    text: Prefer the BSL semantic tables (offense_seasons, offense_events, pitching_seasons, pitching_events, fielding_seasons, fielding_events) over main_models.metrics_* directly. The semantic tables apply consistent league joining and regular-season filtering.
+    text: Prefer the semantic views (semantic.offense_seasons, semantic.offense_events, semantic.pitching_seasons, semantic.pitching_events, semantic.fielding_seasons, semantic.fielding_events) over the player_*_stats and event_*_stats tables directly. The views apply consistent league joining and regular-season filtering.
   - severity: should
     scope: global
     text: Prefer published main_models.* tables over staging stg_* tables.
-  - severity: should
+  - severity: must
     scope: global
-    text: For rate stats (batting_average, obp, slg, era, whip, ...), recompute from underlying counting stats when grouping. Never SUM or AVG a stored rate column across rows.
+    text: For rate stats (batting_average, on_base_percentage, slugging_percentage, on_base_plus_slugging, earned_run_average, walks_and_hits_per_innings_pitched, ...) over a semantic view, aggregate with the metrics.<name>(...) macro named on the METRIC record, passing the base columns in the listed order, inside a GROUP BY query. The macros return NULL when a denominator sums to 0. The stored rate columns exist only on main_models.metrics_* tables, may hold inf or NaN where a denominator was 0, and must never be SUMmed or AVGed across rows.
   - severity: warn
     scope: global
-    text: Season-grain BSL tables filter to regular-season game types by default. Pass game_type explicitly when postseason data is wanted.
+    text: Season-grain semantic views keep only regular-season game types (RegularSeason, TiebreakerPlayoff). For postseason season totals query main_models.player_team_season_*_stats with an explicit game_type, or sum the event-grain view filtered on is_postseason.
   - severity: warn
     scope: global
     text: Event-level data is sparse before 1910. Restrict event-grain queries to season >= 1910 unless the question specifically targets the early era.
+  - severity: must
+    scope: global
+    text: fielding_position is an integer (1=P, 2=C, 3=1B, 4=2B, 5=3B, 6=SS, 7=LF, 8=CF, 9=RF, 10=DH), never a text abbreviation.
+  - severity: must
+    scope: global
+    text: main_models.standings holds one row per team per date. For a final or current record take the latest date per (season, team_id), e.g. with QUALIFY row_number() OVER (PARTITION BY season, team_id ORDER BY date DESC) = 1.
+  - severity: should
+    scope: global
+    text: Franchises change team_id when they move (MON → WAS, WS1 → MIN). Use main_seeds.seed_franchises.franchise_id joined on team_id and season for franchise history; a bare team_id covers only one era.
   - severity: must
     scope: global
     text: >-
@@ -121,25 +190,369 @@ rules:
 verified_queries:
   - id: vq.trout_2018_obp
     question: What was Mike Trout's OBP in 2018?
-    notes: Single-player season, AL regular season; canonical use of the offense season metric.
+    notes: Single-player season via the offense view and the on_base_percentage macro. Regular season only by default. Returns 0.4596.
     sql: |
-      select obp
+      select metrics.on_base_percentage(on_base_successes, on_base_opportunities) as obp
+      from semantic.offense_seasons
+      where player_id = 'troum001' and season = 2018
+      group by player_id
+  - id: vq.williams_1941_batting_average
+    question: What did Ted Williams hit in 1941?
+    notes: Stored rate column on the season/league metrics table; league filter keeps the AL row. Returns 0.4057.
+    sql: |
+      select batting_average
       from main_models.metrics_player_season_league_offense
-      where player_id = 'troum001' and season = 2018 and league = 'AL'
-  - id: vq.team_ops_2003
-    question: What was the lowest team OPS in 2003?
-    notes: Team-season aggregate. Uses main_models.metrics_team_season_league_offense (regular season only).
+      where player_id = 'willt103' and season = 1941 and league = 'AL'
+  - id: vq.bonds_2004_ops
+    question: What was Barry Bonds' OPS in 2004?
+    notes: Derived metric; the macro takes the four base columns of OBP and SLG. Returns 1.4217.
     sql: |
-      select team_id, ops
-      from main_models.metrics_team_season_league_offense
-      where season = 2003
-      order by ops asc
+      select metrics.on_base_plus_slugging(on_base_successes, on_base_opportunities, total_bases, at_bats) as ops
+      from semantic.offense_seasons
+      where player_id = 'bondb001' and season = 2004
+      group by player_id
+  - id: vq.ops_leaders_2004_qualified
+    question: Who led the majors in OPS in 2004 among qualified hitters?
+    notes: Qualification threshold expressed as a HAVING on summed plate appearances (502 = 3.1 per team game). Bonds first at 1.4217.
+    sql: |
+      select player_id,
+             sum(plate_appearances) as pa,
+             metrics.on_base_plus_slugging(on_base_successes, on_base_opportunities, total_bases, at_bats) as ops
+      from semantic.offense_seasons
+      where season = 2004
+      group by player_id
+      having sum(plate_appearances) >= 502
+      order by ops desc
+      limit 5
+  - id: vq.gibson_1968_era
+    question: What was Bob Gibson's ERA in 1968?
+    notes: Pitching view plus the earned_run_average macro over outs_recorded. Returns 1.1225.
+    sql: |
+      select metrics.earned_run_average(earned_runs, outs_recorded) as era
+      from semantic.pitching_seasons
+      where player_id = 'gibsb101' and season = 1968
+      group by player_id
+  - id: vq.gibson_1968_complete_games_shutouts
+    question: How many complete games and shutouts did Bob Gibson throw in 1968?
+    notes: Counting columns summed from the pitching view. Returns 28 and 13.
+    sql: |
+      select sum(complete_games) as complete_games, sum(shutouts) as shutouts
+      from semantic.pitching_seasons
+      where player_id = 'gibsb101' and season = 1968
+      group by player_id
+  - id: vq.clemens_1997_strikeouts_per_nine
+    question: What was Roger Clemens' K/9 in 1997?
+    notes: Per-nine-innings macro over outs_recorded. Returns 9.95.
+    sql: |
+      select metrics.strikeouts_per_9_innings(strikeouts, outs_recorded) as k_per_9
+      from semantic.pitching_seasons
+      where player_id = 'clemr001' and season = 1997
+      group by player_id
+  - id: vq.ryan_1987_strikeout_to_walk
+    question: What was Nolan Ryan's strikeout-to-walk ratio in 1987?
+    notes: Shows the counting columns next to the macro. Returns 270 K, 87 BB, 3.103.
+    sql: |
+      select sum(strikeouts) as strikeouts,
+             sum(walks) as walks,
+             metrics.strikeout_to_walk_ratio(strikeouts, walks) as k_per_bb
+      from semantic.pitching_seasons
+      where player_id = 'ryann001' and season = 1987
+      group by player_id
+  - id: vq.jeter_2000_errors_at_shortstop
+    question: How many errors did Derek Jeter make at shortstop in 2000?
+    notes: fielding_position is an integer; 6 is shortstop. Returns 24.
+    sql: |
+      select sum(errors) as errors
+      from semantic.fielding_seasons
+      where player_id = 'jeted001' and season = 2000 and fielding_position = 6
+      group by player_id
+  - id: vq.passed_balls_leader_1987
+    question: Which catcher had the most passed balls in 1987?
+    notes: Fielding view filtered to position 2 (catcher). Returns petrg001 with 35.
+    sql: |
+      select player_id, sum(passed_balls) as passed_balls
+      from semantic.fielding_seasons
+      where season = 1987 and fielding_position = 2
+      group by player_id
+      order by passed_balls desc
       limit 1
-  - id: vq.most_hr_career
+  - id: vq.team_fielding_percentage_2015
+    question: Which team had the best fielding percentage in 2015?
+    notes: Team grain from the fielding view, grouped by team_id, with the fielding_percentage macro. Returns LAN at 0.98779.
+    sql: |
+      select team_id, metrics.fielding_percentage(putouts, assists, errors) as fielding_percentage
+      from semantic.fielding_seasons
+      where season = 2015
+      group by team_id
+      order by fielding_percentage desc
+      limit 1
+  - id: vq.henderson_1982_stolen_bases
+    question: How many bases did Rickey Henderson steal in 1982, and at what success rate?
+    notes: Baserunning counts live on the offense view. Returns 130 SB, 42 CS, 0.7558.
+    sql: |
+      select sum(stolen_bases) as stolen_bases,
+             sum(caught_stealing) as caught_stealing,
+             metrics.stolen_base_percentage(stolen_bases, caught_stealing) as stolen_base_percentage
+      from semantic.offense_seasons
+      where player_id = 'hendr001' and season = 1982
+      group by player_id
+  - id: vq.league_batting_average_1968
+    question: What was the league batting average in each league in 1968?
+    notes: League grain comes from the view's league column. Returns AL 0.2301, NL 0.2431.
+    sql: |
+      select league, metrics.batting_average(hits, at_bats) as batting_average
+      from semantic.offense_seasons
+      where season = 1968
+      group by league
+      order by league
+  - id: vq.nl_rbi_leader_1930
+    question: Who led the National League in RBI in 1930?
+    notes: League filter on the view. Returns wilsh102 (Hack Wilson) with 191.
+    sql: |
+      select player_id, sum(runs_batted_in) as rbi
+      from semantic.offense_seasons
+      where season = 1930 and league = 'NL'
+      group by player_id
+      order by rbi desc
+      limit 1
+  - id: vq.triples_leader_1912
+    question: Who hit the most triples in 1912?
+    notes: Returns wilsc102 (Chief Wilson) with 36, the single-season record.
+    sql: |
+      select player_id, sum(triples) as triples
+      from semantic.offense_seasons
+      where season = 1912
+      group by player_id
+      order by triples desc
+      limit 1
+  - id: vq.ground_ball_rate_leader_2019
+    question: Who had the highest ground-ball rate in 2019 among hitters with at least 400 batted balls?
+    notes: Batted-ball macro; threshold on balls_batted. Returns ramow001 (Wilson Ramos) at 0.623.
+    sql: |
+      select player_id,
+             sum(balls_batted) as balls_batted,
+             metrics.ground_ball_rate(trajectory_ground_ball, trajectory_broad_known) as ground_ball_rate
+      from semantic.offense_seasons
+      where season = 2019
+      group by player_id
+      having sum(balls_batted) >= 400
+      order by ground_ball_rate desc
+      limit 1
+  - id: vq.ohtani_2021_two_way
+    question: What were Shohei Ohtani's OPS and ERA in 2021?
+    notes: Two-way player; one scalar subquery per view. Returns 0.9646 and 3.1765.
+    sql: |
+      select
+        (select metrics.on_base_plus_slugging(on_base_successes, on_base_opportunities, total_bases, at_bats)
+         from semantic.offense_seasons
+         where player_id = 'ohtas001' and season = 2021) as ops,
+        (select metrics.earned_run_average(earned_runs, outs_recorded)
+         from semantic.pitching_seasons
+         where player_id = 'ohtas001' and season = 2021) as era
+  - id: vq.bonds_2001_home_runs_home_away
+    question: How many of Barry Bonds' 2001 home runs came at home versus on the road?
+    notes: Event grain carries team_side; the event view is not regular-season filtered, so the flag is explicit. Returns Home 37, Away 36.
+    sql: |
+      select team_side, sum(home_runs) as home_runs
+      from semantic.offense_events
+      where player_id = 'bondb001' and season = 2001 and is_regular_season
+      group by team_side
+      order by team_side
+  - id: vq.coors_field_home_run_leader_1999
+    question: Who hit the most home runs at Coors Field in 1999?
+    notes: park_id filter on the event view (DEN02 = Coors Field). Returns walkl001 with 26.
+    sql: |
+      select player_id, sum(home_runs) as home_runs
+      from semantic.offense_events
+      where season = 1999 and park_id = 'DEN02' and is_regular_season
+      group by player_id
+      order by home_runs desc
+      limit 1
+  - id: vq.postseason_home_run_leader_2004
+    question: Who hit the most home runs in the 2004 postseason?
+    notes: Postseason via the event view's is_postseason flag. Returns beltc001 (Carlos Beltran) with 8.
+    sql: |
+      select player_id, sum(home_runs) as home_runs
+      from semantic.offense_events
+      where season = 2004 and is_postseason
+      group by player_id
+      order by home_runs desc
+      limit 1
+  - id: vq.randy_johnson_2001_postseason
+    question: How many strikeouts did Randy Johnson record in the 2001 postseason, and in how many innings?
+    notes: Pitching event grain with is_postseason; innings from outs. Returns 47 K in 41.33 innings (41.1).
+    sql: |
+      select sum(strikeouts) as strikeouts,
+             sum(outs_recorded) / 3.0 as innings_pitched
+      from semantic.pitching_events
+      where player_id = 'johnr005' and season = 2001 and is_postseason
+      group by player_id
+  - id: vq.ozzie_smith_1985_assists_by_park
+    question: Where did Ozzie Smith record his shortstop assists in 1985, by ballpark?
+    notes: Fielding event grain grouped by park_id. Home park STL09 leads with 301 of 547.
+    sql: |
+      select park_id, sum(assists) as assists
+      from semantic.fielding_events
+      where player_id = 'smito001' and season = 1985 and fielding_position = 6 and is_regular_season
+      group by park_id
+      order by assists desc
+  - id: vq.ortiz_2004_world_series
+    question: How did David Ortiz hit in the 2004 World Series?
+    notes: Series-level postseason totals are on the base season table with an explicit game_type; the semantic view would drop them. Returns 4 H, 13 AB, 1 HR.
+    sql: |
+      select sum(hits) as hits, sum(at_bats) as at_bats, sum(home_runs) as home_runs
+      from main_models.player_team_season_offense_stats
+      where player_id = 'ortid001' and season = 2004 and game_type = 'WorldSeries'
+      group by player_id
+  - id: vq.most_home_runs_career
     question: Who has the most career home runs?
-    notes: Career-grain table; counts only documented MLB seasons.
+    notes: Career-grain table; counts only documented MLB seasons. Bonds first with 762.
     sql: |
       select player_id, home_runs
       from main_models.metrics_player_career_offense
       order by home_runs desc
       limit 5
+  - id: vq.most_strikeouts_career
+    question: Who has the most career strikeouts as a pitcher?
+    notes: Career pitching table. Ryan first with 5714.
+    sql: |
+      select player_id, strikeouts
+      from main_models.metrics_player_career_pitching
+      order by strikeouts desc
+      limit 5
+  - id: vq.rivera_career_era_saves
+    question: What were Mariano Rivera's career ERA and save total?
+    notes: Career table carries stored rate columns. Returns 2.2085 and 652. Note rivem002, not river001.
+    sql: |
+      select earned_run_average, saves
+      from main_models.metrics_player_career_pitching
+      where player_id = 'rivem002'
+  - id: vq.cubs_1906_record
+    question: What was the Cubs' record in 1906?
+    notes: standings has one row per date; the final record is the latest date. Returns 116-36.
+    sql: |
+      select wins, losses
+      from main_models.standings
+      where season = 1906 and team_id = 'CHN'
+      qualify row_number() over (order by date desc) = 1
+  - id: vq.mariners_2001_record
+    question: How many games did the 2001 Mariners win?
+    notes: Same latest-date pattern. Returns 116-46.
+    sql: |
+      select wins, losses
+      from main_models.standings
+      where season = 2001 and team_id = 'SEA'
+      qualify row_number() over (order by date desc) = 1
+  - id: vq.yankees_1961_home_wins
+    question: How many home games did the 1961 Yankees win?
+    notes: Home/away splits are columns on standings. Returns 65.
+    sql: |
+      select home_wins, home_losses
+      from main_models.standings
+      where season = 1961 and team_id = 'NYA'
+      qualify row_number() over (order by date desc) = 1
+  - id: vq.lowest_team_ops_2003
+    question: What was the lowest team OPS in 2003?
+    notes: Team grain by grouping the offense view on team_id. Returns LAN at 0.671.
+    sql: |
+      select team_id,
+             metrics.on_base_plus_slugging(on_base_successes, on_base_opportunities, total_bases, at_bats) as ops
+      from semantic.offense_seasons
+      where season = 2003
+      group by team_id
+      order by ops asc
+      limit 1
+  - id: vq.best_team_era_2011
+    question: Which team had the best ERA in 2011?
+    notes: Team grain from the pitching view. Returns PHI at 3.022.
+    sql: |
+      select team_id, metrics.earned_run_average(earned_runs, outs_recorded) as era
+      from semantic.pitching_seasons
+      where season = 2011
+      group by team_id
+      order by era asc
+      limit 1
+  - id: vq.expos_1994_home_runs
+    question: How many home runs did the Expos hit in 1994?
+    notes: Montreal's team_id is MON (franchise WAS). Returns 108.
+    sql: |
+      select sum(home_runs) as home_runs
+      from semantic.offense_seasons
+      where team_id = 'MON' and season = 1994
+      group by team_id
+  - id: vq.expos_nationals_franchise_best_season
+    question: What was the best season in Expos/Nationals franchise history?
+    notes: Renamed franchise; join final standings to seed_franchises on team_id and season and filter franchise_id. Ranked by win percentage. Returns the 1994 Expos, 74-40 (.649), ahead of the 2012 Nationals at 98-64.
+    sql: |
+      with final as (
+        select *
+        from main_models.standings
+        qualify row_number() over (partition by season, team_id order by date desc) = 1
+      )
+      select s.season, s.team_id, s.wins, s.losses
+      from final as s
+      join main_seeds.seed_franchises as f
+        on s.team_id = f.team_id
+       and s.season >= year(f.date_start)
+       and s.season <= coalesce(year(f.date_end), 9999)
+      where f.franchise_id = 'WAS'
+      order by s.win_percentage desc
+      limit 1
+  - id: vq.hits_leader_1894
+    question: Who had the most hits in 1894?
+    notes: Pre-1910 season data is complete even though event data is sparse. Returns duffh101 (Hugh Duffy) with 237.
+    sql: |
+      select player_id, sum(hits) as hits
+      from semantic.offense_seasons
+      where season = 1894
+      group by player_id
+      order by hits desc
+      limit 1
+  - id: vq.cy_young_1901
+    question: What were Cy Young's ERA and win total in 1901?
+    notes: Pre-1910 pitching. Cy Young is younc102. Returns 1.622 and 33.
+    sql: |
+      select metrics.earned_run_average(earned_runs, outs_recorded) as era, sum(wins) as wins
+      from semantic.pitching_seasons
+      where player_id = 'younc102' and season = 1901
+      group by player_id
+  - id: vq.dominican_home_run_leader_2023
+    question: Which Dominican-born player hit the most home runs in 2023?
+    notes: Join outside the semantic layer to people for birthplace. birth_country is spelled out. Returns Marcell Ozuna with 40.
+    sql: |
+      select o.player_id, p.first_name, p.last_name, sum(o.home_runs) as home_runs
+      from semantic.offense_seasons as o
+      join main_models.people as p on o.player_id = p.player_id
+      where o.season = 2023 and p.birth_country = 'Dominican Republic'
+      group by o.player_id, p.first_name, p.last_name
+      order by home_runs desc
+      limit 1
+  - id: vq.left_handed_home_run_leader_2019
+    question: Which left-handed hitter hit the most home runs in 2019?
+    notes: people.bats is L, R, or B. Returns Cody Bellinger with 47.
+    sql: |
+      select o.player_id, p.first_name, p.last_name, sum(o.home_runs) as home_runs
+      from semantic.offense_seasons as o
+      join main_models.people as p on o.player_id = p.player_id
+      where o.season = 2019 and p.bats = 'L'
+      group by o.player_id, p.first_name, p.last_name
+      order by home_runs desc
+      limit 1
+  - id: vq.longest_game_1984
+    question: What was the longest game of 1984 by outs, and how many people attended?
+    notes: Join of two game tables outside the semantic layer. Returns CHA198405080, 148 outs, attendance 14754.
+    sql: |
+      select r.game_id, r.duration_outs, r.duration_minutes, s.attendance
+      from main_models.game_results as r
+      join main_models.game_start_info as s on r.game_id = s.game_id
+      where r.season = 1984
+      order by r.duration_outs desc
+      limit 1
+  - id: vq.clarify_senators_best_season
+    question: What was the Senators' best season?
+    notes: The nickname Senators maps to four team_ids across three franchises (WS9 1891, WSN 1892-1899, WS1 1901-1960 now MIN, WS2 1961-1971 now TEX). Ask which era or franchise before writing SQL.
+    expect: clarify
+  - id: vq.clarify_average_for_pitchers
+    question: What was the average for pitchers in 2019?
+    notes: The word average defaults to batting average, but for pitchers it could mean their own hitting, batting average against, or an arithmetic mean of some pitching stat. Ask which before writing SQL.
+    expect: clarify

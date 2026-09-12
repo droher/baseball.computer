@@ -95,3 +95,4 @@ reportArgumentType = "warning"
 "bc/tests/statistical/**" = ["E402"]
 "scripts/permutation_importance_generic.py" = ["E402"]
 "scripts/permutation_importance_trajectory.py" = ["E402"]
+"scripts/publish_ducklake.py" = ["E402"]

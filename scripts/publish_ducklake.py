@@ -7,6 +7,12 @@ data files to R2.
 Outputs:
   bc/bc_publish.ducklake     SQLite catalog (consumer attaches to this URL)
   bc/bc_publish_data/        parquet data files referenced by the catalog
+  docs/llm/baseball.lsf      LSF-1 context packet, regenerated after publish
+
+The catalog also carries a `semantic` schema with one view per BSL
+semantic table and a `metrics` schema with one macro per metric name.
+`--semantic-only` recreates those objects on an existing catalog without
+copying any table.
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ import argparse
 import contextlib
 import logging
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -24,6 +31,27 @@ import duckdb
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BC_DB = PROJECT_ROOT / "bc.db"
 BC_DIR = PROJECT_ROOT / "bc"
+
+if str(BC_DIR) not in sys.path:
+    sys.path.insert(0, str(BC_DIR))
+
+from python_models.metrics.registry import (
+    MetricKind,
+    MetricSource,
+    metrics_for,
+)
+from python_models.metrics.sql_render import (
+    MacroSpec,
+    MetricSlice,
+    macro_specs,
+)
+from semantic._views import (
+    SEMANTIC_SCHEMA,
+    SEMANTIC_VIEWS,
+    semantic_view_name,
+    semantic_view_sql,
+)
+
 # Relative names — script chdirs to BC_DIR before ATTACH so the catalog
 # stores relative paths. That keeps the catalog portable: uploaded as a
 # blob alongside bc_publish_data/, consumers attach by URL and DuckLake
@@ -34,8 +62,13 @@ CATALOG_PATH = BC_DIR / CATALOG_NAME
 DATA_PATH = BC_DIR / DATA_DIR_NAME
 DATA_VERSION_FILE = BC_DIR / "data_version.txt"
 PUBLIC_HOST = "data.baseball.computer"
+PACKET_PATH = PROJECT_ROOT / "docs" / "llm" / "baseball.lsf"
+GENERATOR_PATH = PROJECT_ROOT / "scripts" / "generate_llm_context.py"
 
 PUBLISH_SCHEMAS = ("main_models", "main_seeds")
+METRICS_SCHEMA = "metrics"
+METRIC_KINDS: tuple[MetricKind, ...] = ("offense", "pitching", "fielding")
+METRIC_SOURCES: tuple[MetricSource, ...] = ("season", "event")
 ESTIMATED_ROW_COUNT_FLOORS: dict[str, int] = {
     "scorer_observation_propensities": 100_000,
     "imputed_ball_handler_probabilities": 100_000,
@@ -293,6 +326,86 @@ def reconcile_published_tables(con: duckdb.DuckDBPyConnection) -> None:
             _log.info("dropped stale published table %s.%s", schema, table)
 
 
+def metric_slices() -> list[MetricSlice]:
+    return [
+        (kind, source, metrics_for(kind, source))
+        for kind in METRIC_KINDS
+        for source in METRIC_SOURCES
+    ]
+
+
+_LIST_VIEWS_SQL = (
+    "SELECT view_name FROM duckdb_views()"
+    " WHERE database_name = 'bc_publish' AND schema_name = ? ORDER BY view_name"
+)
+_LIST_MACROS_SQL = (
+    "SELECT DISTINCT function_name FROM duckdb_functions()"
+    " WHERE database_name = 'bc_publish' AND schema_name = ? AND function_type = 'macro'"
+    " ORDER BY function_name"
+)
+
+
+def list_views(con: duckdb.DuckDBPyConnection, schema: str) -> list[str]:
+    return [r[0] for r in con.execute(_LIST_VIEWS_SQL, [schema]).fetchall()]
+
+
+def list_macros(con: duckdb.DuckDBPyConnection, schema: str) -> list[str]:
+    return [r[0] for r in con.execute(_LIST_MACROS_SQL, [schema]).fetchall()]
+
+
+def publish_semantic_views(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """Create the six semantic views; drop any view the layout no longer defines."""
+    _ = con.execute(f'CREATE SCHEMA IF NOT EXISTS "bc_publish"."{SEMANTIC_SCHEMA}"')
+    names: list[str] = []
+    for name, kind, grain in SEMANTIC_VIEWS:
+        _ = con.execute(
+            f'CREATE OR REPLACE VIEW "bc_publish"."{SEMANTIC_SCHEMA}"."{name}" AS\n'
+            + semantic_view_sql(kind, grain)
+        )
+        names.append(name)
+        _log.info("published view %s.%s", SEMANTIC_SCHEMA, name)
+    for stale in sorted(set(list_views(con, SEMANTIC_SCHEMA)) - set(names)):
+        _ = con.execute(f'DROP VIEW "bc_publish"."{SEMANTIC_SCHEMA}"."{stale}"')
+        _log.info("dropped stale view %s.%s", SEMANTIC_SCHEMA, stale)
+    return names
+
+
+def publish_metric_macros(
+    con: duckdb.DuckDBPyConnection, specs: list[MacroSpec]
+) -> list[str]:
+    """Create one aggregate macro per metric name; drop macros no longer registered."""
+    _ = con.execute(f'CREATE SCHEMA IF NOT EXISTS "bc_publish"."{METRICS_SCHEMA}"')
+    names: list[str] = []
+    for spec in specs:
+        params = ", ".join(spec.params)
+        _ = con.execute(
+            f'CREATE OR REPLACE MACRO "bc_publish"."{METRICS_SCHEMA}"."{spec.name}"'
+            f"({params}) AS {spec.body}"
+        )
+        names.append(spec.name)
+    _log.info("published %d macros in %s", len(names), METRICS_SCHEMA)
+    for stale in sorted(set(list_macros(con, METRICS_SCHEMA)) - set(names)):
+        _ = con.execute(f'DROP MACRO "bc_publish"."{METRICS_SCHEMA}"."{stale}"')
+        _log.info("dropped stale macro %s.%s", METRICS_SCHEMA, stale)
+    return names
+
+
+def publish_semantic_objects(con: duckdb.DuckDBPyConnection) -> None:
+    _ = publish_semantic_views(con)
+    _ = publish_metric_macros(con, macro_specs(metric_slices()))
+
+
+def generate_packet() -> Path:
+    """Regenerate docs/llm/baseball.lsf with the LSF-1 validator on."""
+    command = [sys.executable, str(GENERATOR_PATH), "--validate"]
+    _log.info("regenerating %s", PACKET_PATH)
+    PACKET_PATH.unlink(missing_ok=True)
+    _ = subprocess.run(command, check=True, cwd=PROJECT_ROOT)
+    if not PACKET_PATH.exists():
+        raise SystemExit(f"generator ran but {PACKET_PATH} is missing")
+    return PACKET_PATH
+
+
 def assert_catalog_exists(catalog_path: Path) -> None:
     if not catalog_path.exists():
         raise SystemExit(
@@ -371,6 +484,24 @@ def _smoke_run(con: duckdb.DuckDBPyConnection) -> None:
             type_set,
         )
 
+    for name, kind, grain in SEMANTIC_VIEWS:
+        row = con.execute(
+            f'SELECT * FROM "bc_publish"."{SEMANTIC_SCHEMA}"."{name}" LIMIT 1'
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"semantic view {name} returned no rows")
+        _log.info("view %s.%s ok (%s/%s)", SEMANTIC_SCHEMA, name, kind, grain)
+
+    for spec in macro_specs(metric_slices()):
+        kind, source = spec.members[0]
+        view = semantic_view_name(kind, source)
+        args = ", ".join(spec.params)
+        _ = con.execute(
+            f'SELECT "bc_publish"."{METRICS_SCHEMA}"."{spec.name}"({args})'
+            f' FROM (SELECT * FROM "bc_publish"."{SEMANTIC_SCHEMA}"."{view}" LIMIT 1000)'
+        ).fetchone()
+    _log.info("all metric macros resolve against their semantic views")
+
     snaps = con.execute("FROM ducklake_snapshots('bc_publish')").fetchall()
     _log.info("snapshots in bc_publish: %d", len(snaps))
 
@@ -408,6 +539,7 @@ def publish() -> None:
                 total_rows += publish_table(con, schema, table)
                 total_tables += 1
 
+        publish_semantic_objects(con)
         expire_snapshots(con)
         con.close()
 
@@ -419,6 +551,20 @@ def publish() -> None:
         elapsed,
     )
     report_sizes()
+    _ = generate_packet()
+
+
+def publish_semantic() -> None:
+    """Recreate the semantic views and metric macros on the existing catalog."""
+    assert_catalog_exists(CATALOG_PATH)
+    data_version = read_data_version()
+    with contextlib.chdir(BC_DIR):
+        con = duckdb.connect(":memory:")
+        attach_catalog(con, data_version=data_version)
+        publish_semantic_objects(con)
+        expire_snapshots(con)
+        con.close()
+    _ = generate_packet()
 
 
 def reset_artifacts() -> None:
@@ -443,6 +589,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Remove the local catalog file + data path before publishing (forces a fresh first snapshot).",
     )
+    mode.add_argument(
+        "--semantic-only",
+        action="store_true",
+        help="Skip table copies; recreate the semantic views, metric macros, and packet on the existing catalog.",
+    )
     parser.add_argument("-v", "--verbose", action="count", default=0)
     args = parser.parse_args(argv)
 
@@ -453,7 +604,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.reset:
         reset_artifacts()
-    if not args.smoke_only:
+    if args.semantic_only:
+        publish_semantic()
+    elif not args.smoke_only:
         publish()
     smoke_check()
     return 0

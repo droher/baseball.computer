@@ -16,9 +16,7 @@ LSF-1 spec: ``docs/llm/lsf_1_spec.md``.
 from __future__ import annotations
 
 import argparse
-import ast
 import csv
-import inspect
 import io
 import logging
 import re
@@ -146,7 +144,14 @@ class VerifiedQuery:
     id: str
     question: str
     notes: str | None
-    sql: str
+    sql: str | None
+    clarify: bool = False
+
+
+@dataclass(frozen=True)
+class League:
+    name: str
+    aliases: list[str]
 
 
 @dataclass(frozen=True)
@@ -156,9 +161,28 @@ class Supplement:
     tz: str
     coverage: str | None
     table_synonyms: dict[str, list[str]]
+    leagues: dict[str, League]
     ambiguities: list[Ambiguity]
     rules: list[Rule]
     verified_queries: list[VerifiedQuery]
+
+
+def _verified_query(raw: dict[str, Any]) -> VerifiedQuery:
+    expect = str(raw.get("expect") or "sql").lower()
+    if expect not in {"sql", "clarify"}:
+        raise ValueError(f"verified query {raw.get('id')!r}: expect must be sql or clarify")
+    sql = raw.get("sql")
+    if expect == "clarify" and sql:
+        raise ValueError(f"verified query {raw['id']!r} expects clarify but carries sql")
+    if expect == "sql" and not sql:
+        raise ValueError(f"verified query {raw['id']!r} has no sql")
+    return VerifiedQuery(
+        id=raw["id"],
+        question=raw["question"],
+        notes=raw.get("notes"),
+        sql=str(sql).rstrip() if sql else None,
+        clarify=expect == "clarify",
+    )
 
 
 def _load_supplement(path: Path) -> Supplement:
@@ -174,6 +198,10 @@ def _load_supplement(path: Path) -> Supplement:
         coverage=(raw.get("coverage") or "").strip() or None,
         table_synonyms={
             str(k): list(v or []) for k, v in (raw.get("table_synonyms") or {}).items()
+        },
+        leagues={
+            str(k): League(name=str(v["name"]), aliases=list(v.get("aliases") or []))
+            for k, v in (raw.get("leagues") or {}).items()
         },
         ambiguities=[
             Ambiguity(
@@ -192,15 +220,7 @@ def _load_supplement(path: Path) -> Supplement:
             )
             for r in raw.get("rules") or []
         ],
-        verified_queries=[
-            VerifiedQuery(
-                id=v["id"],
-                question=v["question"],
-                notes=v.get("notes"),
-                sql=v["sql"].rstrip(),
-            )
-            for v in raw.get("verified_queries") or []
-        ],
+        verified_queries=[_verified_query(v) for v in raw.get("verified_queries") or []],
     )
 
 
@@ -616,10 +636,13 @@ def _build_bsl_tables(
     tables: list[Table] = []
     metrics: list[Metric] = []
     metric_kind_grain = metric_registry.metrics_for
-    for kind, grain in _BSL_GRAINS:
-        from semantic._tables_common import backing_model_name
+    from python_models.metrics.sql_render import render_metrics
+    from semantic._tables_common import backing_model_name
+    from semantic._views import SEMANTIC_SCHEMA, semantic_view_name
 
-        physical = backing_model_name(kind, grain)
+    for kind, grain in _BSL_GRAINS:
+        principal = backing_model_name(kind, grain)
+        physical = f"{SEMANTIC_SCHEMA}.{semantic_view_name(kind, grain)}"
         table_id = _bsl_table_id(kind, grain)
         dim_names = layout.dim_names(kind, grain)
         ms = metric_kind_grain(kind, grain)
@@ -647,33 +670,26 @@ def _build_bsl_tables(
         allowed_dims = [_col_ref(table_id, d) for d in dim_names]
         time_col = _col_ref(table_id, "season") if grain == "season" else None
 
-        for m in ms:
+        for r in render_metrics(ms):
+            m = r.metric
             kind_str = m.classification
             agg = "sum" if kind_str == "sum" else "ratio" if kind_str == "ratio" else "derived"
             role = "MEASURE" if kind_str == "sum" else "DERIVED"
             col_type = "int" if (kind_str == "sum" and "int" in (m.dtype or "").lower()) else "float"
-            cols.append(
-                Column(
-                    name=m.name,
-                    type=col_type,
-                    role=role,
-                    desc=_metric_desc_text(m),
-                )
-            )
+            desc = _metric_desc_text(m, r.columns)
+            cols.append(Column(name=m.name, type=col_type, role=role, desc=desc))
 
-            metric_id = f"metric.{m.name}_{kind}_{grain}"
-            expr = _metric_expr_text(m)
             metrics.append(
                 Metric(
-                    metric_id=metric_id,
+                    metric_id=f"metric.{m.name}_{kind}_{grain}",
                     name=m.name,
                     base_table=table_id,
-                    expr=expr,
+                    expr=r.expr,
                     agg=agg,
                     time_col=time_col,
                     default_filter=None,
                     allowed_dims=allowed_dims,
-                    description=_metric_desc_text(m),
+                    description=desc,
                     synonyms=[],
                 )
             )
@@ -686,23 +702,24 @@ def _build_bsl_tables(
             grain_str = "one row per event"
         if grain == "season":
             descr = (
-                f"BSL semantic table for {kind} stats at {grain} grain. "
-                f"Principal table is {physical}; this view also exposes "
-                "league (joined from main_seeds.seed_franchises) and "
-                "pre-filters to regular-season game types. "
-                f"Counting-stat columns are direct columns on {physical}; "
-                "rate columns and DERIVED metrics are computed from those counts. "
-                f"Direct SQL against {physical} will not see the league dim."
+                f"BSL semantic table for {kind} stats at {grain} grain, published as "
+                f"the view {physical} over {principal}. The view adds league "
+                "(joined from main_seeds.seed_franchises on team_id and season) and "
+                "keeps only regular-season game types. Counting-stat columns are "
+                "stored; rate and DERIVED metrics are not stored columns: compute them "
+                "in an aggregate query with the metrics.<name>(...) macros listed on "
+                "each METRIC record."
             )
         else:
             descr = (
-                f"BSL semantic table for {kind} stats at {grain} grain. "
-                f"Principal table is {physical}; this view also exposes "
-                "season, league, park_id, game_type, is_regular_season "
-                "(joined from main_models.team_game_start_info on team_id+game_id). "
-                f"Counting-stat columns are direct columns on {physical}; "
-                "rate columns and DERIVED metrics are computed from those counts. "
-                f"Direct SQL against {physical} will not see the joined dims."
+                f"BSL semantic table for {kind} stats at {grain} grain, published as "
+                f"the view {physical} over {principal}. The view adds season, league, "
+                "park_id, game_type, is_regular_season and the other game columns "
+                "(joined from main_models.team_game_start_info on team_id and game_id) "
+                "and does not filter by game type. Counting-stat columns are stored; "
+                "rate and DERIVED metrics are not stored columns: compute them in an "
+                "aggregate query with the metrics.<name>(...) macros listed on each "
+                "METRIC record."
             )
         synonyms = supplement.table_synonyms.get(_bsl_table_name(kind, grain), [])
         warns = [
@@ -731,241 +748,12 @@ def _non_additive_warn(metric: Any) -> str:
     )
 
 
-def _metric_desc_text(metric: Any) -> str:
-    return f"{metric.classification} metric ({metric.dtype})."
-
-
-def _metric_expr_text(metric: Any) -> str:
-    """Render a Pydantic Metric's lambdas as SQL-shaped text.
-
-    Inspects the lambda source (the registry stores them as ibis
-    expressions, so we can't `to_sql` without booting ibis-framework,
-    which doesn't ship in the SQLMesh group). For ratios we render
-    ``numerator / nullif(denominator,0)``; for derived metrics we render
-    the composite expression in terms of sibling measure names.
-    """
-    try:
-        if metric.derived is not None:
-            return _render_lambda(metric.derived, scope_var="m")
-        if metric.numerator is not None and metric.denominator is not None:
-            num = _render_lambda(metric.numerator, scope_var="t")
-            den = _render_lambda(metric.denominator, scope_var="t")
-            return f"{num} / nullif({den},0)"
-        if metric.formula is not None:
-            return _render_lambda(metric.formula, scope_var="t")
-    except _MetricExprUnrenderable as exc:
-        logger.warning("metric %s: cannot render expr (%s)", metric.name, exc)
-    if metric.derived is not None and hasattr(metric, "dependencies"):
-        try:
-            deps = sorted(metric.dependencies())
-        except Exception:
-            deps = []
-        if deps:
-            return "f(" + ", ".join(deps) + ") -- see registry"
-    return f"-- {metric.classification} metric; expression in python_models.metrics registry"
-
-
-class _MetricExprUnrenderable(Exception):
-    pass
-
-
-def _fn_body_and_args(fn: Any) -> tuple[ast.AST, ast.arguments]:
-    """Return the AST body + arguments for a lambda or single-return function.
-
-    Lambdas: trims surrounding context until the source parses to a Lambda.
-    Named functions: parses the source (dedented) and finds the FunctionDef;
-    a single ``return X`` body returns ``X`` as the body node.
-    """
-    try:
-        src = inspect.getsource(fn)
-    except (OSError, TypeError) as exc:
-        raise _MetricExprUnrenderable(f"getsource failed: {exc}") from exc
-
-    if "lambda" in src:
-        idx = src.find("lambda")
-        cand = src[idx:].strip()
-        while cand:
-            try:
-                tree = ast.parse(cand, mode="eval")
-                if isinstance(tree.body, ast.Lambda):
-                    return tree.body.body, tree.body.args
-            except SyntaxError:
-                pass
-            cand = cand[:-1].rstrip()
-        raise _MetricExprUnrenderable("could not isolate lambda from source")
-
-    try:
-        module = ast.parse(_dedent(src))
-    except SyntaxError as exc:
-        raise _MetricExprUnrenderable(f"def source did not parse: {exc}") from exc
-    for node in ast.walk(module):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            body = node.body
-            if len(body) == 1 and isinstance(body[0], ast.Return) and body[0].value is not None:
-                return body[0].value, node.args
-            raise _MetricExprUnrenderable(
-                f"function {node.name} body is not a single return"
-            )
-    raise _MetricExprUnrenderable("no lambda or function found")
-
-
-def _dedent(src: str) -> str:
-    lines = src.splitlines()
-    if not lines:
-        return src
-    indents = [len(ln) - len(ln.lstrip()) for ln in lines if ln.strip()]
-    pad = min(indents) if indents else 0
-    return "\n".join(ln[pad:] if len(ln) >= pad else ln for ln in lines)
-
-
-def _render_lambda(fn: Any, *, scope_var: str) -> str:
-    body, args = _fn_body_and_args(fn)
-    arg_names = [a.arg for a in args.args]
-    defaults_vals = list(fn.__defaults__ or ())
-    name_to_value: dict[str, Any] = {}
-    if defaults_vals:
-        for n, v in zip(arg_names[-len(defaults_vals):], defaults_vals):
-            name_to_value[n] = v
-    return _ExprRenderer(scope_var, name_to_value).render(body)
-
-
-_BIN_OPS: dict[type[ast.operator], str] = {
-    ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/",
-    ast.FloorDiv: "/", ast.Mod: "%",
-}
-_CMP_OPS: dict[type[ast.cmpop], str] = {
-    ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">=",
-    ast.Eq: "=", ast.NotEq: "<>",
-}
-_AGG_METHODS = {"sum", "count", "mean", "min", "max", "stddev"}
-
-
-class _ExprRenderer:
-    """AST → SQL-shaped text for the small dialect used by Metric lambdas.
-
-    Handles ``t.col``, ``t.col.sum()``, ``(expr).sum()``, arithmetic,
-    ``ibis.coalesce``-style calls, and scope reads on the derived
-    measure proxy (``m.measure_name``).
-    """
-
-    def __init__(self, scope_var: str, name_values: dict[str, Any] | None = None) -> None:
-        self.scope_var = scope_var
-        self.name_values = name_values or {}
-
-    def render(self, node: ast.AST) -> str:
-        return self._v(node)
-
-    def _v(self, node: ast.AST) -> str:
-        method = getattr(self, f"v_{type(node).__name__}", None)
-        if method is None:
-            raise _MetricExprUnrenderable(
-                f"unsupported AST node {type(node).__name__}"
-            )
-        return method(node)
-
-    def v_Attribute(self, node: ast.Attribute) -> str:
-        if isinstance(node.value, ast.Name) and node.value.id == self.scope_var:
-            return node.attr
-        return f"{self._v(node.value)}.{node.attr}"
-
-    def v_Name(self, node: ast.Name) -> str:
-        return node.id
-
-    def v_Call(self, node: ast.Call) -> str:
-        args_rendered = [self._v(a) for a in node.args]
-        if isinstance(node.func, ast.Attribute):
-            method = node.func.attr
-            inner = self._v(node.func.value)
-            if method in _AGG_METHODS:
-                rest = ("," + ",".join(args_rendered)) if args_rendered else ""
-                return f"{method}({_strip_outer_parens(inner)}{rest})"
-            args = ",".join([inner, *args_rendered])
-            return f"{method}({args})"
-        return f"{self._v(node.func)}({','.join(args_rendered)})"
-
-    def v_BinOp(self, node: ast.BinOp) -> str:
-        op = _BIN_OPS.get(type(node.op))
-        if op is None:
-            raise _MetricExprUnrenderable(f"binop {type(node.op).__name__}")
-        return f"({self._v(node.left)} {op} {self._v(node.right)})"
-
-    def v_UnaryOp(self, node: ast.UnaryOp) -> str:
-        if isinstance(node.op, ast.USub):
-            return f"(-{self._v(node.operand)})"
-        if isinstance(node.op, ast.UAdd):
-            return f"(+{self._v(node.operand)})"
-        raise _MetricExprUnrenderable(f"unaryop {type(node.op).__name__}")
-
-    def v_Compare(self, node: ast.Compare) -> str:
-        parts = [self._v(node.left)]
-        for op, cmp in zip(node.ops, node.comparators):
-            sym = _CMP_OPS.get(type(op))
-            if sym is None:
-                raise _MetricExprUnrenderable(f"compare {type(op).__name__}")
-            parts.append(sym)
-            parts.append(self._v(cmp))
-        return " ".join(parts)
-
-    def v_Constant(self, node: ast.Constant) -> str:
-        if isinstance(node.value, str):
-            return "'" + node.value.replace("'", "''") + "'"
-        return repr(node.value)
-
-    def v_IfExp(self, node: ast.IfExp) -> str:
-        return (
-            f"case when {self._v(node.test)} then {self._v(node.body)} "
-            f"else {self._v(node.orelse)} end"
-        )
-
-    def v_Subscript(self, node: ast.Subscript) -> str:
-        if isinstance(node.value, ast.Name) and node.value.id == self.scope_var:
-            col = self._eval_str(node.slice)
-            if col is None:
-                raise _MetricExprUnrenderable("dynamic subscript not resolvable")
-            return col
-        raise _MetricExprUnrenderable("subscript outside scope variable")
-
-    def v_JoinedStr(self, node: ast.JoinedStr) -> str:
-        s = self._eval_str(node)
-        if s is None:
-            raise _MetricExprUnrenderable("f-string with unresolvable value")
-        return s
-
-    def _eval_str(self, node: ast.AST) -> str | None:
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            return node.value
-        if isinstance(node, ast.JoinedStr):
-            parts: list[str] = []
-            for v in node.values:
-                if isinstance(v, ast.Constant) and isinstance(v.value, str):
-                    parts.append(v.value)
-                elif isinstance(v, ast.FormattedValue):
-                    sub = self._eval_str(v.value)
-                    if sub is None:
-                        return None
-                    parts.append(sub)
-                else:
-                    return None
-            return "".join(parts)
-        if isinstance(node, ast.Name):
-            if node.id in self.name_values:
-                return str(self.name_values[node.id])
-            return None
-        return None
-
-
-def _strip_outer_parens(s: str) -> str:
-    if s.startswith("(") and s.endswith(")"):
-        depth = 0
-        for i, ch in enumerate(s):
-            if ch == "(":
-                depth += 1
-            elif ch == ")":
-                depth -= 1
-                if depth == 0 and i < len(s) - 1:
-                    return s
-        return s[1:-1]
-    return s
+def _metric_desc_text(metric: Any, columns: tuple[str, ...]) -> str:
+    call = f"metrics.{metric.name}({', '.join(columns)})"
+    return (
+        f"{metric.classification} metric ({metric.dtype}); macro {call}; "
+        "NULL when a denominator sums to 0."
+    )
 
 
 _DIM_TYPES = {
@@ -977,7 +765,7 @@ _DIM_TYPES = {
     "league": "string",
     "game_type": "string",
     "is_regular_season": "boolean",
-    "fielding_position": "string",
+    "fielding_position": "int<INTEGER>",
 }
 
 _DIM_DESCS = {
@@ -989,7 +777,7 @@ _DIM_DESCS = {
     "league": "League id (AL/NL/...).",
     "game_type": "Game-type code; season tables filter to regular season by default.",
     "is_regular_season": "True for regular-season games.",
-    "fielding_position": "Defensive position code (P, C, 1B, ...).",
+    "fielding_position": "Defensive position number: 1=P, 2=C, 3=1B, 4=2B, 5=3B, 6=SS, 7=LF, 8=CF, 9=RF, 10=DH.",
 }
 
 
@@ -1040,6 +828,210 @@ def _build_enums(seeds: list[Seed], in_scope: set[str]) -> list[EnumValue]:
                 )
             )
     return enums
+
+
+# ----- team / park / league enums ---------------------------------------
+
+TEAM_ENUM_ID = "enum.team_id"
+PARK_ENUM_ID = "enum.park_id"
+LEAGUE_ENUM_ID = "enum.league"
+FRANCHISES_TABLE_ID = _physical_table_id("main_seeds.seed_franchises")
+PARKS_TABLE_ID = _physical_table_id("main_models.stg_parks")
+PARKS_SQL = (
+    "SELECT park_id, name, aka, city, state, start_date, end_date"
+    " FROM main_models.stg_parks ORDER BY park_id"
+)
+NO_LEAGUE_VALUE = "N/A"
+
+
+def _year(value: str | None) -> int | None:
+    """Year of an ISO ``YYYY-MM-DD`` or US ``M/D/YYYY`` date string."""
+    if not value:
+        return None
+    text = str(value).strip()
+    m = re.match(r"^(\d{4})-\d{2}-\d{2}$", text)
+    if m:
+        return int(m.group(1))
+    m = re.match(r"^\d{1,2}/\d{1,2}/(\d{4})$", text)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _year_span(start: int | None, end: int | None) -> str:
+    if start is None:
+        return "years unknown"
+    return f"{start}-{end}" if end is not None else f"{start}-"
+
+
+@dataclass
+class TeamSpan:
+    team_id: str
+    franchise_id: str
+    location: str
+    nickname: str
+    league: str | None
+    alt_nicknames: list[str]
+    start: int | None
+    end: int | None
+
+
+def _team_spans(rows: list[dict[str, str]]) -> list[TeamSpan]:
+    """Collapse seed_franchises rows into (team_id, name, league) spans.
+
+    Division realignments split one identity across several seed rows;
+    consecutive rows that agree on everything but the division merge into
+    one span so the packet lists each name once with its full year range.
+    """
+    def key(r: dict[str, str]) -> tuple[str, str]:
+        return (r["team_id"], r.get("date_start") or "")
+
+    spans: list[TeamSpan] = []
+    for r in sorted(rows, key=key):
+        alt = [a.strip() for a in (r.get("alternative_nicknames") or "").split(";") if a.strip()]
+        span = TeamSpan(
+            team_id=r["team_id"],
+            franchise_id=r.get("franchise_id") or r["team_id"],
+            location=(r.get("location") or "").strip(),
+            nickname=(r.get("nickname") or "").strip(),
+            league=(r.get("league") or "").strip() or None,
+            alt_nicknames=alt,
+            start=_year(r.get("date_start")),
+            end=_year(r.get("date_end")),
+        )
+        prev = spans[-1] if spans else None
+        same_identity = prev is not None and (
+            prev.team_id, prev.franchise_id, prev.location, prev.nickname, prev.league
+        ) == (span.team_id, span.franchise_id, span.location, span.nickname, span.league)
+        contiguous = (
+            prev is not None
+            and prev.end is not None
+            and span.start is not None
+            and span.start <= prev.end + 1
+        )
+        if prev is not None and same_identity and contiguous:
+            prev.end = span.end
+            for a in span.alt_nicknames:
+                if a not in prev.alt_nicknames:
+                    prev.alt_nicknames.append(a)
+            continue
+        spans.append(span)
+    return spans
+
+
+def _team_enums(rows: list[dict[str, str]]) -> list[EnumValue]:
+    col_ref = _col_ref(FRANCHISES_TABLE_ID, "team_id")
+    out: list[EnumValue] = []
+    for span in _team_spans(rows):
+        years = _year_span(span.start, span.end)
+        full_name = f"{span.location} {span.nickname}".strip()
+        meaning = (
+            f"{full_name}, {span.league or 'no league'}, {years}; "
+            f"franchise {span.franchise_id}"
+        )
+        aliases = [span.nickname, full_name, *span.alt_nicknames, years]
+        out.append(
+            EnumValue(
+                enum_id=TEAM_ENUM_ID,
+                column_ref=col_ref,
+                value=span.team_id,
+                meaning=meaning,
+                aliases=list(dict.fromkeys(a for a in aliases if a)),
+            )
+        )
+    return out
+
+
+def _league_enums(rows: list[dict[str, str]], supplement: Supplement) -> list[EnumValue]:
+    col_ref = _col_ref(FRANCHISES_TABLE_ID, "league")
+    starts: dict[str, int] = {}
+    ends: dict[str, int] = {}
+    still_active: set[str] = set()
+    for r in rows:
+        league = (r.get("league") or "").strip()
+        if not league:
+            continue
+        y0, y1 = _year(r.get("date_start")), _year(r.get("date_end"))
+        if y0 is not None:
+            starts[league] = min(starts.get(league, y0), y0)
+        if y1 is None:
+            still_active.add(league)
+        else:
+            ends[league] = max(ends.get(league, y1), y1)
+    out: list[EnumValue] = []
+    for league in sorted(starts):
+        info = supplement.leagues.get(league)
+        if info is None:
+            logger.warning("league %s has no entry under supplement leagues:", league)
+        name = info.name if info else league
+        end = None if league in still_active else ends.get(league)
+        years = _year_span(starts[league], end)
+        out.append(
+            EnumValue(
+                enum_id=LEAGUE_ENUM_ID,
+                column_ref=col_ref,
+                value=league,
+                meaning=f"{name}, {years}",
+                aliases=list(info.aliases) if info else [],
+            )
+        )
+    out.append(
+        EnumValue(
+            enum_id=LEAGUE_ENUM_ID,
+            column_ref=col_ref,
+            value=NO_LEAGUE_VALUE,
+            meaning=(
+                "No league on record for that team-season (independent or pre-league "
+                "club); the semantic views substitute this when seed_franchises has "
+                "no matching span."
+            ),
+            aliases=["no league", "independent"],
+        )
+    )
+    return out
+
+
+def _park_enums(rows: list[tuple[Any, ...]]) -> list[EnumValue]:
+    col_ref = _col_ref(PARKS_TABLE_ID, "park_id")
+    out: list[EnumValue] = []
+    for park_id, name, aka, city, state, start_date, end_date in rows:
+        place = ", ".join(p for p in (str(city or "").strip(), str(state or "").strip()) if p)
+        years = _year_span(_year(start_date), _year(end_date))
+        meaning = f"{name}, {place}" if place else str(name)
+        if years != "years unknown":
+            meaning = f"{meaning}, {years}"
+        aliases = [a.strip() for a in str(aka or "").split(";") if a.strip()]
+        out.append(
+            EnumValue(
+                enum_id=PARK_ENUM_ID,
+                column_ref=col_ref,
+                value=str(park_id),
+                meaning=meaning,
+                aliases=aliases,
+            )
+        )
+    return out
+
+
+def _build_entity_enums(
+    seeds: list[Seed],
+    parks: list[tuple[Any, ...]],
+    supplement: Supplement,
+    in_scope: set[str],
+) -> list[EnumValue]:
+    """Team, league, and park ids: the values users name in questions."""
+    out: list[EnumValue] = []
+    franchises = next((s for s in seeds if s.name == "seed_franchises"), None)
+    if franchises is None or FRANCHISES_TABLE_ID not in in_scope:
+        logger.warning("seed_franchises not in scope; skipping team and league enums")
+    else:
+        out.extend(_team_enums(franchises.rows))
+        out.extend(_league_enums(franchises.rows, supplement))
+    if PARKS_TABLE_ID not in in_scope:
+        logger.warning("main_models.stg_parks not in scope; skipping park enums")
+    else:
+        out.extend(_park_enums(parks))
+    return out
 
 
 # ----- emission ----------------------------------------------------------
@@ -1170,7 +1162,12 @@ def _emit_packet(
     if supplement.verified_queries:
         buf.write("VERIFIED_QUERIES\n")
         for vq in supplement.verified_queries:
-            buf.write(_row("VQ", vq.id, vq.question, vq.notes) + "\n")
+            notes = vq.notes
+            if vq.clarify:
+                notes = "Expected response: clarify, not SQL. " + (notes or "")
+            buf.write(_row("VQ", vq.id, vq.question, notes) + "\n")
+            if vq.sql is None:
+                continue
             buf.write(f"SQL|{vq.id}<<\n")
             buf.write(vq.sql.rstrip() + "\n")
             buf.write(">>SQL\n")
@@ -1591,6 +1588,11 @@ def main() -> int:
             physical_tables.append(t)
 
     enums = _build_enums(seeds, selected_table_ids)
+    parks: list[tuple[Any, ...]] = []
+    if PARKS_TABLE_ID in selected_table_ids:
+        parks = list(ctx.engine_adapter.fetchall(PARKS_SQL))
+    enums.extend(_build_entity_enums(seeds, parks, supplement, selected_table_ids))
+    logger.info("built %d enum values", len(enums))
 
     all_tables = bsl_tables + physical_tables + seed_tables
 

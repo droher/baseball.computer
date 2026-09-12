@@ -325,3 +325,85 @@ def test_data_upload_failure_cancels_queued_files(tmp_path: Path) -> None:
         )
 
     assert uploader.calls == ["baseball/v1/bc_publish_data/first.parquet"] * 3
+
+
+MINIMAL_PACKET = (
+    '<DB_CONTEXT version="LSF-1" dialect="duckdb">\n'
+    "DOMAIN|domain.t|test\n"
+    "TABLES\n"
+    "TABLE|table.a|s.a|one row per id|test|-\n"
+    "COLS|table.a|name|type|role|ref|desc|examples|tags\n"
+    "COL|table.a|id|int|PK|-|-|-|-\n"
+    "RELATIONSHIPS\n"
+    "</DB_CONTEXT>\n"
+)
+
+
+def test_assert_packet_valid_accepts_valid_and_rejects_invalid(tmp_path: Path) -> None:
+    script = _load_script()
+    packet = tmp_path / "baseball.lsf"
+    packet.write_text(MINIMAL_PACKET, encoding="utf-8")
+    script.assert_packet_valid(packet)
+    packet.write_text(
+        MINIMAL_PACKET.replace("COL|table.a|id|int|PK|-|-|-|-\n", ""), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="fails LSF-1 validation"):
+        script.assert_packet_valid(packet)
+    with pytest.raises(SystemExit, match="packet not found"):
+        script.assert_packet_valid(tmp_path / "missing.lsf")
+
+
+class _HeaderRecordingUploader:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, str]] = []
+
+    def upload(
+        self,
+        local: Path,
+        key: str,
+        cache_control: str,
+        content_type: str,
+    ) -> int:
+        self.calls.append((key, cache_control, content_type))
+        return local.stat().st_size
+
+
+def test_upload_artifact_ships_packet_with_revalidating_headers_before_catalog(
+    tmp_path: Path,
+) -> None:
+    script = _load_script()
+    catalog_path = tmp_path / "bc_publish.ducklake"
+    data_path = tmp_path / "bc_publish_data"
+    _create_catalog(catalog_path, data_path)
+    packet = tmp_path / "baseball.lsf"
+    packet.write_text(MINIMAL_PACKET, encoding="utf-8")
+    script.CATALOG_PATH = catalog_path
+    script.DATA_PATH = data_path
+    script.PACKET_PATH = packet
+    script.CATALOG_METADATA_PATH = tmp_path / "catalog.json"
+    uploader = _HeaderRecordingUploader()
+
+    catalog_url, metadata_url, packet_url, _ = script.upload_artifact(
+        "baseball/v9", uploader, workers=1
+    )
+
+    tail = uploader.calls[-3:]
+    assert [key for key, _, _ in tail] == [
+        "baseball/v9/catalog.json",
+        "baseball/v9/baseball.lsf",
+        "baseball/v9/baseball.ducklake",
+    ]
+    assert tail[1] == (
+        "baseball/v9/baseball.lsf",
+        script.CATALOG_METADATA_CACHE_CONTROL,
+        "text/plain; charset=utf-8",
+    )
+    assert all(
+        key.startswith("baseball/v9/bc_publish_data/")
+        for key, _, _ in uploader.calls[:-3]
+    )
+    assert packet_url == f"https://{script.PUBLIC_HOST}/baseball/v9/baseball.lsf"
+    assert {catalog_url, metadata_url, packet_url} == {
+        f"https://{script.PUBLIC_HOST}/baseball/v9/{name}"
+        for name in ("baseball.ducklake", "catalog.json", "baseball.lsf")
+    }

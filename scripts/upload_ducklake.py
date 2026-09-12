@@ -10,6 +10,8 @@ attach to the catalog URL and read parquet files from that path.
 
 R2 prefix: s3://timeball/baseball/v<DATA_VERSION>/
   <prefix>/baseball.ducklake          (renamed catalog, the attach target)
+  <prefix>/catalog.json               (schema sidebar metadata)
+  <prefix>/baseball.lsf               (LSF-1 context packet for the site's NL query feature)
   <prefix>/bc_publish_data/*.parquet  (data files, immutable)
 
 Required env vars:
@@ -26,6 +28,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import importlib
+import importlib.util
 import json
 import logging
 import os
@@ -45,16 +48,21 @@ CATALOG_PATH = PROJECT_ROOT / "bc" / "bc_publish.ducklake"
 DATA_PATH = PROJECT_ROOT / "bc" / "bc_publish_data"
 DATA_VERSION_FILE = PROJECT_ROOT / "bc" / "data_version.txt"
 CATALOG_METADATA_PATH = PROJECT_ROOT / "bc" / "catalog.json"
+PACKET_PATH = PROJECT_ROOT / "docs" / "llm" / "baseball.lsf"
+GENERATOR_PATH = PROJECT_ROOT / "scripts" / "generate_llm_context.py"
 
 R2_BUCKET = "timeball"
 PUBLIC_HOST = "data.baseball.computer"
 CATALOG_OBJECT_NAME = "baseball.ducklake"
 CATALOG_METADATA_OBJECT_NAME = "catalog.json"
+PACKET_OBJECT_NAME = "baseball.lsf"
 DATA_DIR_NAME = DATA_PATH.name
 
 DATA_CACHE_CONTROL = "public, max-age=31536000, immutable"
 CATALOG_CACHE_CONTROL = "public, max-age=0, must-revalidate"
 CATALOG_METADATA_CACHE_CONTROL = "public, max-age=0, must-revalidate"
+PACKET_CACHE_CONTROL = CATALOG_METADATA_CACHE_CONTROL
+PACKET_CONTENT_TYPE = "text/plain; charset=utf-8"
 DATA_UPLOAD_WORKERS = 4
 MIN_DATA_UPLOAD_WORKERS = 1
 MAX_DATA_UPLOAD_WORKERS = 16
@@ -273,7 +281,7 @@ def uses_wrangler(uploader: ObjectUploader) -> bool:
 
 def r2_client() -> Boto3Uploader:
     account_id = env("R2_ACCOUNT_ID")
-    boto3 = cast(Boto3Module, importlib.import_module("boto3"))
+    boto3 = cast(Boto3Module, cast(object, importlib.import_module("boto3")))
     return Boto3Uploader(
         boto3.client(
             "s3",
@@ -349,7 +357,7 @@ def catalog_metadata(
     )
     tables = con.execute(
         "SELECT table_schema, table_name FROM information_schema.tables "
-        "WHERE table_catalog = 'bc_publish' AND table_type = 'BASE TABLE' "
+        "WHERE table_catalog = 'bc_publish' AND table_type IN ('BASE TABLE', 'VIEW') "
         "ORDER BY table_schema, table_name"
     ).fetchall()
     nodes: dict[str, object] = {}
@@ -380,17 +388,40 @@ def write_catalog_metadata(
     return output_path
 
 
+def assert_packet_valid(packet_path: Path = PACKET_PATH) -> None:
+    """Refuse to upload a packet the LSF-1 validator rejects."""
+    if not packet_path.exists():
+        raise SystemExit(
+            f"packet not found at {packet_path} — run publish_ducklake.py first"
+        )
+    spec = importlib.util.spec_from_file_location(
+        "generate_llm_context", GENERATOR_PATH
+    )
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load {GENERATOR_PATH}")
+    generator = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = generator
+    spec.loader.exec_module(generator)
+    validate = cast(Callable[[str], object], generator.validate)
+    report = validate(packet_path.read_text(encoding="utf-8"))
+    violations = cast(list[str], getattr(report, "violations"))
+    if violations:
+        listing = "\n  ".join(violations)
+        raise SystemExit(f"packet {packet_path} fails LSF-1 validation:\n  {listing}")
+
+
 def upload_artifact(
     prefix: str,
     uploader: ObjectUploader,
     workers: int = DATA_UPLOAD_WORKERS,
-) -> tuple[str, str, int]:
+) -> tuple[str, str, str, int]:
     if not CATALOG_PATH.exists():
         raise SystemExit(
             f"catalog not found at {CATALOG_PATH} — run publish_ducklake.py first"
         )
     if not DATA_PATH.is_dir():
         raise SystemExit(f"data dir not found at {DATA_PATH}")
+    assert_packet_valid()
 
     data_files = sorted(p for p in DATA_PATH.rglob("*") if p.is_file())
     _log.info(
@@ -405,10 +436,16 @@ def upload_artifact(
     ]
     metadata_path = write_catalog_metadata()
     metadata_key = f"{prefix}/{CATALOG_METADATA_OBJECT_NAME}"
+    packet_key = f"{prefix}/{PACKET_OBJECT_NAME}"
     catalog_key = f"{prefix}/{CATALOG_OBJECT_NAME}"
     preflight_uploads(
         uploader,
-        data_uploads + [(metadata_path, metadata_key), (CATALOG_PATH, catalog_key)],
+        data_uploads
+        + [
+            (metadata_path, metadata_key),
+            (PACKET_PATH, packet_key),
+            (CATALOG_PATH, catalog_key),
+        ],
     )
     total_data_bytes = upload_data_files(uploader, data_uploads, workers)
 
@@ -418,6 +455,13 @@ def upload_artifact(
         metadata_key,
         CATALOG_METADATA_CACHE_CONTROL,
         "application/json",
+    )
+    packet_bytes = upload_file(
+        uploader,
+        PACKET_PATH,
+        packet_key,
+        PACKET_CACHE_CONTROL,
+        PACKET_CONTENT_TYPE,
     )
     catalog_bytes = upload_file(
         uploader,
@@ -429,13 +473,16 @@ def upload_artifact(
 
     catalog_url = f"https://{PUBLIC_HOST}/{catalog_key}"
     metadata_url = f"https://{PUBLIC_HOST}/{metadata_key}"
+    packet_url = f"https://{PUBLIC_HOST}/{packet_key}"
     _log.info(
-        "upload summary: data=%.1f MB across %d files, catalog=%.1f MB",
+        "upload summary: data=%.1f MB across %d files, catalog=%.1f MB, packet=%.1f MB",
         total_data_bytes / 1e6,
         len(data_files),
         (catalog_bytes + metadata_bytes) / 1e6,
+        packet_bytes / 1e6,
     )
-    return catalog_url, metadata_url, total_data_bytes + catalog_bytes + metadata_bytes
+    total = total_data_bytes + catalog_bytes + metadata_bytes + packet_bytes
+    return catalog_url, metadata_url, packet_url, total
 
 
 def upload_data_files(
@@ -544,12 +591,14 @@ def main(argv: list[str] | None = None) -> int:
     uploader: ObjectUploader = WranglerUploader() if args.wrangler else r2_client()
     if args.resume:
         uploader = ResumeUploader(uploader, prefix)
-    catalog_url, metadata_url, _ = upload_artifact(prefix, uploader, args.workers)
+    catalog_url, metadata_url, packet_url, _ = upload_artifact(
+        prefix, uploader, args.workers
+    )
 
     if args.skip_purge:
         _log.info("--skip-purge set; not calling Cloudflare API")
     else:
-        cloudflare_purge([catalog_url, metadata_url])
+        cloudflare_purge([catalog_url, metadata_url, packet_url])
 
     _log.info("attach URL: ducklake:%s", catalog_url)
     return 0
