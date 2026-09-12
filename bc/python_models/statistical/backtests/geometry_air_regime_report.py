@@ -103,6 +103,13 @@ def _season_slices(group: pl.DataFrame) -> list[tuple[str, pl.DataFrame]]:
     ]
 
 
+def class_ece(probability: FloatArray, target: FloatArray, bins: int = 15) -> float:
+    binned = np.minimum((probability * bins).astype(np.int64), bins - 1)
+    counts = np.bincount(binned, minlength=bins)
+    errors = np.bincount(binned, weights=probability - target, minlength=bins)
+    return float(np.abs(errors[counts > 0]).sum() / probability.size)
+
+
 def class_calibration(predictions: pl.DataFrame) -> pl.DataFrame:
     rows: list[dict[str, object]] = []
     for key, group in predictions.group_by("split_family", "prior_strength"):
@@ -114,10 +121,7 @@ def class_calibration(predictions: pl.DataFrame) -> pl.DataFrame:
             for index, label in enumerate(AIR_CLASSES):
                 probability = matrix[:, index]
                 target = (labels == index).astype(np.float64)
-                bins = np.minimum((probability * 15).astype(np.int64), 14)
-                counts = np.bincount(bins, minlength=15)
-                errors = np.bincount(bins, weights=probability - target, minlength=15)
-                ece = float(np.abs(errors[counts > 0]).sum() / frame.height)
+                ece = class_ece(probability, target)
                 rows.append(
                     {
                         "split_family": family,

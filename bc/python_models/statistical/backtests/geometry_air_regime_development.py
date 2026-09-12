@@ -78,12 +78,14 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def declared_source_paths() -> dict[str, Path]:
+def declared_source_paths(
+    modules: tuple[str, ...] = SOURCE_MODULES,
+) -> dict[str, Path]:
     module_root = Path(__file__).resolve().parent
     package_root = module_root.parents[2]
     paths = {
         str((module_root / name).relative_to(package_root)): module_root / name
-        for name in SOURCE_MODULES
+        for name in modules
     }
     missing = [name for name, path in paths.items() if not path.is_file()]
     if missing:
@@ -379,7 +381,13 @@ def build_oof_predictions(
     return pl.concat(outputs, how="vertical"), fit_records
 
 
-def write_manifest(output_root: Path, status: str, **extra: object) -> None:
+def write_manifest(
+    output_root: Path,
+    status: str,
+    *,
+    experiment: str = EXPERIMENT_ID,
+    **extra: object,
+) -> None:
     files = {
         str(path.relative_to(output_root)): sha256_file(path)
         for path in sorted(output_root.rglob("*"))
@@ -388,7 +396,7 @@ def write_manifest(output_root: Path, status: str, **extra: object) -> None:
     _ = (output_root / "manifest.json").write_text(
         json.dumps(
             {
-                "experiment": EXPERIMENT_ID,
+                "experiment": experiment,
                 "status": status,
                 "files_sha256": files,
                 **extra,
