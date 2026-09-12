@@ -35,6 +35,8 @@ _ESTIMATED_MODELS: tuple[str, ...] = (
     "state_transition_summary",
     "linear_weights_estimated",
     "assist_count_distribution",
+    "air_trajectory_translation",
+    "standardized_air_trajectory",
 )
 
 

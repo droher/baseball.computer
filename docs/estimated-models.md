@@ -11,7 +11,7 @@ last-verified: 2026-09-04
 
 ## TL;DR
 
-The estimated tier is twelve `main_models.*` tables that fill documented gaps in the play-by-play record with hierarchical-Bayes posteriors: observation propensities, fielding credit, ball-handler, batted-ball geometry, park factors, run expectancy, base-out transitions, assist counts, and final-count distributions. Every value is a posterior estimate, never an official fact. The tables carry an eight-column provenance contract so a consumer can always tell an estimate from a recorded value, and the two are kept in separate namespaces.
+The estimated tier is fourteen `main_models.*` tables that fill documented gaps in the play-by-play record: twelve hierarchical-Bayes posteriors (observation propensities, fielding credit, ball-handler, batted-ball geometry, park factors, run expectancy, base-out transitions, assist counts, and final-count distributions) and two airborne trajectory translation tables that map recorded Fly / LineDrive / PopUp labels to standardized launch-angle bands season by season. Every value is a posterior estimate, never an official fact. The tables carry an eight-column provenance contract so a consumer can always tell an estimate from a recorded value, and the two are kept in separate namespaces.
 
 **Invariant:** a posterior expected counter, an official source value, and a deterministic derivation are three different quantities. Never add an `expected_share` into an official counter.
 
@@ -389,6 +389,53 @@ ORDER BY assist_count_class;
 | 4 | 0.000 |
 
 A bases-empty groundout is one assist (6-3) 99% of the time. Multi-assist mass concentrates in double-play states.
+
+---
+
+## Airborne trajectory translation
+
+### `air_trajectory_translation`
+
+**Estimand.** P(standardized launch-angle band | recorded airborne label, result family, season) for 1989 to 2025. The bands are Fly (25 to 50 degrees), LineDrive (10 to 25), and PopUp (above 50). Recorded ground balls and bunts are not translated; the recorded ground-versus-air distinction is preserved as recorded.
+
+**Table.** Grain `(season, recorded_air_subtype, result_family, standardized_air_subtype)`. The three bands of a cell sum to 1. `probability_lower_95` / `probability_upper_95` are the nominal 95% interval of the translation draws. `basis` records how the season was estimated and `partially_identified` (also stamped as `weak_identification_flag`) is TRUE for every season before 2009.
+
+**Formula.** A per-pipeline Dirichlet hierarchy over the referenced seasons with Statcast angles (2015 to 2019 for the 2009 to 2019 recording pipeline, 2023 and 2025 for the 2020 onward pipeline). Referenced seasons publish their posterior; other seasons in a referenced pipeline publish the pipeline's new-season predictive. Seasons before 2009 have no same-pipeline reference: their translation is the 2020 onward translation raked (iterative proportional fitting) to the season's recorded label shares under the assumption that the true band mix equals the modern mix. That assumption is declared, not tested, which is why the rows are partially identified. Method and reproduction: [the estimate document](geometry-air-translation-estimate-2026-09-11.md).
+
+This is not a Bayes artifact with a published pointer: `confidence_status` is always `exploratory`, and the `validate-gates` sweep does not cover it.
+
+**Example: what a recorded fly-ball hit in 2000 most likely was.**
+
+```sql
+SELECT standardized_air_subtype, ROUND(probability_mean, 3) AS p,
+       ROUND(probability_lower_95, 3) AS lo, ROUND(probability_upper_95, 3) AS hi
+FROM main_models.air_trajectory_translation
+WHERE season = 2000 AND recorded_air_subtype = 'Fly' AND result_family = 'hit'
+ORDER BY standardized_air_subtype;
+```
+
+| standardized_air_subtype | p | lo | hi |
+| --- | --- | --- | --- |
+| Fly | 0.674 | 0.511 | 0.807 |
+| LineDrive | 0.314 | 0.178 | 0.482 |
+| PopUp | 0.011 | 0.002 | 0.029 |
+
+A third of the balls scored as fly-ball hits in 2000 were, by the modern angle definition, line drives. The interval is wide because 2000 is raked, not referenced.
+
+### `standardized_air_trajectory`
+
+**Estimand.** The same translation applied per event: for every directly recorded Fly, LineDrive, or PopUp in `event_observation_geometry` whose season is 1989 to 2025 and whose result family is one of the five translated families, the probability of each standardized band.
+
+**Table.** Grain `(event_key, standardized_air_subtype)`; three rows per event summing to 1. `expected_share` is the cell's posterior mean and `share_lower_95` / `share_upper_95` its interval. Carries the season's `basis`, `cell_status`, and `partially_identified`. Events with ground-ball or bunt labels, seasons before 1989, or a result family outside the five have no rows. Every game type is covered, although the translation was fit on regular-season games only (about 1.3% of the rows are postseason, All-Star, or tiebreaker events).
+
+**Example: standardized band mix of recorded fly balls by era.**
+
+```sql
+SELECT season, standardized_air_subtype, ROUND(AVG(expected_share), 3) AS share
+FROM main_models.standardized_air_trajectory
+WHERE recorded_air_subtype = 'Fly' AND season IN (1995, 2012, 2023)
+GROUP BY 1, 2 ORDER BY 1, 2;
+```
 
 ---
 

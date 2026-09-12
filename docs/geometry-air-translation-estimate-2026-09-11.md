@@ -37,7 +37,7 @@ Cells with no reference events in the seed pipeline (fielders' choice, most PopU
 
 ## What to do with it
 
-Use the JSON table as the season-by-season translation when standardizing airborne subtypes. Every pre-2009 row is partially identified and should publish with that flag. The 2020 to 2022 and 2024 rows rest on a two-season fit whose season level was not validated. The remaining step is wiring the table into the geometry export; this document does not do that.
+The JSON table is published as `main_models.air_trajectory_translation` (one row per season, recorded label, result family, and band, through the seed `seed_air_trajectory_translation`) and applied per event as `main_models.standardized_air_trajectory` (every directly recorded Fly, LineDrive, or PopUp in 1989 to 2025 joined on season, recorded label, and result family). Both are estimated-tier SQLMesh models with `confidence_status = 'exploratory'` (validated read-only against the production data; the production build waits on the scorer source reload noted in the handoff); every pre-2009 row carries `partially_identified = TRUE` and `weak_identification_flag = TRUE`. The 2020 to 2022 and 2024 rows rest on a two-season fit whose season level was not validated. Ground balls and bunts keep their recorded labels and have no standardized rows.
 
 ## Reproduction
 

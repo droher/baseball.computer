@@ -80,6 +80,8 @@ ESTIMATED_ROW_COUNT_FLOORS: dict[str, int] = {
     "state_transition_summary": 10_000,
     "linear_weights_estimated": 1_000,
     "assist_count_distribution": 100,
+    "air_trajectory_translation": 1_000,
+    "standardized_air_trajectory": 1_000_000,
 }
 COMPRESSION = "zstd"
 ROW_GROUP_SIZE = "1966080"

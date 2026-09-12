@@ -1,0 +1,57 @@
+version: 2
+seeds:
+  - name: seed_air_trajectory_translation
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: season
+        description: 'Season the translation applies to, 1989 to 2025.'
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: recorded_air_subtype
+        description: 'Recorded airborne trajectory label: Fly, LineDrive, or PopUp.'
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: result_family
+        description: 'Plate appearance result family the translation is conditioned on.'
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: standardized_air_subtype
+        description: 'Standardized launch-angle band: Fly, LineDrive, or PopUp.'
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: probability_mean
+        description: 'Posterior mean probability that the recorded label is this band.'
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: probability_lower_95
+        description: 'Lower end of the nominal 95 percent interval.'
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: probability_upper_95
+        description: 'Upper end of the nominal 95 percent interval.'
+        data_type: double
+        constraints:
+          - type: not_null
+      - name: basis
+        description: 'How the season was estimated: referenced_season_posterior, pipeline_new_season_predictive, or raked_from_pipeline_c_with_modern_mix.'
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: cell_status
+        description: 'posterior_cell when the seed pipeline had reference events for the cell, prior_only_cell otherwise.'
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: partially_identified
+        description: 'TRUE for seasons before 2009, whose translation rests on the modern band-mix assumption.'
+        data_type: boolean
+        constraints:
+          - type: not_null

@@ -11,6 +11,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from python_models.statistical.air_trajectory_translation import ESTIMATE_ID
 from python_models.statistical.backtests.geometry_air_pipeline_data import (
     CLASSES,
     PIPELINES,
@@ -32,7 +33,6 @@ Basis = Literal[
     "raked_from_pipeline_c_with_modern_mix",
 ]
 
-ESTIMATE_ID = "geometry-air-translation-estimate-v1"
 RESULT_FAMILIES = (
     "hit",
     "out_in_play",
