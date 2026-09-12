@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import platform
 import shutil
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from importlib.metadata import version
@@ -36,6 +38,9 @@ from python_models.statistical.evidence_binding import file_digest
 LOGGER = logging.getLogger(__name__)
 SMOKE_ROOT = BASE / "geometry_reliability/20260911-statcast-bridge-smoke-v1"
 RESERVE = BASE / "historical_stress/20260911-reserve-v1/reserved_games.parquet"
+DEFAULT_PROTOCOL = "docs/geometry-statcast-development-protocol.md"
+DEFAULT_INPUTS = REPOSITORY / "docs/geometry-statcast-development-inputs.json"
+TERMINAL_STATUSES = frozenset({"paired", "pairing_incomplete", "failed"})
 PA_INCREMENT_SQL = """CASE WHEN plate_appearance_result IS NOT NULL
     OR (plate_appearance_result IS NULL AND NOT no_play_flag AND outs + outs_on_play >= 3)
     THEN 1 ELSE 0 END"""
@@ -72,16 +77,21 @@ def fetch(url: str, path: Path) -> None:
 
 def validate_mechanics(
     cache: Path,
-    fitting_games: pl.DataFrame,
     *,
     expected_manifest_sha256: str,
     crosswalk: dict[str, set[str]],
+    declared_games: set[str] | None = None,
 ) -> None:
     if file_digest(cache / "manifest.json") != expected_manifest_sha256:
         raise ValueError("mechanics manifest differs from accepted binding")
     manifest = read_json(cache / "manifest.json")
     inventory = cast(dict[str, str], manifest["files_sha256"])
+    if "selected_fitting_games.parquet" not in inventory:
+        raise ValueError("mechanics acceptance evidence is incomplete")
+    fitting_games = pl.read_parquet(cache / "selected_fitting_games.parquet")
     declared = set(fitting_games.filter(pl.col("is_smoke"))["game_id"].to_list())
+    if declared_games is not None and declared != declared_games:
+        raise ValueError("mechanics artifact does not cover the declared smoke games")
     required = {
         "report.json",
         "selected_fitting_games.parquet",
@@ -169,6 +179,12 @@ def validate_mechanics(
         raise ValueError("mechanics availability evidence does not reproduce")
 
 
+Acquire = Callable[
+    [SelectedGame, pl.DataFrame, dict[str, set[str]], Path, Path | None],
+    dict[str, object],
+]
+
+
 def acquire_game(
     game: SelectedGame,
     local: pl.DataFrame,
@@ -246,28 +262,120 @@ def acquire_game(
     return report
 
 
-def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
-    inputs_path = REPOSITORY / "docs/geometry-statcast-development-inputs.json"
+def pending_games(output: Path, selected: list[SelectedGame]) -> list[SelectedGame]:
+    pending: list[SelectedGame] = []
+    for game in selected:
+        root = output / "games" / game.game_id
+        report_path = root / "report.json"
+        if report_path.exists():
+            try:
+                status = read_json(report_path).get("status")
+            except json.JSONDecodeError:
+                status = None
+            if status in TERMINAL_STATUSES:
+                continue
+        if root.exists():
+            shutil.rmtree(root)
+        pending.append(game)
+    return pending
+
+
+def repository_path(repository: Path, value: object) -> Path:
+    relative = Path(str(value))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError(f"inputs path must stay inside the repository: {value}")
+    return repository / relative
+
+
+def validate_smoke_acceptance(
+    root: Path,
+    *,
+    expected_manifest_sha256: str,
+    smoke_games: set[str],
+    gates: dict[str, object],
+) -> None:
+    if file_digest(root / "manifest.json") != expected_manifest_sha256:
+        raise ValueError("smoke manifest differs from accepted binding")
+    inventory = cast(dict[str, str], read_json(root / "manifest.json")["files_sha256"])
+    if "report.json" not in inventory:
+        raise ValueError("smoke acceptance evidence is incomplete")
+    for name, expected in inventory.items():
+        path = root / name
+        if (
+            not path.resolve().is_relative_to(root.resolve())
+            or file_digest(path) != expected
+        ):
+            raise ValueError("smoke artifact content differs")
+    report = read_json(root / "report.json")
+    game_reports = cast(list[dict[str, object]], report["reports"])
+    reported = {
+        str(cast(dict[str, object], item["game"])["game_id"]) for item in game_reports
+    }
+    events = sum(int(str(item["local_events"])) for item in game_reports)
+    angles = sum(
+        int(str(item.get("matched_angle_available", 0))) for item in game_reports
+    )
+    resolved = sum(item.get("game_pk") is not None for item in game_reports)
+    if (
+        not smoke_games
+        or reported != smoke_games
+        or len(game_reports) != len(smoke_games)
+        or resolved < int(str(gates["resolved_games_required"]))
+        or (
+            bool(gates["complete_one_to_one_batted_ball_matches"])
+            and any(item["status"] != "paired" for item in game_reports)
+        )
+        or events == 0
+        or angles / events < float(str(gates["angle_availability_overall_minimum"]))
+        or report["modern_angle_evaluation_acquired"] is not False
+    ):
+        raise ValueError(
+            "predeclared smoke acceptance failed; full acquisition refused"
+        )
+
+
+def run(
+    output: Path,
+    *,
+    smoke: bool,
+    cache: Path | None,
+    inputs_path: Path = DEFAULT_INPUTS,
+    resume: bool = False,
+    repository: Path = REPOSITORY,
+    database: Path = DATABASE,
+    reserve: Path = RESERVE,
+    crosswalk_root: Path = SMOKE_ROOT,
+    acquire: Acquire = acquire_game,
+) -> None:
     inputs = read_json(inputs_path)
-    amendment = REPOSITORY / "docs/geometry-statcast-matching-amendment.md"
+    amendment = repository / "docs/geometry-statcast-matching-amendment.md"
     if file_digest(amendment) != inputs["matching_amendment_sha256"]:
         raise ValueError("matching amendment changed")
-    if (
-        file_digest(REPOSITORY / "docs/geometry-statcast-development-protocol.md")
-        != inputs["protocol_sha256"]
-    ):
+    development_protocol = repository / DEFAULT_PROTOCOL
+    protocol = repository_path(
+        repository, inputs.get("protocol_path", DEFAULT_PROTOCOL)
+    )
+    if file_digest(protocol) != inputs["protocol_sha256"]:
         raise ValueError("acquisition protocol changed")
-    selection = REPOSITORY / str(inputs["selection_root"])
+    bound_documents = [inputs_path, amendment, protocol]
+    if protocol != development_protocol:
+        if file_digest(development_protocol) != inputs["development_protocol_sha256"]:
+            raise ValueError("development protocol changed")
+        bound_documents.append(development_protocol)
+    selection = repository_path(repository, inputs["selection_root"])
     if (
         file_digest(selection / "selected_games.parquet")
         != inputs["selected_games_sha256"]
         or file_digest(selection / "manifest.json") != inputs["manifest_sha256"]
     ):
         raise ValueError("frozen game selection changed")
-    if file_digest(RESERVE) != inputs["reserve_file_sha256"]:
+    if file_digest(reserve) != inputs["reserve_file_sha256"]:
         raise ValueError("confirmation reserve changed")
     games = pl.read_parquet(selection / "selected_games.parquet").filter(
         pl.col("acquisition_fold") == "fitting"
+    )
+    smoke_games = set(
+        cast(list[str], games.filter(pl.col("is_smoke"))["game_id"].to_list())
     )
     if smoke:
         games = games.filter(pl.col("is_smoke"))
@@ -278,18 +386,18 @@ def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
     ):
         raise ValueError("invalid fitting-only acquisition set")
     if set(games["game_id"].to_list()) & set(
-        pl.read_parquet(RESERVE)["game_id"].to_list()
+        pl.read_parquet(reserve)["game_id"].to_list()
     ):
         raise ValueError("reserve entered acquisition")
     selected = [
         SelectedGame.model_validate({**row, "date": str(row["date"])})
         for row in games.to_dicts()
     ]
-    crosswalk_path = SMOKE_ROOT / "bc-chadwick-register.zip"
+    crosswalk_path = crosswalk_root / "bc-chadwick-register.zip"
     expected = str(inputs["chadwick_zip_sha256"])
     if file_digest(crosswalk_path) != expected:
         raise ValueError("pinned crosswalk content changed")
-    commit = read_json(SMOKE_ROOT / "bc-chadwick-commit.json")
+    commit = read_json(crosswalk_root / "bc-chadwick-commit.json")
     if commit["sha"] != inputs["chadwick_commit"]:
         raise ValueError("crosswalk commit differs from frozen inputs")
     crosswalk = read_crosswalk(crosswalk_path)
@@ -299,29 +407,45 @@ def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
             cache is None
             or acceptance is None
             or str(cache.resolve())
-            != str((REPOSITORY / str(acceptance["root"])).resolve())
+            != str(repository_path(repository, acceptance["root"]).resolve())
         ):
             raise ValueError(
                 "full acquisition requires a bound accepted mechanics artifact"
             )
+        smoke_gates = cast(dict[str, object] | None, inputs.get("smoke_gates"))
+        if smoke_gates is not None:
+            smoke_acceptance = cast(
+                dict[str, object] | None, inputs.get("smoke_acceptance")
+            )
+            if smoke_acceptance is None:
+                raise ValueError(
+                    "full acquisition requires a bound accepted smoke artifact"
+                )
+            validate_smoke_acceptance(
+                repository_path(repository, smoke_acceptance["root"]),
+                expected_manifest_sha256=str(smoke_acceptance["manifest_sha256"]),
+                smoke_games=smoke_games,
+                gates=smoke_gates,
+            )
         validate_mechanics(
             cache,
-            games,
             expected_manifest_sha256=str(acceptance["manifest_sha256"]),
             crosswalk=crosswalk,
+            declared_games=None if smoke_gates is not None else smoke_games,
         )
-    output.mkdir(parents=True, exist_ok=False)
-    for path in (
-        inputs_path,
-        amendment,
-        REPOSITORY / "docs/geometry-statcast-development-protocol.md",
-        Path(__file__),
-        Path(__file__).with_name("geometry_statcast_bridge.py"),
-    ):
-        shutil.copy2(path, output / path.name)
+    output.mkdir(parents=True, exist_ok=resume)
+    copied = {
+        path.name: path
+        for path in (
+            *bound_documents,
+            Path(__file__),
+            Path(__file__).with_name("geometry_statcast_bridge.py"),
+        )
+    }
+    for name, path in copied.items():
+        shutil.copy2(path, output / name)
     (output / "local_query.sql").write_text(LOCAL_QUERY)
-    games.write_parquet(output / "selected_fitting_games.parquet")
-    with duckdb.connect(str(DATABASE), read_only=True) as connection:
+    with duckdb.connect(str(database), read_only=True) as connection:
         connection.register("acquisition_games", games.select("game_id"))
         folds = connection.execute(
             f"SELECT DISTINCT primary_fold FROM {SCHEMA}.model_input_geometry WHERE game_id IN (SELECT game_id FROM acquisition_games)"
@@ -329,8 +453,19 @@ def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
         if folds != [("TRAIN",)]:
             raise ValueError("live game partition mismatch")
         local = connection.execute(LOCAL_QUERY).pl()
-    local.write_parquet(output / "local_fitting_events.parquet")
-    plan = {
+    frozen = {
+        "selected_fitting_games.parquet": games,
+        "local_fitting_events.parquet": local,
+    }
+    for name, frame in frozen.items():
+        path = output / name
+        if resume and path.exists():
+            if not pl.read_parquet(path).equals(frame):
+                raise ValueError(f"resume population differs from the stored {name}")
+        else:
+            frame.write_parquet(path)
+    now = datetime.now(timezone.utc).isoformat()
+    plan: dict[str, object] = {
         "status": "fitting_acquisition_only",
         "smoke": smoke,
         "games": games.height,
@@ -339,21 +474,44 @@ def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
         "modern_angle_evaluation_acquired": False,
         "crosswalk_sha256": expected,
         "inputs": inputs,
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "runtime": {
-            "python": platform.python_version(),
-            **{name: version(name) for name in ("duckdb", "polars", "pydantic")},
-        },
         "files_sha256": {
-            p.name: file_digest(p) for p in output.iterdir() if p.is_file()
+            name: file_digest(output / name)
+            for name in (*copied, "local_query.sql", *frozen)
         },
     }
+    stored = (
+        read_json(output / "plan.json")
+        if resume and (output / "plan.json").exists()
+        else None
+    )
+    if stored is None:
+        plan.update(
+            started_at=now,
+            runtime={
+                "python": platform.python_version(),
+                **{name: version(name) for name in ("duckdb", "polars", "pydantic")},
+            },
+        )
+    else:
+        if any(stored.get(key) != value for key, value in plan.items()):
+            raise ValueError("resume inputs differ from the stored plan")
+        resumed_at = cast(list[str], stored.get("resumed_at", []))
+        plan = {**stored, "resumed_at": [*resumed_at, now]}
     write_json(output / "plan.json", plan)
-    reports: list[dict[str, object]] = []
+    selected_ids = {game.game_id for game in selected}
+    if resume:
+        selected = pending_games(output, selected)
+        LOGGER.info("Resuming %s with %d pending games", output, len(selected))
+    retained_ids = selected_ids - {game.game_id for game in selected}
+    reports: list[dict[str, object]] = [
+        read_json(path)
+        for path in sorted((output / "games").glob("*/report.json"))
+        if path.parent.name in retained_ids
+    ]
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [
             pool.submit(
-                acquire_game,
+                acquire,
                 game,
                 local.filter(pl.col("game_id") == game.game_id),
                 crosswalk,
@@ -368,11 +526,15 @@ def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
                 output / "progress.json",
                 {
                     "completed_games": len(reports),
-                    "planned_games": len(selected),
+                    "planned_games": games.height,
                     "game_reports": reports,
                 },
             )
-    paths = sorted((output / "games").glob("*/paired_events.parquet"))
+    paths = [
+        path
+        for path in sorted((output / "games").glob("*/paired_events.parquet"))
+        if path.parent.name in selected_ids
+    ]
     if paths:
         pl.concat(
             [pl.read_parquet(p) for p in paths], how="diagonal_relaxed"
@@ -380,7 +542,7 @@ def run(output: Path, *, smoke: bool, cache: Path | None) -> None:
     write_json(
         output / "report.json",
         {
-            "games_planned": len(selected),
+            "games_planned": games.height,
             "games_paired_complete": sum(r["status"] == "paired" for r in reports),
             "games_incomplete": sum(
                 r["status"] == "pairing_incomplete" for r in reports
@@ -410,6 +572,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--cache", type=Path)
+    parser.add_argument("--inputs", type=Path, default=DEFAULT_INPUTS)
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
@@ -418,6 +582,8 @@ def main() -> None:
         cast(Path, args.output),
         smoke=bool(args.smoke),
         cache=cast(Path | None, args.cache),
+        inputs_path=cast(Path, args.inputs),
+        resume=bool(args.resume),
     )
 
 

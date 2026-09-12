@@ -4,8 +4,10 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import re
 import shutil
+import threading
 from pathlib import Path
 from typing import cast
 
@@ -29,7 +31,10 @@ def read_json(path: Path) -> dict[str, object]:
 
 
 def write_json(path: Path, value: object) -> None:
-    path.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
+    encoded = json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    staging = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}")
+    staging.write_text(encoded)
+    os.replace(staging, path)
 
 
 def inner_fold(game_id: str) -> str:

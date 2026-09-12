@@ -1,0 +1,78 @@
+{
+  "angle_contract": {
+    "bunt": "separate attribute; every bunt remains in the four-class angle target and batted-ball denominator",
+    "classes": {
+      "Fly": "> 25 and <= 50",
+      "GroundBall": "< 10",
+      "LineDrive": ">= 10 and <= 25",
+      "PopUp": "> 50"
+    },
+    "fly_alias": "FlyBall normalizes to canonical Fly",
+    "line_drive_25_boundary": true
+  },
+  "artifact_id": "geometry-statcast-bridge-inputs-v1",
+  "chadwick_commit": "7640314a83d788c63fa7d26fa5ce9a9871053e27",
+  "chadwick_zip_sha256": "6b18444f5ee2f7137294cad1b71c7676fb41162b872759f0ce0be746eb98f2ef",
+  "counts": {
+    "modern_angle_evaluation_games": 0,
+    "selected_games": 4962,
+    "selected_games_by_season": {
+      "2016": 1700,
+      "2017": 1651,
+      "2018": 1611
+    },
+    "smoke_games": 6
+  },
+  "development_protocol_sha256": "319b238028f1e41001539a4b8fcbb675c95329d5faa6f8c2fcae7514c828ca87",
+  "evaluation_status": "no evaluation games; the 121 modern-angle evaluation games and the 6,105-game reserve remain unopened",
+  "manifest_sha256": "12f542ade528ad9f1b1ec6e5d41c4a9e5aa40c1413722978f0a386b157d6dc65",
+  "matching_amendment_sha256": "b25391d995d3b103ef7e82d9171c6e26b9cc747b0ab4a0121817991a6e2585aa",
+  "measurement_origin": "tracking_or_estimate_not_distinguished",
+  "mechanics_acceptance": {
+    "available_angles": 627,
+    "games": 12,
+    "manifest_sha256": "6f928b4e3dc0af0f7e8efa9ae7efe94ad9f7b68796eb19fd906c449b472e5fd5",
+    "paired_events": 633,
+    "root": "artifacts/statistical/backtests/geometry_reliability/20260911-statcast-mechanics-v2"
+  },
+  "protocol_path": "docs/geometry-statcast-bridge-protocol.md",
+  "protocol_sha256": "1225c7df708fdca8879625547e9479da08df7adafbef60c5a100d989da95603a",
+  "purpose": "development-only full-season Statcast reference for 2016-2018 PRIMARY TRAIN games; bridging-hitter transport check for the 2009-2019 recording pipeline",
+  "recorded_label_status": "all selected games are PRIMARY TRAIN and existing recorded labels are development-exposed",
+  "reserve_file_sha256": "fa6e83509bec2b412781340c4e66cd940159ada4d95de8e4fe5b3fba2d325a35",
+  "reserve_game_ids_sha256": "5ac641fe78b19e98ec5cb576ebb85e652ff289e445e0f6e54e109c523a614dba",
+  "selected_game_ids_sha256": "c103ab1983580ffed92c565dd584ca01038c9b5820f2e6edb6a4bf5b6e71b3f0",
+  "selected_games_sha256": "5138710863a6afe3631098259832b38710efcb84edce739d8ffd36d649dbe611",
+  "selection_root": "artifacts/statistical/backtests/geometry_reliability/20260911-statcast-bridge-selection-v1",
+  "smoke_acceptance": {
+    "available_angles": 300,
+    "games": 6,
+    "manifest_sha256": "1a9043cc3b8d16d27a03b6e47d5819ac0db2e996559d0e7b0fc5c179d87a542d",
+    "paired_events": 308,
+    "root": "artifacts/statistical/backtests/geometry_reliability/20260911-statcast-bridge-smoke-2016-2018-v1"
+  },
+  "smoke_game_ids": [
+    "CIN201705040",
+    "KCA201808140",
+    "LAN201608050",
+    "NYA201605080",
+    "SDN201709200",
+    "SEA201805020"
+  ],
+  "smoke_gates": {
+    "angle_availability_overall_minimum": 0.95,
+    "complete_one_to_one_batted_ball_matches": true,
+    "resolved_games_required": 6
+  },
+  "source_contract": {
+    "geometry_schema": "main_models__geometry_v2_research_20260911",
+    "geometry_target_contract": "geometry-v2-global-side",
+    "provenance_status": "partial_materialization_and_selected_contract_binding",
+    "source_snapshot_id": "geometry-v2-20260911"
+  },
+  "standardized_target_contract": {
+    "id": "trajectory-air-standard-v1",
+    "path": "docs/geometry-air-standard-target-contract.md",
+    "sha256": "8ed865ddc207e278b620a12e08e25546db086d5e702aaf86f116aa0d45b87850"
+  }
+}

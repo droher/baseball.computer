@@ -180,12 +180,21 @@ def test_full_acquisition_rejects_unverified_mechanics(tmp_path: Path) -> None:
     )
     digest = hashlib.sha256((tmp_path / "manifest.json").read_bytes()).hexdigest()
     with pytest.raises(ValueError, match="mechanics acceptance evidence"):
-        validate_mechanics(
-            tmp_path, games, expected_manifest_sha256=digest, crosswalk={}
-        )
+        validate_mechanics(tmp_path, expected_manifest_sha256=digest, crosswalk={})
     with pytest.raises(ValueError, match="manifest differs"):
         validate_mechanics(
-            tmp_path, games, expected_manifest_sha256="unaccepted", crosswalk={}
+            tmp_path, expected_manifest_sha256="unaccepted", crosswalk={}
+        )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"files_sha256": {"selected_fitting_games.parquet": "x"}})
+    )
+    digest = hashlib.sha256((tmp_path / "manifest.json").read_bytes()).hexdigest()
+    with pytest.raises(ValueError, match="declared smoke games"):
+        validate_mechanics(
+            tmp_path,
+            expected_manifest_sha256=digest,
+            crosswalk={},
+            declared_games={"other"},
         )
 
 

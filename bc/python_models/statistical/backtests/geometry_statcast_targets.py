@@ -32,6 +32,13 @@ class StandardizedTrajectory(BaseModel):
     angle_boundary: bool
 
 
+RECORDED_AIR_SUBTYPES: tuple[str, ...] = ("Fly", "LineDrive", "PopUp")
+
+
+def recorded_air_subtype(value: str | None) -> str | None:
+    return value if value in RECORDED_AIR_SUBTYPES else None
+
+
 def broad_type(value: str | None) -> BroadType | None:
     if value in {"GroundBall", "GroundBallBunt"}:
         return "Ground"
