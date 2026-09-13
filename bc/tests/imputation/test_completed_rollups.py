@@ -14,9 +14,9 @@ MODELS = Path(__file__).parents[2] / "models" / "intermediate" / "coverage"
 
 def test_completed_rollup_models_parse_as_sqlmesh_models() -> None:
     for name in (
-        "pbp_completed_pitch_items.sql",
-        "pbp_completed_pitch_totals.sql",
-        "pbp_completed_fielding_totals.sql",
+        "pbp_imputed_pitch_items.sql",
+        "pbp_imputed_pitch_totals.sql",
+        "pbp_imputed_fielding_totals.sql",
     ):
         expressions = parse((MODELS / name).read_text())
         assert len(expressions) == 2
@@ -24,18 +24,18 @@ def test_completed_rollup_models_parse_as_sqlmesh_models() -> None:
 
 def test_completed_consumer_grains_use_composite_unique_audits() -> None:
     expected = {
-        "pbp_completed_events.sql": "unique_grain(columns := (event_key))",
-        "pbp_completed_games.sql": "unique_grain(columns := (game_id))",
-        "pbp_completed_pitch_items.sql": "unique_grain(columns := (event_key, sequence_index))",
-        "pbp_completed_pitch_totals.sql": "unique_grain(columns := (game_id, pitcher_id, batter_id))",
-        "pbp_completed_fielding_totals.sql": "unique_grain(columns := (game_id, player_id, completed_fielding_position, credit_type))",
+        "pbp_imputed_events.sql": "unique_grain(columns := (event_key))",
+        "pbp_imputed_games.sql": "unique_grain(columns := (game_id))",
+        "pbp_imputed_pitch_items.sql": "unique_grain(columns := (event_key, sequence_index))",
+        "pbp_imputed_pitch_totals.sql": "unique_grain(columns := (game_id, pitcher_id, batter_id))",
+        "pbp_imputed_fielding_totals.sql": "unique_grain(columns := (game_id, player_id, completed_fielding_position, credit_type))",
     }
     for name, audit in expected.items():
         assert audit in (MODELS / name).read_text()
 
 
 def test_completed_events_exposes_values_and_preserves_raw_values() -> None:
-    source = (MODELS / "pbp_completed_events.sql").read_text()
+    source = (MODELS / "pbp_imputed_events.sql").read_text()
     expressions = parse(source)
     assert len(expressions) == 2
 
@@ -57,10 +57,10 @@ def test_completed_events_exposes_values_and_preserves_raw_values() -> None:
         )
         connection.execute(
             """
-            CREATE TABLE main_models.pbp_completed_pitches AS
+            CREATE TABLE main_models.pbp_imputed_pitches AS
             SELECT * FROM (VALUES
-                (1, 'G-ORDINARY', 1, 2024, 'Single', 0, 0, 1, 1, 3, 'pitch-artifact', 'pbp_completed_pitches', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE),
-                (2, 'G-EARLY', 1, 1903, 'Single', 0, 0, 1, 1, 2, 'pitch-artifact', 'pbp_completed_pitches', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE)
+                (1, 'G-ORDINARY', 1, 2024, 'Single', 0, 0, 1, 1, 3, 'pitch-artifact', 'pbp_imputed_pitches', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE),
+                (2, 'G-EARLY', 1, 1903, 'Single', 0, 0, 1, 1, 2, 'pitch-artifact', 'pbp_imputed_pitches', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE)
             ) AS values_(
                 event_key, game_id, event_id, season, plate_appearance_result,
                 count_balls, count_strikes, completed_count_balls,
@@ -72,7 +72,7 @@ def test_completed_events_exposes_values_and_preserves_raw_values() -> None:
         )
         connection.execute(
             """
-            CREATE TABLE main_models.pbp_completed_geometry AS
+            CREATE TABLE main_models.pbp_imputed_geometry AS
             SELECT * FROM (VALUES
                 (1, 'Fly', 8, 'Outfield', 'Deep', 'Center', 'Hard', 'Center', 'Deep', 'Middle', 'fly', 0.0, 1.0, 0.0, 0.0, 'observed', 'observed', 'observed', 'observed', 'observed', 'observed', 'observed', 'geometry-artifact'),
                 (2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'geometry-artifact')
@@ -90,10 +90,10 @@ def test_completed_events_exposes_values_and_preserves_raw_values() -> None:
         )
         connection.execute(
             """
-            CREATE TABLE main_models.pbp_completed_event_values AS
+            CREATE TABLE main_models.pbp_imputed_event_values AS
             SELECT * FROM (VALUES
-                (1, 4.2, 3.7, 0.55, 0.62, 1.25, 1.25, 0.2, 0.07, 0.2, -0.07, 'existing_event_transition_value', 'existing_event_transition_value', 'value-artifact', 'pbp_completed_event_values', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE),
-                (2, 2.1, 1.6, 0.5, 0.45, 0.0, 0.5, 0.0, -0.05, 0.0, 0.05, 'derived_pooled_base_out_run_expectancy', 'derived_neutral_win_expectancy_prior', 'value-artifact', 'pbp_completed_event_values', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE)
+                (1, 4.2, 3.7, 0.55, 0.62, 1.25, 1.25, 0.2, 0.07, 0.2, -0.07, 'existing_event_transition_value', 'existing_event_transition_value', 'value-artifact', 'pbp_imputed_event_values', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE),
+                (2, 2.1, 1.6, 0.5, 0.45, 0.0, 0.5, 0.0, -0.05, 0.0, 0.05, 'derived_pooled_base_out_run_expectancy', 'derived_neutral_win_expectancy_prior', 'value-artifact', 'pbp_imputed_event_values', '1', 'source', 'completion', 'estimated', 'exploratory', TRUE)
             ) AS values_(
                 event_key, run_expectancy_start, run_expectancy_end,
                 home_win_expectancy_start, home_win_expectancy_end,
@@ -147,7 +147,7 @@ def test_completed_events_exposes_values_and_preserves_raw_values() -> None:
 
 
 def test_pitch_total_columns_partition_each_completed_counter() -> None:
-    source = (MODELS / "pbp_completed_pitch_totals.sql").read_text()
+    source = (MODELS / "pbp_imputed_pitch_totals.sql").read_text()
 
     for counter in PITCH_COUNTERS:
         assert f"SUM(completed_{counter})" in source
@@ -189,7 +189,7 @@ def test_pitch_total_columns_partition_each_completed_counter() -> None:
 
 
 def test_pitch_totals_do_not_count_terminal_appearances_as_interrupted() -> None:
-    source = (MODELS / "pbp_completed_pitch_totals.sql").read_text()
+    source = (MODELS / "pbp_imputed_pitch_totals.sql").read_text()
     assert "COUNT(DISTINCT appearance_start_event_id)\n            - COUNT(" in source
 
     with duckdb.connect() as connection:
@@ -215,7 +215,7 @@ def test_pitch_totals_do_not_count_terminal_appearances_as_interrupted() -> None
 
 
 def test_pitch_items_omit_structural_zero_and_keep_indexed_source_evidence() -> None:
-    source = (MODELS / "pbp_completed_pitch_items.sql").read_text()
+    source = (MODELS / "pbp_imputed_pitch_items.sql").read_text()
     assert "WHERE completed.completed_pitch_sequence <> ''" in source
     assert (
         "LEFT JOIN source_items AS source USING (event_key, item_ordinality)" in source
@@ -265,7 +265,7 @@ def test_pitch_items_omit_structural_zero_and_keep_indexed_source_evidence() -> 
 
 
 def test_fielding_rollup_has_explicit_unresolved_and_disposition_counts() -> None:
-    source = (MODELS / "pbp_completed_fielding_totals.sql").read_text()
+    source = (MODELS / "pbp_imputed_fielding_totals.sql").read_text()
     assert "player_id" in source
     assert "observed_play_credits" in source
     assert "estimated_play_credits" in source

@@ -11,9 +11,9 @@ last-verified: 2026-09-04
 
 ## TL;DR
 
-This reference describes fourteen legacy `main_models.*` model surfaces: twelve hierarchical-Bayes posterior surfaces and two airborne trajectory translation tables. The additional sixteen [full-history PBP completion surfaces](pbp-imputation.md) provide recorded values, deterministic derivations, and explicitly rough estimates across the available 1903–2025 PBP population. They include completed runner and pitch outputs even where the older optional posterior tables remain empty.
+This reference describes fourteen legacy `main_models.*` model surfaces: twelve hierarchical-Bayes posterior surfaces and two airborne trajectory translation tables. The additional sixteen [full-history PBP imputation surfaces](pbp-imputation.md) provide recorded values, deterministic derivations, and explicitly rough estimates across the available 1903–2025 PBP population. They include imputed runner and pitch outputs even where the older optional posterior tables remain empty.
 
-The legacy surfaces cover observation propensities, fielding credit, ball-handler, batted-ball geometry, park factors, run expectancy, base-out transitions, assist counts, final-count distributions, and standardized airborne labels. They carry an eight-column provenance contract; their estimates are never official facts. Historical examples and fit-specific diagnostics below retain their original snapshot dates. The completion release uses explicitly exploratory legacy pointers with current evidence gaps preserved, rather than treating old validation stamps as current passes.
+The legacy surfaces cover observation propensities, fielding credit, ball-handler, batted-ball geometry, park factors, run expectancy, base-out transitions, assist counts, final-count distributions, and standardized airborne labels. They carry an eight-column provenance contract; their estimates are never official facts. Historical examples and fit-specific diagnostics below retain their original snapshot dates. The imputation release uses explicitly exploratory legacy pointers with current evidence gaps preserved, rather than treating old validation stamps as current passes.
 
 **Invariant:** a posterior expected counter, an official source value, and a deterministic derivation are three different quantities. Never add an `expected_share` into an official counter.
 
@@ -105,7 +105,7 @@ Modern scoring records nearly everything. The propensity weight matters most in 
 
 **Estimand.** P(batted-ball class) for each event whose geometry was not recorded, per geometry dimension: trajectory (Fly/LineDrive/GroundBall/PopUp), location side/depth/edge, and general location (the fielding region).
 
-The legacy `location_side` fit actually contains angle-modifier classes `Default`, `Foul`, `FoulLine`, `Left`, `Middle`, and `Right`. The completion release exposes those retained rows as `geometry_dimension='location_angle'`; they do not estimate global field side. Use `pbp_completed_geometry.location_side` for the completed global-side taxonomy. This semantic repair preserves the legacy probabilities and their evidence limitations.
+The legacy `location_side` fit actually contains angle-modifier classes `Default`, `Foul`, `FoulLine`, `Left`, `Middle`, and `Right`. The imputation release exposes those retained rows as `geometry_dimension='location_angle'`; they do not estimate global field side. Use `pbp_imputed_geometry.location_side` for the imputed global-side taxonomy. This semantic repair preserves the legacy probabilities and their evidence limitations.
 
 **Table.** Grain `(event_key, geometry_dimension, class_index)`. `class_label` is the human-readable class. Per-event shares over a dimension's classes sum to 1.
 

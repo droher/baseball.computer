@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 logger = logging.getLogger(__name__)
-MODEL_NAME: Final = "pbp_completed_runners"
+MODEL_NAME: Final = "pbp_imputed_runners"
 MODEL_VERSION: Final = "1.0.0"
 SOURCE_SIGNATURE: Final = "pbp-runners-current-source-v1"
 INPUT_RELATIONS: Final = (

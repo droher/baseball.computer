@@ -211,7 +211,7 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
             targets=(
                 CompletionTarget(
                     source_field="main_models.stg_events.event_key",
-                    completed_field="main_models.pbp_completed_events.event_key",
+                    completed_field="main_models.pbp_imputed_events.event_key",
                     disposition="source_complete_on_applicable_rows",
                     source_missing_or_unspecified=0,
                     source_missing_blocks=0,
@@ -356,26 +356,26 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
         )
     }
     simple_tables = (
-        "pbp_completed_geometry",
-        "pbp_completed_officials",
-        "pbp_completed_game_context",
-        "pbp_completed_park_factors",
-        "pbp_completed_run_expectancy",
-        "pbp_completed_state_transitions",
-        "pbp_completed_linear_weights",
+        "pbp_imputed_geometry",
+        "pbp_imputed_officials",
+        "pbp_imputed_game_context",
+        "pbp_imputed_park_factors",
+        "pbp_imputed_run_expectancy",
+        "pbp_imputed_state_transitions",
+        "pbp_imputed_linear_weights",
     )
     for table in simple_tables:
         connection.execute(
             f"CREATE TABLE {schema}.{table} (id BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
         )
     simple_table_components = {
-        "pbp_completed_geometry": "geometry",
-        "pbp_completed_officials": "officials",
-        "pbp_completed_game_context": "context",
-        "pbp_completed_park_factors": "park_factors",
-        "pbp_completed_run_expectancy": "run_expectancy",
-        "pbp_completed_state_transitions": "state_transitions",
-        "pbp_completed_linear_weights": "linear_weights",
+        "pbp_imputed_geometry": "geometry",
+        "pbp_imputed_officials": "officials",
+        "pbp_imputed_game_context": "context",
+        "pbp_imputed_park_factors": "park_factors",
+        "pbp_imputed_run_expectancy": "run_expectancy",
+        "pbp_imputed_state_transitions": "state_transitions",
+        "pbp_imputed_linear_weights": "linear_weights",
     }
     for table, component in simple_table_components.items():
         connection.execute(
@@ -398,22 +398,22 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
         )
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_games ({context_columns}, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_games ({context_columns}, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_games VALUES ('g', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', '{component_ids['context']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_games VALUES ('g', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', '{component_ids['context']}', '{source_id}')"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_events (event_key BIGINT, completed_count_balls BIGINT, completed_count_strikes BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR, raw_batted_trajectory VARCHAR, raw_batted_to_fielder BIGINT, geometry_artifact_id VARCHAR, value_artifact_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_events (event_key BIGINT, completed_count_balls BIGINT, completed_count_strikes BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR, raw_batted_trajectory VARCHAR, raw_batted_to_fielder BIGINT, geometry_artifact_id VARCHAR, value_artifact_id VARCHAR)"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_events VALUES (1, 0, 0, '{component_ids['pitches']}', '{source_id}', NULL, NULL, '{component_ids['geometry']}', '{component_ids['event_values']}')"
+        f"INSERT INTO {schema}.pbp_imputed_events VALUES (1, 0, 0, '{component_ids['pitches']}', '{source_id}', NULL, NULL, '{component_ids['geometry']}', '{component_ids['event_values']}')"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_event_values (event_key BIGINT, expected_runs_change DOUBLE, expected_batting_win_change DOUBLE, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_event_values (event_key BIGINT, expected_runs_change DOUBLE, expected_batting_win_change DOUBLE, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_event_values VALUES (1, 0, 0, '{component_ids['event_values']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_event_values VALUES (1, 0, 0, '{component_ids['event_values']}', '{source_id}')"
     )
     counters = tuple(
         name.removeprefix("completed_")
@@ -465,50 +465,50 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
             *(f"estimated_{name} BIGINT" for name in counters),
         ]
     )
-    connection.execute(f"CREATE TABLE {schema}.pbp_completed_pitches ({pitch_columns})")
+    connection.execute(f"CREATE TABLE {schema}.pbp_imputed_pitches ({pitch_columns})")
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_pitches VALUES ({', '.join(["''", "''", "''", f"'{component_ids['pitches']}'", f"'{source_id}'", *('0' for _ in counters)])})"
+        f"INSERT INTO {schema}.pbp_imputed_pitches VALUES ({', '.join(["''", "''", "''", f"'{component_ids['pitches']}'", f"'{source_id}'", *('0' for _ in counters)])})"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_pitch_totals ({total_columns})"
+        f"CREATE TABLE {schema}.pbp_imputed_pitch_totals ({total_columns})"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_pitch_totals VALUES ('{component_ids['pitches']}', '{source_id}', 1, 1, 0, {', '.join('0' for _ in range(len(counters) * 3))})"
+        f"INSERT INTO {schema}.pbp_imputed_pitch_totals VALUES ('{component_ids['pitches']}', '{source_id}', 1, 1, 0, {', '.join('0' for _ in range(len(counters) * 3))})"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_pitch_items (event_key BIGINT, sequence_index BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_pitch_items (event_key BIGINT, sequence_index BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_fielding_plays (constraint_disposition VARCHAR, aggregate_constraint_delta DOUBLE, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_fielding_plays (constraint_disposition VARCHAR, aggregate_constraint_delta DOUBLE, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_fielding_plays VALUES ('aggregate_capacity_assignment_satisfied', 0, '{component_ids['fielding']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_fielding_plays VALUES ('aggregate_capacity_assignment_satisfied', 0, '{component_ids['fielding']}', '{source_id}')"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_fielding_totals (play_credits BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_fielding_totals (play_credits BIGINT, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_fielding_totals VALUES (1, '{component_ids['fielding']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_fielding_totals VALUES (1, '{component_ids['fielding']}', '{source_id}')"
     )
     connection.execute(
-        f"CREATE TABLE {schema}.pbp_completed_runners (constraint_disposition VARCHAR, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
+        f"CREATE TABLE {schema}.pbp_imputed_runners (constraint_disposition VARCHAR, artifact_id VARCHAR, source_snapshot_id VARCHAR)"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_runners VALUES ('satisfied', '{component_ids['runners']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_runners VALUES ('satisfied', '{component_ids['runners']}', '{source_id}')"
     )
     valid_report = validate_candidate(connection, root, schema, pitch, grouped)
     assert valid_report["candidate_ready"] is True
-    connection.execute(f"DELETE FROM {schema}.pbp_completed_runners")
+    connection.execute(f"DELETE FROM {schema}.pbp_imputed_runners")
     truncated_runners = validate_candidate(connection, root, schema, pitch, grouped)
     assert truncated_runners["candidate_ready"] is False
     assert (
         truncated_runners["checks"]["materialized_artifact_identities"]["value"][
-            "pbp_completed_runners_row_count"
+            "pbp_imputed_runners_row_count"
         ]
         == 1
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_runners VALUES ('satisfied', '{component_ids['runners']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_runners VALUES ('satisfied', '{component_ids['runners']}', '{source_id}')"
     )
     manifest = json.loads((root / "manifest.json").read_text())
     manifest["status"] = "failed"
@@ -557,7 +557,7 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
         )
     )
     connection.execute(
-        f"UPDATE {schema}.pbp_completed_pitch_totals SET estimated_pitches = NULL"
+        f"UPDATE {schema}.pbp_imputed_pitch_totals SET estimated_pitches = NULL"
     )
     null_rollup = validate_candidate(connection, root, schema, pitch, grouped)
     assert null_rollup["candidate_ready"] is False
@@ -568,10 +568,10 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
         == 1
     )
     connection.execute(
-        f"UPDATE {schema}.pbp_completed_pitch_totals SET estimated_pitches = 0"
+        f"UPDATE {schema}.pbp_imputed_pitch_totals SET estimated_pitches = 0"
     )
     connection.execute(
-        f"UPDATE {schema}.pbp_completed_pitch_totals SET interrupted_appearances = 1"
+        f"UPDATE {schema}.pbp_imputed_pitch_totals SET interrupted_appearances = 1"
     )
     invalid_appearances = validate_candidate(connection, root, schema, pitch, grouped)
     assert invalid_appearances["candidate_ready"] is False
@@ -582,10 +582,10 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
         == 1
     )
     connection.execute(
-        f"UPDATE {schema}.pbp_completed_pitch_totals SET interrupted_appearances = 0"
+        f"UPDATE {schema}.pbp_imputed_pitch_totals SET interrupted_appearances = 0"
     )
     connection.execute(
-        f"INSERT INTO {schema}.pbp_completed_pitch_items VALUES (1, 0, '{component_ids['pitches']}', '{source_id}'), (1, 0, '{component_ids['pitches']}', '{source_id}')"
+        f"INSERT INTO {schema}.pbp_imputed_pitch_items VALUES (1, 0, '{component_ids['pitches']}', '{source_id}'), (1, 0, '{component_ids['pitches']}', '{source_id}')"
     )
     duplicate_items = validate_candidate(connection, root, schema, pitch, grouped)
     assert duplicate_items["candidate_ready"] is False
@@ -596,13 +596,13 @@ def test_candidate_validator_accepts_a_complete_small_fixture(tmp_path: Path) ->
         == 1
     )
     connection.execute(
-        f"UPDATE {schema}.pbp_completed_events SET artifact_id = 'stale'"
+        f"UPDATE {schema}.pbp_imputed_events SET artifact_id = 'stale'"
     )
     stale = validate_candidate(connection, root, schema, pitch, grouped)
     assert stale["candidate_ready"] is False
     assert (
         stale["checks"]["materialized_artifact_identities"]["value"][
-            "pbp_completed_events"
+            "pbp_imputed_events"
         ]
         == 1
     )

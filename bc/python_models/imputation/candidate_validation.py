@@ -42,22 +42,22 @@ _COMPONENTS: Final = (
     "linear_weights",
 )
 _CONSUMER_TABLES: Final = (
-    "pbp_completed_event_values",
-    "pbp_completed_events",
-    "pbp_completed_fielding_plays",
-    "pbp_completed_fielding_totals",
-    "pbp_completed_game_context",
-    "pbp_completed_games",
-    "pbp_completed_geometry",
-    "pbp_completed_linear_weights",
-    "pbp_completed_officials",
-    "pbp_completed_park_factors",
-    "pbp_completed_pitch_items",
-    "pbp_completed_pitch_totals",
-    "pbp_completed_pitches",
-    "pbp_completed_run_expectancy",
-    "pbp_completed_runners",
-    "pbp_completed_state_transitions",
+    "pbp_imputed_event_values",
+    "pbp_imputed_events",
+    "pbp_imputed_fielding_plays",
+    "pbp_imputed_fielding_totals",
+    "pbp_imputed_game_context",
+    "pbp_imputed_games",
+    "pbp_imputed_geometry",
+    "pbp_imputed_linear_weights",
+    "pbp_imputed_officials",
+    "pbp_imputed_park_factors",
+    "pbp_imputed_pitch_items",
+    "pbp_imputed_pitch_totals",
+    "pbp_imputed_pitches",
+    "pbp_imputed_run_expectancy",
+    "pbp_imputed_runners",
+    "pbp_imputed_state_transitions",
 )
 _PITCH_COUNTERS: Final = tuple(
     field.removeprefix("completed_")
@@ -241,9 +241,9 @@ def _population_checks(
 ) -> dict[str, int]:
     source_games = _relation("main_models", "game_start_info")
     source_events = _relation("main_models", "stg_events")
-    games = _relation(schema, "pbp_completed_games")
-    events = _relation(schema, "pbp_completed_events")
-    values = _relation(schema, "pbp_completed_event_values")
+    games = _relation(schema, "pbp_imputed_games")
+    events = _relation(schema, "pbp_imputed_events")
+    values = _relation(schema, "pbp_imputed_event_values")
     pbp_games = f"SELECT game_id FROM {source_games} WHERE source_type = 'PlayByPlay'"
     pbp_events = f"SELECT event_key FROM {source_events} WHERE game_id IN ({pbp_games})"
     return {
@@ -307,11 +307,11 @@ def _population_checks(
 def _reconciliation_checks(
     connection: duckdb.DuckDBPyConnection, schema: str
 ) -> dict[str, object]:
-    pitches = _relation(schema, "pbp_completed_pitches")
-    totals = _relation(schema, "pbp_completed_pitch_totals")
-    items = _relation(schema, "pbp_completed_pitch_items")
-    fielding = _relation(schema, "pbp_completed_fielding_plays")
-    fielding_totals = _relation(schema, "pbp_completed_fielding_totals")
+    pitches = _relation(schema, "pbp_imputed_pitches")
+    totals = _relation(schema, "pbp_imputed_pitch_totals")
+    items = _relation(schema, "pbp_imputed_pitch_items")
+    fielding = _relation(schema, "pbp_imputed_fielding_plays")
+    fielding_totals = _relation(schema, "pbp_imputed_fielding_totals")
     counters = {
         counter: _scalar(
             connection,
@@ -359,7 +359,7 @@ def _reconciliation_checks(
         ),
         "runner_conflicts": _scalar(
             connection,
-            f"SELECT count(*) FROM {_relation(schema, 'pbp_completed_runners')} WHERE constraint_disposition LIKE '%conflict%'",
+            f"SELECT count(*) FROM {_relation(schema, 'pbp_imputed_runners')} WHERE constraint_disposition LIKE '%conflict%'",
         ),
     }
 
@@ -377,24 +377,24 @@ def _materialized_identity_checks(
 
     checks: dict[str, int] = {}
     direct = {
-        "context": "pbp_completed_game_context",
-        "officials": "pbp_completed_officials",
-        "geometry": "pbp_completed_geometry",
-        "pitches": "pbp_completed_pitches",
-        "runners": "pbp_completed_runners",
-        "fielding": "pbp_completed_fielding_plays",
-        "event_values": "pbp_completed_event_values",
-        "park_factors": "pbp_completed_park_factors",
-        "run_expectancy": "pbp_completed_run_expectancy",
-        "state_transitions": "pbp_completed_state_transitions",
-        "linear_weights": "pbp_completed_linear_weights",
+        "context": "pbp_imputed_game_context",
+        "officials": "pbp_imputed_officials",
+        "geometry": "pbp_imputed_geometry",
+        "pitches": "pbp_imputed_pitches",
+        "runners": "pbp_imputed_runners",
+        "fielding": "pbp_imputed_fielding_plays",
+        "event_values": "pbp_imputed_event_values",
+        "park_factors": "pbp_imputed_park_factors",
+        "run_expectancy": "pbp_imputed_run_expectancy",
+        "state_transitions": "pbp_imputed_state_transitions",
+        "linear_weights": "pbp_imputed_linear_weights",
     }
     inherited = {
-        "pbp_completed_games": "context",
-        "pbp_completed_events": "pitches",
-        "pbp_completed_pitch_items": "pitches",
-        "pbp_completed_pitch_totals": "pitches",
-        "pbp_completed_fielding_totals": "fielding",
+        "pbp_imputed_games": "context",
+        "pbp_imputed_events": "pitches",
+        "pbp_imputed_pitch_items": "pitches",
+        "pbp_imputed_pitch_totals": "pitches",
+        "pbp_imputed_fielding_totals": "fielding",
     }
     for component, table in direct.items():
         relation = _relation(schema, table)
@@ -413,12 +413,12 @@ def _materialized_identity_checks(
             connection,
             f"SELECT count(*) FROM {relation} WHERE artifact_id IS DISTINCT FROM '{artifact_id(component)}' OR source_snapshot_id IS DISTINCT FROM '{source.sha256}'",
         )
-    events = _relation(schema, "pbp_completed_events")
-    checks["pbp_completed_events_geometry"] = _scalar(
+    events = _relation(schema, "pbp_imputed_events")
+    checks["pbp_imputed_events_geometry"] = _scalar(
         connection,
         f"SELECT count(*) FROM {events} WHERE (raw_batted_trajectory IS NOT NULL OR raw_batted_to_fielder IS NOT NULL) AND geometry_artifact_id IS DISTINCT FROM '{artifact_id('geometry')}'",
     )
-    checks["pbp_completed_events_values"] = _scalar(
+    checks["pbp_imputed_events_values"] = _scalar(
         connection,
         f"SELECT count(*) FROM {events} WHERE value_artifact_id IS DISTINCT FROM '{artifact_id('event_values')}'",
     )

@@ -6,7 +6,7 @@ from python_models.imputation.values import STATE_TRANSITIONS_OUTPUT_SCHEMA
 
 
 @model(
-    "main_models.pbp_completed_state_transitions",
+    "main_models.pbp_imputed_state_transitions",
     is_sql=True,
     kind="FULL",
     columns=completed_schema(STATE_TRANSITIONS_OUTPUT_SCHEMA),

@@ -1,9 +1,9 @@
 MODEL (
-  name main_models.pbp_completed_events,
+  name main_models.pbp_imputed_events,
   kind VIEW,
   grain (event_key),
   audits (estimated_contract_complete, min_row_count(threshold := 1), unique_grain(columns := (event_key))),
-  description 'Complete-value event spine for PBP games across history. Recorded outcomes remain unchanged; counts and contact geometry use additive completion artifacts. Child runner, fielding and pitch evidence remains available at its original grain.'
+  description 'Imputed event spine for PBP games across history. Recorded outcomes remain unchanged; estimated counts and contact geometry use additive imputation artifacts. Child runner, fielding and pitch evidence remains available at its original grain.'
 );
 
 SELECT
@@ -63,6 +63,6 @@ SELECT
     v.weak_identification_flag AS value_weak_identification_flag,
     p.* EXCLUDE (event_key, game_id, event_id, season, plate_appearance_result, count_balls, count_strikes)
 FROM main_models.stg_events e
-JOIN main_models.pbp_completed_pitches p USING (event_key)
-LEFT JOIN main_models.pbp_completed_geometry g USING (event_key)
-LEFT JOIN main_models.pbp_completed_event_values v USING (event_key)
+JOIN main_models.pbp_imputed_pitches p USING (event_key)
+LEFT JOIN main_models.pbp_imputed_geometry g USING (event_key)
+LEFT JOIN main_models.pbp_imputed_event_values v USING (event_key)

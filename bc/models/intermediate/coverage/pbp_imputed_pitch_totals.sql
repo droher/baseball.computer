@@ -1,9 +1,9 @@
 MODEL (
-  name main_models.pbp_completed_pitch_totals,
+  name main_models.pbp_imputed_pitch_totals,
   kind FULL,
   grain (game_id, pitcher_id, batter_id),
   audits (estimated_contract_complete, min_row_count(threshold := 1), unique_grain(columns := (game_id, pitcher_id, batter_id))),
-  description 'Completed pitch counters by game, pitcher, and batter. Each counter keeps observed and estimated contributions separate using its declared completion method; rates use terminal completed plate appearances.'
+  description 'Imputed pitch counters by game, pitcher, and batter. Each counter keeps observed and estimated contributions separate using its declared imputation method; rates use recorded terminal plate appearances.'
 );
 
 WITH event_rows AS (
@@ -63,7 +63,7 @@ WITH event_rows AS (
         completed.wild_pitches_method,
         completed.completed_balks::BIGINT AS completed_balks,
         completed.balks_method
-    FROM main_models.pbp_completed_pitches AS completed
+    FROM main_models.pbp_imputed_pitches AS completed
     INNER JOIN main_models.stg_events AS event USING (event_key)
 ),
 rolled AS (
@@ -188,7 +188,7 @@ SELECT
     completed_strikes::DOUBLE / NULLIF(completed_pitches, 0) AS strike_rate,
     completed_swings::DOUBLE / NULLIF(completed_pitches, 0) AS swing_rate,
     completed_swings_with_contact::DOUBLE / NULLIF(completed_swings, 0) AS contact_rate,
-    'pbp_completed_pitch_totals' AS model_name,
+    'pbp_imputed_pitch_totals' AS model_name,
     '1' AS model_version,
     'completed_counter_rollup' AS method,
     CASE WHEN all_counters_observed THEN 'observed' ELSE 'mixed' END AS observed_status

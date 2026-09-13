@@ -1,18 +1,18 @@
 from sqlmesh import model
 from sqlmesh.core.macros import MacroEvaluator
 
-from python_models.imputation.geometry import OUTPUT_SCHEMA
 from python_models.imputation.ingest import completed_schema
+from python_models.imputation.values import RUN_EXPECTANCY_OUTPUT_SCHEMA
 
 
 @model(
-    "main_models.pbp_completed_geometry",
+    "main_models.pbp_imputed_run_expectancy",
     is_sql=True,
     kind="FULL",
-    columns=completed_schema(OUTPUT_SCHEMA),
-    grain=["event_key"],
+    columns=completed_schema(RUN_EXPECTANCY_OUTPUT_SCHEMA),
+    grain=["season", "league", "base_state", "outs"],
     audits=[("estimated_contract_complete", {}), ("min_row_count", {"threshold": 1})],
-    description="Current-target batted-ball completion for PBP games including pre-1910 games. Recorded, derived, and sampled fields remain distinguishable; historical standardization is explicitly exploratory. Empty until a full artifact root is selected.",
+    description="Run expectancy for base-out contexts present in actual PBP, with explicitly exploratory transported fallback.",
 )
 def entrypoint(evaluator: MacroEvaluator) -> str:
     from python_models.imputation.ingest import build_ingestion_sql
@@ -20,4 +20,4 @@ def entrypoint(evaluator: MacroEvaluator) -> str:
     root = evaluator.var("pbp_imputation_root", "")
     if not isinstance(root, str):
         raise TypeError("pbp_imputation_root must be a string")
-    return build_ingestion_sql(root, "geometry", OUTPUT_SCHEMA)
+    return build_ingestion_sql(root, "run_expectancy", RUN_EXPECTANCY_OUTPUT_SCHEMA)

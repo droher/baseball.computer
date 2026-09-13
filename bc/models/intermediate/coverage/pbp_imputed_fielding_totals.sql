@@ -1,9 +1,9 @@
 MODEL (
-  name main_models.pbp_completed_fielding_totals,
+  name main_models.pbp_imputed_fielding_totals,
   kind FULL,
   grain (game_id, player_id, completed_fielding_position, credit_type),
   audits (estimated_contract_complete, min_row_count(threshold := 1), unique_grain(columns := (game_id, player_id, completed_fielding_position, credit_type))),
-  description 'Completed raw fielding-play credits by game, player, position, and credit type. A nullable player identifies an explicit unresolved personnel slot.'
+  description 'Fielding totals from recorded and imputed play credits, by game, player, position, and credit type. A nullable player identifies an explicit unresolved personnel slot.'
 );
 
 WITH plays AS (
@@ -19,7 +19,7 @@ WITH plays AS (
         completed.source_snapshot_id,
         completed.confidence_status,
         completed.weak_identification_flag
-    FROM main_models.pbp_completed_fielding_plays AS completed
+    FROM main_models.pbp_imputed_fielding_plays AS completed
 ),
 rolled AS (
     SELECT
@@ -48,7 +48,7 @@ rolled AS (
 )
 SELECT
     rolled.*,
-    'pbp_completed_fielding_totals' AS model_name,
+    'pbp_imputed_fielding_totals' AS model_name,
     '1' AS model_version,
     'completed_raw_fielding_play_rollup' AS method,
     CASE WHEN estimated_play_credits = 0 THEN 'observed' ELSE 'mixed' END AS observed_status

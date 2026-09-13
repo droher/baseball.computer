@@ -195,7 +195,7 @@ def test_api_exposes_parseable_query_and_declared_schema(
     _ = sqlglot.parse_one(sql, read="duckdb")
     columns = connection.execute(f"DESCRIBE SELECT * FROM ({sql})").fetchall()
     assert tuple(row[0] for row in columns) == tuple(OUTPUT_SCHEMA)
-    assert MODEL_NAME == "pbp_completed_geometry"
+    assert MODEL_NAME == "pbp_imputed_geometry"
     assert SOURCE_SIGNATURE == "pbp-geometry-current-source-v1"
 
 

@@ -8,7 +8,7 @@ from typing import ClassVar, Final
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-MODEL_NAME: Final = "pbp_completed_fielding_plays"
+MODEL_NAME: Final = "pbp_imputed_fielding_plays"
 MODEL_VERSION: Final = "1.0.0"
 SOURCE_SIGNATURE: Final = "pbp-fielding-current-source-v1"
 INPUT_RELATIONS: Final = (

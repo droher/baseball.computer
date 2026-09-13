@@ -75,7 +75,7 @@ def test_runner_destination_maps_to_completed_child() -> None:
     target = completion_targets(
         _report("main_models.stg_event_baserunners.base_end", 1)
     )[0]
-    assert target.completed_field.endswith("pbp_completed_runners.completed_base_end")
+    assert target.completed_field.endswith("pbp_imputed_runners.completed_base_end")
     assert "destination_support" in target.evidence_fields
 
 

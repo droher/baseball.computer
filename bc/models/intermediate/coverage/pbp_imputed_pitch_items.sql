@@ -1,9 +1,9 @@
 MODEL (
-  name main_models.pbp_completed_pitch_items,
+  name main_models.pbp_imputed_pitch_items,
   kind FULL,
   grain (event_key, sequence_index),
   audits (estimated_contract_complete, min_row_count(threshold := 1), unique_grain(columns := (event_key, sequence_index))),
-  description 'Normalized completed pitch items. Source items and flags are retained when their sequence index resolves; reconstructed items state their prior or structural-zero provenance.'
+  description 'Normalized imputed pitch items. Source items and flags are retained when their sequence index resolves; reconstructed items state their prior or structural-zero provenance.'
 );
 
 WITH completed_items AS (
@@ -30,7 +30,7 @@ WITH completed_items AS (
         completed.model_version AS source_model_version,
         completed.confidence_status AS source_confidence_status,
         completed.weak_identification_flag AS source_weak_identification_flag
-    FROM main_models.pbp_completed_pitches AS completed
+    FROM main_models.pbp_imputed_pitches AS completed
     INNER JOIN main_models.stg_events AS event USING (event_key)
     CROSS JOIN UNNEST(STRING_SPLIT(completed.completed_pitch_sequence, '|'))
         WITH ORDINALITY AS item(completed_sequence_item, ordinality)
@@ -95,7 +95,7 @@ SELECT
         ELSE 'reconstructed_prior'
     END AS item_method,
     completed.artifact_id,
-    'pbp_completed_pitch_items' AS model_name,
+    'pbp_imputed_pitch_items' AS model_name,
     '1' AS model_version,
     completed.source_snapshot_id,
     'normalized_source_preserving_pitch_items' AS method,

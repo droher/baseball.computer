@@ -135,12 +135,12 @@ def build_ingestion_sql(root: str, component: str, columns: Mapping[str, str]) -
     payload = [f'"{column}"' for column in columns if column not in CONTRACT_SCHEMA]
     metadata = {
         "artifact_id": artifact.data.sha256,
-        "model_name": "pbp_completed_game_context"
+        "model_name": "pbp_imputed_game_context"
         if component == "context"
         else (
-            "pbp_completed_fielding_plays"
+            "pbp_imputed_fielding_plays"
             if component == "fielding"
-            else f"pbp_completed_{component}"
+            else f"pbp_imputed_{component}"
         ),
         "model_version": "1",
         "source_snapshot_id": source.sha256,

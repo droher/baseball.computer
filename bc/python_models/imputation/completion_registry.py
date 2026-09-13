@@ -119,7 +119,7 @@ def _target(
             "count_strikes": "count_strikes_method",
         }.get(column)
         return (
-            f"main_models.pbp_completed_events.{column}",
+            f"main_models.pbp_imputed_events.{column}",
             component,
             (method,) if method else (),
             None,
@@ -127,20 +127,20 @@ def _target(
     if relation == "main_models.game_start_info":
         if column in OFFICIAL_ROLES:
             return (
-                "main_models.pbp_completed_officials.candidate_identities",
+                "main_models.pbp_imputed_officials.candidate_identities",
                 "officials",
                 ("recorded_identity", "candidate_probabilities", "unresolved_slot"),
                 f"role = '{column}'",
             )
         return (
-            f"main_models.pbp_completed_games.{column}",
+            f"main_models.pbp_imputed_games.{column}",
             "context" if column in CONTEXT_FIELDS else None,
             (f"{column}_method",) if column in CONTEXT_FIELDS else (),
             None,
         )
     if relation == "main_models.game_results":
         return (
-            f"main_models.pbp_completed_games.{column}",
+            f"main_models.pbp_imputed_games.{column}",
             "context" if column == "duration_minutes" else None,
             ("duration_minutes_method",) if column == "duration_minutes" else (),
             None,
@@ -150,14 +150,14 @@ def _target(
             "completed_fielding_position" if column == "fielding_position" else column
         )
         return (
-            f"main_models.pbp_completed_fielding_plays.{selected}",
+            f"main_models.pbp_imputed_fielding_plays.{selected}",
             "fielding",
             ("completion_method", "constraint_disposition", "candidate_probabilities"),
             None,
         )
     if relation == "main_models.stg_event_baserunners" and column == "base_end":
         return (
-            "main_models.pbp_completed_runners.completed_base_end",
+            "main_models.pbp_imputed_runners.completed_base_end",
             "runners",
             (
                 "completed_destination",
@@ -176,14 +176,14 @@ def _target(
             "catcher_pickoff_attempt_at_base": "completed_catcher_pickoff_attempt_at_base",
         }.get(column, column)
         return (
-            f"main_models.pbp_completed_pitch_items.{selected}",
+            f"main_models.pbp_imputed_pitch_items.{selected}",
             "pitches",
             ("item_method", "source_item_evidence_status", "constraint_disposition"),
             None,
         )
     if relation == "main_models.stg_event_pitch_sequence_status":
         return (
-            f"main_models.pbp_completed_pitches.{column}",
+            f"main_models.pbp_imputed_pitches.{column}",
             "pitches",
             ("source_resolution_status", "constraint_disposition"),
             None,

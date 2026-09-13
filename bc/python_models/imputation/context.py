@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-MODEL_NAME = "pbp_completed_game_context"
+MODEL_NAME = "pbp_imputed_game_context"
 MODEL_VERSION = "1"
 INPUT_RELATIONS = ("main_models.game_start_info", "main_models.game_results")
 CONTEXT_FIELDS = {

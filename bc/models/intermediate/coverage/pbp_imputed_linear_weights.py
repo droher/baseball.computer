@@ -6,7 +6,7 @@ from python_models.imputation.values import LINEAR_WEIGHTS_OUTPUT_SCHEMA
 
 
 @model(
-    "main_models.pbp_completed_linear_weights",
+    "main_models.pbp_imputed_linear_weights",
     is_sql=True,
     kind="FULL",
     columns=completed_schema(LINEAR_WEIGHTS_OUTPUT_SCHEMA),
