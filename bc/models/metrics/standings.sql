@@ -1,7 +1,7 @@
 MODEL (
   name main_models.standings,
   kind FULL,
-  description 'Daily snapshots of team standings.',
+  description 'End-of-day team-standing snapshots by game completion date, carried through offdays.',
   grain (season, date, team_id),
   columns (
     season BIGINT,
@@ -125,53 +125,100 @@ standings_spine AS (
     WHERE d.date BETWEEN b.season_start_date AND b.season_end_date
 ),
 
+regular_games AS MATERIALIZED (
+    SELECT *
+    FROM main_models.team_game_results
+    WHERE game_type = 'RegularSeason'
+        AND game_finish_date IS NOT NULL
+),
+
+game_states AS (
+    SELECT
+        r.*,
+        SUM(wins) OVER team_window AS wins_to_date,
+        SUM(losses) OVER team_window AS losses_to_date,
+        SUM(runs_scored) OVER team_window AS runs_scored_to_date,
+        SUM(runs_allowed) OVER team_window AS runs_allowed_to_date,
+        SUM(home_wins) OVER team_window AS home_wins_to_date,
+        SUM(home_losses) OVER team_window AS home_losses_to_date,
+        SUM(away_wins) OVER team_window AS away_wins_to_date,
+        SUM(away_losses) OVER team_window AS away_losses_to_date,
+        SUM(interleague_wins) OVER team_window AS interleague_wins_to_date,
+        SUM(interleague_losses) OVER team_window AS interleague_losses_to_date,
+        SUM(east_wins) OVER team_window AS east_wins_to_date,
+        SUM(east_losses) OVER team_window AS east_losses_to_date,
+        SUM(central_wins) OVER team_window AS central_wins_to_date,
+        SUM(central_losses) OVER team_window AS central_losses_to_date,
+        SUM(west_wins) OVER team_window AS west_wins_to_date,
+        SUM(west_losses) OVER team_window AS west_losses_to_date,
+        SUM(one_run_wins) OVER team_window AS one_run_wins_to_date,
+        SUM(one_run_losses) OVER team_window AS one_run_losses_to_date,
+        SUM(wins) OVER last_10_window AS last_10_wins_to_date,
+        SUM(losses) OVER last_10_window AS last_10_losses_to_date
+    FROM regular_games AS r
+    WINDOW
+        team_window AS (
+            PARTITION BY r.season, r.team_id
+            ORDER BY r.game_finish_date, r.season_game_number, r.game_id
+        ),
+        last_10_window AS (
+            PARTITION BY r.season, r.team_id
+            ORDER BY r.game_finish_date, r.season_game_number, r.game_id
+            ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+        )
+),
+
+ranked_game_date_states AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY season, team_id, game_finish_date
+            ORDER BY season_game_number DESC, game_id DESC
+        ) AS game_date_rank
+    FROM game_states
+),
+
+daily_game_states AS (
+    SELECT * EXCLUDE (game_date_rank)
+    FROM ranked_game_date_states
+    WHERE game_date_rank = 1
+),
+
 crossed AS (
-    SELECT DISTINCT ON (s.date, s.season, s.league, s.team_id)
+    SELECT
         s.date,
         s.season,
         s.league,
         s.division,
         s.team_id,
         s.team_name,
-        COALESCE(SUM(r.wins) OVER team_window, 0) AS wins,
-        COALESCE(SUM(r.losses) OVER team_window, 0) AS losses,
-        -- Take the streak count from the last game of the day
-        COALESCE(LAST(r.win_streak_length IGNORE NULLS) OVER team_window, 0) AS win_streak_length,
-        COALESCE(LAST(r.loss_streak_length IGNORE NULLS) OVER team_window, 0) AS loss_streak_length,
-        COALESCE(SUM(r.runs_scored) OVER team_window, 0) AS runs_scored,
-        COALESCE(SUM(r.runs_allowed) OVER team_window, 0) AS runs_allowed,
-        COALESCE(SUM(r.home_wins) OVER team_window, 0) AS home_wins,
-        COALESCE(SUM(r.home_losses) OVER team_window, 0) AS home_losses,
-        COALESCE(SUM(r.away_wins) OVER team_window, 0) AS away_wins,
-        COALESCE(SUM(r.away_losses) OVER team_window, 0) AS away_losses,
-        COALESCE(SUM(r.interleague_wins) OVER team_window, 0) AS interleague_wins,
-        COALESCE(SUM(r.interleague_losses) OVER team_window, 0) AS interleague_losses,
-        COALESCE(SUM(r.east_wins) OVER team_window, 0) AS east_wins,
-        COALESCE(SUM(r.east_losses) OVER team_window, 0) AS east_losses,
-        COALESCE(SUM(r.central_wins) OVER team_window, 0) AS central_wins,
-        COALESCE(SUM(r.central_losses) OVER team_window, 0) AS central_losses,
-        COALESCE(SUM(r.west_wins) OVER team_window, 0) AS west_wins,
-        COALESCE(SUM(r.west_losses) OVER team_window, 0) AS west_losses,
-        COALESCE(SUM(r.one_run_wins) OVER team_window, 0) AS one_run_wins,
-        COALESCE(SUM(r.one_run_losses) OVER team_window, 0) AS one_run_losses,
-        COALESCE(SUM(r.wins) OVER last_10_window, 0) AS last_10_wins,
-        COALESCE(SUM(r.losses) OVER last_10_window, 0) AS last_10_losses,
+        COALESCE(g.wins_to_date, 0) AS wins,
+        COALESCE(g.losses_to_date, 0) AS losses,
+        COALESCE(g.win_streak_length, 0) AS win_streak_length,
+        COALESCE(g.loss_streak_length, 0) AS loss_streak_length,
+        COALESCE(g.runs_scored_to_date, 0) AS runs_scored,
+        COALESCE(g.runs_allowed_to_date, 0) AS runs_allowed,
+        COALESCE(g.home_wins_to_date, 0) AS home_wins,
+        COALESCE(g.home_losses_to_date, 0) AS home_losses,
+        COALESCE(g.away_wins_to_date, 0) AS away_wins,
+        COALESCE(g.away_losses_to_date, 0) AS away_losses,
+        COALESCE(g.interleague_wins_to_date, 0) AS interleague_wins,
+        COALESCE(g.interleague_losses_to_date, 0) AS interleague_losses,
+        COALESCE(g.east_wins_to_date, 0) AS east_wins,
+        COALESCE(g.east_losses_to_date, 0) AS east_losses,
+        COALESCE(g.central_wins_to_date, 0) AS central_wins,
+        COALESCE(g.central_losses_to_date, 0) AS central_losses,
+        COALESCE(g.west_wins_to_date, 0) AS west_wins,
+        COALESCE(g.west_losses_to_date, 0) AS west_losses,
+        COALESCE(g.one_run_wins_to_date, 0) AS one_run_wins,
+        COALESCE(g.one_run_losses_to_date, 0) AS one_run_losses,
+        COALESCE(g.last_10_wins_to_date, 0) AS last_10_wins,
+        COALESCE(g.last_10_losses_to_date, 0) AS last_10_losses
     FROM standings_spine AS s
-    LEFT JOIN main_models.team_game_results AS r
-        ON r.season = s.season
-            AND r.team_id = s.team_id
-            AND r.game_finish_date = s.date
-            AND r.game_type = 'RegularSeason'
-    WINDOW
-        team_window AS (
-            PARTITION BY s.season, s.team_id
-            ORDER BY s.date, r.season_game_number
-        ),
-        last_10_window AS (
-            PARTITION BY s.season, s.team_id
-            ORDER BY r.season_game_number
-            RANGE BETWEEN 9 PRECEDING AND CURRENT ROW
-        )
+    ASOF LEFT JOIN daily_game_states AS g
+        ON s.season = g.season
+            AND s.team_id = g.team_id
+            AND s.date >= g.game_finish_date
 ),
 
 final AS (

@@ -163,7 +163,7 @@ rules:
     text: fielding_position is an integer (1=P, 2=C, 3=1B, 4=2B, 5=3B, 6=SS, 7=LF, 8=CF, 9=RF, 10=DH), never a text abbreviation.
   - severity: must
     scope: global
-    text: main_models.standings holds one row per team per date. For a final or current record take the latest date per (season, team_id), e.g. with QUALIFY row_number() OVER (PARTITION BY season, team_id ORDER BY date DESC) = 1.
+    text: main_models.standings holds one end-of-day row per team per date, counting games on their completion date and carrying the latest completed-game state across off days. Last-ten records cover the ten most recently completed games, including ties. For a final or current record take the latest date per (season, team_id), e.g. with QUALIFY row_number() OVER (PARTITION BY season, team_id ORDER BY date DESC) = 1.
   - severity: should
     scope: global
     text: Franchises change team_id when they move (MON → WAS, WS1 → MIN). Use main_seeds.seed_franchises.franchise_id joined on team_id and season for franchise history; a bare team_id covers only one era.
