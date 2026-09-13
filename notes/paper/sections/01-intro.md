@@ -1,120 +1,51 @@
 ## Introduction
 
-A century of major-league baseball play-by-play looks, at first, like a solved
-data problem. Every game since 1910 that was recorded at the event level has a
-complete account of outcomes: who batted, what the result was, how the base-out
-state changed, which runs scored. The database this paper draws on holds
-205,845 play-by-play games and 18,141,020 events across the 1910–2025 span
-<!-- src: tables/corpus_by_decade.md -->. Outcomes are there.
-What is not uniformly there is detail: the trajectory of a batted ball, its
-location, which fielder handled it, the sequence of pitches, the fielder charged
-with a putout. These fields are missing not at random across the game but
-according to who was keeping score and when.
+A historical play-by-play account can identify the batter, the play result, and
+the change in base-out state while omitting the pitches, the ball's trajectory,
+or the fielder who made an out. These omissions limit comparisons across eras:
+a statistic computed only where detail survives describes a selected part of
+the archive. An estimate can make the remaining record usable, but its meaning
+depends on why the detail is missing and on the assumptions used to fill it.
 
-The distinction matters because detail completeness is a property of the
-observation process, not of the game. A scorer in 1935 and a scorer in 2015 both
-watched a ground ball to shortstop; only one of them reliably wrote down that it
-was a ground ball. When the record omits the trajectory, the omission is
-systematic. Before 1950 the scorer wrote a trajectory on 712,469 batted balls
-and omitted it on 2.6 million; of the omitted, 763,993 are ground balls whose
-class the fielding string alone recovers — a ball fielded by the shortstop and
-thrown to first — more events than the whole recorded slice, and a floor of
-0.29 under the unrecorded ground-ball share before a single genuinely unknown
-event is counted <!-- src: notes/paper/tables/groundball_mnar.md -->. A model
-trained on the recorded slice assigns those known ground balls a mean
-ground-ball probability of 0.32 <!-- src: notes/paper/tables/groundball_mnar.md -->.
-The pattern holds through 1987 and collapses after 1988, when the unrecorded
-slice shrinks to 135 thousand events against 4.8 million recorded
-<!-- src: notes/paper/tables/groundball_mnar.md -->. Scorers before 1988 omitted
-the trajectory on routine grounders the fielding string made redundant, and a
-model that treats the recorded trajectories as a random sample of all
-trajectories misstates the unrecorded class mix by an amount the recorded data
-cannot bound from above, in exactly the era where nearly everything must be
-imputed — the unobserved slice is 78 to 95 percent of all events before 1988
-across the geometry and location dimensions
-<!-- src: notes/data-coverage-implementation/implementation-review.md -->.
+This paper studies 18,141,020 events in 205,886 acquired play-by-play (PBP) games
+from 1903 through 2025. Of these, 119,335 games and 10,308,542 events precede
+1989. The earliest decade contributes only 41 games; the calendar span is not a
+claim of complete historical acquisition. We target fields on actual PBP rows.
+Reconstruction from box scores or season totals is a separate problem because
+it requires inventing the event spine as well as its missing details.
 
-This is the record problem: the play-by-play archive is the joint output of two
-coupled processes. One is the game — a ball is hit, it has a latent trajectory
-and location, fielders handle it, runners advance, a scorer assigns official
-credit. The other is the observation process — a source, a scorer, an inputter,
-a translator, and a parser recorded or dropped parts of that event. Most
-existing treatments of historical baseball data blur the two, filling missing
-detail with deterministic rules, source-precedence orderings, and sample-size
-thresholds that hide the assumption that complete cases stand in for missing
-ones. Those rules are useful and this paper keeps the good ones as measurement
-constraints, but they publish a point where the honest answer is a distribution,
-and they say nothing about whether the complete cases are representative.
+Two coupled processes produce the archive. The game generates a trajectory,
+location, sequence of pitches, and sequence of fielding actions. Scorers,
+sources, translators, and parsers determine which aspects become recorded data.
+A source may omit a label precisely when another part of the account makes it
+redundant. In the historical geometry dataset, the pre-1950 unrecorded slice
+contains 763,993 ground balls deducible from fielding strings, compared with
+712,469 explicitly recorded trajectories of all classes. The derived cases
+impose a lower bound on the unrecorded ground-ball share; they do not make that
+slice a random sample or identify its remaining composition. Section 5 develops
+this argument, and Section 7 identifies the dated evidence behind the counts.
 
-We take the other route. Modeling the observation process explicitly — who
-recorded what, when, and why — turns missing data from a cleaning nuisance into
-an estimand. It yields probability surfaces whose calibration is checked
-against held-out data — reliability and interval coverage, not asserted —
-where deterministic imputation would fabricate certainty. And it draws a line,
-for each quantity,
-between what a single-source record can identify and what it cannot: some
-targets are unidentifiable from one scorer's account and must not be published
-as facts, only bounded or withheld.
+The work has two connected parts. The first is a family of hierarchical
+coverage models for observation propensity, geometry, fielding credit, handlers,
+park factors, run expectancy, transitions, and pitch summaries. These models
+make assumptions and uncertainty explicit, but the available experiments do not
+establish historical identification or calibrated reconstruction across eras.
+The second is an additive imputation layer that covers the acquired PBP schema
+using those retained estimates where available and declared rule-based,
+empirical, transported, or neutral fallbacks elsewhere. This second part accepts
+rough estimates while requiring their estimated status to remain visible.
 
-The paper makes five contributions.
+The contributions are a taxonomy at event-dimension grain; a selection-model
+sensitivity formulation that separates lower bounds from point identification;
+a full-history PBP field registry and imputation implementation; and an evidence
+contract that separates numerical convergence, predictive performance,
+calibration, transport, identification, and provenance. The results include
+failed and unsupported evidence. Passing a conservation check, or successfully
+materializing a database table, does not turn an assumption into an observation.
 
-First, a taxonomy of missingness that separates the game process from the
-observation process. A single missing-completely-at-random / missing-at-random /
-missing-not-at-random label per field is the wrong ontology for a record where
-one row can be complete for batting, missing a trajectory, complete for team
-fielding, and missing a putout fielder. We classify ten missingness mechanisms
-and identify which are selection-biased on the unobserved value itself.
-
-Second, a family of hierarchical Bayesian coverage models that share one
-statistical contract — non-centered partial pooling, game-grouped holdouts, a
-per-model deep-learning-covariate ablation, and acceptance gates that pair
-convergence diagnostics with held-out predictive lift over a baseline, with
-held-out calibration and posterior-predictive interval coverage reported
-alongside as diagnostics <!-- src: bc/python_models/statistical/validate.py -->. The family spans
-observation propensity (Model A, published as `scorer_observation_propensities`),
-fielding credit (Model C, `imputed_fielding_credit`), ball handler (Model D,
-`imputed_ball_handler_probabilities`), batted-ball geometry (Model E,
-`imputed_batted_ball_geometry`), park factors (Model F, `park_factor_summary`),
-run expectancy and base-out transitions (Model G, `run_expectancy_summary` and
-`state_transition_summary`), and pitch coverage and summary (Model J)
-<!-- src: docs/estimated-models.md -->.
-
-Third, a treatment of missingness that is not at random. For the trajectory and
-location dimensions, whether a label was recorded is correlated with what the
-label would have been. We report a learned correction that is inert — a
-propensity coefficient that converges cleanly and leaves the masked-slice error
-unchanged — a fixed per-class selection offset δ_c that the observed-only
-likelihood cannot identify, a hard lower bound on the unrecorded ground-ball
-share from the deduced-trajectory slice together with a known-truth diagnostic
-of the missing-at-random fit on that slice, and a sensitivity ribbon over the
-offset published as an assumed band that the bound constrains from below
-<!-- src: bc/python_models/statistical/mnar_anchor.py, bc/python_models/statistical/sensitivity.py -->.
-An earlier revision's data-anchored offset is withdrawn as an identity of the
-observed slice. The offset mechanism is checked in a masked backtest whose one
-informative design — selection on class and a covariate the model conditions
-on — shows the per-class offset recovering about half the bias
-<!-- src: notes/paper/tables/mnar_backtest_robustness.md -->.
-
-Fourth, a deep-learning supplement that supplies proposal distributions and
-shared entity embeddings to the Bayesian layer, never published facts. Its term
-enters the softmax as γ · log p̃^dl_{i,c} with one scalar γ ~ N(0, 0.5) whose
-posterior the data dominate, behind leakage gates and a cross-fitting contract;
-argmax-to-fact is banned. A defect in how the term handled a missing prediction
-shifted three published location surfaces and is disclosed and corrected in
-this revision.
-
-Fifth, a publication policy. Estimated surfaces ship as posteriors with an
-eight-column provenance contract — artifact_id, model_name, model_version,
-source_snapshot_id, method, observed_status, confidence_status, and
-weak_identification_flag <!-- src: notes/paper/OUTLINE.md --> — kept in a
-separate namespace from recorded and deterministic facts. Three designed models
-are withheld with their names reserved, for three different reasons: contact-
-label confusion (B), where a single scorer per event and no independent second
-label leave the data uninformative about the confusion matrix, so any fit
-returns its prior; fielder responsibility (I), where the positioning prior a
-correct model needs does not exist anywhere in the source — a data-availability
-limitation, not an identification proof; and shift propensity (K), designed but
-not yet built in this pass — unfinished scope, not a claim about the record.
-Publishing the propensity to observe, the posterior over what was observed, and
-a sensitivity ribbon over what was not — and nothing else — is the discipline
-the record demands.
+The manuscript's evidence cutoff is September 13, 2026. Earlier fit summaries
+are retained as dated research observations. The new PBP surfaces and migrated
+legacy wrappers have been exercised in isolated database copies; production
+promotion and public publication of this candidate remain pending. Throughout,
+"imputed" describes estimated data, including rough reconstructions, and
+"observed" is reserved for recorded source evidence.

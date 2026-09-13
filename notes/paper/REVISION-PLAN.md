@@ -1,3 +1,5 @@
+> Historical internal drafting record. The [September 13 revision](REVISION-2026-09-13.md) and [current evidence ledger](EVIDENCE.md) supersede its status claims. This is not evidence of external journal review or submission.
+
 ---
 title: Revision plan — modeling response to the referee report
 type: design-doc

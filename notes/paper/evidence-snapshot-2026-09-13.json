@@ -1,0 +1,1787 @@
+{
+  "evidence_cutoff": "2026-09-13",
+  "verification_scope": "Evidence-file identities and extracted results; no new fits, database build, or production publication.",
+  "code_commit": "98da62cfbe381e83e36bc55cfc47abdcc94fdafc",
+  "source_database": {
+    "path": "/Users/davidroher/Repos/baseball.computer/bc.db",
+    "bytes": 31871479808,
+    "sha256": "fc94ec74507ceb0e7ab60296006de534253d364b0c9d5b64f352c82749c23f9c"
+  },
+  "release_status": {
+    "status": "ready_for_production_approval",
+    "production_promoted": false,
+    "publicly_published": false
+  },
+  "population": {
+    "games": 205886,
+    "events": 18141020,
+    "first_season": 1903,
+    "last_season": 2025,
+    "pre_1989_games": 119335,
+    "pre_1989_events": 10308542,
+    "target_fields": 116
+  },
+  "registry": {
+    "classified_columns": 179,
+    "source_relations": 10,
+    "targets": 116
+  },
+  "components": {
+    "context": {
+      "rows": 205886,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/context.parquet",
+        "bytes": 7034640,
+        "sha256": "850e67e8d811dd2c6cf7ac7e5cf424e56e3272e7265c8dfc90305796d2859175"
+      }
+    },
+    "event_values": {
+      "rows": 18141020,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/event_values.parquet",
+        "bytes": 277883244,
+        "sha256": "7cd2e85befd3b586194a8b52bc5e9c4cd9288f82c871fb8e111065617e4e8132"
+      }
+    },
+    "fielding": {
+      "rows": 15719352,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/fielding.parquet",
+        "bytes": 168843427,
+        "sha256": "43d7e3447dda940de637f8092e7e9963d5e0057f607f5ed2e6f32e40bd9f2c2c"
+      }
+    },
+    "geometry": {
+      "rows": 12041398,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/geometry_v2.parquet",
+        "bytes": 170853250,
+        "sha256": "fcdbd984b7c7437f082299ee446def4bd914807915634cbbe5d2e2e16577d65c"
+      }
+    },
+    "linear_weights": {
+      "rows": 7640,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/linear_weights.parquet",
+        "bytes": 114977,
+        "sha256": "9baed7e3bd3199479557ac80f4c7eeb865bad07579ab624fbe8676c581581280"
+      }
+    },
+    "officials": {
+      "rows": 1441202,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/officials.parquet",
+        "bytes": 9523248,
+        "sha256": "11cf45a30b1da2332d62c43d39161b3993639f967755d0274705baa45e866796"
+      }
+    },
+    "park_factors": {
+      "rows": 72930,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/park_factors.parquet",
+        "bytes": 211314,
+        "sha256": "0aa4b0ceac7f6adb3c465ba20cbc3bc06954bd72c8b4fb6a02dede25ca2c5944"
+      }
+    },
+    "pitches": {
+      "rows": 18141020,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/pitches.parquet",
+        "bytes": 311201200,
+        "sha256": "4aa014a75574210a21f8d94db6c98bfcd0ca26ee4b78e88bf6cca04796a28c03"
+      }
+    },
+    "run_expectancy": {
+      "rows": 8473,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/run_expectancy.parquet",
+        "bytes": 177594,
+        "sha256": "447fa0d38eb4bdd11efb2d06863a135729ff4a376fa4cfaed41c812d5f559b49"
+      }
+    },
+    "runners": {
+      "rows": 17411649,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/runners.parquet",
+        "bytes": 164780084,
+        "sha256": "a26ff046e74621bf3ab3f8454cececb2cee863a68c2ab2c3f11c77087a3fdf19"
+      }
+    },
+    "state_transitions": {
+      "rows": 211825,
+      "data": {
+        "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-pbp-imputed-v1/state_transitions.parquet",
+        "bytes": 3263176,
+        "sha256": "369a5a1565c9b188543364556bce80c08ee6a6eb75d5085ba7e75ca6edb073d1"
+      }
+    }
+  },
+  "candidate_ready": true,
+  "candidate_checks": {
+    "full_scope": true,
+    "artifact_integrity": true,
+    "completion_registry": true,
+    "pitch_validation": true,
+    "grouped_coverage": true,
+    "consumer_schemas": true,
+    "materialized_artifact_identities": true,
+    "completion_targets": true,
+    "population": true,
+    "reconciliation": true
+  },
+  "candidate_reconciliation": {
+    "pitch_counter_differences": {
+      "pitches": 0,
+      "swings": 0,
+      "swings_with_contact": 0,
+      "strikes": 0,
+      "strikes_called": 0,
+      "strikes_swinging": 0,
+      "strikes_foul": 0,
+      "strikes_foul_tip": 0,
+      "strikes_in_play": 0,
+      "strikes_unknown": 0,
+      "balls": 0,
+      "balls_called": 0,
+      "balls_intentional": 0,
+      "balls_automatic": 0,
+      "unknown_pitches": 0,
+      "pitchouts": 0,
+      "pitcher_pickoff_attempts": 0,
+      "catcher_pickoff_attempts": 0,
+      "pitches_blocked_by_catcher": 0,
+      "pitches_with_runners_going": 0,
+      "passed_balls": 0,
+      "wild_pitches": 0,
+      "balks": 0
+    },
+    "observed_estimated_rollup_mismatches": {
+      "pitches": 0,
+      "swings": 0,
+      "swings_with_contact": 0,
+      "strikes": 0,
+      "strikes_called": 0,
+      "strikes_swinging": 0,
+      "strikes_foul": 0,
+      "strikes_foul_tip": 0,
+      "strikes_in_play": 0,
+      "strikes_unknown": 0,
+      "balls": 0,
+      "balls_called": 0,
+      "balls_intentional": 0,
+      "balls_automatic": 0,
+      "unknown_pitches": 0,
+      "pitchouts": 0,
+      "pitcher_pickoff_attempts": 0,
+      "catcher_pickoff_attempts": 0,
+      "pitches_blocked_by_catcher": 0,
+      "pitches_with_runners_going": 0,
+      "passed_balls": 0,
+      "wild_pitches": 0,
+      "balks": 0
+    },
+    "normalized_pitch_item_difference": 0,
+    "duplicate_completed_pitch_item_keys": 0,
+    "pitch_appearance_partition_mismatches": 0,
+    "fielding_total_play_credit_difference": 0,
+    "fielding_allocation_delta_nonzero": 0,
+    "pitch_conflicts": 8350189,
+    "fielding_conflicts": 29649,
+    "runner_conflicts": 8
+  },
+  "namespace_check": {
+    "passed": true,
+    "relations": [
+      "pbp_imputed_event_values",
+      "pbp_imputed_events",
+      "pbp_imputed_fielding_plays",
+      "pbp_imputed_fielding_totals",
+      "pbp_imputed_game_context",
+      "pbp_imputed_games",
+      "pbp_imputed_geometry",
+      "pbp_imputed_linear_weights",
+      "pbp_imputed_officials",
+      "pbp_imputed_park_factors",
+      "pbp_imputed_pitch_items",
+      "pbp_imputed_pitch_totals",
+      "pbp_imputed_pitches",
+      "pbp_imputed_run_expectancy",
+      "pbp_imputed_runners",
+      "pbp_imputed_state_transitions"
+    ]
+  },
+  "grouped_coverage": {
+    "fields": 116,
+    "full_population_match": true,
+    "baseline_mismatches": 0,
+    "grouping_mismatches": 0
+  },
+  "pitch": {
+    "appearances": 15822702,
+    "constraint_statuses": {
+      "completed_appearance_terminal_conflict": 859,
+      "completed_appearance_transition_conflict": 958,
+      "completed_count_boundary_conflict": 141909,
+      "constructed_legal_transition_sequence": 9790274,
+      "count_progression_contradiction": 728,
+      "source_conflict_quarantined": 333,
+      "source_preserved_no_detected_transition_conflict": 8204503,
+      "terminal_count_contradiction": 1456
+    },
+    "counters": [
+      {
+        "checked_rows": 18141020,
+        "counter": "pitches",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "swings",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "swings_with_contact",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes_called",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes_swinging",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes_foul",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes_foul_tip",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes_in_play",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "strikes_unknown",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "balls",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "balls_called",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "balls_intentional",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "balls_automatic",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "unknown_pitches",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "pitchouts",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      },
+      {
+        "checked_rows": 18141020,
+        "counter": "pitcher_pickoff_attempts",
+        "explicit_conflict_violations": 0,
+        "unflagged_violations": 0
+      }
+    ],
+    "explicit_conflict_appearance_violations": {
+      "ball_boundary": 26996,
+      "pitch_after_terminal": 816,
+      "strike_boundary": 51245,
+      "terminal_outcome": 375
+    },
+    "games": 205886,
+    "input_bytes": 311201200,
+    "input_sha256": "4aa014a75574210a21f8d94db6c98bfcd0ca26ee4b78e88bf6cca04796a28c03",
+    "passed": true,
+    "rows": 18141020,
+    "season_end": 2025,
+    "season_start": 1903,
+    "seed_sha256": "d4321f173d813232dc6787e36b65116636b7f7f2d1d4bf64596a6af2a2113e6d",
+    "unclassified_constraint_statuses": {},
+    "unflagged_appearance_violations": {},
+    "unknown_tokens": {}
+  },
+  "geometry_repair": {
+    "rows": 12041398,
+    "invalid_nonbunt": 0,
+    "invalid_bunt": 0,
+    "changed_standardized_rows": 1123,
+    "changed_other_geometry_columns": 0,
+    "original_artifact_sha256": "ffb11a201c7392ec8c377dea8c1f9c7527c274861bae58137d0522a09ba68231",
+    "repaired_artifact_sha256": "fcdbd984b7c7437f082299ee446def4bd914807915634cbbe5d2e2e16577d65c"
+  },
+  "context_holdout": {
+    "held_out_seasons": [
+      1903,
+      1910,
+      1940,
+      1960,
+      1980,
+      2000,
+      2025
+    ],
+    "predicted_games": 1000,
+    "scores": {
+      "time_of_day": {
+        "observed_test_values": 1000,
+        "exact_match_fraction": 0.483,
+        "source_leakage_rows": 0
+      },
+      "sky": {
+        "observed_test_values": 541,
+        "exact_match_fraction": 0.48428835489833644,
+        "source_leakage_rows": 0
+      },
+      "field_condition": {
+        "observed_test_values": 78,
+        "exact_match_fraction": 0.8717948717948718,
+        "source_leakage_rows": 0
+      },
+      "precipitation": {
+        "observed_test_values": 282,
+        "exact_match_fraction": 0.9397163120567376,
+        "source_leakage_rows": 0
+      },
+      "wind_direction": {
+        "observed_test_values": 396,
+        "exact_match_fraction": 0.19696969696969696,
+        "source_leakage_rows": 0
+      },
+      "temperature_fahrenheit": {
+        "observed_test_values": 543,
+        "mean_absolute_error": 7.52670349907919,
+        "source_leakage_rows": 0
+      },
+      "attendance": {
+        "observed_test_values": 944,
+        "mean_absolute_error": 10226.799788135593,
+        "source_leakage_rows": 0
+      },
+      "wind_speed_mph": {
+        "observed_test_values": 403,
+        "mean_absolute_error": 4.315136476426799,
+        "source_leakage_rows": 0
+      },
+      "start_time": {
+        "observed_test_values": 578,
+        "mean_absolute_clock_minutes": 234.33737024221455,
+        "source_leakage_rows": 0
+      },
+      "duration_minutes": {
+        "observed_test_values": 999,
+        "mean_absolute_error": 25.66766766766767,
+        "source_leakage_rows": 0
+      }
+    },
+    "interpretation": "Grouped-season holdout on recorded game context; does not calibrate historical missingness or air-trajectory estimates.",
+    "source_snapshot_id": "fc94ec74507ceb0e7ab60296006de534253d364b0c9d5b64f352c82749c23f9c",
+    "implementation": {
+      "path": "/Users/davidroher/Repos/baseball.computer/bc/python_models/imputation/context.py",
+      "bytes": 7236,
+      "sha256": "f369e914383fc5dfcaa503912a4ffef34bd9e46237f9e0a5255c303056c37a20"
+    },
+    "query": {
+      "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-context-holdout-v1/query.sql",
+      "bytes": 112112,
+      "sha256": "20ae88ff4d9524cfdbe0849664d687317512f3c7ab12d4ef839d064d256db430"
+    },
+    "script": {
+      "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-context-holdout-v1/run.py",
+      "bytes": 4103,
+      "sha256": "d6c19e07af3cc59dd6f8c970673c83a5c7251c13b25c4540d6f2a871877c2b9b"
+    },
+    "predictions": {
+      "path": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/20260913-context-holdout-v1/predictions.parquet",
+      "bytes": 63696,
+      "sha256": "ebf55d833216f57cf360a5ab0a61af0c82ad0d1ab0f3a5f59491d08c7ed4534e"
+    }
+  },
+  "legacy": {
+    "pointers": [
+      {
+        "model_name": "assist_count",
+        "candidate_artifact_id": "assist-count-v1-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "assist_credit_allocation",
+        "candidate_artifact_id": "full-10k-v3-cut1-prod-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "ball_handler_imputation",
+        "candidate_artifact_id": "d-noprop-10k-v2-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "ball_handler_position_observedness",
+        "candidate_artifact_id": "10k-v6-unseen-fix-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "dl_proposal_location_depth",
+        "candidate_artifact_id": "phase3-location-depth-v8-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "failed",
+          "calibration": "failed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "dl_proposal_location_edge",
+        "candidate_artifact_id": "phase3-location-edge-v8-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "failed",
+          "calibration": "failed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "dl_proposal_location_side",
+        "candidate_artifact_id": "phase3-location-side-v8-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "failed",
+          "calibration": "failed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "dl_proposal_trajectory",
+        "candidate_artifact_id": "phase3-trajectory-v9-cv-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "failed",
+          "calibration": "failed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "event_universe",
+        "candidate_artifact_id": "phase3-pretrain-v6-ab1-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "unsupported",
+          "predictive": "unsupported",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "general_location_observedness",
+        "candidate_artifact_id": "10k-v6-unseen-fix-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "geometry_general_location",
+        "candidate_artifact_id": "e-v12-noprop-general_location-zero-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "geometry_location_depth",
+        "candidate_artifact_id": "e-v12-noprop-location_depth-zero-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "geometry_location_edge",
+        "candidate_artifact_id": "e-v12-noprop-location_edge-zero-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "geometry_location_side",
+        "candidate_artifact_id": "e-v12-noprop-location_side-zero-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "geometry_trajectory",
+        "candidate_artifact_id": "e-v12-noprop-trajectory-shrunk-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "location_depth_observedness",
+        "candidate_artifact_id": "10k-v6-unseen-fix-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "location_edge_observedness",
+        "candidate_artifact_id": "10k-v6-unseen-fix-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "location_side_observedness",
+        "candidate_artifact_id": "10k-v6-unseen-fix-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "park_factor_runs",
+        "candidate_artifact_id": "pf-full-ar1-v4-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "pitch_summary",
+        "candidate_artifact_id": "ps-cut1-full-v7-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "putout_credit_allocation",
+        "candidate_artifact_id": "full-10k-v16-production-export-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "run_expectancy",
+        "candidate_artifact_id": "re-full-eraregime-v4-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "state_transition",
+        "candidate_artifact_id": "state-transition-v5-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "unsupported",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      },
+      {
+        "model_name": "trajectory_observedness",
+        "candidate_artifact_id": "10k-v6-unseen-fix-legacy-exploratory-v1",
+        "status": "failed",
+        "evidence": {
+          "numerical": "passed",
+          "predictive": "passed",
+          "calibration": "passed",
+          "transport": "unsupported",
+          "identification": "unsupported",
+          "provenance": "unsupported"
+        }
+      }
+    ],
+    "consumer_report": {
+      "started_at": "2026-09-13T18:46:54.966113+00:00",
+      "mode": "candidate",
+      "database": "/Users/davidroher/Repos/baseball.computer/artifacts/imputation/dev-validation-v1/bc_dev.db",
+      "schema": "main_models",
+      "threads": 1,
+      "memory_limit": "16GB",
+      "status": "passed",
+      "checks": [
+        {
+          "name": "smoke.assist_count_distribution",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.imputed_fielding_credit",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.imputed_ball_handler_probabilities",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.scorer_observation_propensities",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.imputed_batted_ball_geometry",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.park_factor_summary",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.pitch_summary_distribution",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.run_expectancy_summary",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.linear_weights_estimated",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.state_transition_summary",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.dl_proposal_manifest",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "smoke.dl_embedding_artifact",
+          "passed": true,
+          "actual": true,
+          "expected": true
+        },
+        {
+          "name": "schema.assist_count_distribution",
+          "passed": true,
+          "actual": {
+            "result_family": "VARCHAR",
+            "base_state_start": "TINYINT",
+            "outs_start": "TINYINT",
+            "assist_count_class": "VARCHAR",
+            "prob_mean": "DOUBLE",
+            "prob_sd": "DOUBLE",
+            "prob_hdi_lower": "DOUBLE",
+            "prob_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "result_family": "VARCHAR",
+            "base_state_start": "TINYINT",
+            "outs_start": "TINYINT",
+            "assist_count_class": "VARCHAR",
+            "prob_mean": "DOUBLE",
+            "prob_sd": "DOUBLE",
+            "prob_hdi_lower": "DOUBLE",
+            "prob_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.assist_count_distribution",
+          "passed": true,
+          "actual": 596,
+          "expected": 596
+        },
+        {
+          "name": "schema.imputed_fielding_credit",
+          "passed": true,
+          "actual": {
+            "event_key": "UINTEGER",
+            "player_id": "VARCHAR",
+            "fielding_position": "UTINYINT",
+            "credit_type": "VARCHAR",
+            "expected_share": "DOUBLE",
+            "none_share": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "event_key": "UINTEGER",
+            "player_id": "VARCHAR",
+            "fielding_position": "UTINYINT",
+            "credit_type": "VARCHAR",
+            "expected_share": "DOUBLE",
+            "none_share": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.imputed_fielding_credit",
+          "passed": true,
+          "actual": 8335674,
+          "expected": 8335674
+        },
+        {
+          "name": "schema.imputed_ball_handler_probabilities",
+          "passed": true,
+          "actual": {
+            "event_key": "UINTEGER",
+            "player_id": "VARCHAR",
+            "fielding_position": "UTINYINT",
+            "expected_share": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "event_key": "UINTEGER",
+            "player_id": "VARCHAR",
+            "fielding_position": "UTINYINT",
+            "expected_share": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.imputed_ball_handler_probabilities",
+          "passed": true,
+          "actual": 11712096,
+          "expected": 11712096
+        },
+        {
+          "name": "schema.scorer_observation_propensities",
+          "passed": true,
+          "actual": {
+            "event_key": "UINTEGER",
+            "dimension": "VARCHAR",
+            "p_observed_mean": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "event_key": "UINTEGER",
+            "dimension": "VARCHAR",
+            "p_observed_mean": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.scorer_observation_propensities",
+          "passed": true,
+          "actual": 67397468,
+          "expected": 67397468
+        },
+        {
+          "name": "schema.imputed_batted_ball_geometry",
+          "passed": true,
+          "actual": {
+            "event_key": "UINTEGER",
+            "geometry_dimension": "VARCHAR",
+            "class_index": "UTINYINT",
+            "class_label": "VARCHAR",
+            "expected_share": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "event_key": "UINTEGER",
+            "geometry_dimension": "VARCHAR",
+            "class_index": "UTINYINT",
+            "class_label": "VARCHAR",
+            "expected_share": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.imputed_batted_ball_geometry",
+          "passed": true,
+          "actual": 253013169,
+          "expected": 253013169
+        },
+        {
+          "name": "schema.park_factor_summary",
+          "passed": true,
+          "actual": {
+            "park_id": "VARCHAR",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "outcome": "VARCHAR",
+            "theta_mean": "DOUBLE",
+            "theta_sd": "DOUBLE",
+            "theta_hdi_lower": "DOUBLE",
+            "theta_hdi_upper": "DOUBLE",
+            "park_factor_mean": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "park_id": "VARCHAR",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "outcome": "VARCHAR",
+            "theta_mean": "DOUBLE",
+            "theta_sd": "DOUBLE",
+            "theta_hdi_lower": "DOUBLE",
+            "theta_hdi_upper": "DOUBLE",
+            "park_factor_mean": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.park_factor_summary",
+          "passed": true,
+          "actual": 2636,
+          "expected": 2636
+        },
+        {
+          "name": "schema.pitch_summary_distribution",
+          "passed": true,
+          "actual": {
+            "result_family": "VARCHAR",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "final_count_class": "VARCHAR",
+            "balls": "TINYINT",
+            "strikes": "TINYINT",
+            "outcome": "VARCHAR",
+            "prob_mean": "DOUBLE",
+            "prob_sd": "DOUBLE",
+            "prob_hdi_lower": "DOUBLE",
+            "prob_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "result_family": "VARCHAR",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "final_count_class": "VARCHAR",
+            "balls": "TINYINT",
+            "strikes": "TINYINT",
+            "outcome": "VARCHAR",
+            "prob_mean": "DOUBLE",
+            "prob_sd": "DOUBLE",
+            "prob_hdi_lower": "DOUBLE",
+            "prob_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.pitch_summary_distribution",
+          "passed": true,
+          "actual": 18156,
+          "expected": 18156
+        },
+        {
+          "name": "schema.run_expectancy_summary",
+          "passed": true,
+          "actual": {
+            "state": "VARCHAR",
+            "base_state": "TINYINT",
+            "outs": "TINYINT",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "outcome": "VARCHAR",
+            "re_value_mean": "DOUBLE",
+            "re_value_sd": "DOUBLE",
+            "re_value_hdi_lower": "DOUBLE",
+            "re_value_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "state": "VARCHAR",
+            "base_state": "TINYINT",
+            "outs": "TINYINT",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "outcome": "VARCHAR",
+            "re_value_mean": "DOUBLE",
+            "re_value_sd": "DOUBLE",
+            "re_value_hdi_lower": "DOUBLE",
+            "re_value_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.run_expectancy_summary",
+          "passed": true,
+          "actual": 5940,
+          "expected": 5940
+        },
+        {
+          "name": "schema.linear_weights_estimated",
+          "passed": true,
+          "actual": {
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "play": "VARCHAR",
+            "play_category": "VARCHAR",
+            "n_events": "BIGINT",
+            "run_value_mean": "DOUBLE",
+            "run_value_sd": "DOUBLE",
+            "run_value_hdi_lower": "DOUBLE",
+            "run_value_hdi_upper": "DOUBLE",
+            "is_imputed": "BOOLEAN",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "play": "VARCHAR",
+            "play_category": "VARCHAR",
+            "n_events": "BIGINT",
+            "run_value_mean": "DOUBLE",
+            "run_value_sd": "DOUBLE",
+            "run_value_hdi_lower": "DOUBLE",
+            "run_value_hdi_upper": "DOUBLE",
+            "is_imputed": "BOOLEAN",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.linear_weights_estimated",
+          "passed": true,
+          "actual": 5036,
+          "expected": 5036
+        },
+        {
+          "name": "schema.state_transition_summary",
+          "passed": true,
+          "actual": {
+            "start_state": "VARCHAR",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "end_class": "VARCHAR",
+            "outcome": "VARCHAR",
+            "prob_mean": "DOUBLE",
+            "prob_sd": "DOUBLE",
+            "prob_hdi_lower": "DOUBLE",
+            "prob_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          },
+          "expected": {
+            "start_state": "VARCHAR",
+            "season": "SMALLINT",
+            "league": "VARCHAR",
+            "end_class": "VARCHAR",
+            "outcome": "VARCHAR",
+            "prob_mean": "DOUBLE",
+            "prob_sd": "DOUBLE",
+            "prob_hdi_lower": "DOUBLE",
+            "prob_hdi_upper": "DOUBLE",
+            "artifact_id": "VARCHAR",
+            "model_name": "VARCHAR",
+            "model_version": "VARCHAR",
+            "source_snapshot_id": "VARCHAR",
+            "method": "VARCHAR",
+            "observed_status": "VARCHAR",
+            "confidence_status": "VARCHAR",
+            "weak_identification_flag": "BOOLEAN"
+          }
+        },
+        {
+          "name": "row_count.state_transition_summary",
+          "passed": true,
+          "actual": 148500,
+          "expected": 148500
+        },
+        {
+          "name": "schema.dl_proposal_manifest",
+          "passed": true,
+          "actual": {
+            "event_key": "UINTEGER",
+            "dimension": "VARCHAR",
+            "dl_artifact_id": "VARCHAR",
+            "dl_p_class": "DOUBLE[]"
+          },
+          "expected": {
+            "event_key": "UINTEGER",
+            "dimension": "VARCHAR",
+            "dl_artifact_id": "VARCHAR",
+            "dl_p_class": "DOUBLE[]"
+          }
+        },
+        {
+          "name": "row_count.dl_proposal_manifest",
+          "passed": true,
+          "actual": 27186432,
+          "expected": 27186432
+        },
+        {
+          "name": "schema.dl_embedding_artifact",
+          "passed": true,
+          "actual": {
+            "entity_type": "VARCHAR",
+            "entity_id": "VARCHAR",
+            "embedding_value": "DOUBLE[]",
+            "dl_artifact_id": "VARCHAR",
+            "source_target": "VARCHAR"
+          },
+          "expected": {
+            "entity_type": "VARCHAR",
+            "entity_id": "VARCHAR",
+            "embedding_value": "DOUBLE[]",
+            "dl_artifact_id": "VARCHAR",
+            "source_target": "VARCHAR"
+          }
+        },
+        {
+          "name": "row_count.dl_embedding_artifact",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "identities.assist_count_distribution",
+          "passed": true,
+          "actual": [
+            [
+              "assist-count-v1-legacy-exploratory-v1",
+              "assist_count",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "assist-count-v1-legacy-exploratory-v1",
+              "assist_count",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.imputed_fielding_credit",
+          "passed": true,
+          "actual": [
+            [
+              "full-10k-v16-production-export-legacy-exploratory-v1",
+              "putout_credit_allocation",
+              "failed"
+            ],
+            [
+              "full-10k-v3-cut1-prod-legacy-exploratory-v1",
+              "assist_credit_allocation",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "full-10k-v16-production-export-legacy-exploratory-v1",
+              "putout_credit_allocation",
+              "failed"
+            ],
+            [
+              "full-10k-v3-cut1-prod-legacy-exploratory-v1",
+              "assist_credit_allocation",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.imputed_ball_handler_probabilities",
+          "passed": true,
+          "actual": [
+            [
+              "d-noprop-10k-v2-legacy-exploratory-v1",
+              "ball_handler_imputation",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "d-noprop-10k-v2-legacy-exploratory-v1",
+              "ball_handler_imputation",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.scorer_observation_propensities",
+          "passed": true,
+          "actual": [
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "ball_handler_position_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "general_location_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "location_depth_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "location_edge_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "location_side_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "trajectory_observedness",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "ball_handler_position_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "general_location_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "location_depth_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "location_edge_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "location_side_observedness",
+              "failed"
+            ],
+            [
+              "10k-v6-unseen-fix-legacy-exploratory-v1",
+              "trajectory_observedness",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.imputed_batted_ball_geometry",
+          "passed": true,
+          "actual": [
+            [
+              "e-v12-noprop-general_location-zero-legacy-exploratory-v1",
+              "geometry_general_location",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-location_depth-zero-legacy-exploratory-v1",
+              "geometry_location_depth",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-location_edge-zero-legacy-exploratory-v1",
+              "geometry_location_edge",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-location_side-zero-legacy-exploratory-v1",
+              "geometry_location_side",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-trajectory-shrunk-legacy-exploratory-v1",
+              "geometry_trajectory",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "e-v12-noprop-general_location-zero-legacy-exploratory-v1",
+              "geometry_general_location",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-location_depth-zero-legacy-exploratory-v1",
+              "geometry_location_depth",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-location_edge-zero-legacy-exploratory-v1",
+              "geometry_location_edge",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-location_side-zero-legacy-exploratory-v1",
+              "geometry_location_side",
+              "failed"
+            ],
+            [
+              "e-v12-noprop-trajectory-shrunk-legacy-exploratory-v1",
+              "geometry_trajectory",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.park_factor_summary",
+          "passed": true,
+          "actual": [
+            [
+              "pf-full-ar1-v4-legacy-exploratory-v1",
+              "park_factor_runs",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "pf-full-ar1-v4-legacy-exploratory-v1",
+              "park_factor_runs",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.pitch_summary_distribution",
+          "passed": true,
+          "actual": [
+            [
+              "ps-cut1-full-v7-legacy-exploratory-v1",
+              "pitch_summary",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "ps-cut1-full-v7-legacy-exploratory-v1",
+              "pitch_summary",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.run_expectancy_summary",
+          "passed": true,
+          "actual": [
+            [
+              "re-full-eraregime-v4-legacy-exploratory-v1",
+              "run_expectancy",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "re-full-eraregime-v4-legacy-exploratory-v1",
+              "run_expectancy",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.linear_weights_estimated",
+          "passed": true,
+          "actual": [
+            [
+              "re-full-eraregime-v4-legacy-exploratory-v1",
+              "run_expectancy",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "re-full-eraregime-v4-legacy-exploratory-v1",
+              "run_expectancy",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "identities.state_transition_summary",
+          "passed": true,
+          "actual": [
+            [
+              "state-transition-v5-legacy-exploratory-v1",
+              "state_transition",
+              "failed"
+            ]
+          ],
+          "expected": [
+            [
+              "state-transition-v5-legacy-exploratory-v1",
+              "state_transition",
+              "failed"
+            ]
+          ]
+        },
+        {
+          "name": "geometry.dimension_counts",
+          "passed": true,
+          "actual": {
+            "general_location": 125816976,
+            "location_angle": 41938992,
+            "location_depth": 27959328,
+            "location_edge": 27959328,
+            "trajectory": 29338545
+          },
+          "expected": {
+            "general_location": 125816976,
+            "location_angle": 41938992,
+            "location_depth": 27959328,
+            "location_edge": 27959328,
+            "trajectory": 29338545
+          }
+        },
+        {
+          "name": "identities.dl_proposal_manifest",
+          "passed": true,
+          "actual": [
+            [
+              "location_depth",
+              "phase3-location-depth-v8-legacy-exploratory-v1"
+            ],
+            [
+              "location_edge",
+              "phase3-location-edge-v8-legacy-exploratory-v1"
+            ],
+            [
+              "location_side",
+              "phase3-location-side-v8-legacy-exploratory-v1"
+            ],
+            [
+              "trajectory",
+              "phase3-trajectory-v9-cv-legacy-exploratory-v1"
+            ]
+          ],
+          "expected": [
+            [
+              "location_depth",
+              "phase3-location-depth-v8-legacy-exploratory-v1"
+            ],
+            [
+              "location_edge",
+              "phase3-location-edge-v8-legacy-exploratory-v1"
+            ],
+            [
+              "location_side",
+              "phase3-location-side-v8-legacy-exploratory-v1"
+            ],
+            [
+              "trajectory",
+              "phase3-trajectory-v9-cv-legacy-exploratory-v1"
+            ]
+          ]
+        },
+        {
+          "name": "simplex.assist_count",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "simplex.fielding_credit",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "simplex.ball_handler",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "simplex.geometry",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "simplex.pitch_summary",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "simplex.state_transition",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "range.observation_propensity",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        },
+        {
+          "name": "simplex.dl_proposal",
+          "passed": true,
+          "actual": 0,
+          "expected": 0
+        }
+      ],
+      "finished_at": "2026-09-13T18:47:08.589816+00:00"
+    }
+  },
+  "report_identities": [
+    {
+      "path": "artifacts/imputation/release-candidate-v2/manifest.json",
+      "bytes": 7392,
+      "sha256": "0dd24abf37459d1c3ded33e839b0a98748c6dc1ab0dce46b96b219bc0755a25f"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/manifest.json",
+      "bytes": 180417,
+      "sha256": "09d754de9c9946a1e3a3c55305eb08e76340ede99d3e15e437a9f968ae6fa14b"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/completion_registry.json",
+      "bytes": 47398,
+      "sha256": "6fce80458814ca7121f761b0d5dd7363cd4a24e373fcc3e22b4bd2769dd3481b"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/field_registry.json",
+      "bytes": 114789,
+      "sha256": "9cd6d27597f2f941d0cfe59e7070b6931eeecc5dfc5930b7b02c23bbb49d138b"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/validation/grouped/coverage_breakdown.json",
+      "bytes": 747714,
+      "sha256": "76da3343c4239ff880a2c452538f12a609a8aa572786539e8cd92692783c30dd"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/validation/candidate/candidate_validation.json",
+      "bytes": 10245,
+      "sha256": "70f62664867fb81bfbc6af1c5b79ba823e129fd5801c102c5d41bbdce8949080"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/validation/pitch/pitch_validation.json",
+      "bytes": 19685,
+      "sha256": "9c4f4ee46b300b05c736b98f74cdb676ed0914e9aa3055e66e54e0f7a1833264"
+    },
+    {
+      "path": "artifacts/imputation/20260913-pbp-imputed-v1/geometry_v2_validation.json",
+      "bytes": 340,
+      "sha256": "72bf0e6b8df7359f95517a3af0c4e51c60ac0ad793b70a24d88683f269190b92"
+    },
+    {
+      "path": "artifacts/imputation/20260913-context-holdout-v1/report.json",
+      "bytes": 2769,
+      "sha256": "ead6cbcca3edf72cba4988e0a73fdf29039cd26e6f608e46add1a192e5772e22"
+    },
+    {
+      "path": "artifacts/imputation/legacy-publication-candidate-v1/migration_summary.json",
+      "bytes": 50561,
+      "sha256": "8a368623f695f45870eb6290b24b676b33ce1df5cdc58b188c55c6047cba1df1"
+    },
+    {
+      "path": "artifacts/imputation/legacy-publication-candidate-v1/legacy-consumer-validation-report.json",
+      "bytes": 25907,
+      "sha256": "6106355d2fa3407e1680e07df50925787614bdaa1902dc904a1b9812ba9ce8cf"
+    }
+  ]
+}

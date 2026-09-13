@@ -1,10 +1,10 @@
 ## A taxonomy of missingness
 
-The standard missing-data vocabulary assigns one mechanism — missing completely
-at random, missing at random, or missing not at random — to a variable. That
-granularity is wrong for this record. A single event can be complete for basic
-batting, missing at random for trajectory given the scorer and result, missing
-not at random for hit location, structurally absent for pitch sequence, and
+Missingness assumptions must specify a population and conditioning set.
+Assigning a single field-wide label of missing completely at random, missing at
+random, or missing not at random is inadequate for this record. A single event can be complete for basic
+batting, treated under an MAR working model for trajectory given scorer and result,
+exposed to an MNAR risk for hit location, structurally absent for pitch sequence, and
 merely aggregate-only for fielding credit, all at the same time. The unit that
 carries a mechanism is the event-dimension, not the field and not the row, and
 the mechanism is a statement about a process, not a flag.
@@ -45,7 +45,8 @@ These classes call for different responses, and conflating them destroys the
 model. Structural absence and aggregate-only coverage are not imputation
 targets in the event namespace at all; they stay at aggregate grain with source
 flags. Taxonomy collapse is deterministic recode, not inference. Cross-source
-disagreement is resolved by an authority order, not a fill. Field-level unknowns
+disagreement requires an explicit authority rule or a retained conflict, rather
+than a fill that silently discards contrary evidence. Field-level unknowns
 take deterministic inference first, empirical priors second, and model
 predictions last, always preserving the raw and imputed values separately. The
 sentinels themselves must stay distinct: null, `Unknown`, `Default`, `0`,
@@ -63,9 +64,9 @@ The default working assumption for the observation models is missingness at
 random conditional on context — source, scorer, inputter, translator, result,
 hit-or-out state, leverage, era, and base-out state
 <!-- src: notes/data-coverage-implementation/statistical-modeling-coverage-design.md -->.
-Two dimensions are flagged as not satisfying it. Hit location and detailed
+Two dimensions are flagged as risks to that assumption. Hit location and detailed
 contact type are treated as missing-not-at-random risks, because whether the
-label was recorded is correlated with what the label would have been
+label was recorded may depend on what the label would have been
 <!-- src: notes/data-coverage-implementation/statistical-modeling-coverage-design.md -->.
 These are the selection-biased-detail class in its sharpest form, and they are
 handled not by an MAR fill but by pattern-mixture sensitivity — letting the
@@ -73,5 +74,6 @@ missing values take distributions shifted from the observed ones within bounded
 plausibility — the subject of the section on selection that never recorded
 itself. A hierarchical model cannot rescue an unidentified estimand: where
 scorer, park, team, source, and era are inseparable in a slice, the output is
-tagged weakly identified or withheld rather than reported as a fill
+tagged weakly identified, withheld, or supplied only as an explicit
+assumption-based proxy
 <!-- src: notes/data-coverage-implementation/statistical-modeling-coverage-design.md -->.

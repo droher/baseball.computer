@@ -1,3 +1,5 @@
+> Historical internal drafting record. The [September 13 revision](REVISION-2026-09-13.md) and [current evidence ledger](EVIDENCE.md) supersede its status claims. This is not evidence of external journal review or submission.
+
 ---
 title: Response to reviewers — Estimating the Unrecorded Game
 type: design-doc
@@ -182,7 +184,7 @@ sweep (it resolves them under a layout they do not use and reports `missing`).
 The permutation-importance gate is documented in
 `notes/data-coverage-implementation/phase3-acceptance-gates-v6.md` with its log
 paths; the linear-probe margins the previous draft quoted for the proxy-metric
-negative result have no repository source and are marked `TODO: unverified`.
+negative result have no repository source and are marked unavailable evidence (resolved in the September 13 revision by withdrawing unsupported claims).
 
 ## M7. Every published surface is `exploratory`; none has cleared the paper's own gate.
 
@@ -321,7 +323,7 @@ comparisons the review required, so it remains above the target length.
 
 **Response:** The `<!-- src: … -->` scaffolding is stripped in the submission
 build. The five citations to memory files that did not exist are replaced with
-repository sources or marked `TODO: unverified`.
+repository sources or marked unavailable evidence (resolved in the September 13 revision by withdrawing unsupported claims).
 
 ---
 

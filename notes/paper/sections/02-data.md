@@ -1,95 +1,53 @@
 ## The record and its gaps
 
-The corpus is a DuckDB database built from several historical baseball source
-families, each recorded at a different grain and playing a different role
-<!-- src: notes/data-coverage-implementation/README.md -->. Play-by-play sources
-carry event and event-player detail — base-out state, batting, pitching,
-fielding, baserunning, batted-ball clues, and pitch sequences — and are the only
-source from which event-level quantities can be estimated. Box scores carry
-official aggregate totals at the game-player and game-team grain: batting lines,
-pitching lines, fielding lines, line scores, decisions, and earned runs. Gamelog
-and schedule sources establish that a game happened and how it ended. Season
-supplements carry season-player and season-team totals that fill in where event
-or box coverage is coarser <!-- src: notes/data-coverage-implementation/README.md -->.
-The invariant that organizes all of them is that a box-score putout, a
-rule-derived batted-ball location, an estimated expected putout, and a
-sampled synthetic event are different quantities and are never stored in one
-column <!-- src: notes/data-coverage-implementation/README.md -->.
+The database combines source families recorded at different grains. PBP carries
+event and event-player detail; box scores carry official game-player and
+game-team totals; gamelogs establish game occurrence and outcomes; season
+supplements carry season aggregates. The project builds its model layer through
+SQLMesh over source Parquet files. An official total, a deterministic deduction,
+an expected credit, and a sampled sequence remain distinct quantities.
 
-Within the 1910–2025 target span the source mix is dominated by play-by-play but
-not exclusively so. The snapshot holds 205,845 play-by-play games in the span, 1,953
-box-score-only games, and 4 gamelog-only games <!-- src: notes/data-coverage-implementation/README.md -->,
-plus 41 play-by-play games from the 1900s decade that lie before the target
-span and surface as a `1900` row wherever a table is keyed by decade
-<!-- src: tables/corpus_by_decade.md -->. The event table, `event_states_full`,
-contains 18,141,020 events, all of them from play-by-play games; that count is
-the whole table and so includes whatever the 41 early games contribute
-<!-- src: tables/corpus_by_decade.md -->. Surfaces keyed by season — park
-factors and Model G's cells — cover every season the source carries, which is
-why a few descriptive rows fall before 1910.
-Event-level estimation is scoped to those games; the box-score-only and
-gamelog-only rows stay at aggregate grain and are not given fabricated event
-records <!-- src: notes/data-coverage-implementation/README.md -->. At the
-coarser season-team grain the same split appears as 2,929 play-by-play
-team-seasons against 269 box-score team-seasons
-<!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->,
-but source absence is not uniform within a season, so the modeling layer works
-from a game-and-dimension ledger rather than a season-level flag.
+The current source snapshot contains 205,886 PBP games and 18,141,020 events
+spanning 1903-2025. Before 1910 there are 41 games and 3,262 events. The historical manuscript's 205,845-game count covered
+1910 onward while its event count included the early games; this revision uses
+the same full PBP population for both counts. Games represented only by box,
+gamelog, or season records receive no generated event rows. Available box totals
+may constrain attribution within an existing PBP game without bringing box-only
+games into the target population.
 
-Having event rows is not the same as having every field on them. The gaps that
-this paper's models target are field-level, and they are large. Of 12,038,982
-batted-ball rows in the deterministic derivation table, 3,992,018 retain an
-unknown final trajectory even after rule-based inference has recovered every
-broad class the fielding evidence supports, and 6,989,832 have no recorded
-location <!-- src: notes/data-coverage-implementation/README.md -->. On the
-fielding side, 463,102 events carry unknown putouts within the span
-<!-- src: notes/data-coverage-implementation/README.md -->. An unknown putout is
-worse than a single missing field because it usually means the assist chain is
-also unrecorded: the record may know that an out occurred without knowing who
-recorded it or whether an assist was involved
-<!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->.
-These counts are not acceptance thresholds; they size the first modeling targets
-<!-- src: notes/data-coverage-implementation/README.md -->.
+The field registry classifies 179 columns across ten source relations: 116
+imputation targets and 63 bookkeeping or derived duplicates. In the baseline,
+28 targets contain null or unspecified values; accounting for whole missing
+pitch blocks raises that count to 35. A target can be complete in the source and
+still belong in the registry because preserving its observed value is part of
+the output contract. Coverage is reconciled by era, league, source type, and
+game type, rather than inferred from a single season-level flag.
 
-Missingness is also multi-dimensional within a single event, which is why no
-one completeness flag can describe a row. The database already exposes coverage
-along separate axes — trajectory, general location, batted-to-fielder,
-depth, angle, and strength for batted balls; count, pitch sequence, pitch
-results, and strike types for pitches; putouts, assists, and errors for fielding
-credit <!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->.
-A row can be complete for basic batting, incomplete for batted-ball trajectory,
-complete for team fielding, incomplete for player fielding credit, and unusable
-for pitch-sequence metrics all at once
-<!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->.
-The coverage of each axis, in turn, is stratified by result: batted-ball
-trajectory and location are recorded more often on outs than on hits, and the
-metric layer already tracks known-trajectory rates separately for the two
-because the missingness mechanism is result-dependent
-<!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->.
-Known location among hits is not a random sample of all hit locations; it is a
-scorer-selected subset <!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->.
+A missing value does not have one meaning. An absent pitch block differs from an
+unknown token within an otherwise recorded sequence. A fielding event may have
+known total outs but unknown player attribution. A missing secondary umpire
+identity may mean the role did not exist or was not recorded. A contact-strength
+code of `Default` is unspecified or neutral; treating it as an unobserved
+`Hard` or `Soft` category would impose a false taxonomy. The imputation layer
+preserves these distinctions in source values and method or disposition fields.
 
-The one dimension that dominates all of these is era. Coverage of trajectory,
-location, pitch sequence, and fielding credit is sparse and heavily selected in
-the early decades, improves through the middle of the century, and reaches
-modern batted-ball and location fidelity only in the most recent seasons; the
-defensive-shift era at the end of the span then changes the meaning of a
-fielder's position as a proxy for location
-<!-- src: notes/data-coverage-implementation/data-coverage-taxonomy-1910-2025.md -->.
-The full decade-by-dimension coverage structure — observation propensity by era
-and dimension from Model A — is an empirical result rather than a fixed corpus
-statistic, and we present it as a table in the Results section rather than
-restating raw counts here. What the counts above establish is only the shape of
-the problem: complete outcomes, field-level gaps that run into the millions, and
-a missingness pattern that tracks the scorer and the era rather than the game.
+Geometry requires particular care. Earlier artifacts called six within-zone
+angle modifiers `location_side`; they do not encode global field side. The
+legacy consumer now exposes that vocabulary as `location_angle`. The full PBP
+candidate derives global side, depth, and edge jointly from general location,
+with separate treatment of angle modifiers. Counts and performance scores for
+the old target cannot be read as evidence for global-side reconstruction.
 
-The modeling datasets carry two game-level partitions, and the paper's
-held-out numbers come from one or the other, never both. The datasets stamp
-`primary_fold` from `HASH(game_id) % 100` — buckets 0–69 `TRAIN`, 70–84
-`VALIDATE`, 85–99 `TEST` — and the deep supplements of §6 train, early-stop,
-and report on it <!-- src: bc/models/intermediate/modeling_datasets/model_input_event_universe.sql -->.
-Every Bayesian fit, and every coverage gate in §7, instead holds out fold 0
-of a ten-fold BLAKE2s hash of `game_id`, removed before any subsampling
-<!-- src: bc/python_models/statistical/splits.py -->. The two hashes are
-unrelated, so the Bayes holdout is a 10% sample of games that cuts across all
-three deep partitions; §6 states what that means for the deep covariate.
+The older modeling datasets contain two unrelated game partitions. Deep
+supplements use DuckDB `HASH(game_id) % 100`: buckets 0-69 for training, 70-84
+for validation, and 85-99 for testing. Bayesian fits and coverage gates hold out
+fold 0 of a ten-fold BLAKE2s hash, removed before subsampling. The deep pipeline
+also uses five-fold BLAKE2s out-of-fold predictions within its training set.
+These are different boundaries, not a common outer holdout. Section 6 explains
+why cross-fitting within one stage is insufficient to certify the whole
+composed predictor as free of leakage.
+
+Population and registry evidence is retained in the September 13 release
+manifest, grouped coverage report, and completion registry. The evidence ledger
+accompanying this paper binds these reports to their file hashes and separates
+them from the older geometry dataset and its descriptive tables.

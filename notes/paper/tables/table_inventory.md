@@ -1,3 +1,5 @@
+> Historical September 4, 2026 snapshot under gate version 2. Its `passed` labels are not current validation claims. See [current evidence](../EVIDENCE.md) and the revised manuscript.
+
 # table_inventory
 
 Row counts and provenance-column cardinality for all 12 published `main_models.*` estimated tables, read from prod `bc.db` on 2026-09-04 after the refit restate. The geometry table alone carries 253M rows, 74% of the 340.6M published rows, and every populated table's `confidence_status` is `passed` under validation gate version 2 at `model_version 0.3.0`.

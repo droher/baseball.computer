@@ -66,7 +66,7 @@ The publisher reruns candidate validation against the production `main_models` t
 
 ## September 13 candidate evidence
 
-The imputed candidate artifact root is `artifacts/imputation/20260913-pbp-imputed-v1`. Its eleven families contain the source-equivalent candidate rows and retained component evidence; new validation is pending.
+The imputed candidate artifact root is `artifacts/imputation/20260913-pbp-imputed-v1`. Its eleven families contain the source-equivalent candidate rows and retained component evidence; the renamed candidate validation has passed as described below.
 
 Read the files selected by the manifest. This retained build selects `geometry_v2.parquet`, which repairs 1,123 early non-bunt standardization gaps. The superseded `geometry.parquet` and failed build attempts remain for diagnosis; they are not the release inputs. Bunts retain their explicit standardization non-applicability.
 

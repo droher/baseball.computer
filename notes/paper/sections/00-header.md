@@ -1,53 +1,34 @@
 ---
-title: "Estimating the Unrecorded Game: Hierarchical Bayesian Coverage Models for a Century of Baseball Play-by-Play"
-type: design-doc
-status: draft
-audience: sports-analytics researchers, applied Bayesian statisticians
-last-verified: 2026-07-13
+title: "Estimating the Unrecorded Game"
+subtitle: "Coverage, Bayesian Models, and Explicit Imputation for Historical Baseball Play-by-Play"
+date: "September 13, 2026"
+status: revised research manuscript
+last-verified: 2026-09-13
 ---
-
-<!-- Structural deviation from tech-write templates: this is a research paper
-(JQAS/AOAS register), not a design doc — sections follow the academic
-convention (intro, data, methods, results, discussion) rather than a template.
-<!-- src: ... --> comments are internal provenance scaffolding; strip before
-external submission. Plan: notes/paper/OUTLINE.md. -->
-
-# Estimating the Unrecorded Game: Hierarchical Bayesian Coverage Models for a Century of Baseball Play-by-Play
 
 ## Abstract
 
-The play-by-play record of major-league baseball is nearly complete in
-outcomes but selectively incomplete in detail: whether a scorer recorded a
-ball's trajectory, location, or handler depends on era, scorer practice, and
-the play's result, not on the play alone. Treating the record as the output of
-two coupled processes — the game and its observation — we build hierarchical
-Bayesian models over 18.1 million events (1910–2025) that estimate both the
-propensity that each detail was recorded and posterior distributions over the
-details themselves. Twelve probabilistic surfaces are defined — ten populated,
-two deferred as typed zero-row frames — spanning observation propensity,
-batted-ball geometry, fielding credit, park factors, run expectancy, base-out
-transitions, and pitch summaries, each row carrying provenance and uncertainty.
-Publication is gated on convergence and on held-out predictive lift over a
-baseline; held-out calibration error and posterior-predictive interval coverage
-are reported beside the gate as diagnostics.
+Historical baseball play-by-play records outcomes much more consistently than
+pitch sequences, batted-ball geometry, fielding attribution, or game conditions.
+We distinguish the process that generates a game from the process that records
+it, then combine hierarchical models, deterministic constraints, and explicitly
+labelled empirical fallbacks over 18,141,020 events in 205,886 acquired
+play-by-play games from 1903 through 2025. The imputation candidate maps 116
+target fields to sixteen additive database surfaces, including games before
+1989; games known only through box scores or season totals are outside its scope.
 
-Three findings organize the paper. First, trajectory recording before 1988 is
-missing not at random: among pre-1950 batted balls whose trajectory the scorer
-did not write, 763,993 are ground balls the fielding string alone identifies —
-more than the whole recorded slice — putting a floor of 0.29 under the
-unrecorded ground-ball share, while the missing-at-random fit scores those known
-ground balls at 0.32. A masked backtest shows the natural learned correction — a
-coefficient on observation propensity — is inert while passing every convergence
-diagnostic; the correct form is a fixed per-class selection offset the observed
-slice cannot identify, published as an assumed sensitivity band that the floor
-constrains from below, not as a point. An earlier revision's data-anchored offset
-is withdrawn as an identity of the observed slice. Second, shared
-entity-embedding pretraining multiplies player-effect permutation importance in
-the trajectory supplement by roughly 6× under a cross-fitting contract that
-caught one real leak, and the deep proposal beats a class-prior baseline on
-held-out log-loss for every dimension it feeds; a defect disclosed in this
-revision — three location dimensions whose production rows carried no deep
-prediction and were shifted by its absence — is corrected by publishing their
-deep-free fits. Third, several natural estimands — scorer label confusion,
-fielder responsibility, shift propensity — cannot be learned from a
-single-source record; we document why and publish nothing.
+The statistical contribution is a treatment of selective observation and its
+limits. Deterministically recoverable ground balls constrain the missing
+trajectory distribution from below, but do not identify a missing-not-at-random
+selection offset. Historical model experiments illustrate this distinction;
+their older validation labels do not establish current calibration or historical
+transport. Under the current evidence contract, all 24 retained legacy artifact
+pointers are explicitly exploratory, with failed overall reports and unsupported
+provenance. The full-history candidate passes population, source-preservation,
+normalization, and reconciliation checks. These establish implementation
+consistency, not reconstruction accuracy. A separate season holdout of 1,000
+games demonstrates the roughness of context imputation: attendance error averages
+10,227 people and start-time error 234 clock minutes. Recorded values, estimates,
+method labels, uncertainty summaries, and unresolved conflicts remain distinct.
+The result is a reviewable imputation resource and a framework for stating what
+its evidence supports, rather than a claim to recover the unrecorded game as fact.

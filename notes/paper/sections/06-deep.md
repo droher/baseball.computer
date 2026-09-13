@@ -1,33 +1,112 @@
 ## Deep-learning supplements
 
-### Role in the pipeline
+### Intended role
 
-Deep models in this system produce proposal distributions and entity embeddings. They never publish a fact. The invariant that governs every supplement registered under `bc/python_models/statistical/deep/targets/` is a fixed pipeline shape: deep model → out-of-fold prediction and leakage checks → Bayesian layer → published surface <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md -->. A deep classifier's argmax class is never written to a `main_models` table; SQL artifact views expose probability vectors, and the acceptance criteria explicitly forbid a downstream table that exposes only the top class of a probabilistic target <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md -->. Where a deep proposal does reach a Bayesian model, it enters as a covariate on the log scale — `γ · log p̃^dl_{i,c}`, the per-class log-probability centered on the training-slice class means and weighted by one scalar `γ` shared across classes, with a `N(0, 0.5)` prior whose posterior standard deviation is 0.03–0.04 in every published fit, so the prior is inert and the data set the weight <!-- src: tables/gamma_dl_ablation.md --> <!-- src: bc/python_models/statistical/models/geometry.py -->. Each downstream Bayesian model that consumes a proposal is fit twice — once with `γ` fixed at zero, once free — and the two artifacts are stored as distinct flavors (`gamma_dl_zero`, `gamma_dl_shrunk`). The design rule was to ship the flavor whose inclusion does not move publication-tier posteriors by more than 0.25 SD on most cells, since a larger shift means the deep model absorbed structural signal the hierarchy already carries rather than adding incremental lift <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md -->. In the geometry softmaxes the publication-tier blocks are not scorer, park, or era random effects — those enter every class logit equally, cancel inside the per-event softmax, and were removed — but the per-class intercept `alpha_class` and the fixed-effect interaction tensors (`delta_alignment_regime`, `delta_base_state_start`, `delta_outs_start`, `delta_result_family`, `delta_batter_hand`) that drive the imputation distribution <!-- src: tables/gamma_dl_ablation.md -->.
+The intended architecture uses a deep classifier as a proposal distribution,
+never as recorded truth:
 
-### Three location dimensions were shifted by a missing covariate
+$$\text{deep proposal}\longrightarrow
+\text{out-of-fold probabilities}\longrightarrow
+\text{Bayesian layer}\longrightarrow
+\text{estimated surface}.$$
 
-A defect in how the covariate handled a missing prediction is disclosed here because it changed three published surfaces. The location deep specs score only rows whose class was observed, so on the frozen dataset every production row for `location_side`, `location_depth`, and `location_edge` — the unrecorded events those tables exist to impute — had no deep prediction; the trajectory spec's filter includes derived and unknown rows and was unaffected. A missing prediction was mapped to a zero log-probability vector before the training-slice class means were subtracted, so every production row carried the covariate value `−mean_c`, and `γ · (−mean_c)` added a large constant per-class shift to every imputed logit. The published production shares diverged from the training shares accordingly: `location_edge`'s `All` class at 0.173 against a training share of 0.009, `location_side`'s `Default` at 0.24 against 0.70, `location_depth`'s `ExtraDeep` at 0.22 against 0.06 <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->. No gate could see it: the held-out rows are observed rows with real predictions, and the tests covered the two halves separately. The fix has two parts. A row with no deep prediction now contributes exactly zero to its logits on every slice, and a fit whose production slice carries no deep prediction at all must publish the `gamma_dl_zero` flavor — the prep raises rather than scoring a covariate that exists on no production row <!-- src: bc/python_models/statistical/bayes/dl_covariate.py --> <!-- src: bc/python_models/statistical/models/_geometry_data.py -->. The three location dimensions are refit and published deep-free in this revision; the finding underneath is that a deep spec that scores only observed rows cannot supply a covariate to an imputation model, and until the location specs score the unrecorded slice the deep supplement reaches one geometry dimension, not four.
+An argmax class is insufficient because it discards uncertainty. In the legacy
+geometry models the proposal entered as
+$\gamma\log\widetilde p^{dl}_{i,c}$, with one scalar $\gamma$ shared across
+classes and a $\mathrm N(0,0.5)$ prior. Separate `gamma_dl_zero` and
+`gamma_dl_shrunk` flavors were meant to show whether the learned proposal added
+signal beyond the hierarchical context model.
+<!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md -->
+<!-- src: bc/python_models/statistical/models/geometry.py -->
 
-### What the deep proposals add, measured
+This remains a design, not current publication evidence. The isolated September
+13 migration contains four deep geometry pointers and one event-universe pretrain
+pointer. All five have overall status `failed`. Each geometry proposal has
+numerical evidence marked passed but predictive and calibration evidence marked
+failed; transport, identification, and provenance are unsupported. Every evidence
+dimension for the pretrain pointer is unsupported. Explicit exploratory reasons
+make the compatibility pointers well formed, but do not validate the models.
+<!-- src: artifacts/imputation/legacy-publication-candidate-v1/migration_summary.json -->
 
-No published deep artifact had been gated against a baseline before this revision: the validator compares held-out log-loss only when a `baseline_predictions.parquet` sits beside the artifact, and nothing wrote one <!-- src: bc/python_models/statistical/validate.py -->. Measured for the modeling review on the `TEST` partition, deep log-loss against a per-`result_family` class prior is 1.229 against 1.258 for trajectory, 0.996 against 1.035 for `location_side`, 1.094 against 1.114 for `location_depth`, and 0.899 against 0.922 for `location_edge` — real, modest, and previously unmeasured <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->.
+### Target semantics and missing proposals
 
-The ablation the previous revision reported — the four `gamma_dl_zero` counterparts fit at the published operating point and compared cell by cell against the `gamma_dl_shrunk` fits — is stated here as what the record supports. The zero fits ran on 2026-07-14, after the shrunk fits had been published, and their logs record convergence and top-1 accuracy; the artifacts themselves, and the `gamma_dl_shift.json` per-cell shift statistics the previous draft quoted, are not on disk, so the log-loss deltas and the share-of-cells-over-0.25-SD figures it reported are unreproducible <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md --> <!-- src: tables/gamma_dl_ablation.md -->. This revision re-fits both flavors for every dimension. On trajectory's 616,513 held-out events the shrunk flavor wins every metric: log-loss 1.1382 against the zero flavor's 1.2327, macro PR-AUC 0.4623 against 0.3484, and top-1 0.4920 against 0.4518, with the marginal-entropy baseline at 1.3529 nats and the majority-class top-1 at 0.4147 <!-- src: artifacts/statistical/bayes/geometry_trajectory/e-v12-noprop-trajectory-{shrunk,zero}/validation/held_out_metrics.json -->. The per-cell shift diagnostic, computed over the publication-tier blocks at the 0.25-SD threshold, is largest on trajectory, where 69.6% of the 115 cells move past the threshold and the maximum shift is 3.27 SD; on the location dimensions it is 21.7% of 138 cells at a maximum of 3.22 SD for `location_side`, 27.2% of 92 cells at 0.97 SD for `location_depth`, and 39.1% of 92 cells at 1.58 SD for `location_edge` <!-- src: artifacts/statistical/bayes/geometry_*/e-v12-noprop-*-zero/validation/gamma_dl_shift.json -->. What is already decided by the defect above is the pointer: the three location dimensions publish the zero flavor because the covariate does not exist on their production rows, and trajectory publishes whichever flavor wins held-out log-loss, with the shift diagnostic disclosed as a caveat rather than a switch rule.
+The old target named `location_side` was misdescribed. Its six categories are
+within-zone angle modifiers, including `Default`, and are now exposed by the
+legacy wrapper as `location_angle`. Development scores for that target cannot be
+interpreted as global left/center/right field-side reconstruction. In the new PBP
+geometry interface, global side is derived from general location and remains
+separate from angle, depth, and edge.
+<!-- src: docs/modeling-evidence-contract.md -->
+<!-- src: artifacts/imputation/legacy-publication-candidate-v1/README.md -->
+<!-- src: docs/pbp-imputation.md -->
 
-### Shared entity-embedding pretraining
+The legacy location proposal specifications also scored observed rows but did not
+supply predictions on the unrecorded production rows they were intended to help
+impute. Centering a missing zero vector by the training-class mean then introduced
+a constant class-specific logit shift. The repair made a missing proposal
+contribute zero and selected deep-free flavors where no production proposal
+existed. This is a valid implementation finding. It does not make the repaired
+legacy artifacts pass the current evidence contract.
+<!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->
+<!-- src: bc/python_models/statistical/bayes/dl_covariate.py -->
 
-Per-target deep models originally learned their own `batter_id` / `pitcher_id` embeddings from scratch, seeing only the row slice each target's label happens to cover — trajectory only sees observed batted balls, handler only sees recorded putout chains. That starves the embedding of the cross-context signal a player's behavior carries. The fix pretrains one shared player embedding once, over the event universe filtered to batted-ball plate appearances — roughly 12M of the 18.1M events, since non-batted-ball rows are NULL on every pretext head — against a multi-head pretext objective, and every downstream target warm-starts from the resulting artifact <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md --> <!-- src: notes/data-coverage-implementation/phase3-acceptance-gates-v6.md -->. The embedding group is batter and pitcher; park and scorer carry their own separate, ungrouped embeddings <!-- src: notes/data-coverage-implementation/phase3-acceptance-gates-v6.md -->. Five pretext heads cover exactly the imputation targets that are genuinely missing in the record — `trajectory_remapped`, three batted-location facets, and `batted_to_fielder_class` — while the outcomes that are fully observed at imputation time (`pa_result`, outs and runs on the play, and the three runner-advancement fields) enter as inputs rather than heads, so the pretext conditional distribution matches the inference distribution and no trivial outcome head can crowd out the hard imputation heads under the multi-task weighting <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md --> <!-- src: notes/data-coverage-implementation/phase3-acceptance-gates-v6.md -->. Training is a residual two-stage decomposition: a stage-1 context-only fit caches its per-head pre-softmax logits, and stage-2 adds the entity embeddings on top of that frozen offset, so the embeddings learn residual and interaction structure rather than re-encoding player skill already carried by context; focal loss counters the severe class imbalance in the location heads <!-- src: notes/data-coverage-implementation/phase3-acceptance-gates-v6.md -->. The gate that justifies the machinery is a permutation-importance comparison against a no-pretrain baseline whose embeddings initialize from scratch, on the time-forward 2023 validation slice: on the geometry-trajectory target, pretraining lifts batter permutation-importance 6.4× and pitcher permutation-importance 6.3× over that baseline <!-- src: notes/data-coverage-implementation/phase3-acceptance-gates-v6.md -->.
+### What the retained development reports support
 
-The pretraining carries a leak the cross-fitting contract below does not close, stated here as a limitation. The pretrain artifact is fit on the whole `TRAIN` partition with heads on the same geometry labels the downstream targets predict, and every fold model warm-starts its embeddings from it; an out-of-fold prediction is therefore made by a model whose embeddings have seen that row's label through the pretext heads. The Bayes holdout compounds it, because the two partitions of §4 are unrelated: 70.1% of the Bayes held-out trajectory rows — 432,301 of 616,513 — lie inside the pretrain's labeled `TRAIN` set, and about 15% of Bayes held-out games are `VALIDATE` games whose deep logits came from the full fit that early-stopped on them, so the Bayes held-out metrics of §7 carry the same contamination. Which pretrain artifact produced the published proposals is not recorded in their manifests, and the magnitude of the leak is unmeasured <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->.
+The September 4 review reported modest TEST-partition improvements over
+result-family marginals for trajectory, angle, depth, and edge. It also reported
+larger held-out gains when the trajectory proposal entered the Bayesian model.
+Those figures remain dated development observations. The strongest ablation claims
+from the previous draft depended on zero-flavor artifacts and per-cell shift files
+that are no longer retained, so their exact log-loss deltas and shares of cells
+moving more than 0.25 posterior standard deviations are omitted here.
 
-### Two negative results
+Gate version 3 now requires aligned model and baseline probabilities on identical
+`event_key + partition` rows, declared class truth, improvement in log loss and
+Brier score, and classwise calibration evidence. The four migrated deep pointers
+fail because the retained artifacts do not provide acceptable baseline and
+calibration evidence under that contract. An older numerical pass or a top-1
+accuracy improvement cannot substitute for these missing checks.
+<!-- src: docs/modeling-evidence-contract.md -->
 
-Two failures in this supplement stack are worth stating plainly, because both would have shipped a contaminated posterior if the acceptance gates had not caught them. Both are ML-workflow quality findings about how the supplement was built, not statistical results about the record.
+### Leakage in the legacy stack
 
-**A proxy metric that pointed the wrong way.** During pretrain-architecture selection, a fast in-loop diagnostic — a linear probe fit on the frozen pretrain embeddings to predict `pa_result`, trajectory, and outs — was used to rank candidate pretrain configurations. One candidate won the probe and, when evaluated the way it actually matters — permutation importance on a real downstream fit that fine-tunes the embeddings jointly with the trunk, on the held-out `time_forward_fold = 'VALIDATE'` slice — came out worse than no pretraining at all <!-- TODO: unverified: the probe and permutation-importance margins the previous draft quoted (+0.0068, −0.001) have no repository source; the logs under logs/permimp_gates/ are the place to recover them -->. The mechanism is that the linear probe measures signal remaining in the embeddings at the end of pretraining, while a fine-tuned downstream fit lets the trunk absorb or overwrite that signal during joint training; the two numbers answer different questions and can move in opposite directions. The rule that replaced the proxy: never ship a pretrain artifact on probe evidence alone. The gate is downstream permutation importance against a `BC_DEEP_DISABLE_PRETRAIN=1` baseline, evaluated on the same held-out fold every per-supplement gate uses <!-- src: notes/data-coverage-implementation/phase3-acceptance-gates-v6.md --> <!-- src: bc/python_models/statistical/deep/training.py -->.
+Two distinct leakage paths prevent confirmatory interpretation. First, the shared
+event-universe pretrain used geometry labels from the whole `TRAIN` partition,
+then downstream fold models warm-started embeddings from that fit. A nominally
+out-of-fold row could therefore influence its own embedding through pretraining.
+The deep partition and Bayesian game-hash holdout were unrelated, so this
+contamination also reached part of the Bayesian held-out evaluation.
 
-**An in-sample fold mislabeled as out-of-fold.** The trajectory geometry target was registered with `fold_count=1`. Because the cross-fitting code path only runs the out-of-fold loop when `fold_count>1`, a `fold_count=1` spec instead falls into a fallback that scores the full training set with the full-fit model and tags every row `OOF` <!-- src: notes/data-coverage-implementation/implementation-review.md -->. The result was 8.43M in-sample predictions carrying an out-of-fold label, flowing through `dl_proposal_manifest` into the geometry Bayesian model as a covariate — a consumed, published posterior trained partly on leaked information. On an identical game-hash holdout, the leaked artifact scored 1.15 percentage points higher on trajectory top-1 accuracy than the refit: 0.5031 leak-inflated versus 0.4916 once the leak was removed <!-- src: notes/data-coverage-implementation/implementation-review.md -->. The fix was mechanical — refit with `fold_count=5` so every prediction is genuinely out-of-fold (8,434,463 OOF rows verified across 5 folds, zero nulls) — but the finding generalizes past this one target: the fallback path mislabels in-sample predictions as `OOF` with no warning, so any future spec left at `fold_count=1` inherits the same silent leak <!-- src: notes/data-coverage-implementation/implementation-review.md -->.
+Second, a trajectory target configured with `fold_count=1` followed a full-fit
+fallback while labelling its predictions as out of fold. The later five-fold
+repair addressed that direct error, but it did not repair the shared-pretraining
+leak or reconstruct complete lineage for the retained artifacts. The dependency
+manifest needed to identify exactly which pretrain produced each proposal is also
+absent.
+<!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->
+<!-- src: docs/modeling-evidence-contract.md -->
 
-### The cross-fitting contract this enforces
+The scientific cross-fitting contract is stricter than a prediction-scope label.
+Every supervised stage that can encode the target must be fit inside the outer
+training games. Predictions must be generated on disjoint games, carry explicit
+scope and class labels, and be compared with a baseline on the same rows. Any
+calibration stage must also be trained without the evaluation rows. The retained
+legacy stack does not demonstrate that complete contract.
 
-Both failures motivate the same standing rule. Every deep proposal consumed by a Bayesian model must be produced by a model that never saw that row during training — trained on `fold_id != k`, predicted on `fold_id = k`, with folds assigned by `blake2s(game_id) % 5` inside the `TRAIN` partition — and exported with an explicit `prediction_scope` (`out_of_fold`, `validation`, `test`, `full_fit`) so downstream code can enforce the distinction rather than infer it <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md --> <!-- src: bc/python_models/statistical/deep/training.py -->. The proposals are not calibrated: no post-hoc calibration has ever run on a published deep artifact, and the `calibration_method: temperature` the published manifests carry was a copied default — the calibrator module was deleted without a call site, the trajectory proposal is a raw focal-loss softmax, and new manifests record `none` <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md --> <!-- src: bc/python_models/statistical/deep/training.py -->. The Bayes layer's scalar `γ` absorbs a global temperature but not a per-class one, and the previous draft's claim that each proposal was "calibrated on a held-out slice" is withdrawn. Embeddings carry a parallel check: a source-probe classifier trained to predict source family or scorer from the embedding vector. An AUC at or above 0.75 marks the embedding diagnostic-only for that source family — it may not enter a Bayes covariate, only the `gamma_dl_zero` flavor is publishable; below 0.65 it is fully publication-eligible; the band between is a manual-review gray zone recorded in the fit manifest <!-- src: notes/data-coverage-implementation/04-deep-learning-supplements.md -->. The probe is implemented as a diagnostic and is not wired into the publish path, so it is a rule the operator applies, not a gate the pipeline enforces <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->. Both checks exist because convergence diagnostics cannot see either failure mode — a leaked or source-encoded proposal can sample cleanly and still bias what gets published.
+### Relation to the September 13 completion layer
+
+The full-history PBP imputation candidate does not require a new deep fit. It uses
+recorded values, deterministic derivations, empirical donor distributions,
+constrained reconciliation, and explicit broad fallbacks. Legacy probabilities
+may be carried as exploratory inputs where configured, but a complete candidate
+row does not inherit scientific validation from an old pointer. The builder keeps
+the method and artifact identity visible so consumers can distinguish a recorded
+fact, a deterministic rule, a transported estimate, and a broad prior.
+
+This separation is deliberate. The coverage objective accepts rough estimates across the acquired historical
+PBP population. More deep training would answer a different
+question and would require fresh lineage, leakage-free outer folds, retained
+baseline predictions, calibration, transport tests, and untouched confirmation
+data. None of that work was performed for the September 13 candidate.
+<!-- src: docs/pbp-imputation.md -->
+<!-- src: notes/full-history-imputation-plan.md -->

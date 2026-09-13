@@ -1,189 +1,140 @@
 ## Selection that never recorded itself
 
-The imputation models of the previous section share a hidden assumption, and it is
-the assumption most likely to be wrong exactly where the models do the most work.
-Each trains on the recorded slice, $P(c \mid x, R_i = 1)$, and scores the
-unrecorded slice, $P(c \mid x, R_i = 0)$. If recording were unrelated to the class
-being recorded, those two distributions would agree and training on one to predict
-the other would be sound. In the early record there is direct evidence that they do
-not. The unrecorded trajectory slice is not uniformly unknown: for a large part of it
-the fielding string a scorer did write identifies a ground ball unambiguously — a
-ball fielded by the shortstop and thrown to first — even though the trajectory field
-is empty. Those `derived` rows are 763,993 of the 2,615,579 unrecorded pre-1950
-events, 1,057,776 of 3,117,160 in 1950–1987, and 53,922 of 134,970 from 1988 on,
-and every one of them is a ground ball <!-- src: tables/groundball_mnar.md -->. The
-scorer omitted the trajectory on a routine grounder often enough that the omitted
-events the record can still classify outnumber the whole recorded slice before 1950
-(712,469 events). It is decisive rather than marginal because the unrecorded slice is
-78–95% of all pre-1988 events across the geometry dimensions, against under 8% from
-1988 on. <!-- src: notes/data-coverage-implementation/implementation-review.md -->
+The September 4 legacy geometry models learned
+$P(c\mid x,R_i=1)$ from events whose class was recorded and applied that
+distribution to events with $R_i=0$. Equality of the two conditional
+distributions is a missing-at-random assumption. The acquired record cannot test
+it directly because the class is absent on the target rows. Moreover, the chance
+that a scorer records trajectory plausibly depends on event salience, source
+practice, and the contact label itself. High held-out accuracy within the recorded
+slice therefore does not establish accuracy on naturally unrecorded events.
 
-### What the correction has to be
+Some unrecorded trajectory rows have fielding descriptions from which the project
+rules derive a broad contact class. For example, certain shortstop-to-first plays
+are classified as ground balls under the deterministic deduction rules. These are
+rule-conditioned derivations, not independent physical measurements and not proof
+that every superficially similar play was a ground ball. In the September 4
+ledger, derived-ground rows numbered 763,993 of 2,615,579 unrecorded pre-1950
+events, 1,057,776 of 3,117,160 in 1950--1987, and 53,922 of 134,970 from 1988
+on. The counts show that the derivation is consequential; because eligibility for
+deduction depends on the recorded fielding description, they do not by themselves
+identify the class mix of the remaining unknown rows.
+<!-- src: tables/groundball_mnar.md -->
 
-Write the observation as a selection process: a latent class is drawn,
-$\text{class}_i \sim P(c \mid x_i)$, and then it is recorded with a probability
-that depends on the class, $R_i \sim \operatorname{Bernoulli}(s(c_i, x_i))$ with
-$s \in (0,1]$. Bayes on this process gives the two slices in terms of the same
-latent distribution,
+### The selection model
 
-$$P(c \mid x, R_i=1) \propto P(c \mid x)\, s(c,x), \qquad P(c \mid x, R_i=0) \propto P(c \mid x)\,\bigl(1 - s(c,x)\bigr),$$
+Let a latent class be drawn from $P(c\mid x_i)$ and then recorded with probability
+$s(c_i,x_i)$:
 
-so the estimand is a per-class reweight of the fit,
+$$c_i\sim P(c\mid x_i), \qquad
+R_i\sim\operatorname{Bernoulli}\{s(c_i,x_i)\}.$$
 
-$$P(c \mid x, R_i=0) \propto P(c \mid x, R_i=1) \cdot \frac{1 - s(c,x)}{s(c,x)}.$$
+Both observed and unobserved slices are products of that selection process:
 
-Take logs. The assumption the rest of the section rests on is that the masking
-log-odds is additively separable — a class-independent part that varies with $x$
-plus a per-class deviation $\delta_c$ that does not. That is an assumption about
-the selection process, not a consequence of the algebra: selection that depends on
-class × covariate jointly is not of this form, and the backtest below measures what
-the offset loses when it is violated. Under separability the class-independent part
-is an equal shift on every logit, and by the same softmax invariance that killed the
-scalar random effects — $\operatorname{softmax}(\eta + c\mathbf{1}) =
-\operatorname{softmax}(\eta)$ — it cancels in the normalization. What remains is a
-per-class offset applied to the fitted logits,
+$$P(c\mid x,R_i=1)\propto P(c\mid x)s(c,x),$$
 
-$$P(c \mid x, R_i=0) = \operatorname{softmax}_c(\eta_{i,c} + \delta_c),$$
+$$P(c\mid x,R_i=0)\propto P(c\mid x)\{1-s(c,x)\}.$$
 
-with $\delta_c$ a natural-log log-odds, in nats, the unit every offset and grid in
-this section uses.
-<!-- src: notes/data-coverage-implementation/mnar-selection-offset-design.md --> The
-correction is a fixed per-class number supplied as data — the per-class selection
-log-odds — not a coefficient to be learned from the observed slice. And it cannot
-be learned from that slice, because the observed slice is by definition the slice
-where selection did not act.
+For the classes under consideration, assume $0<s(c,x)<1$, so both selection
+outcomes have positive support. Consequently,
 
-### A clean fit of an inert quantity
+$$P(c\mid x,R_i=0)\propto P(c\mid x,R_i=1)
+  \frac{1-s(c,x)}{s(c,x)}.$$
 
-The design this replaced tried to learn the correction. It added a per-class
-coefficient $\gamma_c$ on the marginal observation propensity from Model A — the one
-signal available at every event — and fit it on the observed data. A masked
-backtest, which hides a realistic scorer-and-era pattern of pre-1988 events and asks
-the model to recover the held-out class mix, showed the term does nothing: the
-relative reduction in the masked-slice focal-share error was $-0.001$ against a
-required 0.25. <!-- src: notes/data-coverage-implementation/implementation-review.md -->
-The fitted $\gamma_{\text{GroundBall}}$ was $-0.083 \pm 0.026$, and under the code's
-convention that is the direction a correction would need, not the wrong sign: $z$
-is the standardized logit of $P(R_i = 1 \mid x_i)$, so masked events sit at low $z$,
-and a negative coefficient on $z$ raises the ground-ball logit exactly there.
-<!-- src: notes/data-coverage-implementation/mnar-selection-offset-design.md --> An
-earlier draft of this paper read the coefficient as wrong-signed; that reading was
-an error in the sign convention, and the run's `metrics.json` is not checked into
-the repository, so the coefficient itself cannot be re-checked without a rerun. The
-correct reading is that a marginal propensity cannot encode class-dependent
-selection, so no coefficient on it can identify the reweight, whatever its sign.
-The load-bearing detail is what the diagnostics did during all of this. The fit
-converged — zero divergences, $\hat R$ and effective sample size within gate — and
-the held-out non-regression check passed.
-<!-- src: notes/data-coverage-implementation/implementation-review.md --> A clean
-trace certifies that the sampler explored the posterior of the model it was given;
-it says nothing about whether that model targets the right quantity. This is the
-paper's thesis in one experiment: convergence is necessary and not sufficient, and
-only a held-out check built to know the truth showed the term was inert.
+Suppose, as a sensitivity assumption, that the nonselection-to-selection log
+odds separate as
 
-### What the derived slice does and does not identify
+$$\log\frac{1-s(c,x)}{s(c,x)}=a(x)+\delta_c.$$
 
-The previous revision of this paper used the derived slice as an anchor: per era it
-set $\delta_{\text{GroundBall}} = \log(p_{\text{derived}} / p_{\text{obs}})$, the
-log-ratio of the derived-slice ground share to the observed-slice ground share, and
-reported offsets of $+1.241$, $+0.917$, and $+0.835$ nats for the three eras and a
-pre-1950 unrecorded ground-ball share of 0.58 at the full anchor. Those numbers are
-withdrawn. The derived slice is entirely GroundBall, so $p_{\text{derived}} = 1$ and
-the "anchor" was $-\ln p_{\text{obs},\text{GroundBall}}$ — $-\ln 0.289$, $-\ln 0.400$,
-$-\ln 0.434$ exactly — a function of the observed slice alone that carries no
-information about the unrecorded slice; the 0.58 was $1/(2 - p_{\text{obs}})$ up to
-renormalization, and the era trend the earlier draft read as scoring practice filling
-in was $p_{\text{obs}}$ rising.
-<!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md --> <!-- src: tables/trajectory_mnar_bound.md -->
+Here $a(x)$ is class independent and $\delta_c$ is a class-specific constant. The
+class-independent component adds the same quantity to every class logit and
+cancels under softmax. The unrecorded distribution can then be represented as
 
-What the derived slice does support is a bound and a diagnostic. Every derived event
-is an unrecorded event whose class is known, so per era
+$$P(c\mid x,R_i=0)=
+\operatorname{softmax}_c(\eta_{i,c}+\delta_c).$$
 
-$$P(\text{GroundBall} \mid R_i = 0) \;\geq\; \frac{n_{\text{derived}}}{n_{\text{unrecorded}}},$$
+This is an assumed sensitivity form. Selection that interacts between class and
+covariates cannot generally be reduced to one constant offset per class.
+<!-- src: notes/data-coverage-implementation/mnar-selection-offset-design.md -->
 
-a hard floor of 0.292 before 1950, 0.339 in 1950–1987, and 0.400 from 1988 on
-<!-- src: tables/groundball_mnar.md -->. The floor is weak by construction — it
-counts only the ground balls a fielding string can name and says nothing about the
-remaining `unknown_code` rows — and it binds from below only. The same rows are a
-subslice of the unrecorded population on which the truth is known, and the published
-missing-at-random export can be scored against it: the export's mean ground-ball
-probability on the derived rows is 0.320 before 1950, 0.402 in 1950–1987, and
-0.375 from 1988 on, against a truth of 1.0, with log loss 1.36, 1.09, and 1.57
-<!-- src: tables/groundball_mnar.md -->. The export gives derived and unknown rows
-almost the same probability (0.3203 against 0.3204 pre-1950) because the fielding
-string that identifies the derived rows is not a model covariate; the diagnostic
-measures how far the MAR shares sit from truth on the one unrecorded subslice where
-truth exists. A partial-truth point estimate that takes truth on the derived rows and
-MAR on the remainder reads 0.519, 0.579, and 0.641, but it is not a correction:
-deduction pulls every ground ball with a deducible fielding string into the derived
-slice, so the remainder is depleted of ground balls and MAR on it is doubtful in a
-known direction <!-- src: tables/groundball_mnar.md -->.
+Neither $P(c\mid x,R_i=1)$ nor the marginal propensity $P(R_i=1\mid x)$
+identifies $\delta_c$. The observed slice was selected too; it identifies the
+conditional distribution among selected rows, while the missing labels prevent a
+direct estimate of how class composition changes when $R_i=0$. A former design
+placed a learned class coefficient on Model A's marginal observation propensity.
+The September 4 masked experiment reported essentially no reduction in its focal
+share error. That result is consistent with the identification problem: a marginal
+propensity cannot recover class-dependent selection without additional truth or a
+specified selection model. Its old smoke artifact is not retained, so the quoted
+coefficient and sampler diagnostics are historical notes rather than reproducible
+current evidence.
+<!-- src: notes/data-coverage-implementation/implementation-review.md -->
+<!-- src: docs/modeling-evidence-contract.md -->
 
-### An assumed ribbon against a hard floor
+### What the derived slice supports
 
-The sensitivity object is therefore a marginal grid, not a data-anchored direction.
-The published imputation shares stay at the missing-at-random point, $\delta = 0$;
-beside them the ribbon reports the class mix as each class's offset sweeps
-$\pm\{0.25, 0.5, 1.0\}$ nats with the other offsets held at zero, computed by the
-per-event closed-form renormalization so it is a post-hoc reweight of the published
-shares and costs no refit <!-- src: tables/trajectory_mnar_bound.md -->. The grid's
-width was checked once against a synthetic mask — the correction that mask induced
-landed inside $\pm 1.0$, and a $\pm 2$-SD-of-logit scale was rejected as
-uninformatively wide — which calibrates the width against one synthetic selection
-process and identifies nothing about the real one
-<!-- src: notes/data-coverage-implementation/mnar-selection-offset-design.md -->. The
-band is an assumption, published as one.
+The previous paper revision set
+$\delta_{\mathrm{GroundBall}}=\log(p_{\mathrm{derived}}/p_{\mathrm{obs}})$.
+Because every row admitted by that derivation was labelled GroundBall,
+$p_{\mathrm{derived}}=1$, so the supposed anchor reduced to
+$-\log p_{\mathrm{obs}}$. It was a function of the observed slice and supplied no
+new measurement of the unknown rows. The offsets and corrected shares derived from
+that construction are withdrawn.
+<!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->
 
-The floor is what the ribbon must respect, and the offset at which the corrected
-ground-ball share reaches it is reported per era. Before 1988 the MAR share already
-sits above the floor: the share could fall by 0.15 nats (pre-1950) or 0.19 nats
-(1950–1987) before violating it. From 1988 on the MAR share, 0.392, sits 0.008 below
-the floor of 0.400 and needs $+0.037$ nats to reach it, so the MAR default is
-inconsistent with the record there by a small margin and the floor is the binding
-statement <!-- src: tables/trajectory_mnar_bound.md -->. Across the $\pm 1.0$ grid
-the pre-1950 unrecorded ground-ball share runs from 0.16 to 0.53; the floor sits
-inside that band in every era, near its center, which is the honest summary of what
-the record says — the band is where the share could be, the floor is the one point
-it cannot be below.
+If the deduction rule is accepted as correct on its admitted rows, it supplies a
+conditional lower bound:
 
-### How far the correction reaches
+$$P(\mathrm{GroundBall}\mid R_i=0)
+\geq\frac{n_{\mathrm{derived\ ground}}}{n_{\mathrm{unrecorded}}}.$$
 
-The fixed-offset mechanism was run against four masking designs in the backtest
-harness, each corrected with its own oracle offset, and reading that table needs two
-caveats stated before any number. First, every run is a smoke-budget fit —
-50 draws × 50 tune × 2 chains — whose convergence gates fail on all four designs
-(bulk ESS 20–47 against a floor of 100), and no run artifacts are checked into the
-repository, so the table is a check of the mechanism, not a publication-grade result
-<!-- src: tables/mnar_backtest_robustness.md -->. Second, three of the four designs
-cannot fail by construction. When selection depends on class alone, or on nothing,
-$P(c \mid R=0) \propto P(c \mid R=1)\,\text{odds}_{\text{mask}}(c)$ holds at the
-marginal level for any per-event shares, a constant model included, so reweighting
-by the realized per-class masked rate reproduces the masked marginal as an algebraic
-identity. The near-exact recoveries on the class-intensity and era-graded designs
-(relative error reduction 0.995 and 0.958) and the near-no-op on the class-independent
-scorer-blocked design (0.015) are properties of those designs, not evidence about the
-offset <!-- src: tables/mnar_backtest_robustness.md -->.
+The September 4 ledger gives floors of 0.292 before 1950, 0.339 in 1950--1987,
+and 0.400 from 1988 onward. These are floors conditional on the rule's validity
+and the ledger's population definition. They do not prove MNAR, identify a point
+share, or validate the derivation on rows without independent labels. No analogous
+deduction supplies a floor for fly balls, line drives, pop-ups, or bunts.
+<!-- src: tables/groundball_mnar.md -->
 
-Only the covariate-joint design is informative. There selection depends on class and
-batter handedness jointly, a covariate the geometry model conditions on, so the
-additive-separability assumption above is genuinely violated; the marginal per-class
-offset cuts the focal-share error from 0.137 to 0.063, a relative reduction of
-0.537 <!-- src: tables/mnar_backtest_robustness.md -->. That is the one measured
-statement about the mechanism's reach: when selection is separable the offset is the
-right form, and when it interacts with a conditioned covariate the offset recovers
-about half the bias. Rerunning the four designs at the default sampler budget, with
-artifacts checked in, is open work (§11).
+The same derived rows can be used as a diagnostic subset, again conditional on the
+deduction. The September 4 MAR export assigned mean GroundBall probabilities of
+0.320, 0.402, and 0.375 across the three era groups to rows labelled GroundBall by
+the rule. The gap is evidence that the model did not encode the deduction signal;
+it is not an unbiased estimate of error on all naturally missing rows, because the
+diagnostic subset is selected by the availability and content of fielding detail.
 
-### What the record still will not say
+### Sensitivity rather than identification
 
-The offset $\delta_c$ is unidentified from the observed slice for every class. The
-derived slice buys a floor for one class in one dimension and a known-truth subslice
-on which the MAR fit can be scored; it does not supply a point, and for fly balls,
-line drives, pop-ups, and bunts there is no analogue of the fielding-string deduction
-at all. Events stamped `unknown_code` or `missing` are recovered by neither the
-recorded label nor the deduction, so they sit outside the floor's reach. The shape of
-the treatment is what it was — the record supports a per-event propensity to observe,
-a posterior over what was observed, and an assumed sensitivity band over what was
-not — with one hard constraint added to the band and one estimator removed from it.
-MAR remains the published default, the ribbon publishes beside it, and the floor is
-the only number in this section the unrecorded slice itself vouches for.
+The defensible use of $\delta_c$ is an assumption grid. The September 4 analysis
+reweighted event probabilities as one class offset swept
+$\pm\{0.25,0.5,1.0\}$ nats with other offsets fixed at zero. This operation is
+a closed-form sensitivity calculation, not a fitted correction. Its width was
+chosen from one synthetic masking exercise and does not bound the real historical
+selection mechanism.
+
+The old robustness table used 50 draws, 50 tuning steps, and two chains. All four
+fits failed their convergence threshold, and the underlying run artifacts are not
+retained. Three masking designs also made oracle marginal reweighting an algebraic
+identity. The remaining covariate-interaction design reported that a marginal
+offset removed about half the induced focal-share error. That is a historical
+mechanism check under a constructed mask, not validation of historical MNAR
+correction.
+<!-- src: tables/mnar_backtest_robustness.md -->
+
+### Current coverage policy
+
+The legacy MAR geometry pointers are explicitly exploratory and fail gate version
+3. In particular, transport and identification are unsupported. The September 13
+full-history PBP candidate addresses a different objective: it supplies normalized
+empirical distributions and broader declared fallbacks so every applicable target
+on the acquired PBP spine has an estimate. It does not estimate $\delta_c$ or
+claim that missingness is at random.
+
+Those completed rows must therefore be interpreted as assumption-labelled rough
+reconstructions. Their method, fallback, source status, and uncertainty fields are
+part of the estimand. Conservation and complete row coverage show that the outputs
+cohere with their declared rules; they do not establish the unobserved historical
+class. No sealed confirmation labels were opened or rescored for this completion
+work.
+<!-- src: artifacts/imputation/legacy-publication-candidate-v1/migration_summary.json -->
+<!-- src: docs/pbp-imputation.md -->
+<!-- src: notes/full-history-imputation-plan.md -->

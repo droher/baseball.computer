@@ -1,31 +1,77 @@
 ## What the record cannot tell you
 
-A single-source play-by-play record bounds what coverage modeling can do, and part of a modeling program's job is to say exactly where that bound sits rather than paper over it with a model fit on the wrong estimand. Three model letters in this family — B, I, and K — are withheld, but they are withheld for three different reasons and the difference matters. Only Model B carries an argument about the likelihood: the data are uninformative about its target, so any fit returns the prior — a statement about what this record can teach, defended below, rather than a formal non-identification proof. Model I is withheld because a specific input its correct specification needs does not exist anywhere in the source data — a data-availability limitation, not a proof that the estimand resists identification in principle. Model K is withheld because it has not been built in this pass — unfinished scope, not a claim about the record at all. Presenting the three at the same rigor would overstate the weakest of them, so each subsection below states its claim type before making it.
+Complete output coverage and statistical identification are different goals. The
+September 13 candidate supplies a reproducible estimate or declared fallback for
+applicable targets on the acquired PBP spine. That policy does not make an
+unobserved historical fact learnable from a single source. Three legacy model
+letters illustrate three different limits.
 
-### Model B — contact-label confusion: the data are uninformative about Ω
+### Model B — contact-label confusion
 
-This is a claim that the data are uninformative, not a report that confusion happens to be rare. Model B was specified as a scorer confusion model: a latent true contact class `Z_i` generating a recorded label `L_i` through a scorer/decade confusion matrix `Ω`. Identifying `Ω` from data needs one of two things — repeated, independent labels for the same event, or outcome evidence that is itself independent of the recorded label and can disagree with it. Retrosheet-era play-by-play has one scorer per event (scorer is a game-level attribute in `game_scorekeeping`), so the first route is closed: there is no second, independently drawn label to compare against the first.
+Model B proposed a latent contact class $Z_i$ and a scorer or era confusion
+matrix $\Omega$ generating the recorded label $L_i$:
 
-The obvious candidate for that second label — the "deduced" batted-ball class computed by `calc_batted_ball_type.sql` — is not independent either. When the recorded trajectory is known, the deduction rule sets the deduced broad class equal to the recorded broad class by construction, so comparing recorded against deduced on that majority of events measures the deduction rule, not scorer behavior; the comparison carries zero independent information about `Ω` there. The only place independent evidence exists is where an outcome, not a recode of `L_i`, can adjudicate the class on its own — home runs, outfield-depth putouts, unassisted putouts. Restricted to that outcome-anchored evidence, the recorded broad class and the deduced broad class disagree on 702 of 6.0M recorded-known, non-bunt batted-ball events, 0.0117% <!-- src: memory:model_b_contact_blocked.md -->, all one-directional (GroundBall → AirBall, never the reverse), with no era or scorer structure.
+$$Z_i\sim P(Z\mid x_i), \qquad L_i\sim\Omega_{g_i}[Z_i,\cdot].$$
 
-The conclusion follows from the shape of the evidence, not from the size of the disagreement rate. Over the overwhelming majority of the record, the likelihood for `Ω` is flat — unmoved by the data, because the only comparison available there is an identity by construction, not a measurement. Over the 0.0117% outcome-anchored sliver, the 702 disagreements carry some information, but not enough to resolve a matrix indexed by scorer and decade, and they carry no era or scorer structure to resolve it with; a likelihood that is flat almost everywhere and thinly informative on a sliver two orders of magnitude too small to inform a structured matrix returns the prior. The precise statement is that the data are uninformative about `Ω` and any fit returns the prior — not that `Ω` is non-identified in a formal sense, since the anchored sliver does move the posterior, just not by enough to matter — and it is a different statement again from "confusion is rare," which describes `Ω`'s value rather than what the data can say about it. Unblocking Model B needs a second, genuinely independent contact-label source per event — a different feed's trajectory call — which means ingesting a second parser source, out of scope for this repository.
+Estimating $\Omega$ requires repeated independent labels for the same event or a
+second measurement that can disagree with $L_i$ without being constructed from
+it. The acquired PBP surface usually provides one recorded contact label. The
+project's deduced broad class is not a general second measurement: on many
+recorded rows its rule uses or reproduces the recorded class, while on other rows
+it depends on fielding outcomes that are themselves selectively recorded.
 
-### Model I — fielder responsibility: a data-availability limitation
+The September 4 audit found only a thin outcome-anchored subset with information
+independent enough to challenge the recorded label. That subset can move a simple
+aggregate confusion rate, but the retained evidence does not support a
+scorer-by-era matrix or historical transport. It is therefore more precise to say
+that this record is uninformative for the proposed structured $\Omega$ than to
+claim a formal non-identification theorem or that scorer confusion is rare.
+Unblocking the estimand requires an independently generated second contact label
+at event grain, with its own provenance and observation model.
+<!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->
 
-This is not a claim that responsibility is unidentifiable in principle. It is a claim about what today's source data contains: Model I's correct specification needs an input that does not exist in the record, and if that input existed the identification picture would look nothing like Model B's — there would be no confusion-matrix-style argument to make at all.
+### Model I — analytical fielder responsibility
 
-Model I's estimand is an analytical opportunity, not a recorded fact: `P(responsible = k | geometry, alignment, …)`, who should have had a play given where the ball went, marginal over who actually got to it — explicitly distinct from the ball handler, the fielder who did get to it <!-- src: notes/data-coverage-implementation/implementation-review.md -->. A first implementation shipped anyway, trained on `ball_handler_position` restricted to range positions, which makes it Model D with a narrower vocabulary rather than a responsibility model at all. The confound is empirical: 28% of the training slice is hits, and on hits the "handler" is just whichever fielder retrieved the ball after it got past the defense — 89% of hit-handlers are outfielders <!-- src: notes/data-coverage-implementation/implementation-review.md -->. A model trained on that label can only relearn who touched the ball, which Model D already publishes; it cannot answer who should have.
+Fielder responsibility asks who should have had a play given geometry and
+alignment:
 
-The design that would actually estimate responsibility decomposes it into a geometry term the pipeline already has — Model E's location posterior — and a term it does not: `π(k | location, alignment)`, a Dirichlet zone-responsibility kernel giving the positional probability of coverage for a location bin under a given defensive alignment <!-- src: notes/data-coverage-implementation/responsibility-zone-design.md -->. No positioning prior of that shape exists anywhere in the source data; the handler is the only position-valued label a batted ball carries. That is the whole limitation: a positioning-prior source — tracking-era defensive alignment logs, for instance — would resolve `π(k | location, alignment)` directly and turn Model I into a straightforward fit. It is withheld because that source is not in this record, not because the estimand resists identification. The prototype was parked and removed, the `responsibility_artifact_id` column stays as a reserved NULL pointer, and nothing named responsibility ships until the zone kernel exists <!-- src: notes/data-coverage-implementation/responsibility-zone-design.md -->.
+$$P(\text{responsible}=k\mid\text{geometry},\text{alignment},\ldots).$$
 
-### Model K — shift propensity: descoped, not a claim
+That differs from the handling fielder, who touched or retrieved the ball. Training
+on `ball_handler_position` would simply reproduce Model D with a narrower
+vocabulary and would be especially misleading on hits, where the retriever need
+not be the defender with the opportunity.
 
-Model K makes no identification claim and no data-availability claim. It is unfinished scope: designed, not built.
+A defensible model would need a zone or positioning kernel such as
+$\pi(k\mid\text{location},\text{alignment})$. The current source does not
+contain tracking-era defensive positions or an independent opportunity label from
+which to estimate that kernel. This is a data-availability limit, not a claim that
+responsibility is unidentifiable in principle. The September 13 fielding candidate
+can allocate official residual credits when eligibility and integer box capacity
+agree, but official credit reconciliation does not identify analytical
+responsibility.
+<!-- src: notes/data-coverage-implementation/responsibility-zone-design.md -->
+<!-- src: docs/pbp-imputation.md -->
 
-Shift propensity was scoped as its own first-class model — `P(shift | player, batter_hand, defending_team, count, outs, base_state)` — rather than folded into a categorical `alignment_regime` covariate, on the reasoning that defensive shifting is too consequential to bucket into four eras and that post-2015 event data and post-2009 pitch data are rich enough to support a dedicated fit <!-- src: memory:data_coverage_shift_model.md -->. Nothing in the record prevents fitting it. Model K was designed to feed Model I's alignment input, and would plausibly feed geometry and run-value models as well, but the fit was not carried out in this pass. Every model that would consume its posterior — Model I above, and Model E's alignment-regime fixed effect — instead falls back to the era-normal alignment prior it was always meant to use for eras and cells where a shift model has no support; that fallback is the entire operating mode today, not a degraded corner case. K appears in this section for publication-transparency inventory — it records that the shift-propensity posterior does not exist yet — not because it belongs beside a genuine identification or data-availability limit.
+### Model K — shift propensity
 
-### What the three share, and what they don't
+Model K was scoped as
 
-These three withheld model letters do not share one failure mode. B's is the narrowest claim: given a single scorer per event and no independent second label, the likelihood barely moves on `Ω` over the whole record, so the data are uninformative and a fit returns the prior. I's is a data-availability limitation: the input a correct model needs is absent from the source, not absent in principle, and a different data source would resolve it outright. K's is neither of those — it is scope not yet completed, and grouping it with B and I asserts nothing about the record at all.
+$$P(\text{shift}\mid\text{player},\text{batter hand},
+\text{defending team},\text{count},\text{outs},\text{base state}).$$
 
-What the three do share is a publication discipline, not a common statistical argument. A model that cannot learn what it claims to (B), a model that needs an input the record does not supply (I), or a model that has not yet been built (K) does not get a hedge column in a published table. Each is parked, its name reserved, and its status — a blocking condition for B and I, remaining work for K — written down until the situation changes.
+It was designed but not fit. No retained result supports a claim about its
+identification or accuracy. Geometry and responsibility work that would consume
+it instead uses coarse alignment regimes or broader fallbacks with explicit
+method labels. K is unfinished research scope, rather than an identified failure
+of the source.
+
+### Publication consequence
+
+These cases share a reporting rule, not a statistical proof. A structured
+confusion model without an independent label, a responsibility model without a
+positioning source, and an unbuilt shift model cannot become validated facts
+through a complete SQL table. A rough fallback may still be useful for an
+authorized coverage interface if it is labelled as an assumption, retains its
+method and provenance, and is kept separate from recorded facts. It must not be
+described as if the historical record identified the latent quantity.

@@ -1,31 +1,119 @@
 ## Limitations and open problems
 
-This section lists what is still open, named against the specific artifact it blocks and the specific condition that would unblock it. None of these are hedges against unknown risk; each is a concrete, already-diagnosed gap. Several items are defects found by the modeling review of 2026-09-03 and fixed in this revision; the refits that carry those fixes into the tables completed on 2026-09-04, and each item states what the restated tables show.
+The principal limitation is evidentiary. The September 13 work completed and
+reconciled a full-history PBP candidate, while the retained September 4 model
+artifacts fail the current scientific publication contract. These statements can
+both be true because coverage validation and model validation answer different
+questions.
 
-**The MNAR offset `δ_c` is unidentified for every class; the derived slice supplies a floor for one.** §5 withdraws the per-era anchored offset the previous revision published — it was `−ln p_obs` of the observed slice, not a measurement of the unrecorded one — and replaces it with the hard lower bound `P(GroundBall | unrecorded) ≥ n_derived / n_unrecorded` (0.292, 0.339, 0.400 by era) and a known-truth diagnostic of the MAR fit on the derived rows (mean `p(GroundBall)` 0.32, 0.40, 0.38 against a truth of 1). <!-- src: tables/groundball_mnar.md --> The four non-GroundBall trajectory classes have no analogous deduction path and no floor; events whose `observed_status` is `unknown_code` or `missing` sit outside the floor's reach entirely; and the derived slice is used only for that diagnostic — it is not folded into training as a labeled slice, not used as a validation set for the imputation fit beyond §5, and the fielding string that identifies it is not a model covariate, which is why the MAR fit cannot tell derived rows from unknown ones. Unblock condition: an independent partial-truth source for the non-ground classes — a second scorer stream or a tracking-era backfill — and a decision on whether the derived rows should enter the geometry fit as labeled unrecorded events, which would turn the diagnostic into training data and remove it as a check.
+**The legacy statistical family does not pass gate version 3.** All 24 migrated
+pointers have overall status `failed`; provenance, identification, and transport
+are unsupported for every pointer. The 19 Bayesian artifacts lack their declared
+`prior_predictive.nc` files. The four geometry deep proposals fail current
+predictive and calibration evidence, and the event-universe pretrain is unsupported
+on every evidence dimension. The strict pointer checker passes the exploratory
+wrappers because their identities, reasons, failed verdicts, and retained-byte
+bindings are internally consistent. That is an integrity result, not scientific
+authorization.
+<!-- src: docs/modeling-evidence-contract.md -->
+<!-- src: artifacts/imputation/legacy-publication-candidate-v1/migration_summary.json -->
 
-**The masked-backtest robustness table is a smoke-budget run.** All four designs in `mnar_backtest_robustness.md` were fit at 50 draws × 50 tune × 2 chains with the convergence gates failing (bulk ESS 20–47), and no run artifacts are checked in; three of the four designs are algebraic identities for the oracle offset, so the table carries one informative number, the covariate-joint design's 0.537. <!-- src: tables/mnar_backtest_robustness.md --> Unblock condition: rerun the four designs at the default sampler budget and check the `metrics.json` / `mask_summary.json` outputs in.
+**The full-history candidate is a rough reconstruction of the acquired PBP
+population.** It covers 205,886 games and 18,141,020 events from 1903--2025 and
+maps all 116 declared completion targets. Its isolated checks establish artifact
+identity, source preservation, row coverage, schema compatibility, probability
+normalization, and defined conservation rules. They do not show that an
+unrecorded temperature, pitch, fielder, trajectory, official, or run value was
+historically correct. Games without an acquired PBP event spine, including
+aggregate-only games, remain outside the estimand.
+<!-- src: docs/pbp-imputation.md -->
 
-**Three location dimensions were published with a constant per-class shift, and the deep supplement reaches one geometry dimension.** §6 discloses the defect: every production row of `location_side`, `location_depth`, and `location_edge` had no deep prediction, and the centering turned that absence into a shift of `−γ · mean_c` on every imputed logit. The fix zeroes the term on rows without a prediction and forces the deep-free flavor when the production slice has none, and the three dimensions are refit deep-free, and the restated production shares sit on the training shares: `location_edge` `All` 0.010, `location_side` `Default` 0.692, `location_depth` `ExtraDeep` 0.050, against 0.173, 0.24, and 0.22 before <!-- src: tables/geometry_marginals_unobserved.md -->. What remains: the location deep specs score only observed rows, so they cannot feed an imputation model at all. Unblock condition: extend the location specs' row filter to the unrecorded slice the way the trajectory spec already does, refit the proposals, and then refit the location dimensions with the covariate active.
+**Missingness remains unidentified for the naturally unrecorded class.** A model
+fit on recorded labels estimates $P(Y\mid X,R=1)$, not
+$P(Y\mid X,R=0)$. Marginal observation propensity does not recover the
+class-dependent selection odds. Rule-derived ground-ball rows provide at most a
+conditional lower bound and a selected diagnostic subset; they do not prove MNAR
+or identify the other trajectory classes. The September 13 candidate uses broad
+empirical fallbacks rather than claiming a fitted MNAR correction.
 
-**The deep out-of-fold predictions carry a pretraining leak, and the deep pointers are outside the gate sweep.** Every fold model warm-starts its batter and pitcher embeddings from a pretrain artifact fit on the whole `TRAIN` partition with heads on the geometry labels, so an out-of-fold prediction comes from a model whose embeddings have seen the row's label; 70.1% of the Bayes held-out trajectory rows lie inside that labeled set, and the Bayes held-out metrics inherit the contamination. The four deep pointers are also not validated by `just validate-gates` — the sweep resolves them under a directory layout they do not use and reports them `missing` — and no deep artifact was compared to a baseline before this revision (§6). <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md --> Unblock condition: pretrain on a partition disjoint from every downstream holdout, or re-derive the pretrain per fold; record the pretrain artifact id in each proposal manifest; and teach the sweep the deep artifact layout so the baseline comparison runs on every published proposal.
+**The location target correction changes the meaning of old results.** The legacy
+six-class `location_side` artifact contains within-zone angle modifiers and is
+now exposed as `location_angle`. Its historical predictive scores do not validate
+global field-side reconstruction. The new PBP interface derives global side from
+general location and keeps angle, depth, and edge distinct, but the fallback
+accuracy of those historical estimates is not confirmed.
+<!-- src: docs/modeling-evidence-contract.md -->
+<!-- src: artifacts/imputation/legacy-publication-candidate-v1/README.md -->
 
-**`linear_weights_estimated`'s band carries RE-posterior and finite-sample uncertainty, and its floor cells are pooled.** The Dirichlet($n$+0.5) combination-weight propagation described in §7 is the published one — promoted 2026-07-14 <!-- src: bc/python_models/statistical/linear_weights_estimated.py --> — and this revision adds the deterministic sibling's occurrence floor (cells at or below 100 occurrences publish the corpus-pooled value with `is_imputed = True`) and drops transitions whose start state has no posterior cell instead of substituting a run expectancy of zero <!-- src: bc/python_models/statistical/CLAUDE.md -->. The table was re-derived from `re-full-eraregime-v4` on 2026-09-04: on the 2015 NL comparison the deterministic value falls inside the 94% HDI on all 20 play types and the offsets are centered near zero (§7). One gap remains. The 827 floor cells are marked `is_imputed = True`, but a floor cell's interval is the corpus-pooled interval (median width 0.0045 against 0.061 above the floor), which is tight because it pools every season, not because the cell is well measured <!-- src: tables/linear_weights_compare.md -->.
+**Airborne standardization is assumption labelled.** The 2009--2019 pipeline has
+useful development support. The 2020-onward held-out screen failed under its
+two-season design, and pre-2009 translation assumes a modern true-band mix and a
+relationship to the 2020-onward vocabulary. Its nominal intervals omit uncertainty
+in those assumptions. The PBP candidate carries the nearest 1989 translation
+backward for earlier seasons with weak-identification flags. This coverage decision
+was explicitly accepted as an estimate; it is not a passed transport result.
+<!-- src: docs/geometry-modeling-handoff.md -->
+<!-- src: docs/geometry-air-translation-estimate-2026-09-11.md -->
 
-**`run_expectancy`'s held-out posterior-predictive coverage was below the acceptance floor.** On the previously published fit the predictive HDI coverage was 0.8774 against a floor of 0.88, fired at `warn` <!-- src: tables/validation_gates.md -->; the review traced part of the under-coverage to a single global dispersion against empirical variance-to-mean ratios that differ by state, and part to the population defect of §4. The corrected fit carries a per-state dispersion and the corrected population; its predictive coverage is 0.9062, back above the 0.88 floor, so `predictive_coverage_out_of_band` no longer fires <!-- src: tables/validation_gates.md -->. Predictive coverage and held-out calibration error are warn-only in the gate suite, so a fit can pass with either out of band; whether they should block is an open policy question rather than a code gap.
+**The confirmation reserves remain sealed.** The 121 deferred modern-angle games
+and 6,105 historical component-local reserve games were not opened for this paper
+revision or the PBP candidate. No new model was fit and no new confirmation data
+were acquired. The air-research decision remains closed under its stated
+assumptions; the later failed screens and partial-identification findings are
+reported without reopening the reserve.
+<!-- src: docs/geometry-modeling-handoff.md -->
 
-**The posterior-predictive coverage check's parameter layer is a reconstruction, not the stored posterior.** Neither `state_transition` nor `run_expectancy` persists per-draw class probabilities in its published summary export, so the predictive-coverage simulation approximates each cell's parameter posterior as an independent Normal(`prob_mean`, `prob_sd`) truncated to $[0, 1]$ and renormalized across classes, rather than drawing from the true correlated posterior captured at fit time. <!-- src: tables/validation_gates.md --> This is adequate where the finite-sample layer dominates predictive width, which holds for both surfaces on this corpus's dense cells, but it is a stated approximation. Park factors have no coverage hook at all: `park_factor_runs` is graded on convergence and held-out lift only, and the interval-width-versus-sparsity pattern §7 shows for the sparse leagues is a description of the posterior, not a validated coverage claim. Unblock condition: persist a per-draw class-probability export, or a compact sufficient summary of the posterior's correlation structure, for a validation-scoped sample of cells, and add a park-factor coverage hook against held-out team-games.
+**Legacy deep evidence is incomplete and partly contaminated.** Shared pretraining
+could encode a downstream row's geometry label before nominal cross-fitting, and
+the Bayesian and deep partitions were not nested. An earlier one-fold trajectory
+configuration also labelled full-fit predictions as out of fold. The strongest
+ablation files quoted by an older draft are not retained, so their exact effects
+cannot be reproduced. A future deep supplement would need target-free outer
+folds across every supervised stage, explicit dependency lineage, aligned baseline
+probabilities, calibration, and transport tests before it could support a
+scientific claim.
 
-**`confidence_status` is a version-stamped status, and every populated table reads `passed` only until the next gate bump.** A `passed` stamp publishes as `passed` only when its gate version matches the current one (§9), so this revision's gate bump, which added the smoke refusal, the block on absent held-out evidence, and the group-level weak-identification flag, reverted every table to `exploratory` until the refits completed, the version-2 sweep re-stamped, and the `@model`s re-materialized on 2026-09-04. Every populated table now reads `passed` under gate version 2 <!-- src: tables/table_inventory.md -->; the two placeholders carry NULL. The next gate change reverts the column again, by design.
+**Reported uncertainty is conditional on method and fallback.** Donor dispersion
+measures empirical variation within the selected donor pool. It does not include
+uncertainty that the fallback hierarchy, historical transport assumption, or source
+measurement is wrong. Pre-2009 airborne intervals omit the error in their two main
+transport assumptions. Legacy run-expectancy and transition interval diagnostics
+use approximations rather than retained joint posterior draws, and park factors
+lack a held-out coverage hook. A narrow conditional interval can therefore coexist
+with weak historical identification.
+<!-- src: docs/pbp-imputation.md -->
+<!-- src: docs/modeling-evidence-contract.md -->
 
-**Six fits carry `weak_identification_flag = True`, and the flag is per row.** Under the previous flag logic (the minimum ESS over every element of every parameter) the run-expectancy and linear-weights tables were flagged on a single dispersion parameter at ESS 396, the transition table on its densest cells, and the park-factor table was unflagged although its persistence hyperparameters, which control all pooling, mixed at ESS 50 and 17 with r-hat up to 1.17. <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md --> The flag now reads the group-level pair over variables with at most 512 elements and is recomputed by the sweep. On the restated tables it is TRUE on every row of `state_transition_summary` (`alpha_trans[1]` at bulk ESS 227 on `state-transition-v5`, with r-hat 1.026 and no divergences; a longer run does not fit in memory), on the assist rows of `imputed_fielding_credit` but not the putout rows, and on the `ball_handler_position`, `location_depth`, `location_edge`, and `trajectory` rows of `scorer_observation_propensities` but not the `general_location` and `location_side` rows; it is FALSE on every row of the other seven populated tables <!-- src: tables/validation_gates.md -->. The park-factor fit is unflagged on evidence rather than by omission: the non-centered gap-aware refit's `rho_park` and `sigma_park_innov` carry bulk ESS 3,261 and 1,891 at r-hat under 1.001 <!-- src: artifacts/statistical/bayes/park_factor_runs/pf-full-ar1-v4/validation/diagnostics_by_variable.json -->. Because the flag is carried per row, both TRUE and FALSE rows exist inside `imputed_fielding_credit` and `scorer_observation_propensities`, and a consumer filtering on it must do so at row grain.
+**Conservation does not resolve source conflict.** Pitch and fielding reconciliation
+ensures that the candidate's defined counters and allocations add up. The builder
+retains parser statuses, raw sequences, and explicit conflict dispositions because
+many source sequences violate modern or internal boundaries. A reconstructed legal
+sequence is one coherent completion of the retained evidence, not proof of the
+historical pitch order. Likewise, exact fielding capacity can constrain a credit
+allocation without independently identifying the responsible fielder.
 
-**Model F's AR(1) chain never resets at park reconfigurations.** The previously published fit treated consecutive fitted seasons of a park-league as adjacent AR steps whatever the calendar gap between them, so one park's 1965 and 1998 seasons were one step apart; the refit (`pf-full-ar1-v4`) is gap-aware, with the innovation over a gap of $d$ seasons following the stationary AR(1) bridge $\rho^d$ and no latent cells for unobserved seasons <!-- src: bc/python_models/statistical/models/park_factor.py -->. What remains is the reset: `park_episode_status` is 100% NULL in both dataset artifacts, so there is no `park_episode_id` to key the chain on; it keys on `(park, league)` alone and runs continuously across a mid-history reconfiguration that should have broken it <!-- src: notes/followups.md --> <!-- src: notes/data-coverage-implementation/modeling-review-2026-09-03.md -->. The runs-per-plate-appearance exposure also attenuates the factor relative to a runs-per-inning definition, since plate appearances are themselves inflated by scoring. Unblock condition: the upstream park-history dimension populates a non-null `park_episode_id`, and the chain is keyed on it.
+**The available context stress test shows material roughness.** In the retained
+1,000-game joint holdout, mean absolute error was 7.53 °F for temperature, 10,227
+for attendance, 4.32 mph for wind speed, 25.67 minutes for duration, and 234.34
+clock minutes for start time; categorical exact agreement ranged from 19.7% for
+wind direction to 94.0% for precipitation. This is a test against recorded values
+under an artificial joint mask, not a calibrated study of historical missingness,
+but it demonstrates why completed context fields should retain their methods and
+donor dispersion.
+<!-- src: artifacts/imputation/20260913-context-holdout-v1/report.json -->
 
-**Model H (advancement) is schema-only.** `model_input_advancement.sql` does not yet emit the dependent variable `advancement_class` or a `time_forward_fold` column, so the advancement DL and Bayes specs no longer register on import <!-- src: notes/followups.md -->. Unblock condition: close the SQL gap upstream (apply the same seven-class advancement derivation the pretrain heads already use for `r1/r2/r3_advancement`), then re-register the specs and restore the target's test suite.
+**Several latent baseball quantities remain outside the supported source.** The
+record does not supply an independent event-level contact label for a structured
+scorer confusion matrix or a positioning/opportunity source for analytical fielder
+responsibility. Shift propensity was designed but not fit. The legacy advancement
+and pitch-count-coverage consumers remain typed empty because they have no retained
+validated pointer. The broader PBP interfaces may still expose rough completed
+values where the registry declares a fallback, but that does not resolve these
+scientific estimands.
 
-**Model C's error-credit arm is code-complete but data-blocked, and its double-play submodel has no truth column.** The error model (`models/error_credit.py`) fits on the 356K attributed error events but produces an empty production export: every one of the 16.3M error rows in `model_input_fielding_credit` already carries `unknown_credit_need = 0` — the upstream parser emits no unknown-error allocation signal, so there is nothing left to impute <!-- src: notes/followups.md -->. Separately, the double-play submodel has no DP truth to train against: `double_plays` exists upstream in `event_player_fielding_stats` but is not surfaced into the modeling dataset, and there is no `outs_on_play` column to gate "two outs recorded on this play" <!-- src: notes/followups.md -->. Unblock condition for errors: an upstream parser or SQL change that emits an unknown-error allocation need, or a team-game box-residual anchor built from `aggregate_residual_errors`. Unblock condition for double plays: surface `double_plays` and an `outs_on_play` column into `model_input_fielding_credit`.
-
-**Model G's context-neutral linear weights are deferred on an estimand ambiguity, not a modeling gap.** The spec's headline context-neutral `P_LW` integrates the end-state value against the modeled marginal transition `P_LW(end | start)` rather than the realized end state. That estimand is ambiguous at the per-play-type grain, because `P_LW` is keyed on the start state alone and so cannot distinguish play types that share a start state <!-- src: notes/followups.md -->. The Markov submodel that would feed `P_LW` is built; only the estimand decision is open. Unblock condition: pin the context-neutral estimand precisely, or confirm the standard marginal linear-weights surface — built, published, and re-derived above — is the intended deliverable and drop the context-neutral variant from scope.
-
-**Model J's cell-grain summary model has a degenerate source-partial-pooling level.** `model_input_pitch_summary` is single-source — `source_family` and `source_type` each take exactly one distinct value in the modeling dataset — so a partial-pooling level over source is mathematically present in the model but carries no information <!-- src: notes/followups.md -->. Unblock condition: a dataset or SQL change that surfaces more than one source family into the pitch-summary modeling dataset.
+Future scientific promotion would require new artifact IDs, complete retained
+lineage and prior-predictive outputs, leakage-free grouped holdouts, calibration,
+source-block and era transport tests, and validation against data not used during
+development. The current paper instead reports the completed PBP candidate as an
+exploratory, assumption-labelled analysis layer and dates older model results to
+the evidence that produced them.

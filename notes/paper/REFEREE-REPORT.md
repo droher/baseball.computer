@@ -1,3 +1,5 @@
+> Historical internal drafting record. The [September 13 revision](REVISION-2026-09-13.md) and [current evidence ledger](EVIDENCE.md) supersede its status claims. This is not evidence of external journal review or submission.
+
 # Referee Report
 
 **Manuscript:** "Estimating the Unrecorded Game: Hierarchical Bayesian Coverage Models for a Century of Baseball Play-by-Play"
