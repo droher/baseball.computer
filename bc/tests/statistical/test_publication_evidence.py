@@ -187,6 +187,48 @@ def test_exploratory_publication_preserves_failed_validation(tmp_path: Path) -> 
         )
 
 
+def test_missing_declared_output_is_bound_as_unsupported_exploratory_evidence(
+    tmp_path: Path,
+) -> None:
+    path = _artifact(tmp_path, _dataset(tmp_path))
+    missing_output = path.parent / "removed-prior-predictive.nc"
+    write_manifest(
+        read_manifest(path).model_copy(
+            update={"output_paths": {"prior_predictive": missing_output}}
+        ),
+        path,
+    )
+    binding = bind_artifact(path)
+    assert any(
+        str(missing_output) in gap and "artifact output missing" in gap
+        for gap in binding.missing_provenance
+    )
+    report = assess_publication(
+        path,
+        candidate_roots=(),
+        exploratory_reason="Retained payload has incomplete legacy provenance",
+    )
+    assert report.status == "failed"
+    assert report.evidence.provenance == "unsupported"
+    with pytest.raises(ValueError, match="complete predictive evidence"):
+        save_publication_evidence(report, path, exploratory=False)
+    save_publication_evidence(report, path, exploratory=True)
+    verify_published_evidence(
+        path,
+        expected_binding=report.artifact_binding,
+        candidate_roots=(),
+        exploratory=True,
+    )
+    path.with_name("payload.txt").write_text("changed predictions")
+    with pytest.raises(ValueError, match="changed after validation"):
+        verify_published_evidence(
+            path,
+            expected_binding=report.artifact_binding,
+            candidate_roots=(),
+            exploratory=True,
+        )
+
+
 def test_empty_exploratory_reason_is_rejected(tmp_path: Path) -> None:
     path = _artifact(tmp_path, _dataset(tmp_path))
     with pytest.raises(ValueError, match="nonempty reason"):

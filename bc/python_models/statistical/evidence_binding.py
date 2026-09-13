@@ -124,7 +124,8 @@ def bind_artifact(
         for output in manifest.output_paths.values():
             resolved = output if output.is_absolute() else path.parent / output
             if not resolved.exists():
-                raise FileNotFoundError(f"artifact output missing: {resolved}")
+                missing.append(f"{identity}: artifact output missing: {resolved}")
+                continue
             if resolved.is_file():
                 files.add(resolved.resolve())
         for file in sorted(files):

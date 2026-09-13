@@ -80,6 +80,12 @@ def read_published_target_manifest(
     return pointer, manifest
 
 
+def resolve_manifest_output_path(manifest_path: Path, output_path: Path) -> Path:
+    return (
+        output_path if output_path.is_absolute() else manifest_path.parent / output_path
+    )
+
+
 def iterate_published_target_frames(
     sibling_manifest_name: SiblingManifestName,
 ) -> Iterator[pl.DataFrame]:
@@ -101,10 +107,12 @@ def iterate_published_target_frames(
                 spec.published_manifest_name(),
             )
             continue
-        _, manifest = read_published_target_manifest(
+        pointer, manifest = read_published_target_manifest(
             pointer_path, target_name=spec.name
         )
-        probabilities_path = manifest.output_paths["probabilities"]
+        probabilities_path = resolve_manifest_output_path(
+            pointer.manifest_path, manifest.output_paths["probabilities"]
+        )
         df = pl.read_parquet(str(probabilities_path))
         if df.height == 0:
             _log.info(

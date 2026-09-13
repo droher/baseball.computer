@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,11 @@ def _declared_min_row_counts() -> dict[str, int]:
                 if isinstance(key, ast.Constant)
             }
             declared[path.stem] = int(args["threshold"])
+    for path in sorted(COVERAGE_MODELS_DIR.glob("*.sql")):
+        text = path.read_text(encoding="utf-8")
+        match = re.search(r"min_row_count\s*\(\s*threshold\s*:=\s*(\d+)\s*\)", text)
+        if match is not None:
+            declared[path.stem] = int(match.group(1))
     return declared
 
 
@@ -118,6 +124,33 @@ def test_source_database_is_attached_read_only(script: Any, tmp_path: Path) -> N
 
     with pytest.raises(duckdb.InvalidInputException):
         _ = con.execute("CREATE TABLE bc.unexpected_write (id INTEGER)")
+
+
+def test_candidate_gate_refuses_missing_root(script: Any, tmp_path: Path) -> None:
+    con = duckdb.connect(":memory:")
+    with pytest.raises(SystemExit, match="invalid PBP imputation root"):
+        script.assert_pbp_candidate_ready(con, tmp_path / "missing")
+
+
+def test_candidate_gate_refuses_false_report(script: Any, tmp_path: Path) -> None:
+    source_path = tmp_path / "source.db"
+    source = duckdb.connect(str(source_path))
+    source.close()
+    root = tmp_path / "candidate"
+    root.mkdir()
+    con = duckdb.connect(":memory:")
+    script.attach_source_database(con, source_path)
+
+    captured: list[object] = []
+
+    def rejected(*args: object) -> dict[str, object]:
+        captured.extend(args)
+        return {"candidate_ready": False}
+
+    with pytest.raises(SystemExit, match="candidate validation failed"):
+        script.assert_pbp_candidate_ready(con, root, checker=rejected)
+    assert captured[2] == "main_models"
+    assert con.execute("SELECT current_database()").fetchone() == ("memory",)
 
 
 def test_publish_table_matches_read_only_source_rows(

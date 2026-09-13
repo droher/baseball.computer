@@ -1,6 +1,14 @@
 # Full-history PBP imputation completion plan
 
-Status: active scope and implementation plan. Updated September 13, 2026.
+Status: implementation complete; the full PBP development candidate passes reconciliation. Production release requires separate approval. Updated September 13, 2026.
+
+The [PBP completion interface](../docs/pbp-imputation.md) documents sixteen additive outputs and the reproducible read-only builder. The registry classifies 179 columns over ten source relations, including 116 completion targets. The full audit identifies null/sentinel gaps in 28 target fields and 35 affected targets when absent pitch blocks are included. Source parser statuses and optional absent actions remain distinct from missing baseball values.
+
+All eleven component families are built over 205,886 PBP games and 18,141,020 events from 1903–2025, including early derived-metric fallbacks. The independent full pitch audit passes all seventeen counters with no unflagged appearance violations. Grouped coverage reconciles every target by era, league, game type, and source type. The isolated SQLMesh candidate passes all sixteen consumer audits and the full publication validator, including exact component row counts, artifact identities, composite keys, and counter/appearance conservation. Evidence is retained under `artifacts/imputation/20260913-pbp-full-v1/validation`.
+
+All 24 legacy pointers have an isolated, explicitly exploratory migration with current failed/unsupported evidence preserved; the strict pointer checker passes and the original 48 manifest/pointer hashes match. The legacy geometry consumer maps the six angle-modifier labels to `location_angle`. Production data and canonical published pointers remain unchanged. The release bundle retains database, SQLMesh state, DuckLake catalog, and schema-packet rollback copies under `artifacts/imputation/release-candidate-v1/rollback`.
+
+The isolated production-promotion rehearsal passes all twelve legacy model audits and 56 consumer checks against the clone's `main_models` schema. The full PBP publication validator passes again after this rehearsal; 176 targeted tests and strict checks pass. The original production database SHA-256 remains unchanged. The candidate is ready for the reserved production-release approval.
 
 ## User objective
 
@@ -67,11 +75,11 @@ On September 13, 2026, the user resolved that this project covers PBP games only
 
 ## Delivery order
 
-1. **Coverage registry and baseline.** Inventory all applicable fields and absent row populations over the full PBP universe. Deliver machine-readable counts by field, era, league, source, and game type, with an implemented fallback or tracked implementation item for every gap. The broad family inventory above and PBP counts are complete; the exhaustive registry is not.
-2. **Complete-value interface and integrity repair.** Define the additive completed outputs and per-value provenance. Repair the published location-side target mismatch and migrate legacy artifact publication metadata. Restore needed retained evidence or version replacements; do not relabel historical `passed` stamps as current validation.
-3. **Historical fallback coverage.** Complete earlier-period geometry, contact normalization for both recorded and missing trajectory, missing personnel/context, and counters within PBP games. Use simple coherent priors first wherever no richer model is ready; improve estimates without changing consumer contracts.
-4. **Remaining event and pitch families.** Fill fielding/run responsibility, advancement, count and sequence gaps within actual PBP games, and enforce cross-field baseball constraints.
-5. **Whole-PBP reconciliation and release.** Check complete outputs across grains, report measured accuracy and uncertainty, retain reproducible artifacts/rollback inputs, and prepare the production release. Production data changes and publication follow the existing explicit approval boundary.
+1. **Coverage registry and baseline — complete.** All 116 targets have verified output/evidence mappings. The full baseline and era, league, source, and game-type breakdowns reconcile without mismatches.
+2. **Complete-value interface and integrity repair — implemented.** Sixteen completed surfaces preserve raw evidence, methods, and artifact identities. The geometry label repair and isolated 24-pointer migration preserve old evidence gaps rather than restamping old passes.
+3. **Historical fallback coverage — complete.** Full component builds cover the earliest available PBP games, earlier-period geometry standardization, missing context, and park/run/win-value fallbacks. Refining historical predictive accuracy remains separate.
+4. **Event and pitch families — complete.** Full fielding, runner, pitch, count, and rollup builds pass their integrity checks. Source contradictions retain explicit dispositions; completed and interrupted appearance counts reconcile.
+5. **Whole-PBP reconciliation and release — candidate verified, production approval pending.** Full-population candidate checks and grouped coverage pass. The recorded-context stress test reports how rough estimates can be. Reproducible artifacts and rollback inputs are retained. Production data changes and publication follow the existing explicit approval boundary.
 
 Use small real-data smoke slices spanning early PBP, pre-1989 sparse geometry, and modern records before full runs. Cache intermediate frames, log progress, and checkpoint long work. Select model complexity from demonstrated value; full-scale Bayesian or deep refitting is not a prerequisite for supplying a defensible broad estimate.
 

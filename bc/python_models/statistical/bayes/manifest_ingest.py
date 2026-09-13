@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable, Iterator, Sequence
+from typing import Final
 
 import duckdb
 import polars as pl
@@ -45,6 +46,10 @@ ESTIMATED_CONTRACT_COLUMNS: tuple[str, ...] = tuple(ESTIMATED_CONTRACT_SCHEMA.ke
 METHOD_HIERARCHICAL_BAYES_SOFTMAX = "hierarchical_bayes_softmax"
 METHOD_HIERARCHICAL_BAYES_NB = "hierarchical_bayes_nb"
 METHOD_HIERARCHICAL_LOGISTIC = "hierarchical_logistic"
+
+LEGACY_LOCATION_ANGLE_LABELS: Final = frozenset(
+    {"Default", "Foul", "FoulLine", "Left", "Middle", "Right"}
+)
 
 
 def stamp_estimated_contract(
@@ -661,6 +666,17 @@ def aggregate_ball_handler_frames() -> Iterator[pl.DataFrame]:
     )
 
 
+def geometry_dimension_for_export(df: pl.DataFrame, spec_dimension: str) -> str:
+    labels = frozenset(df.get_column("class_label").cast(pl.Utf8).unique().to_list())
+    if spec_dimension == "location_side" and labels == LEGACY_LOCATION_ANGLE_LABELS:
+        _log.warning(
+            "bayes.manifest_ingest: legacy location_side artifact has angle "
+            "modifier labels; exposing geometry_dimension=location_angle"
+        )
+        return "location_angle"
+    return spec_dimension
+
+
 def _build_geometry_frame(
     df: pl.DataFrame, manifest: ArtifactManifest, spec: BayesTargetSpec
 ) -> pl.DataFrame:
@@ -675,11 +691,10 @@ def _build_geometry_frame(
                 f"geometry_dimension={exported_dimensions!r}; expected "
                 f"{spec.dimension!r}"
             )
-        dimension_expr = pl.col("geometry_dimension").cast(pl.Utf8)
-    else:
-        dimension_expr = pl.lit(spec.dimension, dtype=pl.Utf8).alias(
-            "geometry_dimension"
-        )
+    resolved_dimension = geometry_dimension_for_export(df, spec.dimension)
+    dimension_expr = pl.lit(resolved_dimension, dtype=pl.Utf8).alias(
+        "geometry_dimension"
+    )
     out = df.with_columns(
         pl.col("event_key").cast(pl.UInt32),
         dimension_expr,

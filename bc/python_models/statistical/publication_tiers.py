@@ -37,6 +37,22 @@ _ESTIMATED_MODELS: tuple[str, ...] = (
     "assist_count_distribution",
     "air_trajectory_translation",
     "standardized_air_trajectory",
+    "pbp_completed_game_context",
+    "pbp_completed_geometry",
+    "pbp_completed_pitches",
+    "pbp_completed_runners",
+    "pbp_completed_fielding_plays",
+    "pbp_completed_officials",
+    "pbp_completed_events",
+    "pbp_completed_games",
+    "pbp_completed_pitch_items",
+    "pbp_completed_pitch_totals",
+    "pbp_completed_fielding_totals",
+    "pbp_completed_event_values",
+    "pbp_completed_park_factors",
+    "pbp_completed_run_expectancy",
+    "pbp_completed_state_transitions",
+    "pbp_completed_linear_weights",
 )
 
 

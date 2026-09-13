@@ -18,6 +18,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ZONE_ID:   ${{ secrets.CLOUDFLARE_ZONE_ID }}
       BC_STATS_ARTIFACTS_ROOT: ${{ vars.BC_STATS_ARTIFACTS_ROOT }}
+      BC_PBP_IMPUTATION_ROOT: ${{ vars.BC_PBP_IMPUTATION_ROOT }}
     steps:
       - uses: actions/checkout@v4
 

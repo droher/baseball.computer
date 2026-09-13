@@ -23,10 +23,12 @@ from python_models.statistical.deep.manifest_ingest import (
     PROPOSAL_MANIFEST_SCHEMA,
     aggregate_proposal_manifest_frames,
     read_published_target_manifest,
+    resolve_manifest_output_path,
 )
 from python_models.statistical.deep.registry import get_target
 from python_models.statistical.manifests import (
     package_versions,
+    read_manifest,
     write_manifest,
     write_published_pointer,
 )
@@ -215,6 +217,35 @@ def test_relative_pointer_resolves_from_artifacts_root(
 
     frames = list(aggregate_proposal_manifest_frames("dl_proposal_manifest"))
     assert frames[0]["dl_artifact_id"].to_list() == ["aid-relative-1"]
+
+
+def test_resolves_relative_probabilities_from_manifest_parent(tmp_path: Path) -> None:
+    manifest_path = _write_artifact(
+        tmp_path / "deep",
+        target_name="geometry_trajectory",
+        artifact_id="aid-relative-probabilities",
+        event_keys=[42],
+        dl_p_class=[[0.8, 0.1, 0.1]],
+    )
+    manifest = read_manifest(manifest_path)
+    relative_manifest = manifest.model_copy(
+        update={
+            "output_paths": {
+                **manifest.output_paths,
+                "probabilities": Path("exports/probabilities.parquet"),
+            }
+        }
+    )
+    write_manifest(relative_manifest, manifest_path)
+
+    relative_path = resolve_manifest_output_path(
+        manifest_path, read_manifest(manifest_path).output_paths["probabilities"]
+    )
+    absolute_path = manifest.output_paths["probabilities"]
+
+    assert relative_path == manifest_path.parent / "exports" / "probabilities.parquet"
+    assert resolve_manifest_output_path(manifest_path, absolute_path) == absolute_path
+    assert pl.read_parquet(relative_path)["event_key"].to_list() == [42]
 
 
 def test_reader_rejects_pointer_artifact_id_mismatch(tmp_path: Path) -> None:

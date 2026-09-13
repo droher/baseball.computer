@@ -20,10 +20,12 @@ from __future__ import annotations
 import argparse
 import contextlib
 import logging
+import os
 import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import duckdb
@@ -40,6 +42,7 @@ from python_models.metrics.registry import (
     MetricSource,
     metrics_for,
 )
+from python_models.imputation.candidate_validation import validate_candidate
 from python_models.metrics.sql_render import (
     MacroSpec,
     MetricSlice,
@@ -82,6 +85,22 @@ ESTIMATED_ROW_COUNT_FLOORS: dict[str, int] = {
     "assist_count_distribution": 100,
     "air_trajectory_translation": 1_000,
     "standardized_air_trajectory": 1_000_000,
+    "pbp_completed_game_context": 1,
+    "pbp_completed_geometry": 1,
+    "pbp_completed_pitches": 1,
+    "pbp_completed_runners": 1,
+    "pbp_completed_fielding_plays": 1,
+    "pbp_completed_officials": 1,
+    "pbp_completed_events": 1,
+    "pbp_completed_games": 1,
+    "pbp_completed_pitch_items": 1,
+    "pbp_completed_pitch_totals": 1,
+    "pbp_completed_fielding_totals": 1,
+    "pbp_completed_event_values": 1,
+    "pbp_completed_park_factors": 1,
+    "pbp_completed_run_expectancy": 1,
+    "pbp_completed_state_transitions": 1,
+    "pbp_completed_linear_weights": 1,
 }
 COMPRESSION = "zstd"
 ROW_GROUP_SIZE = "1966080"
@@ -116,6 +135,53 @@ def attach_source_database(con: duckdb.DuckDBPyConnection, source_path: Path) ->
     _ = con.execute(
         f"ATTACH '{sql_literal(str(source_path.resolve()))}' AS bc (READ_ONLY)"
     )
+
+
+def pbp_imputation_root() -> Path:
+    configured = os.environ.get("BC_PBP_IMPUTATION_ROOT")
+    if not configured:
+        raise SystemExit("BC_PBP_IMPUTATION_ROOT is required before publishing")
+    root = Path(configured)
+    if not root.is_absolute():
+        raise SystemExit("BC_PBP_IMPUTATION_ROOT must be an absolute path")
+    if not root.is_dir():
+        raise SystemExit(f"BC_PBP_IMPUTATION_ROOT does not exist: {root}")
+    return root
+
+
+def assert_pbp_candidate_ready(
+    con: duckdb.DuckDBPyConnection,
+    root: Path,
+    *,
+    checker: Callable[..., dict[str, object]] = validate_candidate,
+) -> dict[str, object]:
+    if not root.is_absolute() or not root.is_dir():
+        raise SystemExit(f"invalid PBP imputation root: {root}")
+    row = con.execute("SELECT current_database()").fetchone()
+    if row is None or not isinstance(row[0], str):
+        raise SystemExit("unable to determine current database before validation")
+    previous = row[0]
+    try:
+        _ = con.execute("USE bc")
+        try:
+            report = checker(
+                con,
+                root,
+                "main_models",
+                root / "validation" / "pitch" / "pitch_validation.json",
+                root / "validation" / "grouped" / "coverage_breakdown.json",
+            )
+        except (OSError, ValueError, duckdb.Error) as error:
+            raise SystemExit(
+                f"PBP imputation candidate validation failed: {error}"
+            ) from error
+    finally:
+        _ = con.execute(f'USE "{previous.replace(chr(34), chr(34) * 2)}"')
+    if report.get("candidate_ready") is not True:
+        raise SystemExit(
+            "PBP imputation candidate validation failed; refusing to publish"
+        )
+    return report
 
 
 _LIST_TABLES_SQL = (
@@ -218,7 +284,8 @@ def assert_estimated_tables_populated(
         listing = "\n  ".join(short)
         raise SystemExit(
             "estimated tables below their row-count floor; refusing to publish."
-            + " Check that BC_STATS_ARTIFACTS_ROOT resolved the published pointers"
+            + " Check that BC_STATS_ARTIFACTS_ROOT and BC_PBP_IMPUTATION_ROOT resolved"
+            + " the published pointers and completion artifacts"
             + f" before the SQLMesh plan.\n  {listing}"
         )
     return counts
@@ -516,12 +583,14 @@ def publish() -> None:
     if not BC_DB.exists():
         raise SystemExit(f"source database not found: {BC_DB}")
     data_version = read_data_version()
+    imputation_root = pbp_imputation_root()
     _log.info("publishing DATA_VERSION=%s from %s", data_version, BC_DB)
     bc_db_abs = str(BC_DB.resolve())
 
     with contextlib.chdir(BC_DIR):
         con = duckdb.connect(":memory:")
         attach_source_database(con, Path(bc_db_abs))
+        _ = assert_pbp_candidate_ready(con, imputation_root)
         _ = assert_estimated_tables_populated(con)
         attach_catalog(con, data_version=data_version)
         set_catalog_options(con)
