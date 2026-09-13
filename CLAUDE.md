@@ -17,6 +17,7 @@ Dev work targets `bc_dev.db` + `bc/bc_state_dev.db`; prod targets `bc.db` + `bc/
 
 ## Where to find more
 
+- [Documentation guide](docs/README.md) — operations, modeling, schema context, research notes, and handoffs.
 - `.claude/rules/sqlmesh.md` — SQLMesh project conventions, the DEV_ONLY trap, per-branch envs, source-table layout.
 - `.claude/rules/performance.md` — `BC_*` env vars and tuning.
 - `bc/python_models/ml/CLAUDE.md` — Keras + MLflow training pipeline conventions.
