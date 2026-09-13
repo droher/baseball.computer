@@ -1,4 +1,4 @@
-# Full-history imputation completion plan
+# Full-history PBP imputation completion plan
 
 Status: active scope and implementation plan. Updated September 13, 2026.
 
@@ -6,25 +6,26 @@ Status: active scope and implementation plan. Updated September 13, 2026.
 
 The user clarified: "full imputation across mlb history for all of the fields" and "fine with estimates being as rough as they need to be."
 
-The completion target is full historical coverage of applicable baseball fields with the best available estimate. Closing only the currently populated estimated tables, stopping at 1910 or 1989, or indefinitely withholding estimates because historical prediction is weak does not meet this objective. This supersedes the narrower completion proposal and the original 1910–2025 scope. Existing experiment results remain evidence with their original limitations.
+The completion target is full historical coverage of applicable baseball fields for games with a play-by-play event spine, using the best available estimate. Closing only the currently populated estimated tables, stopping at 1910 or 1989, or indefinitely withholding estimates because historical prediction is weak does not meet this objective. This supersedes the narrower completion proposal and the original 1910–2025 scope for PBP games. Existing experiment results remain evidence with their original limitations. Box-score and season-based imputation is a separate project.
 
 An estimate can be a broad historical prior, an expected count, a probability distribution, or a reproducibly sampled reconstruction. Poor historical accuracy must be disclosed and measured where possible; it is not by itself a reason to leave an applicable target without an estimate. Roughness does not permit contradictory counts, impossible sequences, invented source provenance, or estimates presented as recorded facts.
 
 ## Historical population
 
-Start from the union of available game, schedule, roster, box-score, and season sources, reconciled by identity. Cover the earliest supported season through the latest ingested season; the current game catalog spans 1871–2025. Remove the implicit 1910 lower bound from the completion contract, while retaining appropriate bounds on each training population. Do not substitute an invented game list for absent historical evidence. Reconcile the catalog against schedule and season sources and report remaining population discrepancies.
+Start from games whose canonical source is `source_type = 'PlayByPlay'`, using schedule, roster, box-score, and season sources only as evidence or constraints for those games. Cover the earliest available PBP season through the latest ingested season; the current PBP population is 1903–2025, 205,886 games and 18,141,020 event rows. Aggregate-only games are explicitly outside this project. Do not substitute an invented game list or synthetic event history for absent PBP. Reconcile the PBP catalog against schedule and season sources and report remaining population discrepancies.
 
-Include the historical leagues represented by the project's major-league taxonomy, including Negro Leagues, and account explicitly for each game type. Training on regular-season games does not establish equivalent evidence for postseason or other game types. Keep those applications in the output with a declared basis rather than silently dropping them. Historical rule regimes govern applicability and legal transitions; modern ball/strike and game rules cannot be imposed across the whole history.
+Include the historical leagues represented by the project's major-league taxonomy, including Negro Leagues, and account explicitly for each PBP game type. Training on regular-season games does not establish equivalent evidence for postseason or other game types. Keep those applications in the output with a declared basis rather than silently dropping them. Historical rule regimes govern applicability and legal transitions; modern ball/strike and game rules cannot be imposed across the whole history.
 
-Read-only baseline from `bc.db`, September 13, 2026, over all catalogued game types:
+Read-only baseline from `bc.db`, September 13, 2026, restricted to PBP games:
 
-| Period | Play-by-play games | Box-score games | Gamelog games | Existing event rows |
-| --- | ---: | ---: | ---: | ---: |
-| Before 1910 | 41 | 13,719 | 17,880 | 3,262 |
-| 1910–1988 | 119,294 | 1,953 | 4 | 10,305,280 |
-| 1989–2025 | 86,551 | 0 | 0 | 7,832,478 |
+| Period | Play-by-play games | Existing event rows |
+| --- | ---: | ---: |
+| Before 1910 | 41 | 3,262 |
+| 1910–1988 | 119,294 | 10,305,280 |
+| 1989–2025 | 86,551 | 7,832,478 |
+| **Total** | **205,886** | **18,141,020** |
 
-These are source-catalog counts, not proof that every historically played game has been acquired. The source breakdown comes from `main_models.game_start_info` grouped by period and `source_type`; event counts come from `main_models.event_states_full` grouped by period. Existing statistical defaults are 1910–2025 in `bc/config.py` and `bc/python_models/statistical/config.py`.
+These are source-catalog counts, not proof that every historically played game has been acquired. The counts come from `main_models.game_start_info` and `main_models.event_states_full`, filtered to `source_type = 'PlayByPlay'` and grouped by period. Existing statistical defaults remain 1910–2025 in `bc/config.py` and `bc/python_models/statistical/config.py`; the completion population for this plan is broader because it follows the available PBP spine.
 
 ## Field contract and consumer outputs
 
@@ -48,37 +49,35 @@ No tier may require a covariate that is itself absent without defining its fallb
 
 | Family | Existing foundation | Completion work |
 | --- | --- | --- |
-| Game conditions and exposure | Game/source/context/exposure ledgers; game and line-score models | Estimate applicable missing time, attendance, weather, park/context and exposure fields; cover aggregate-only games and historical rules. |
-| People, participation, and lineups | Rosters, biographies, personnel states, appearances, synthetic lineup optimizer | Complete missing eligible participant assignments and lineup/substitution states; propagate uncertain identities instead of treating them as hard eligibility facts. |
-| Game/player/season counters | Event, box-score, gamelog, and season-source rollups | Estimate missing batting, pitching, and fielding totals; reconcile known totals across grains and explicitly disposition conflicts. |
-| Event outcomes and state | Event spine and state reconstruction | Complete gaps within existing plays and reconstruct legal state transitions without changing recorded outcomes. Whole absent event streams depend on the decision below. |
+| Game conditions and exposure | Game/source/context/exposure ledgers; game and line-score models | Estimate applicable missing time, attendance, weather, park/context and exposure fields for PBP games; preserve historical rules. |
+| People, participation, and lineups | Rosters, biographies, personnel states, and appearances; the synthetic lineup optimizer is retained as historical evidence only | Complete missing eligible participant assignments and lineup/substitution states within PBP games; propagate uncertain identities instead of treating them as hard eligibility facts. |
+| Game/player/season counters | Event rollups, constrained by box-score and season sources where available | Estimate missing batting, pitching, and fielding totals for PBP games; reconcile known totals across grains and explicitly disposition conflicts. Filling absent games from aggregate sources is separate. |
+| Event outcomes and state | Event spine and state reconstruction | Complete gaps within existing PBP plays and reconstruct legal state transitions without changing recorded outcomes. Absent event streams are out of scope. |
 | Fielding credit and run attribution | Putout/assist allocation, handler probabilities, official credit authority, run assignment | Finish errors, multi-fielder chains, earned-run and pitcher responsibility, and no-box fallbacks; retain the distinction between official credit and analytical responsibility. |
 | Contact geometry | Existing geometry posteriors, corrected target ledger, airborne translation | Correct the old location-side artifact semantics; cover depth, side, angle, edge, strength, general location, trajectory, and normalized categories throughout history, including missing recorded trajectory. |
-| Pitches and counts | Parsed sequence/status/issues, pitch summaries, smoke-tested count observedness | Complete per-event counts, pitch results, strike types, sequence lengths, and other applicable pitch fields; preserve known subsequences and mark reconstructed portions. Whole-sequence generation depends on the decision below. |
+| Pitches and counts | Parsed sequence/status/issues, pitch summaries, smoke-tested count observedness | Complete per-event counts, pitch results, strike types, sequence lengths, and other applicable pitch fields within actual PBP games; preserve known subsequences and mark reconstructed portions. |
 | Runner advancement and defensive responsibility | Advancement builder, observed baserunner states, geometry/handler models | Publish advancement estimates, complete missing runner outcomes and responsibility distributions, and carry geometry/personnel uncertainty forward. |
-| Park/run values and downstream metrics | Park factors, run expectancy, transitions, estimated linear weights | Extend fallback coverage to every applicable historical slice and recompute complete analysis metrics with denominators and uncertainty. |
+| Park/run values and downstream metrics | Park factors, run expectancy, transitions, estimated linear weights | Extend fallback coverage to every applicable PBP slice and recompute complete analysis metrics with denominators and uncertainty. |
 
 This family list guides implementation but is not the exhaustive field registry. No field family is deferred merely because its estimate will be crude.
 
-## Decision awaiting the user
+## Resolved scope decision
 
-For games with only box scores or final scores and no play-by-play, should completion include synthetic plays and pitch sequences, or complete only game/player totals while leaving the unrecorded sequence absent? The question was submitted on September 13, 2026. There is no default authorization from elapsed time; event-stream generation for aggregate-only games waits for the answer.
-
-Both choices require full aggregate coverage and the same per-field accounting. If synthetic histories are included, they need a separate generated-event identity, reproducible random seed/draw identity, historical rule state, and reconciliation to known game, inning, player, and season constraints. If sequence generation is excluded, the finished contract must explicitly report that aggregate-only games have completed totals but no generated event history.
+On September 13, 2026, the user resolved that this project covers PBP games only. Do not generate synthetic plays or pitch sequences for games lacking PBP, and do not fill those games from box-score or season aggregates. Box totals, rosters, and season context may constrain estimates for games that do have PBP. Box-score and season-based imputation, including aggregate-only games, is a separate project.
 
 ## Delivery order
 
-1. **Coverage registry and baseline.** Inventory all applicable fields and absent row populations over the full historical universe. Deliver machine-readable counts by field, era, league, source, and game type, with an implemented fallback or tracked implementation item for every gap. The broad family inventory above and game counts are complete; the exhaustive registry is not.
+1. **Coverage registry and baseline.** Inventory all applicable fields and absent row populations over the full PBP universe. Deliver machine-readable counts by field, era, league, source, and game type, with an implemented fallback or tracked implementation item for every gap. The broad family inventory above and PBP counts are complete; the exhaustive registry is not.
 2. **Complete-value interface and integrity repair.** Define the additive completed outputs and per-value provenance. Repair the published location-side target mismatch and migrate legacy artifact publication metadata. Restore needed retained evidence or version replacements; do not relabel historical `passed` stamps as current validation.
-3. **Historical fallback coverage.** Complete earlier-period geometry, contact normalization for both recorded and missing trajectory, missing personnel/context, and aggregate counters. Use simple coherent priors first wherever no richer model is ready; improve estimates without changing consumer contracts.
-4. **Remaining event and pitch families.** Fill fielding/run responsibility, advancement, count and sequence gaps. Integrate the aggregate-only history decision and enforce cross-field baseball constraints.
-5. **Whole-history reconciliation and release.** Check complete outputs across grains, report measured accuracy and uncertainty, retain reproducible artifacts/rollback inputs, and prepare the production release. Production data changes and publication follow the existing explicit approval boundary.
+3. **Historical fallback coverage.** Complete earlier-period geometry, contact normalization for both recorded and missing trajectory, missing personnel/context, and counters within PBP games. Use simple coherent priors first wherever no richer model is ready; improve estimates without changing consumer contracts.
+4. **Remaining event and pitch families.** Fill fielding/run responsibility, advancement, count and sequence gaps within actual PBP games, and enforce cross-field baseball constraints.
+5. **Whole-PBP reconciliation and release.** Check complete outputs across grains, report measured accuracy and uncertainty, retain reproducible artifacts/rollback inputs, and prepare the production release. Production data changes and publication follow the existing explicit approval boundary.
 
-Use small real-data smoke slices spanning early aggregate-only history, early play-by-play, pre-1989 sparse geometry, and modern records before full runs. Cache intermediate frames, log progress, and checkpoint long work. Select model complexity from demonstrated value; full-scale Bayesian or deep refitting is not a prerequisite for supplying a defensible broad estimate.
+Use small real-data smoke slices spanning early PBP, pre-1989 sparse geometry, and modern records before full runs. Cache intermediate frames, log progress, and checkpoint long work. Select model complexity from demonstrated value; full-scale Bayesian or deep refitting is not a prerequisite for supplying a defensible broad estimate.
 
 ## Acceptance criteria
 
-- Every applicable field and historical population in the registry has an observed value, deterministic derivation, probability/expectation, or clearly marked generated value. No applicable gap silently disappears through a date filter, missing join, sentinel, empty artifact, or absent row.
+- Every applicable field and PBP population in the registry has an observed value, deterministic derivation, probability/expectation, or clearly marked generated value. No applicable gap silently disappears through a date filter, missing join, sentinel, empty artifact, or absent row.
 - Genuine non-applicability, unresolved source identity, and contradictory evidence are reported explicitly with their chosen treatment. They do not become unexamined ways to exclude difficult baseball quantities.
 - Recorded facts and authoritative constraints are preserved. Conflicting sources receive a documented authority disposition rather than forcing mutually inconsistent totals to match.
 - Estimates satisfy their joint constraints: nonnegative counts, valid probability distributions, eligible participants or explicit unresolved slots, historical rule legality, outs/base/score continuity, and known aggregate totals.
@@ -86,11 +85,12 @@ Use small real-data smoke slices spanning early aggregate-only history, early pl
 - Uncertainty distinguishes fitted variation from assumed historical transport. Wide intervals or prior-only distributions are acceptable; narrow intervals conditional on strong assumptions must not be sold as total uncertainty.
 - Complete analysis views expose source and estimate contributions and propagate them into derived metrics. Official-only views remain available.
 - Completion is verified against the exact released artifacts and materialized outputs, not merely the existence of model code or an old checklist.
+- The registry and completed outputs cover only the PBP population in this plan. Downstream rollups computed from completed PBP are in scope; filling absent games from box-score or season aggregates is outside this plan.
 
 ## Evidence retained from the current inventory
 
 The local production database has 14 estimated output tables, of which 12 are populated; advancement and pitch-count coverage are empty. Sampled rows from each populated table carry `confidence_status='exploratory'`. The published location-side artifact remains `e-v12-noprop-location_side-zero` with angle-modifier categories. The current pointer checker stops at `published/assist_count.json` because its publication evidence policy is absent; legacy manifests also reference removed `prior_predictive.nc` files. These are implementation/integrity gaps, separate from the user's acceptance of rough historical estimates.
 
-The airborne-only research thread remains closed under its accepted assumptions. Extending coverage is authorized by this broader objective; reopening its failed validation experiments or consuming sealed confirmation data is not necessary to begin. Frozen protocols, datasets, and historical reports retain their original meaning and are not rewritten to claim a pass.
+The airborne-only research thread remains closed under its accepted assumptions. Extending coverage is authorized by this broader objective; reopening its failed validation experiments or consuming sealed confirmation data is not necessary to begin. Frozen protocols, datasets, and historical reports retain their original meaning and are not rewritten to claim a pass. Aggregate-only games and box/season-only imputation remain outside this plan.
 
 See the [estimated output reference](../docs/estimated-models.md), [evidence contract](../docs/modeling-evidence-contract.md), [geometry handoff](../docs/geometry-modeling-handoff.md), and [original coverage design](data-coverage-implementation/README.md) for reusable implementation and historical evidence.

@@ -43,7 +43,7 @@ Start with the [documentation guide](docs/README.md) for the complete map.
 
 - [Model and column reference](https://docs.baseball.computer)
 - [Modeling contracts, protocols, and results](docs/modeling/README.md)
-- [Full-history imputation completion plan](notes/full-history-imputation-plan.md)
+- [Full-history PBP imputation completion plan](notes/full-history-imputation-plan.md)
 - [Production publication and verification](docs/ducklake-production.md)
 - [LLM schema context](docs/llm/README.md)
 - [Research notes and implementation plans](notes/README.md)

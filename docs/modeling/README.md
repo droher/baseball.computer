@@ -6,7 +6,7 @@ This index is a map of the modeling documentation in `docs/`. Start with the rea
 
 For the broader project framing and dependency order, see the [data coverage implementation plan](../../notes/data-coverage-implementation/README.md). For the currently described estimated output tables, see [Estimated Models — Reference](../estimated-models.md).
 
-The current completion objective is [full-history imputation](../../notes/full-history-imputation-plan.md): all applicable baseball fields across the historical catalog, accepting explicitly rough estimates. It supersedes the original date-limited scope and the proposal to close around existing outputs. The plan separates complete coverage from evidence about prediction quality and records the pending decision on synthetic event histories.
+The current completion objective is [full-history PBP imputation](../../notes/full-history-imputation-plan.md): all applicable baseball fields for the available play-by-play game population, accepting explicitly rough estimates. It excludes aggregate-only games and synthetic histories for games without PBP; box-score and season-based imputation is a separate project. The plan separates complete coverage from evidence about prediction quality.
 
 ## Continue an existing modeling thread
 

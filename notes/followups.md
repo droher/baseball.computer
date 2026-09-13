@@ -2,9 +2,9 @@
 
 Operational items that don't block deployment but deserve a home.
 
-## Full-history imputation objective — 2026-09-13
+## Full-history PBP imputation objective — 2026-09-13
 
-The user wants full imputation across MLB history for all fields and accepts estimates as rough as necessary. The [current completion plan](full-history-imputation-plan.md) supersedes the original 1910–2025 scope and a proposed closeout limited to existing outputs. Coverage extends to the available historical universe (the current game catalog begins in 1871), with explicit fallbacks and separate observed/derived/estimated values. An exhaustive field registry, earlier-history and remaining field-family coverage, a complete analysis interface, and production artifact integrity remain required. Whether aggregate-only games should receive synthetic plays and pitch sequences awaits the user's answer. The plan records the live baseline and distinguishes coverage work from optional improvements in predictive accuracy.
+The user wants full imputation across MLB history for all fields and accepts estimates as rough as necessary. The [current completion plan](full-history-imputation-plan.md) now covers only the available play-by-play population: 205,886 games and 18,141,020 event rows from 1903–2025. Aggregate-only games are excluded; the user resolved that this project must not generate synthetic plays or pitch sequences for games lacking PBP, and box-score or season-based imputation is a separate project. Box totals, rosters, and season context may constrain estimates for PBP games. An exhaustive field registry, remaining field-family coverage, a complete analysis interface, and production artifact integrity remain required. The plan distinguishes coverage work from optional improvements in predictive accuracy.
 
 The publication integrity issues recorded there do block a clean release under the current artifact checker: old pointers lack publication evidence policy, and the location-side estimate still uses obsolete angle semantics. They must not be treated as resolved by accepting rough estimates. Older status and next-step entries below are historical and may be superseded.
 

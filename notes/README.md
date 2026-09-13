@@ -9,7 +9,7 @@ proposal or handoff is not evidence that its implementation is still pending.
 ## Follow-ups and implementation
 
 - [Open follow-ups](followups.md): the shared backlog and recorded dispositions.
-- [Full-history imputation completion plan](full-history-imputation-plan.md): current all-fields historical scope, fallback policy, baseline, and delivery order.
+- [Full-history PBP imputation completion plan](full-history-imputation-plan.md): current all-fields play-by-play scope, fallback policy, baseline, and delivery order.
 - [Data coverage implementation plan](data-coverage-implementation/README.md): the six-phase plan and its detailed contracts.
 - [Implementation checklist](data-coverage-implementation/implementation-checklist.md) and [implementation review](data-coverage-implementation/implementation-review.md): progress and review evidence for that plan.
 - [Modeling documentation](../docs/modeling/README.md): contracts, protocols, and dated experiment reports.
