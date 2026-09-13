@@ -6,6 +6,8 @@ This index is a map of the modeling documentation in `docs/`. Start with the rea
 
 For the broader project framing and dependency order, see the [data coverage implementation plan](../../notes/data-coverage-implementation/README.md). For the currently described estimated output tables, see [Estimated Models — Reference](../estimated-models.md).
 
+The current completion objective is [full-history imputation](../../notes/full-history-imputation-plan.md): all applicable baseball fields across the historical catalog, accepting explicitly rough estimates. It supersedes the original date-limited scope and the proposal to close around existing outputs. The plan separates complete coverage from evidence about prediction quality and records the pending decision on synthetic event histories.
+
 ## Continue an existing modeling thread
 
 The [geometry modeling handoff](../geometry-modeling-handoff.md) is the continuation entrypoint for the airborne recording-regime work. It collects the current thread, boundaries, artifacts, and next decisions. It is a handoff document, not an independent assertion that the scientific work is ready.

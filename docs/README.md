@@ -10,6 +10,7 @@
 | Query tables and metrics | [Published model reference](https://docs.baseball.computer), [semantic layer guide](../bc/semantic/CLAUDE.md), and [LLM schema context](llm/README.md) |
 | Publish or verify production | [DuckLake publication](ducklake-production.md) and [script guide](../scripts/CLAUDE.md) |
 | Understand estimated data | [Estimated-model guide](estimated-models.md) and [modeling documentation](modeling/README.md) |
+| Complete historical imputation | [Full-history completion plan](../notes/full-history-imputation-plan.md) |
 | Continue geometry research | [Geometry handoff](geometry-modeling-handoff.md), then its linked protocols and results |
 | Find plans, investigations, or writing | [Research notes](../notes/README.md) |
 | Pick up outstanding work | [Follow-ups](../notes/followups.md) |

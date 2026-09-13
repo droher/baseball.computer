@@ -2,6 +2,12 @@
 
 Operational items that don't block deployment but deserve a home.
 
+## Full-history imputation objective — 2026-09-13
+
+The user wants full imputation across MLB history for all fields and accepts estimates as rough as necessary. The [current completion plan](full-history-imputation-plan.md) supersedes the original 1910–2025 scope and a proposed closeout limited to existing outputs. Coverage extends to the available historical universe (the current game catalog begins in 1871), with explicit fallbacks and separate observed/derived/estimated values. An exhaustive field registry, earlier-history and remaining field-family coverage, a complete analysis interface, and production artifact integrity remain required. Whether aggregate-only games should receive synthetic plays and pitch sequences awaits the user's answer. The plan records the live baseline and distinguishes coverage work from optional improvements in predictive accuracy.
+
+The publication integrity issues recorded there do block a clean release under the current artifact checker: old pointers lack publication evidence policy, and the location-side estimate still uses obsolete angle semantics. They must not be treated as resolved by accepting rough estimates. Older status and next-step entries below are historical and may be superseded.
+
 ## Seed corrections — 2026-09-11
 
 **Franchise seed and game-type overrides** (the Guardians row, the 1925/1927 Memphis, 1929 American Negro League, and 1931 Louisville league spans in `seed_franchises`, and `seed_game_type_overrides` for ten 1941 to 1942 barnstorming and all-star games) landed in `bc.db` with the 2026-09-12 full rebuild.
