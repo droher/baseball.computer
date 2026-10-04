@@ -5,4 +5,4 @@
 - Training is offline. Run `scripts/train_<name>.py` to produce the artifact JSON at `bc/python_models/ml/artifacts/<name>.json`.
 - The `predictions_<target>.py` `@model` gates on `artifact_exists(target)`, so a fresh prod plan skips untrained targets cleanly. Don't break this gate.
 - Predictions stream via DuckDB Arrow `to_batches` with `_BATCH_ROWS=500_000`.
-- ML deps live in the `ml` uv group (`apache-hamilton`, `mlflow`, `keras`, `torch`, `scikit-learn`). Mutually exclusive with the `bsl` group — don't try to install both into the same env.
+- ML deps live in the `ml` uv group (`apache-hamilton`, `mlflow`, `keras`, `torch`, `scikit-learn`).

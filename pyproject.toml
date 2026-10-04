@@ -26,8 +26,8 @@ dev = [
     "hypothesis>=6.168.0",
     "pytest>=9.1.1",
 ]
-# SQLMesh + Ibis build engine. boring-semantic-layer (in `bsl`) pins an
-# incompatible sqlglot, so the groups are mutually exclusive.
+# SQLMesh + Ibis build engine. boring-semantic-layer (in `bsl`) newer than
+# 0.3.16 needs ibis<12, which this group's ibis>=12 excludes.
 build = [
     "ibis-framework[duckdb]>=12.0",
     "polars>=1.31",
