@@ -39,4 +39,5 @@ docs/llm/baseball.lsf
 .gemini
 .opencode
 AGENTS.md
-GEMINI.mdbc/.tmp/
+GEMINI.md
+bc/.tmp/
