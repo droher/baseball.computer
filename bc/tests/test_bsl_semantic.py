@@ -48,31 +48,17 @@ def pitching_event_table(con):
 
 
 def test_dimensions_and_calc_classification(offense):
-    """BSL must classify ratio + composite metrics as [calc] and pure
-    aggregations as [base]. This is the introspection-graph invariant
-    the LLM/MCP tooling relies on.
-
-    BSL flags any BinOp it sees during introspection as calc — that
-    includes our ``numerator/denominator`` Metric form (e.g. OBP, SLG,
-    BA), since those resolve to a division. Only pure aggregations
-    (e.g. ``SUM(col)`` formulas) and the secondary_average-style
-    aggregate-of-arithmetic ratios stay base.
-    """
     base = set(offense.get_measures())
     calc = set(offense.get_calculated_measures())
 
     # Sanity overlap check: no measure can be both.
     assert not (base & calc), f"measures both base+calc: {base & calc}"
 
-    # Derived (Metric.derived) and ratio-shaped metrics show up as calc.
-    for name in (
-        "on_base_plus_slugging",
-        "isolated_power",
-        "on_base_percentage",
-        "slugging_percentage",
-        "batting_average",
-    ):
+    for name in ("on_base_plus_slugging", "isolated_power"):
         assert name in calc, f"{name!r} should be a calc measure"
+
+    for name in ("on_base_percentage", "slugging_percentage", "batting_average"):
+        assert name in base, f"{name!r} should be a base measure"
 
     # Sanity: the union covers every metric we registered for this
     # (kind, source). Anything missing means BSL silently dropped a
