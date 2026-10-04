@@ -77,7 +77,7 @@ If a downstream wants predictions, add `download_parquet` to the predictions `@m
 
 ### Hamilton dependency upgrade path
 
-`apache-hamilton` 1.90 resolves alongside SQLMesh 0.234 cleanly. Watch for sqlglot pin conflicts on future Hamilton upgrades. Same constraint story as `boring-semantic-layer` could appear.
+`apache-hamilton` 1.90 resolves alongside SQLMesh 0.236 cleanly. Watch for sqlglot pin conflicts on future Hamilton upgrades. Same constraint story as `boring-semantic-layer` could appear.
 
 ## Audits
 
