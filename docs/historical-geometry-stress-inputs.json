@@ -1,9 +1,0 @@
-{
-  "profile_root": "artifacts/statistical/backtests/historical_stress/20260911-profile-v2",
-  "profile_manifest_sha256": "ef2e134a26270d7ff9fc3fba84d67cf6fe1c1e4d10f8e63d3263bc6d33a5f9f8",
-  "reserve_game_digest": "5ac641fe78b19e98ec5cb576ebb85e652ff289e445e0f6e54e109c523a614dba",
-  "candidate_game_digest": "7b78c61dbd39e17916377d7272fe5bb9cb72d7afdcaf1fa00b026c8477895f68",
-  "confirmation_query_sha256": "6cec02663a37f6394d041005c6d21681e901936f318ca4c85d477e2285c0ad13",
-  "seed": 20260911,
-  "status": "frozen_before_stress_fit_or_score"
-}

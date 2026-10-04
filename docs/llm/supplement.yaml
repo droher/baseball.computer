@@ -35,13 +35,6 @@ table_synonyms:
   main_models.stg_parks: [ballparks, stadiums, park names]
   main_seeds.seed_franchises: [franchises, teams, team history, team names, relocations]
   main_seeds.seed_game_types: [game type, postseason flag]
-  main_models.park_factor_summary: [estimated park factor, modeled park factor, park factor uncertainty]
-  main_models.run_expectancy_summary: [estimated run expectancy, modeled run expectancy, run value uncertainty]
-  main_models.imputed_batted_ball_geometry: [imputed trajectory, imputed batted-ball location, estimated hit type]
-  main_models.state_transition_summary: [base-out transition matrix, base-out transition probabilities, estimated state transition]
-  main_models.linear_weights_estimated: [estimated linear weights, linear weights uncertainty, run value uncertainty]
-  main_models.air_trajectory_translation: [fly ball line drive popup translation, launch angle band translation, trajectory label standardization]
-  main_models.standardized_air_trajectory: [standardized fly ball line drive popup, launch angle band probabilities, standardized batted ball trajectory]
 
 leagues:
   AL:
@@ -117,24 +110,6 @@ ambiguities:
       - franchise (multi-era)
     default: table.main_seeds_seed_franchises.team_id
     clarify_when: question concerns franchise history rather than a single team-era, or a nickname maps to more than one team_id (Senators → WS1, WS2, WS9, WSN; Athletics → PHA, KC1, OAK).
-  - term: park factor
-    meanings:
-      - table.main_models_park_factors
-      - table.main_models_park_factor_summary
-    default: table.main_models_park_factors
-    clarify_when: question wants modeled uncertainty (HDI / posterior) → the estimated park_factor_summary; the deterministic park_factors is the default point surface.
-  - term: run expectancy
-    meanings:
-      - table.main_models_run_expectancy_matrix
-      - table.main_models_run_expectancy_summary
-    default: table.main_models_run_expectancy_matrix
-    clarify_when: question wants modeled uncertainty per season/league → the estimated run_expectancy_summary; the deterministic run_expectancy_matrix is the default.
-  - term: linear weights
-    meanings:
-      - table.main_models_linear_weights
-      - table.main_models_linear_weights_estimated
-    default: table.main_models_linear_weights
-    clarify_when: question wants modeled uncertainty (HDI / posterior sd on the run value) → the estimated linear_weights_estimated; the deterministic linear_weights is the default point surface.
 
 rules:
   - severity: must
@@ -167,31 +142,6 @@ rules:
   - severity: should
     scope: global
     text: Franchises change team_id when they move (MON → WAS, WS1 → MIN). Use main_seeds.seed_franchises.franchise_id joined on team_id and season for franchise history; a bare team_id covers only one era.
-  - severity: must
-    scope: global
-    text: >-
-      Tables carrying observed_status='estimated' (the data-coverage outputs:
-      imputed_batted_ball_geometry, imputed_fielding_credit,
-      imputed_ball_handler_probabilities, imputed_advancement_probabilities,
-      scorer_observation_propensities, pitch_count_coverage, park_factor_summary,
-      run_expectancy_summary, pitch_summary_distribution,
-      state_transition_summary, linear_weights_estimated, air_trajectory_translation,
-      standardized_air_trajectory) are MODEL ESTIMATES, not
-      official facts. Do not present them as recorded values; they are posterior
-      expectations or probabilities for data that was not directly recorded.
-  - severity: should
-    scope: global
-    text: >-
-      When querying an estimated table, surface its uncertainty (the *_sd / *_hdi_lower /
-      *_hdi_upper columns) and its confidence_status, not only the point estimate. A
-      weak_identification_flag=true row is flagged as weakly identified — caveat it.
-  - severity: should
-    scope: global
-    text: >-
-      For park factors and run expectancy, the deterministic surfaces (park_factors,
-      run_expectancy_matrix) are the default; the estimated siblings (park_factor_summary,
-      run_expectancy_summary) carry modeled uncertainty. Do not join or union the two — their
-      grains differ.
 
 verified_queries:
   - id: vq.trout_2018_obp

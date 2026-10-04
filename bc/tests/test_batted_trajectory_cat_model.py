@@ -13,7 +13,6 @@ from python_models.ml.features import (
     BATTED_TRAJECTORY_CAT,
     GRAIN_COLUMN,
     HIGH_CARD_CATEGORICAL,
-    LEGACY_ML_LAYOUT,
     LOW_CARD_CATEGORICAL,
     NUMERIC,
     Vocabulary,
@@ -43,7 +42,6 @@ def test_build_model_softmax_output_shape() -> None:
     for n in (3, 5, 7):
         model = build_model(
             target_spec=BATTED_TRAJECTORY_CAT,
-            layout=LEGACY_ML_LAYOUT,
             vocab_sizes=_vocab_sizes(),
             numeric_means=means,
             numeric_variances=variances,
@@ -57,7 +55,6 @@ def test_shim_matches_factory() -> None:
     means, variances = _numeric_stats()
     direct = build_model(
         target_spec=BATTED_TRAJECTORY_CAT,
-        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=_vocab_sizes(),
         numeric_means=means,
         numeric_variances=variances,
@@ -90,7 +87,6 @@ def _make_scorer(class_labels: tuple[str, ...]) -> Scorer:
     means, variances = _numeric_stats()
     model = build_model(
         target_spec=BATTED_TRAJECTORY_CAT,
-        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=_vocab_sizes(),
         numeric_means=means,
         numeric_variances=variances,

@@ -9,11 +9,6 @@ proposal or handoff is not evidence that its implementation is still pending.
 ## Follow-ups and implementation
 
 - [Open follow-ups](followups.md): the shared backlog and recorded dispositions.
-- [Full-history PBP imputation completion plan](full-history-imputation-plan.md): current all-fields play-by-play scope, fallback policy, baseline, and delivery order.
-- [Data coverage implementation plan](data-coverage-implementation/README.md): the six-phase plan and its detailed contracts.
-- [Implementation checklist](data-coverage-implementation/implementation-checklist.md) and [implementation review](data-coverage-implementation/implementation-review.md): progress and review evidence for that plan.
-- [Modeling documentation](../docs/modeling/README.md): contracts, protocols, and dated experiment reports.
-- [Geometry handoff](../docs/geometry-modeling-handoff.md): continuation context and evidence boundaries.
 
 ## Performance investigations
 
@@ -31,6 +26,5 @@ proposal or handoff is not evidence that its implementation is still pending.
 
 ## Writing and earlier proposals
 
-- [Research paper](paper/README.md): manuscript, sections, reviews, and supporting tables.
 - [LLM metadata proposal](llm-metadata.md): the earlier remote-database proposal. Use the [LLM context guide](../docs/llm/README.md) and [DuckLake publication guide](../docs/ducklake-production.md) for the implemented publication workflow.
 - [Blog notes](blog.md) and [possible posts](possible_posts.md): writing ideas and older project notes.

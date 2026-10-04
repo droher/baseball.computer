@@ -1,4 +1,0 @@
-interface:
-  display_name: "Baseball Statistical Modeling"
-  short_description: "Project Bayesian modeling conventions"
-  default_prompt: "Use $baseball-statistical-modeling to plan baseball.computer statistical models for coverage, imputation, park factors, and derived metrics."

@@ -126,8 +126,6 @@ config = Config(
         "force_reload": False,
         "start_season": 1910,
         "end_season": 2025,
-        "source_snapshot_id": "dev",
-        "pbp_imputation_root": os.environ.get("BC_PBP_IMPUTATION_ROOT", ""),
     },
     ignore_patterns=[
         "models/**/*.yml",

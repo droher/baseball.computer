@@ -24,7 +24,6 @@ dev = [
     "ipykernel>=6.25.2",
     "boto3>=1.34.45",
     "ruamel.yaml>=0.18.5",
-    "basedpyright>=1.39.9",
     "hypothesis>=6.168.0",
 ]
 # SQLMesh + Ibis build engine. boring-semantic-layer (in `bsl`) pins an
@@ -53,19 +52,6 @@ bsl = [
     "ibis-framework[duckdb]>=11.0",
 ]
 
-stats = [
-    {include-group = "build"},
-    "pymc>=5",
-    "arviz>=0.20",
-    "xarray>=2025.1",
-    "zarr>=2.18",
-    "scikit-learn>=1.5",
-    "numpyro>=0.15",
-    "jax>=0.4.30",
-    "jaxlib>=0.4.30",
-    "nutpie>=0.16.10",
-]
-
 [tool.uv]
 package = false
 default-groups = "all"
@@ -82,17 +68,5 @@ markers = [
     "slow: tests that import Keras/Torch or hit bc_dev.db; opt in with `pytest -m slow`",
 ]
 
-[tool.basedpyright]
-include = ["bc/python_models/statistical"]
-extraPaths = ["bc"]
-reportMissingTypeArgument = "warning"
-
-[[tool.basedpyright.executionEnvironments]]
-root = "bc/python_models/statistical/deep/training.py"
-reportArgumentType = "warning"
-
 [tool.ruff.lint.per-file-ignores]
-"bc/tests/statistical/**" = ["E402"]
-"scripts/permutation_importance_generic.py" = ["E402"]
-"scripts/permutation_importance_trajectory.py" = ["E402"]
 "scripts/publish_ducklake.py" = ["E402"]

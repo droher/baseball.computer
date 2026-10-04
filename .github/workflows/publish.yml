@@ -17,8 +17,6 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ZONE_ID:   ${{ secrets.CLOUDFLARE_ZONE_ID }}
-      BC_STATS_ARTIFACTS_ROOT: ${{ vars.BC_STATS_ARTIFACTS_ROOT }}
-      BC_PBP_IMPUTATION_ROOT: ${{ vars.BC_PBP_IMPUTATION_ROOT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -28,9 +26,6 @@ jobs:
           cache-dependency-glob: uv.lock
 
       - run: uv sync --group build --frozen
-
-      - name: Check estimated-model artifact pointers
-        run: uv run --group build python scripts/check_published_pointers.py
 
       - name: Preload production sources
         run: uv run --group build python scripts/preload_sources.py

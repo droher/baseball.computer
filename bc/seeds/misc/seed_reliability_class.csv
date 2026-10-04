@@ -1,6 +1,0 @@
-reliability_class,description,is_hard_mask_eligible,numeric_rank,notes
-direct,Direct primary evidence at the target grain.,true,1,Highest authority; safe for hard-zero personnel masks.
-derived,Deterministically derived from direct evidence by documented rule.,true,2,Reproducible deduction; treat as direct-equivalent.
-inferred,Inferred from indirect evidence or model proposals.,false,3,Probabilistic; never use as a hard mask.
-synthetic,Synthesized via dedup/imputation/lookup heuristics.,false,4,Always carry uncertainty; never collapse to a point fact.
-ambiguous,Multiple plausible values; identity not resolvable.,false,5,Withhold or tag downstream; not a random-effect level.

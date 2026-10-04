@@ -12,7 +12,6 @@ import polars as pl
 from python_models.ml.features import (
     GRAIN_COLUMN,
     HIGH_CARD_CATEGORICAL,
-    LEGACY_ML_LAYOUT,
     LOW_CARD_CATEGORICAL,
     NUMERIC,
     RUNS_FOLLOWING_NUM,
@@ -42,7 +41,6 @@ def test_regression_build_model_emits_single_linear_output() -> None:
     means, variances = _numeric_stats()
     model = build_model(
         target_spec=RUNS_FOLLOWING_NUM,
-        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=_vocab_sizes(),
         numeric_means=means,
         numeric_variances=variances,
@@ -56,7 +54,6 @@ def test_regression_compiled_with_mse_loss_and_mae_metric() -> None:
     means, variances = _numeric_stats()
     model = build_model(
         target_spec=RUNS_FOLLOWING_NUM,
-        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=_vocab_sizes(),
         numeric_means=means,
         numeric_variances=variances,
@@ -75,7 +72,6 @@ def test_regression_shim_matches_factory() -> None:
     means, variances = _numeric_stats()
     direct = build_model(
         target_spec=RUNS_FOLLOWING_NUM,
-        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=_vocab_sizes(),
         numeric_means=means,
         numeric_variances=variances,
@@ -107,7 +103,6 @@ def _make_regression_scorer() -> Scorer:
     means, variances = _numeric_stats()
     model = build_model(
         target_spec=RUNS_FOLLOWING_NUM,
-        layout=LEGACY_ML_LAYOUT,
         vocab_sizes=_vocab_sizes(),
         numeric_means=means,
         numeric_variances=variances,

@@ -1,1 +1,0 @@
-Superseded by `trajectory_mnar_bound.md`: the anchored joint direction this table swept was `log(p_derived / p_obs) = -ln(p_obs_GB)`, an identity of the observed slice (modeling review H2), so the shares it reported did not describe the unrecorded slice.
