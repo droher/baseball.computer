@@ -737,3 +737,213 @@ def test_head_sends_a_named_user_agent_and_lowercases_headers() -> None:
     assert seen[0].get_method() == "HEAD"
     assert seen[0].get_header("User-agent") == script.VERIFY_USER_AGENT
     assert "urllib" not in script.VERIFY_USER_AGENT
+
+
+class _FakeStore:
+    def __init__(self, keys: list[str]) -> None:
+        self.keys = list(keys)
+        self.listed: list[str] = []
+        self.deleted: list[str] = []
+
+    def list_keys(self, prefix: str) -> list[str]:
+        self.listed.append(prefix)
+        return [key for key in self.keys if key.startswith(prefix)]
+
+    def delete_keys(self, keys: list[str]) -> None:
+        self.deleted.extend(keys)
+        self.keys = [key for key in self.keys if key not in set(keys)]
+
+
+def test_prune_deletes_only_unreferenced_data_files_under_the_prefix() -> None:
+    script = _load_script()
+    data = "baseball/v9/bc_publish_data"
+    store = _FakeStore(
+        [
+            f"{data}/main_models/a/new.parquet",
+            f"{data}/main_models/a/old.parquet",
+            f"{data}/main_models/dropped/old.parquet",
+            "baseball/v9/baseball.ducklake",
+            "baseball/v8/bc_publish_data/main_models/a/old.parquet",
+            "event/events.parquet",
+        ]
+    )
+    current = {f"{data}/main_models/a/new.parquet", f"{data}/main_models/b/new.parquet"}
+
+    pruned = script.prune_stale_data(store, "baseball/v9", current)
+
+    assert pruned == 2
+    assert store.listed == [f"{data}/"]
+    assert sorted(store.deleted) == [
+        f"{data}/main_models/a/old.parquet",
+        f"{data}/main_models/dropped/old.parquet",
+    ]
+    assert set(store.keys) == {
+        f"{data}/main_models/a/new.parquet",
+        "baseball/v9/baseball.ducklake",
+        "baseball/v8/bc_publish_data/main_models/a/old.parquet",
+        "event/events.parquet",
+    }
+
+
+@pytest.mark.parametrize(
+    "current",
+    [set(), {"baseball/v8/bc_publish_data/x.parquet"}],
+)
+def test_prune_refuses_an_empty_or_foreign_current_set(current: set[str]) -> None:
+    script = _load_script()
+    store = _FakeStore(["baseball/v9/bc_publish_data/x.parquet"])
+
+    with pytest.raises(SystemExit, match="refusing to prune"):
+        script.prune_stale_data(store, "baseball/v9", current)
+
+    assert store.deleted == []
+    assert store.listed == []
+
+
+class _PagedS3Client:
+    def __init__(self, keys: list[str], page_size: int) -> None:
+        self.keys = keys
+        self.page_size = page_size
+        self.delete_batches: list[list[str]] = []
+
+    def list_objects_v2(self, **kwargs: str) -> dict[str, Any]:
+        matching = [key for key in self.keys if key.startswith(kwargs["Prefix"])]
+        start = int(kwargs.get("ContinuationToken", "0"))
+        page = matching[start : start + self.page_size]
+        end = start + len(page)
+        response: dict[str, Any] = {"Contents": [{"Key": key} for key in page]}
+        if end < len(matching):
+            response["IsTruncated"] = True
+            response["NextContinuationToken"] = str(end)
+        return response
+
+    def delete_objects(self, *, Bucket: str, Delete: dict[str, Any]) -> dict[str, Any]:
+        assert Bucket == "timeball"
+        self.delete_batches.append([item["Key"] for item in Delete["Objects"]])
+        return {}
+
+
+def test_boto3_store_follows_pagination_and_batches_deletes() -> None:
+    script = _load_script()
+    keys = [f"p/{i:05d}.parquet" for i in range(2_345)]
+    client = _PagedS3Client(keys + ["q/other.parquet"], page_size=1_000)
+    store = script.Boto3ObjectStore(client)
+
+    listed = store.list_keys("p/")
+    store.delete_keys(listed)
+
+    assert listed == keys
+    assert [len(batch) for batch in client.delete_batches] == [1_000, 1_000, 345]
+    assert [key for batch in client.delete_batches for key in batch] == keys
+
+
+def test_boto3_store_fails_on_delete_errors() -> None:
+    script = _load_script()
+
+    class _FailingClient(_PagedS3Client):
+        def delete_objects(
+            self, *, Bucket: str, Delete: dict[str, Any]
+        ) -> dict[str, Any]:
+            return {
+                "Errors": [{"Key": Delete["Objects"][0]["Key"], "Code": "AccessDenied"}]
+            }
+
+    store = script.Boto3ObjectStore(_FailingClient([], page_size=10))
+
+    with pytest.raises(SystemExit, match="R2 delete failed for 1 objects"):
+        store.delete_keys(["p/a.parquet"])
+
+
+def _publish_fixture(script: Any, tmp_path: Path) -> None:
+    catalog_path = tmp_path / "bc_publish.ducklake"
+    data_path = tmp_path / "bc_publish_data"
+    _create_catalog(catalog_path, data_path)
+    current = data_path / "main_models" / "players" / "current.parquet"
+    current.parent.mkdir(parents=True, exist_ok=True)
+    current.write_bytes(b"PAR1")
+    packet = tmp_path / "baseball.lsf"
+    packet.write_text(MINIMAL_PACKET, encoding="utf-8")
+    version_file = tmp_path / "data_version.txt"
+    version_file.write_text("9\n", encoding="utf-8")
+    script.CATALOG_PATH = catalog_path
+    script.DATA_PATH = data_path
+    script.PACKET_PATH = packet
+    script.CATALOG_METADATA_PATH = tmp_path / "catalog.json"
+    script.DATA_VERSION_FILE = version_file
+
+
+def test_run_prunes_after_the_catalog_upload_and_purge(tmp_path: Path) -> None:
+    script = _load_script()
+    _publish_fixture(script, tmp_path)
+    events: list[str] = []
+    uploader = _HeaderRecordingUploader()
+    stale = "baseball/v9/bc_publish_data/main_models/gone/old.parquet"
+    kept = "baseball/v9/bc_publish_data/main_models/players/current.parquet"
+
+    class _OrderedStore(_FakeStore):
+        def delete_keys(self, keys: list[str]) -> None:
+            events.append("prune")
+            super().delete_keys(keys)
+
+    store = _OrderedStore([stale, kept])
+
+    def head(url: str) -> dict[str, str]:
+        events.append("head")
+        return {"cf-cache-status": "DYNAMIC"}
+
+    exit_code = script.run(
+        script.parse_args(["--skip-purge", "--skip-cache-rule"]),
+        lambda: ("zone", _FakeCloudflare([])),
+        head,
+        lambda args, prefix: uploader,
+        lambda: store,
+    )
+
+    uploaded = {key for key, _, _ in uploader.calls}
+    assert exit_code == 0
+    assert "baseball/v9/baseball.ducklake" in uploaded
+    assert events[-1] == "prune"
+    assert "head" in events[:-1]
+    assert store.deleted == [stale]
+    assert kept in uploaded
+    assert store.keys == [kept]
+
+
+def test_run_checks_prune_credentials_before_uploading(tmp_path: Path) -> None:
+    script = _load_script()
+    _publish_fixture(script, tmp_path)
+    uploader = _HeaderRecordingUploader()
+
+    def missing_credentials() -> Any:
+        raise SystemExit("missing required env var: R2_ACCESS_KEY_ID")
+
+    with pytest.raises(SystemExit, match="R2_ACCESS_KEY_ID"):
+        script.run(
+            script.parse_args(["--skip-purge", "--skip-cache-rule"]),
+            lambda: ("zone", _FakeCloudflare([])),
+            lambda url: {"cf-cache-status": "DYNAMIC"},
+            lambda args, prefix: uploader,
+            missing_credentials,
+        )
+
+    assert uploader.calls == []
+
+
+def test_skip_prune_never_builds_the_store(tmp_path: Path) -> None:
+    script = _load_script()
+    _publish_fixture(script, tmp_path)
+    uploader = _HeaderRecordingUploader()
+
+    def store_factory() -> Any:
+        raise AssertionError("built an object store")
+
+    exit_code = script.run(
+        script.parse_args(["--skip-purge", "--skip-cache-rule", "--skip-prune"]),
+        lambda: ("zone", _FakeCloudflare([])),
+        lambda url: {"cf-cache-status": "DYNAMIC"},
+        lambda args, prefix: uploader,
+        store_factory,
+    )
+
+    assert exit_code == 0
+    assert "baseball/v9/baseball.ducklake" in {key for key, _, _ in uploader.calls}

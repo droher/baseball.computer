@@ -15,7 +15,7 @@ R2 prefix: s3://timeball/baseball/v<DATA_VERSION>/
   <prefix>/bc_publish_data/*.parquet  (data files, immutable)
 
 Required env vars:
-  boto3: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+  boto3 uploads and the R2 prune: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
   Cloudflare cache rule + purge: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID
     (the token needs Cache Rules edit and Cache Purge on the zone)
 
@@ -31,7 +31,12 @@ URL and fails if Cloudflare reports a cache HIT. Cloudflare keys cached
 responses by request Origin, so the purge sends the plain URL plus one
 variant per `--purge-origin`.
 
-`--wrangler` uses the active Cloudflare OAuth login instead of R2 credentials.
+After the edge-cache check it lists `<prefix>/bc_publish_data/` through the
+S3 API and deletes every object the uploaded catalog no longer references,
+so R2 holds only the current snapshot. The prune needs the R2 variables even
+with `--wrangler`; `--skip-prune` keeps the old files.
+
+`--wrangler` uploads with the active Cloudflare OAuth login instead of R2 credentials.
 For a fresh version prefix, `--skip-purge` also avoids cache-purge credentials;
 `--skip-cache-rule` skips the rule check when no Cloudflare token is available.
 `--metadata-cache-only` uploads nothing and only repairs the cache rule and
@@ -68,6 +73,7 @@ PACKET_PATH = PROJECT_ROOT / "docs" / "llm" / "baseball.lsf"
 GENERATOR_PATH = PROJECT_ROOT / "scripts" / "generate_llm_context.py"
 
 R2_BUCKET = "timeball"
+DELETE_BATCH_SIZE = 1000
 PUBLIC_HOST = "data.baseball.computer"
 CATALOG_OBJECT_NAME = "baseball.ducklake"
 CATALOG_METADATA_OBJECT_NAME = "catalog.json"
@@ -191,6 +197,49 @@ class Boto3Module(Protocol):
         aws_access_key_id: str,
         aws_secret_access_key: str,
     ) -> S3Client: ...
+
+
+class S3AdminClient(Protocol):
+    def list_objects_v2(self, **kwargs: str) -> dict[str, Any]: ...
+
+    def delete_objects(
+        self, *, Bucket: str, Delete: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+
+class ObjectStore(Protocol):
+    def list_keys(self, prefix: str) -> list[str]: ...
+
+    def delete_keys(self, keys: list[str]) -> None: ...
+
+
+class Boto3ObjectStore:
+    def __init__(self, client: S3AdminClient) -> None:
+        self.client = client
+
+    def list_keys(self, prefix: str) -> list[str]:
+        keys: list[str] = []
+        request = {"Bucket": R2_BUCKET, "Prefix": prefix}
+        while True:
+            page = self.client.list_objects_v2(**request)
+            keys.extend(str(item["Key"]) for item in page.get("Contents", []))
+            if not page.get("IsTruncated"):
+                return keys
+            request["ContinuationToken"] = str(page["NextContinuationToken"])
+
+    def delete_keys(self, keys: list[str]) -> None:
+        for start in range(0, len(keys), DELETE_BATCH_SIZE):
+            batch = keys[start : start + DELETE_BATCH_SIZE]
+            response = self.client.delete_objects(
+                Bucket=R2_BUCKET,
+                Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
+            )
+            errors = response.get("Errors") or []
+            if errors:
+                raise SystemExit(
+                    f"R2 delete failed for {len(errors)} objects: {errors[:3]}"
+                )
+            _log.info("prune checkpoint: deleted %d/%d", start + len(batch), len(keys))
 
 
 class Boto3Uploader:
@@ -347,17 +396,54 @@ def uses_wrangler(uploader: ObjectUploader) -> bool:
     return False
 
 
-def r2_client() -> Boto3Uploader:
+def r2_s3_client() -> object:
     account_id = env("R2_ACCOUNT_ID")
     boto3 = cast(Boto3Module, cast(object, importlib.import_module("boto3")))
-    return Boto3Uploader(
-        boto3.client(
-            "s3",
-            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
-            aws_access_key_id=env("R2_ACCESS_KEY_ID"),
-            aws_secret_access_key=env("R2_SECRET_ACCESS_KEY"),
-        )
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=env("R2_ACCESS_KEY_ID"),
+        aws_secret_access_key=env("R2_SECRET_ACCESS_KEY"),
     )
+
+
+def r2_client() -> Boto3Uploader:
+    return Boto3Uploader(cast(S3Client, r2_s3_client()))
+
+
+def r2_object_store() -> ObjectStore:
+    return Boto3ObjectStore(cast(S3AdminClient, r2_s3_client()))
+
+
+def stale_data_keys(
+    remote_keys: list[str], current_keys: set[str], data_prefix: str
+) -> list[str]:
+    return sorted(
+        key
+        for key in remote_keys
+        if key.startswith(data_prefix) and key not in current_keys
+    )
+
+
+def prune_stale_data(store: ObjectStore, prefix: str, current_keys: set[str]) -> int:
+    data_prefix = f"{prefix}/{DATA_DIR_NAME}/"
+    if not current_keys or not all(key.startswith(data_prefix) for key in current_keys):
+        raise SystemExit(
+            f"refusing to prune {data_prefix}: the current data file set is empty "
+            + "or lies outside the prefix"
+        )
+    remote_keys = store.list_keys(data_prefix)
+    stale = stale_data_keys(remote_keys, current_keys, data_prefix)
+    _log.info(
+        "prune: %d remote data files, %d current, %d stale under s3://%s/%s",
+        len(remote_keys),
+        len(current_keys),
+        len(stale),
+        R2_BUCKET,
+        data_prefix,
+    )
+    store.delete_keys(stale)
+    return len(stale)
 
 
 def upload_file(
@@ -490,6 +576,13 @@ def metadata_urls(prefix: str) -> list[str]:
     return [f"https://{PUBLIC_HOST}/{key}" for key in metadata_keys(prefix)]
 
 
+def data_file_uploads(prefix: str) -> list[tuple[Path, str]]:
+    return [
+        (file, f"{prefix}/{DATA_DIR_NAME}/{file.relative_to(DATA_PATH).as_posix()}")
+        for file in sorted(p for p in DATA_PATH.rglob("*") if p.is_file())
+    ]
+
+
 def upload_artifact(
     prefix: str,
     uploader: ObjectUploader,
@@ -503,17 +596,10 @@ def upload_artifact(
         raise SystemExit(f"data dir not found at {DATA_PATH}")
     assert_packet_valid()
 
-    data_files = sorted(p for p in DATA_PATH.rglob("*") if p.is_file())
+    data_uploads = data_file_uploads(prefix)
     _log.info(
-        "uploading %d data files under %s/%s/", len(data_files), prefix, DATA_DIR_NAME
+        "uploading %d data files under %s/%s/", len(data_uploads), prefix, DATA_DIR_NAME
     )
-    data_uploads = [
-        (
-            file,
-            f"{prefix}/{DATA_DIR_NAME}/{file.relative_to(DATA_PATH).as_posix()}",
-        )
-        for file in data_files
-    ]
     metadata_path = write_catalog_metadata()
     catalog_key, metadata_key, packet_key = metadata_keys(prefix)
     preflight_uploads(
@@ -553,7 +639,7 @@ def upload_artifact(
     _log.info(
         "upload summary: data=%.1f MB across %d files, catalog=%.1f MB, packet=%.1f MB",
         total_data_bytes / 1e6,
-        len(data_files),
+        len(data_uploads),
         (catalog_bytes + metadata_bytes) / 1e6,
         packet_bytes / 1e6,
     )
@@ -798,6 +884,7 @@ def cloudflare_purge(
 
 CredentialsProvider = Callable[[], tuple[str, CloudflareRequest]]
 UploaderFactory = Callable[[argparse.Namespace, str], ObjectUploader]
+StoreFactory = Callable[[], ObjectStore]
 
 
 def build_uploader(args: argparse.Namespace, prefix: str) -> ObjectUploader:
@@ -812,9 +899,12 @@ def run(
     credentials: CredentialsProvider = cloudflare_credentials,
     head: HeadRequest = http_head,
     uploader_factory: UploaderFactory = build_uploader,
+    store_factory: StoreFactory = r2_object_store,
 ) -> int:
     prefix = f"baseball/v{read_data_version()}"
     urls = metadata_urls(prefix)
+    prune = not args.metadata_cache_only and not args.skip_prune
+    store = store_factory() if prune else None
 
     if args.skip_cache_rule:
         _log.info("--skip-cache-rule set; not checking the Cloudflare cache rule")
@@ -838,6 +928,12 @@ def run(
         zone_id, request = credentials()
         cloudflare_purge(urls, zone_id, request, args.purge_origins)
     assert_metadata_not_edge_cached(urls, head)
+
+    if store is not None:
+        current_keys = {key for _, key in data_file_uploads(prefix)}
+        _ = prune_stale_data(store, prefix, current_keys)
+    elif not args.metadata_cache_only:
+        _log.info("--skip-prune set; leaving unreferenced data files on R2")
 
     _log.info("attach URL: ducklake:%s", urls[0])
     return 0
@@ -870,6 +966,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--resume",
         action="store_true",
         help="Skip matching immutable data files already present at the public URL.",
+    )
+    parser.add_argument(
+        "--skip-prune",
+        action="store_true",
+        help="Keep data files on R2 that the uploaded catalog no longer references.",
     )
     parser.add_argument(
         "--metadata-cache-only",
