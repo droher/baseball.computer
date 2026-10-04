@@ -139,9 +139,10 @@ promote-prod *MODELS:
     uv run --group build sqlmesh plan --auto-apply --no-prompts
     uv run --group build sqlmesh plan "${args[@]}" --auto-apply --no-prompts
 
-# Wipe bc.db + bc/bc_state.db, then preload + plan PROD from sources. After: re-run `just bootstrap-dev` to resync dev.
+# Wipe bc.db + bc/bc_state.db (with WALs and DuckDB spill), then preload + plan PROD from sources. After: re-run `just bootstrap-dev` to resync dev.
 [confirm("Delete bc.db AND bc/bc_state.db and rebuild PROD from sources? Type 'yes' to proceed.")]
 rebuild-prod:
-    rm -f "{{ _prod_db }}" "{{ _prod_state }}"
+    rm -f "{{ _prod_db }}" "{{ _prod_db }}.wal" "{{ _prod_state }}" "{{ _prod_state }}.wal"
+    rm -rf "{{ repo_root }}/bc/.tmp"
     uv run --group build python scripts/preload_sources.py
     cd bc && uv run --group build sqlmesh plan --auto-apply --no-prompts
