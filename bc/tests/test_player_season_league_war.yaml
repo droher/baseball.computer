@@ -1,0 +1,54 @@
+test_player_season_league_war_components:
+  model: main_models.player_season_league_war
+  inputs:
+    main_models.linear_weights:
+      rows:
+        - {season: 2000, league: AL, play: Single, relative_run_value: 0.5, average_run_value: 0.25}
+        - {season: 2000, league: AL, play: Double, relative_run_value: 0.8, average_run_value: 0.55}
+        - {season: 2000, league: AL, play: Triple, relative_run_value: 1.0, average_run_value: 0.75}
+        - {season: 2000, league: AL, play: HomeRun, relative_run_value: 1.4, average_run_value: 1.15}
+        - {season: 2000, league: AL, play: Walk, relative_run_value: 0.3, average_run_value: 0.05}
+        - {season: 2000, league: AL, play: IntentionalWalk, relative_run_value: 0.2, average_run_value: -0.05}
+        - {season: 2000, league: AL, play: HitByPitch, relative_run_value: 0.3, average_run_value: 0.05}
+        - {season: 2000, league: AL, play: StolenBase, relative_run_value: 0.45, average_run_value: 0.2}
+        - {season: 2000, league: AL, play: CaughtStealing, relative_run_value: -0.15, average_run_value: -0.4}
+    main_models.team_season_context:
+      rows:
+        - {season: 2000, team_id: TMA, league: AL, games: 2, runs_scored: 10, runs_allowed: 10, home_park_factor: 1.0, batting_park_factor: 1.0}
+    main_models.player_team_season_roles:
+      rows:
+        - {season: 2000, team_id: TMA, player_id: aaa, pitching_outs: 0, non_pitching_outs_played: 30, is_primary_pitcher: false}
+        - {season: 2000, team_id: TMA, player_id: bbb, pitching_outs: 0, non_pitching_outs_played: 30, is_primary_pitcher: false}
+        - {season: 2000, team_id: TMA, player_id: ppp, pitching_outs: 60, non_pitching_outs_played: 0, is_primary_pitcher: true}
+    main_models.player_team_season_offense_stats:
+      rows:
+        - {season: 2000, team_id: TMA, player_id: aaa, game_type: RegularSeason, plate_appearances: 10, singles: 2, doubles: 0, triples: 0, home_runs: 0, walks: 0, intentional_walks: 0, hit_by_pitches: 0, stolen_bases: 1, caught_stealing: 0}
+        - {season: 2000, team_id: TMA, player_id: bbb, game_type: RegularSeason, plate_appearances: 10, singles: 0, doubles: 0, triples: 0, home_runs: 0, walks: 0, intentional_walks: 0, hit_by_pitches: 0, stolen_bases: 0, caught_stealing: 0}
+        - {season: 2000, team_id: TMA, player_id: ppp, game_type: RegularSeason, plate_appearances: 5, singles: 0, doubles: 0, triples: 0, home_runs: 0, walks: 0, intentional_walks: 0, hit_by_pitches: 0, stolen_bases: 0, caught_stealing: 0}
+        - {season: 2000, team_id: TMA, player_id: aaa, game_type: WorldSeries, plate_appearances: 50, singles: 40, doubles: 0, triples: 0, home_runs: 0, walks: 0, intentional_walks: 0, hit_by_pitches: 0, stolen_bases: 0, caught_stealing: 0}
+    main_models.player_position_team_season_fielding_stats:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        player_id: VARCHAR
+        fielding_position: UTINYINT
+        game_type: VARCHAR
+        outs_played: INTEGER
+        putouts: INTEGER
+        assists: INTEGER
+        stolen_bases: INTEGER
+        caught_stealing: INTEGER
+      rows:
+        - {season: 2000, team_id: TMA, player_id: aaa, fielding_position: 6, game_type: RegularSeason, outs_played: 30, putouts: 9, assists: 6, stolen_bases: 0, caught_stealing: 0}
+        - {season: 2000, team_id: TMA, player_id: bbb, fielding_position: 6, game_type: RegularSeason, outs_played: 30, putouts: 1, assists: 2, stolen_bases: 0, caught_stealing: 0}
+        - {season: 2000, team_id: TMA, player_id: ppp, fielding_position: 1, game_type: RegularSeason, outs_played: 60, putouts: 5, assists: 5, stolen_bases: 0, caught_stealing: 0}
+    main_models.player_team_season_pitching_stats:
+      rows:
+        - {season: 2000, team_id: TMA, player_id: ppp, game_type: RegularSeason, outs_recorded: 60, runs: 10, strikeouts: 0}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {player_id: aaa, season: 2000, league: AL, is_primary_pitcher: false, batting_runs: 0.6, baserunning_runs: 0.0, fielding_runs: 0.8, positional_runs: 0.0501543, league_runs: -0.1501543, replacement_runs: 1.1435185, pitching_runs: 0.0, pitching_replacement_runs: 0.0, runs_per_win: 9.75, war: 0.2506173}
+        - {player_id: bbb, season: 2000, league: AL, is_primary_pitcher: false, batting_runs: -0.4, baserunning_runs: 0.0, fielding_runs: -0.8, positional_runs: 0.0501543, league_runs: -0.1501543, replacement_runs: 1.1435185, pitching_runs: 0.0, pitching_replacement_runs: 0.0, runs_per_win: 9.75, war: -0.0160494}
+        - {player_id: ppp, season: 2000, league: AL, is_primary_pitcher: true, batting_runs: -0.2, baserunning_runs: 0.0, fielding_runs: 0.0, positional_runs: 0.2, league_runs: 0.0, replacement_runs: 0.0, pitching_runs: 0.0, pitching_replacement_runs: 1.7253086, runs_per_win: 9.75, war: 0.1769547}

@@ -1,0 +1,54 @@
+test_team_season_context_park_factor_fallbacks:
+  model: main_models.team_season_context
+  inputs:
+    main_models.team_game_results:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        league: VARCHAR
+        game_type: VARCHAR
+        runs_scored: INTEGER
+        runs_allowed: INTEGER
+        team_side: VARCHAR
+        opponent_team_id: VARCHAR
+      rows:
+        - {season: 2000, team_id: ADV, league: AL, game_type: RegularSeason, runs_scored: 5, runs_allowed: 3}
+        - {season: 2000, team_id: ADV, league: null, game_type: RegularSeason, runs_scored: 2, runs_allowed: 4}
+        - {season: 2000, team_id: ADV, league: AL, game_type: WorldSeries, runs_scored: 9, runs_allowed: 0}
+        - {season: 2000, team_id: BAS, league: AL, game_type: RegularSeason, runs_scored: 1, runs_allowed: 2}
+        - {season: 2000, team_id: NON, league: NL, game_type: RegularSeason, runs_scored: 3, runs_allowed: 3}
+    main_models.team_game_start_info:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        park_id: VARCHAR
+        league: VARCHAR
+        game_type: VARCHAR
+        team_side: VARCHAR
+        opponent_id: VARCHAR
+        doubleheader_status: VARCHAR
+        time_of_day: VARCHAR
+        bat_first_side: VARCHAR
+        sky: VARCHAR
+        field_condition: VARCHAR
+        precipitation: VARCHAR
+        wind_direction: VARCHAR
+        away_franchise_id: VARCHAR
+        home_franchise_id: VARCHAR
+      rows:
+        - {season: 2000, team_id: ADV, park_id: PK1, league: AL, game_type: RegularSeason, team_side: Home}
+        - {season: 2000, team_id: ADV, park_id: PK2, league: AL, game_type: RegularSeason, team_side: Away}
+        - {season: 2000, team_id: BAS, park_id: PK2, league: AL, game_type: RegularSeason, team_side: Home}
+        - {season: 2000, team_id: NON, park_id: PK9, league: NL, game_type: RegularSeason, team_side: Home}
+    main_models.park_factors:
+      query: >-
+        SELECT 2000::SMALLINT AS season, 'PK1' AS park_id, 'AL' AS league,
+          1.2::DOUBLE AS overall_park_factor, 1.4::DOUBLE AS basic_park_factor
+        UNION ALL
+        SELECT 2000::SMALLINT, 'PK2', 'AL', 'NaN'::DOUBLE, 0.8::DOUBLE
+  outputs:
+    query:
+      rows:
+        - {season: 2000, team_id: ADV, league: AL, games: 2, runs_scored: 7, runs_allowed: 7, home_park_factor: 1.2, batting_park_factor: 1.1}
+        - {season: 2000, team_id: BAS, league: AL, games: 1, runs_scored: 1, runs_allowed: 2, home_park_factor: 0.8, batting_park_factor: 0.9}
+        - {season: 2000, team_id: NON, league: NL, games: 1, runs_scored: 3, runs_allowed: 3, home_park_factor: 1.0, batting_park_factor: 1.0}
