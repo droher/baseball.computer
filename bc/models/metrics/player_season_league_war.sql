@@ -12,7 +12,7 @@ MODEL (
     is_primary_pitcher = 'Whether the player was a primary pitcher (`player_team_season_roles.is_primary_pitcher`) for at least one of their teams in the league-season. Batting for a team where the player was a primary pitcher is compared with other primary pitchers and earns no replacement or league-adjustment runs.',
     batting_runs = 'Park-adjusted linear-weights batting runs above league average: singles, doubles, triples, home runs, unintentional walks, intentional walks, and hit by pitches valued with the league-season `linear_weights.relative_run_value`.',
     baserunning_runs = 'Stolen-base runs above league average (wSB): stolen bases and times caught stealing at league-season run values, less the league rate per time on first base.',
-    fielding_runs = 'Range runs: putouts plus assists (assists alone at first base) above the league-season rate for the position per in-play out on the field, at 0.4 runs per play. Catchers are credited instead for times caught stealing above the league rate. Pitchers and designated hitters get none.',
+    fielding_runs = 'Range runs: plays made above the league-season rate for the position per ball in play while on the field, at 0.4 runs per play. Plays are assists for infielders and putouts plus assists for outfielders. Balls in play are allotted from the team''s pitching totals by outs played; league-seasons where any team lacks ball-in-play counts use non-strikeout outs instead. Catchers are credited instead for times caught stealing above the league rate. Pitchers and designated hitters get none.',
     positional_runs = 'Position adjustment per out played (FanGraphs scale per 1,458 innings: C +12.5, SS +7.5, 2B/3B/CF +2.5, LF/RF -7.5, 1B -12.5, DH -17.5), scaled by league-season runs per win / 10 so the adjustment is worth the same wins in every run environment. Primary pitchers instead offset the league-season average pitcher batting runs per plate appearance.',
     league_runs = 'League adjustment that zeroes the league-season sum of batting, baserunning, fielding, and positional runs per non-pitcher plate appearance.',
     replacement_runs = 'Position-player replacement runs, distributed per non-pitcher plate appearance.',
@@ -107,17 +107,34 @@ pitching AS (
         COALESCE(p.outs_recorded, 0) AS outs_recorded,
         COALESCE(p.runs, 0) AS runs_allowed,
         COALESCE(p.strikeouts, 0) AS strikeouts,
+        p.balls_in_play,
     FROM main_models.player_team_season_pitching_stats AS p
     WHERE p.game_type = 'RegularSeason'
 ),
 
-team_in_play_share AS (
+team_ball_in_play_rates AS (
+    SELECT
+        p.season,
+        p.team_id,
+        ctx.league,
+        SUM(p.balls_in_play) / NULLIF(SUM(p.outs_recorded) FILTER (WHERE p.balls_in_play IS NOT NULL), 0)
+            AS balls_in_play_per_out,
+        1 - SUM(p.strikeouts) / NULLIF(SUM(p.outs_recorded), 0) AS non_strikeout_share_of_outs,
+    FROM pitching AS p
+    INNER JOIN main_models.team_season_context AS ctx USING (season, team_id)
+    GROUP BY 1, 2, 3
+),
+
+team_balls_in_play AS (
     SELECT
         season,
         team_id,
-        1 - SUM(strikeouts) / NULLIF(SUM(outs_recorded), 0) AS in_play_out_share,
-    FROM pitching
-    GROUP BY 1, 2
+        CASE
+            WHEN BOOL_AND(balls_in_play_per_out IS NOT NULL) OVER (PARTITION BY season, league)
+                THEN balls_in_play_per_out
+            ELSE non_strikeout_share_of_outs
+        END AS balls_in_play_per_out,
+    FROM team_ball_in_play_rates
 ),
 
 batting AS (
@@ -243,10 +260,10 @@ fielding_context AS (
         f.*,
         ctx.league,
         CASE WHEN f.fielding_position IN (3, 4, 5, 6) THEN f.assists ELSE f.putouts + f.assists END AS plays,
-        f.outs_played * COALESCE(tip.in_play_out_share, 1) AS in_play_outs_played,
+        f.outs_played * COALESCE(tbip.balls_in_play_per_out, 1) AS balls_in_play_while_fielding,
     FROM fielding AS f
     INNER JOIN main_models.team_season_context AS ctx USING (season, team_id)
-    LEFT JOIN team_in_play_share AS tip USING (season, team_id)
+    LEFT JOIN team_balls_in_play AS tbip USING (season, team_id)
 ),
 
 position_rates AS (
@@ -254,7 +271,7 @@ position_rates AS (
         season,
         league,
         fielding_position,
-        SUM(plays) / NULLIF(SUM(in_play_outs_played), 0) AS plays_per_in_play_out,
+        SUM(plays) / NULLIF(SUM(balls_in_play_while_fielding), 0) AS plays_per_ball_in_play,
         SUM(caught_stealing) / NULLIF(SUM(caught_stealing + stolen_bases_allowed), 0) AS caught_stealing_rate,
     FROM fielding_context
     GROUP BY 1, 2, 3
@@ -271,7 +288,7 @@ player_fielding AS (
                 THEN (f.caught_stealing - (f.caught_stealing + f.stolen_bases_allowed) * COALESCE(pr.caught_stealing_rate, 0))
                     * (w.w_stolen_base - w.w_caught_stealing)
             WHEN f.fielding_position IN (0, 3, 4, 5, 6, 7, 8, 9)
-                THEN 0.4 * (f.plays - f.in_play_outs_played * COALESCE(pr.plays_per_in_play_out, 0))
+                THEN 0.4 * (f.plays - f.balls_in_play_while_fielding * COALESCE(pr.plays_per_ball_in_play, 0))
             ELSE 0
         END AS fielding_runs,
         CASE

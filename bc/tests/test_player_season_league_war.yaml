@@ -44,7 +44,7 @@ test_player_season_league_war_components:
         - {season: 2000, team_id: TMA, player_id: ppp, fielding_position: 1, game_type: RegularSeason, outs_played: 60, putouts: 5, assists: 5, stolen_bases: 0, caught_stealing: 0}
     main_models.player_team_season_pitching_stats:
       rows:
-        - {season: 2000, team_id: TMA, player_id: ppp, game_type: RegularSeason, outs_recorded: 60, runs: 10, strikeouts: 0}
+        - {season: 2000, team_id: TMA, player_id: ppp, game_type: RegularSeason, outs_recorded: 60, runs: 10, strikeouts: 0, balls_in_play: 40}
   outputs:
     query:
       partial: true
@@ -52,3 +52,138 @@ test_player_season_league_war_components:
         - {player_id: aaa, season: 2000, league: AL, is_primary_pitcher: false, batting_runs: 0.6, baserunning_runs: 0.0, fielding_runs: 0.8, positional_runs: 0.0501543, league_runs: -0.1501543, replacement_runs: 1.1435185, pitching_runs: 0.0, pitching_replacement_runs: 0.0, runs_per_win: 9.75, war: 0.2506173}
         - {player_id: bbb, season: 2000, league: AL, is_primary_pitcher: false, batting_runs: -0.4, baserunning_runs: 0.0, fielding_runs: -0.8, positional_runs: 0.0501543, league_runs: -0.1501543, replacement_runs: 1.1435185, pitching_runs: 0.0, pitching_replacement_runs: 0.0, runs_per_win: 9.75, war: -0.0160494}
         - {player_id: ppp, season: 2000, league: AL, is_primary_pitcher: true, batting_runs: -0.2, baserunning_runs: 0.0, fielding_runs: 0.0, positional_runs: 0.2, league_runs: 0.0, replacement_runs: 0.0, pitching_runs: 0.0, pitching_replacement_runs: 1.7253086, runs_per_win: 9.75, war: 0.1769547}
+
+test_player_season_league_war_fielding_credits_balls_in_play_converted:
+  model: main_models.player_season_league_war
+  inputs:
+    main_models.linear_weights:
+      rows:
+        - {season: 2000, league: AL, play: Single, relative_run_value: 0.5, average_run_value: 0.25}
+        - {season: 2000, league: AL, play: StolenBase, relative_run_value: 0.45, average_run_value: 0.2}
+        - {season: 2000, league: AL, play: CaughtStealing, relative_run_value: -0.15, average_run_value: -0.4}
+    main_models.team_season_context:
+      rows:
+        - {season: 2000, team_id: TMA, league: AL, games: 1, runs_scored: 3, runs_allowed: 3, home_park_factor: 1.0, batting_park_factor: 1.0}
+        - {season: 2000, team_id: TMB, league: AL, games: 1, runs_scored: 3, runs_allowed: 3, home_park_factor: 1.0, batting_park_factor: 1.0}
+    main_models.player_team_season_roles:
+      rows:
+        - {season: 2000, team_id: TMA, player_id: ssa, pitching_outs: 0, non_pitching_outs_played: 30, is_primary_pitcher: false}
+        - {season: 2000, team_id: TMB, player_id: ssb, pitching_outs: 0, non_pitching_outs_played: 30, is_primary_pitcher: false}
+        - {season: 2000, team_id: TMA, player_id: pa, pitching_outs: 30, non_pitching_outs_played: 0, is_primary_pitcher: true}
+        - {season: 2000, team_id: TMB, player_id: pb, pitching_outs: 30, non_pitching_outs_played: 0, is_primary_pitcher: true}
+    main_models.player_team_season_offense_stats:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        player_id: VARCHAR
+        game_type: VARCHAR
+        plate_appearances: INTEGER
+        singles: INTEGER
+        doubles: INTEGER
+        triples: INTEGER
+        home_runs: INTEGER
+        walks: INTEGER
+        intentional_walks: INTEGER
+        hit_by_pitches: INTEGER
+        stolen_bases: INTEGER
+        caught_stealing: INTEGER
+      rows: []
+    main_models.player_position_team_season_fielding_stats:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        player_id: VARCHAR
+        fielding_position: UTINYINT
+        game_type: VARCHAR
+        outs_played: INTEGER
+        putouts: INTEGER
+        assists: INTEGER
+        stolen_bases: INTEGER
+        caught_stealing: INTEGER
+      rows:
+        - {season: 2000, team_id: TMA, player_id: ssa, fielding_position: 6, game_type: RegularSeason, outs_played: 30, putouts: 0, assists: 6, stolen_bases: 0, caught_stealing: 0}
+        - {season: 2000, team_id: TMB, player_id: ssb, fielding_position: 6, game_type: RegularSeason, outs_played: 30, putouts: 0, assists: 6, stolen_bases: 0, caught_stealing: 0}
+    main_models.player_team_season_pitching_stats:
+      rows:
+        - {season: 2000, team_id: TMA, player_id: pa, game_type: RegularSeason, outs_recorded: 30, runs: 3, strikeouts: 0, balls_in_play: 20}
+        - {season: 2000, team_id: TMB, player_id: pb, game_type: RegularSeason, outs_recorded: 30, runs: 3, strikeouts: 0, balls_in_play: 40}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {player_id: pa, fielding_runs: 0.0}
+        - {player_id: pb, fielding_runs: 0.0}
+        - {player_id: ssa, fielding_runs: 0.8}
+        - {player_id: ssb, fielding_runs: -0.8}
+
+test_player_season_league_war_fielding_uses_one_denominator_per_league:
+  model: main_models.player_season_league_war
+  inputs:
+    main_models.linear_weights:
+      rows:
+        - {season: 2000, league: AL, play: Single, relative_run_value: 0.5, average_run_value: 0.25}
+        - {season: 2000, league: AL, play: StolenBase, relative_run_value: 0.45, average_run_value: 0.2}
+        - {season: 2000, league: AL, play: CaughtStealing, relative_run_value: -0.15, average_run_value: -0.4}
+    main_models.team_season_context:
+      rows:
+        - {season: 2000, team_id: TMA, league: AL, games: 1, runs_scored: 3, runs_allowed: 3, home_park_factor: 1.0, batting_park_factor: 1.0}
+        - {season: 2000, team_id: TMB, league: AL, games: 1, runs_scored: 3, runs_allowed: 3, home_park_factor: 1.0, batting_park_factor: 1.0}
+    main_models.player_team_season_roles:
+      rows:
+        - {season: 2000, team_id: TMA, player_id: ssa, pitching_outs: 0, non_pitching_outs_played: 30, is_primary_pitcher: false}
+        - {season: 2000, team_id: TMB, player_id: ssb, pitching_outs: 0, non_pitching_outs_played: 30, is_primary_pitcher: false}
+        - {season: 2000, team_id: TMA, player_id: pa, pitching_outs: 30, non_pitching_outs_played: 0, is_primary_pitcher: true}
+        - {season: 2000, team_id: TMB, player_id: pb, pitching_outs: 30, non_pitching_outs_played: 0, is_primary_pitcher: true}
+    main_models.player_team_season_offense_stats:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        player_id: VARCHAR
+        game_type: VARCHAR
+        plate_appearances: INTEGER
+        singles: INTEGER
+        doubles: INTEGER
+        triples: INTEGER
+        home_runs: INTEGER
+        walks: INTEGER
+        intentional_walks: INTEGER
+        hit_by_pitches: INTEGER
+        stolen_bases: INTEGER
+        caught_stealing: INTEGER
+      rows: []
+    main_models.player_position_team_season_fielding_stats:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        player_id: VARCHAR
+        fielding_position: UTINYINT
+        game_type: VARCHAR
+        outs_played: INTEGER
+        putouts: INTEGER
+        assists: INTEGER
+        stolen_bases: INTEGER
+        caught_stealing: INTEGER
+      rows:
+        - {season: 2000, team_id: TMA, player_id: ssa, fielding_position: 6, game_type: RegularSeason, outs_played: 30, putouts: 0, assists: 6, stolen_bases: 0, caught_stealing: 0}
+        - {season: 2000, team_id: TMB, player_id: ssb, fielding_position: 6, game_type: RegularSeason, outs_played: 30, putouts: 0, assists: 6, stolen_bases: 0, caught_stealing: 0}
+    main_models.player_team_season_pitching_stats:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        player_id: VARCHAR
+        game_type: VARCHAR
+        outs_recorded: INTEGER
+        runs: INTEGER
+        strikeouts: INTEGER
+        balls_in_play: INTEGER
+      rows:
+        - {season: 2000, team_id: TMA, player_id: pa, game_type: RegularSeason, outs_recorded: 30, runs: 3, strikeouts: 0, balls_in_play: 20}
+        - {season: 2000, team_id: TMB, player_id: pb, game_type: RegularSeason, outs_recorded: 30, runs: 3, strikeouts: 0, balls_in_play: null}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {player_id: pa, fielding_runs: 0.0}
+        - {player_id: pb, fielding_runs: 0.0}
+        - {player_id: ssa, fielding_runs: 0.0}
+        - {player_id: ssb, fielding_runs: 0.0}
