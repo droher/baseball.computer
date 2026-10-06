@@ -195,3 +195,11 @@ Team-seasons with no `baseballdatabank.appearances` rows are dropped silently by
 ### Lahman/Databank ↔ Retrosheet team_id mismatches
 
 Resolved. The four Databank stagings (`stg_databank_appearances`, `stg_databank_batting`, `stg_databank_fielding`, `stg_databank_pitching`) now translate `team_id` via `baseballdatabank.teams.team_id_retro` (joined on `(year_id, team_id)`) and project `team_id_retro` directly with no fallback. The `not_null(team_id)` audit on each staging fails the build loudly if a row ever lacks a crosswalk match.
+
+## Quick WAR and OPS+ — 2026-10-06
+
+`player_season_league_war`, `player_season_league_ops_plus`, `team_season_context`, and `player_team_season_roles` are built in dev only. Promote with `just promote-prod` on all four, then `just gen-llm-context` so the LSF picks them up.
+
+**Fielding is the weakest component.** Range runs compare assists (infield) or putouts plus assists (outfield) with the league rate per ball in play, so they can't see staff ground-ball mix, batter handedness, or a teammate taking balls in the hole. Brooks Robinson gets +137 career runs against Baseball-Reference's +293; Mazeroski (+274 vs +148) and Schmidt (+270 vs +127) run high because second-base double-play pivots and third-base assist volume count as range. Building expected plays from event-level batted-ball location and type, where Retrosheet has them, is the real fix. Splitting team credit between infield and outfield by league share was tried and made Vizquel and Arenado worse.
+
+**Other known gaps:** catchers get only caught-stealing runs; pitching uses all runs allowed, so team defense counts in both pitching and fielding; relievers get no leverage credit; 1880s pitcher seasons run high (Radbourn 1884: 24.7).
