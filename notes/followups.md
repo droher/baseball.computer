@@ -198,7 +198,7 @@ Resolved. The four Databank stagings (`stg_databank_appearances`, `stg_databank_
 
 ## Quick WAR and OPS+ — 2026-10-06
 
-`player_season_league_war`, `player_season_league_ops_plus`, `team_season_context`, and `player_team_season_roles` are built in dev only. Promote with `just promote-prod` on all four, then `just gen-llm-context` so the LSF picks them up.
+`player_season_league_war`, `player_season_league_ops_plus`, `team_season_context`, and `player_team_season_roles` are in `bc.db` as of 2026-10-06.
 
 **Fielding is the weakest component.** Range runs compare assists (infield) or putouts plus assists (outfield) with the league rate per ball in play, so they can't see staff ground-ball mix, batter handedness, or a teammate taking balls in the hole. Brooks Robinson gets +137 career runs against Baseball-Reference's +293; Mazeroski (+274 vs +148) and Schmidt (+270 vs +127) run high because second-base double-play pivots and third-base assist volume count as range. Building expected plays from event-level batted-ball location and type, where Retrosheet has them, is the real fix. Splitting team credit between infield and outfield by league share was tried and made Vizquel and Arenado worse.
 
