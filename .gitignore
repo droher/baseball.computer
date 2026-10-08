@@ -30,6 +30,7 @@ bc/mlflow.db-*
 bc/hamilton_artifacts/
 bc/.lineup_cache/
 artifacts/
+outputs/retrosheet-diff-*/
 docs/llm/baseball.lsf
 *.bak.*
 

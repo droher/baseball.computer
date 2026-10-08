@@ -25,6 +25,9 @@ which-env:
 preload *ARGS:
     uv run --group build python scripts/preload_sources.py "$@"
 
+compare-sources *ARGS:
+    uv run --group build python scripts/compare_retrosheet_sources.py "$@"
+
 # Copy prod bc.db + bc_state.db onto dev paths. Refuses if dev files are locked.
 bootstrap-dev:
     #!/usr/bin/env bash

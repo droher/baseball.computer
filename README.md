@@ -37,6 +37,11 @@ Development uses `bc_dev.db` and `bc/bc_state_dev.db`; production uses
 for development recipes. Production changes use `just promote-prod` or
 `just rebuild-prod`, as described in the build conventions.
 
+Before loading a Retrosheet update, use `just compare-sources` to compare the
+current raw tables with a frozen candidate extract. See the
+[source comparison guide](docs/retrosheet-source-comparison.md) for coverage
+reports, saved snapshots, and repeatable commands.
+
 ## Documentation
 
 Start with the [documentation guide](docs/README.md) for the complete map.
