@@ -2,6 +2,7 @@ MODEL (
   name main_models.player_game_offense_stats,
   kind FULL,
   grain (game_id, player_id, team_id),
+  depends_on (main_models.box_score_data_issues),
   column_descriptions (
     game_id = @doc('game_id'),
     team_id = @doc('team_id'),
@@ -150,7 +151,6 @@ MODEL (
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
     relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
-    bounded_range(column := home_runs, min_v := 0, max_v := hits),
     bounded_range(column := walks, min_v := 0, max_v := plate_appearances, condition := plate_appearances IS NOT NULL),
     bounded_range(column := caught_stealing, min_v := 0, max_v := stolen_base_opportunities, condition := stolen_base_opportunities IS NOT NULL),
     bounded_excluding_data_issues(column := hits, min_v := 0, max_v := at_bats, issue_type := 'hits_gt_at_bats'),

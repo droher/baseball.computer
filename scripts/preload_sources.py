@@ -1,9 +1,9 @@
-"""Parallel-load source parquet into bc.db before SQLMesh runs.
+"""Parallel-load source parquet into the warehouse before SQLMesh runs.
 
 SQLMesh's `before_all` executes returned DDL serially. The 45 source
 parquet loads from R2 are network-bound and trivially parallel, so
 running them through SQLMesh's adapter wastes wall-clock time. This
-script opens bc.db directly (one DuckDB Database, many cursors), reads
+script opens the warehouse directly (one DuckDB Database, many cursors), reads
 the same `external_models.yaml` source list the macro uses, and runs
 CREATE TABLE IF NOT EXISTS in a thread pool.
 
@@ -40,7 +40,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BC_DIR = REPO_ROOT / "bc"
-DB_PATH = REPO_ROOT / "bc.db"
+DEFAULT_DB_PATH = REPO_ROOT / "bc.db"
 EXTERNAL_MODELS = BC_DIR / "external_models.yaml"
 
 DEFAULT_SOURCE_ROOTS: dict[str, str] = {
@@ -109,6 +109,10 @@ def source_roots_from_overrides(
     return roots
 
 
+def db_path_from_env(environ: Mapping[str, str]) -> Path:
+    return Path(environ.get("BC_DB_PATH", str(DEFAULT_DB_PATH)))
+
+
 def _no_quote(s: str, label: str) -> None:
     if "'" in s:
         raise RuntimeError(f"single-quote in {label} breaks DDL: {s!r}")
@@ -151,9 +155,15 @@ def _build_items(
 
         bust_qs = f"?v={bust}" if root.startswith("http") else ""
         url = f"{root}/{name}.parquet{bust_qs}"
-        verb = "CREATE OR REPLACE TABLE" if force_reload else "CREATE TABLE IF NOT EXISTS"
+        verb = (
+            "CREATE OR REPLACE TABLE" if force_reload else "CREATE TABLE IF NOT EXISTS"
+        )
         items.append(
-            (schema, name, f"{verb} {schema}.{name} AS (SELECT * FROM read_parquet('{url}'))")
+            (
+                schema,
+                name,
+                f"{verb} {schema}.{name} AS (SELECT * FROM read_parquet('{url}'))",
+            )
         )
         schemas.add(schema)
     return items, schemas
@@ -163,6 +173,7 @@ def preload(
     workers: int,
     force_reload: bool,
     roots: dict[str, str],
+    db_path: Path,
 ) -> None:
     sources = _parsed_sources()
     bust = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S")
@@ -174,10 +185,10 @@ def preload(
         len(schemas),
         workers,
         force_reload,
-        DB_PATH,
+        db_path,
     )
 
-    db = duckdb.connect(str(DB_PATH))
+    db = duckdb.connect(str(db_path))
     try:
         # Match the gateway's runtime knobs so parquet reads behave the
         # same in preload and in SQLMesh.
@@ -225,10 +236,14 @@ def preload(
                     errors.append(e)
 
         if errors:
-            raise RuntimeError(f"preload: {len(errors)} task(s) failed; first: {errors[0]!r}")
+            raise RuntimeError(
+                f"preload: {len(errors)} task(s) failed; first: {errors[0]!r}"
+            )
 
         db.commit()
-        logger.info("preload: all %d tables done in %.1fs", len(items), time.monotonic() - t0)
+        logger.info(
+            "preload: all %d tables done in %.1fs", len(items), time.monotonic() - t0
+        )
     finally:
         db.close()
 
@@ -271,6 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         roots=source_roots_from_overrides(
             args.source_root, source_roots_from_env(os.environ)
         ),
+        db_path=db_path_from_env(os.environ),
     )
     return 0
 

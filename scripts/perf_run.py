@@ -258,6 +258,7 @@ def main() -> None:
         workers=int(os.environ.get("BC_INIT_DB_PARALLELISM", "8")),
         force_reload=False,
         roots=DEFAULT_SOURCE_ROOTS,
+        db_path=DB_PATH,
     )
     logger.info("preload complete in %.1fs", time.monotonic() - preload_t0)
 

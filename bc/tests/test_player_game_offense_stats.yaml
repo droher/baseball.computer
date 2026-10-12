@@ -27,6 +27,15 @@ test_player_game_offense_stats_pitch_totals_follow_status:
         away_team_id: VARCHAR
         source_type: VARCHAR
       rows: []
+    main_models.box_score_data_issues:
+      columns:
+        source_table: VARCHAR
+        game_id: VARCHAR
+        player_id: VARCHAR
+        issue_type: VARCHAR
+        value_a: USMALLINT
+        value_b: USMALLINT
+      rows: []
   outputs:
     query:
       partial: true

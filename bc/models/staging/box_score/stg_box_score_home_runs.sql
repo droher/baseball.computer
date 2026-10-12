@@ -1,6 +1,7 @@
 MODEL (
   name main_models.stg_box_score_home_runs,
   kind FULL,
+  depends_on (main_models.game_start_info),
   description 'Individually noted home run events from box score accounts, with varying degrees of detail.',
   column_descriptions (
     game_id = @doc('game_id'),
@@ -12,7 +13,9 @@ MODEL (
   audits (
     relationships(column := batter_id, to_model := main_models.people, to_column := player_id),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
-    relationships(column := pitcher_id, to_model := main_models.people, to_column := player_id)
+    relationships(column := pitcher_id, to_model := main_models.people, to_column := player_id),
+    box_score_home_run_pitcher_missing(excused_population := FALSE),
+    box_score_home_run_pitcher_missing(excused_population := TRUE, blocking := FALSE)
   ),
 );
 

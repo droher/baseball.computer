@@ -7,7 +7,7 @@ differ) into a single registration loop.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import NotRequired, TypedDict
 
 from sqlglot import exp
 
@@ -32,7 +32,7 @@ def register_park_factor_model(
     """Register one calc_park_factor_<variant> view via @model."""
     name = f"main_models.calc_park_factor_{variant}"
     grain: list[str] = ["park_id", "season", "league"]
-    columns: dict[str, Any] = {
+    columns: dict[str, str | exp.DataType] = {
         "park_id": PARK_ID,
         "season": "SMALLINT",
         "league": "VARCHAR",
@@ -56,7 +56,7 @@ def register_park_factor_model(
     _batter_hand_split = batter_hand_split
 
     grain_tuple = exp.Tuple(expressions=[exp.column(c) for c in grain])
-    audits: list[tuple[str, dict[str, Any]]] = [
+    audits: list[tuple[str, dict[str, exp.Expr]]] = [
         ("not_null", {"columns": grain_tuple}),
         ("valid_baseball_season", {"column": exp.column("season")}),
         (
@@ -69,16 +69,18 @@ def register_park_factor_model(
         ),
     ]
     for s in rate_stats:
-        audits.append(
-            (
-                "bounded_range",
-                {
-                    "column": exp.column(f"{s}_park_factor"),
-                    "min_v": exp.convert(0.0),
-                    "max_v": exp.convert(bounded_max),
-                },
+        for excused_population in (False, True):
+            audits.append(
+                (
+                    "park_factor_bounds",
+                    {
+                        "column": exp.column(f"{s}_park_factor"),
+                        "max_v": exp.convert(bounded_max),
+                        "excused_population": exp.convert(excused_population),
+                        "blocking": exp.convert(not excused_population),
+                    },
+                )
             )
-        )
 
     @model(
         name,
@@ -88,28 +90,43 @@ def register_park_factor_model(
         column_descriptions=column_descriptions,
         grain=grain,
         audits=audits,
+        depends_on=[
+            "main_models.game_start_info",
+            "main_models.event_states_full",
+            "main_models.event_offense_stats",
+        ],
     )
     def entrypoint(evaluator: MacroEvaluator) -> str:
         del evaluator
-        kwargs: dict[str, Any] = {
-            "rate_stats": _rate_stats,
-            "denominator_stat": _denominator_stat,
-        }
-        if _filter_exp is not None:
-            kwargs["filter_exp"] = _filter_exp
-        if not _use_odds:
-            kwargs["use_odds"] = False
-        if _batter_hand_split:
-            kwargs["batter_hand_split"] = True
-        return batter_pitcher_park_factor(**kwargs)
+        return batter_pitcher_park_factor(
+            rate_stats=_rate_stats,
+            denominator_stat=_denominator_stat,
+            filter_exp=_filter_exp if _filter_exp is not None else "1=1",
+            use_odds=_use_odds,
+            batter_hand_split=_batter_hand_split,
+        )
 
 
-_VARIANTS: list[dict[str, Any]] = [
+class ParkFactorSpec(TypedDict):
+    variant: str
+    rate_stats: list[str]
+    denominator_stat: str
+    filter_exp: NotRequired[str]
+    use_odds: NotRequired[bool]
+    batter_hand_split: NotRequired[bool]
+    bounded_max: NotRequired[float]
+
+
+_VARIANTS: list[ParkFactorSpec] = [
     {
         "variant": "in_play",
         "rate_stats": [
-            "hits", "singles", "doubles", "triples",
-            "reached_on_errors", "batting_outs",
+            "hits",
+            "singles",
+            "doubles",
+            "triples",
+            "reached_on_errors",
+            "batting_outs",
         ],
         "denominator_stat": "balls_in_play",
         "filter_exp": "balls_in_play = 1",
@@ -117,8 +134,15 @@ _VARIANTS: list[dict[str, Any]] = [
     {
         "variant": "outs",
         "rate_stats": [
-            "singles", "doubles", "triples", "home_runs", "strikeouts",
-            "reached_on_errors", "walks", "plate_appearances", "runs",
+            "singles",
+            "doubles",
+            "triples",
+            "home_runs",
+            "strikeouts",
+            "reached_on_errors",
+            "walks",
+            "plate_appearances",
+            "runs",
             "balls_in_play",
         ],
         "denominator_stat": "batting_outs",
@@ -127,8 +151,15 @@ _VARIANTS: list[dict[str, Any]] = [
     {
         "variant": "plate_appearances",
         "rate_stats": [
-            "singles", "doubles", "triples", "home_runs", "strikeouts",
-            "reached_on_errors", "walks", "batting_outs", "runs",
+            "singles",
+            "doubles",
+            "triples",
+            "home_runs",
+            "strikeouts",
+            "reached_on_errors",
+            "walks",
+            "batting_outs",
+            "runs",
             "balls_in_play",
         ],
         "denominator_stat": "plate_appearances",
@@ -136,8 +167,11 @@ _VARIANTS: list[dict[str, Any]] = [
     {
         "variant": "trajectory_outs",
         "rate_stats": [
-            "trajectory_broad_air_ball", "trajectory_ground_ball",
-            "trajectory_fly_ball", "trajectory_line_drive", "trajectory_pop_up",
+            "trajectory_broad_air_ball",
+            "trajectory_ground_ball",
+            "trajectory_fly_ball",
+            "trajectory_line_drive",
+            "trajectory_pop_up",
         ],
         "denominator_stat": "plate_appearances",
         "filter_exp": "trajectory_known = 1 AND batting_outs > 0",
@@ -145,11 +179,17 @@ _VARIANTS: list[dict[str, Any]] = [
     {
         "variant": "hit_location",
         "rate_stats": [
-            "batted_distance_plate", "batted_distance_infield",
-            "batted_distance_outfield", "fielded_by_battery",
-            "fielded_by_infielder", "fielded_by_outfielder",
-            "batted_angle_left", "batted_angle_right", "batted_angle_middle",
-            "batted_location_left_field", "batted_location_center_field",
+            "batted_distance_plate",
+            "batted_distance_infield",
+            "batted_distance_outfield",
+            "fielded_by_battery",
+            "fielded_by_infielder",
+            "fielded_by_outfielder",
+            "batted_angle_left",
+            "batted_angle_right",
+            "batted_angle_middle",
+            "batted_location_left_field",
+            "batted_location_center_field",
             "batted_location_right_field",
         ],
         "denominator_stat": "plate_appearances",
@@ -160,13 +200,21 @@ _VARIANTS: list[dict[str, Any]] = [
     {
         "variant": "out_location",
         "rate_stats": [
-            "batted_distance_plate", "batted_distance_infield",
-            "batted_distance_outfield", "fielded_by_battery",
-            "fielded_by_infielder", "fielded_by_outfielder",
-            "batted_angle_left", "batted_angle_right", "batted_angle_middle",
-            "batted_location_plate", "batted_location_right_infield",
-            "batted_location_middle_infield", "batted_location_left_infield",
-            "batted_location_left_field", "batted_location_center_field",
+            "batted_distance_plate",
+            "batted_distance_infield",
+            "batted_distance_outfield",
+            "fielded_by_battery",
+            "fielded_by_infielder",
+            "fielded_by_outfielder",
+            "batted_angle_left",
+            "batted_angle_right",
+            "batted_angle_middle",
+            "batted_location_plate",
+            "batted_location_right_infield",
+            "batted_location_middle_infield",
+            "batted_location_left_infield",
+            "batted_location_left_field",
+            "batted_location_center_field",
             "batted_location_right_field",
         ],
         "denominator_stat": "plate_appearances",

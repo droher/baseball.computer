@@ -2,7 +2,8 @@ MODEL (
   name main_models.box_score_data_issues,
   kind FULL,
   grain (source_table, game_id, player_id, issue_type),
-  description 'Every row in the `stg_box_score_*_lines` tables that violates a definitional within-row invariant (e.g. hits exceeding at-bats). Sourced verbatim from the parquet emitted by baseball.computer.rs, so the issues live upstream of this repo. Used by the `bounded_excluding_data_issues` audit to carve out known source-data exceptions on game-grain stat models, so any final-layer violation that is *not* listed here is treated as a real bug introduced by this layer.',
+  depends_on (main_models.game_start_info),
+  description 'Every row in the `stg_box_score_*_lines` tables that violates a definitional within-row invariant (e.g. hits exceeding at-bats). Sourced verbatim from the parquet emitted by baseball.computer.rs, so the issues live upstream of this repo. Used by the `bounded_excluding_data_issues` audit to carve out known source-data exceptions on game-grain stat models, so any final-layer violation that is *not* listed here is treated as a real bug introduced by this layer. Extra-base-hit and home-run issues are accepted only from Negro League and pre-1875 box-score accounts; elsewhere they fail the `box_score_data_issue_source_scope` audit.',
   column_descriptions (
     source_table = 'The `stg_box_score_*_lines` table that carries the bad row.',
     game_id = @doc('game_id'),
@@ -13,7 +14,9 @@ MODEL (
   ),
   audits (
     not_null(columns := (source_table, game_id, player_id, issue_type)),
-    unique_grain(columns := (source_table, game_id, player_id, issue_type))
+    unique_grain(columns := (source_table, game_id, player_id, issue_type)),
+    box_score_data_issue_source_scope(issue_types := ['extra_base_hits_gt_hits', 'home_runs_gt_hits'], excused_population := FALSE),
+    box_score_data_issue_source_scope(issue_types := ['extra_base_hits_gt_hits', 'home_runs_gt_hits'], excused_population := TRUE, blocking := FALSE)
   ),
 );
 

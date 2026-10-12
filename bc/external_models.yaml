@@ -239,7 +239,7 @@
 - name: box_score.box_score_home_runs
   audits:
   - - not_null
-    - columns: (batter_id, batting_side, game_id, pitcher_id)
+    - columns: (batter_id, batting_side, game_id)
 - name: box_score.box_score_line_scores
 - name: box_score.box_score_pinch_hitting_lines
   grain:

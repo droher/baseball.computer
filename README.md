@@ -42,6 +42,11 @@ current raw tables with a frozen candidate extract. See the
 [source comparison guide](docs/retrosheet-source-comparison.md) for coverage
 reports, saved snapshots, and repeatable commands.
 
+Then use `just build-source-candidate` to build the branch against current and
+release sources in isolation, and `just compare-models` to compare the fully
+processed tables. The [modeled comparison guide](docs/retrosheet-model-comparison.md)
+describes the builds, the three comparisons, and promotion acceptance.
+
 ## Documentation
 
 Start with the [documentation guide](docs/README.md) for the complete map.

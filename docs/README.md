@@ -7,7 +7,8 @@
 | Task | Read first |
 | --- | --- |
 | Build or change the database | [Setup](../README.md#build-engine), [build conventions](../.claude/rules/sqlmesh.md), and [justfile](../justfile) |
-| Compare a source update before promotion | [Retrosheet source comparison](retrosheet-source-comparison.md) |
+| Compare a source update before promotion | [Retrosheet source comparison](retrosheet-source-comparison.md), [modeled-table comparison](retrosheet-model-comparison.md) |
+| Interpret data-quality failures and NLB exceptions | [Audit standards](data-quality-audit-standards.md) |
 | Query tables and metrics | [Published model reference](https://docs.baseball.computer), [semantic layer guide](../bc/semantic/CLAUDE.md), and [LLM schema context](llm/README.md) |
 | Publish or verify production | [DuckLake publication](ducklake-production.md) and [script guide](../scripts/CLAUDE.md) |
 | Find plans, investigations, or writing | [Research notes](../notes/README.md) |

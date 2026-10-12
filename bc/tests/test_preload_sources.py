@@ -65,3 +65,9 @@ def test_cli_override_beats_env(script: Any) -> None:
     )
     roots = script.source_roots_from_overrides([f"{schema}=file:///cli"], env_roots)
     assert roots[schema] == "file:///cli"
+
+
+def test_warehouse_follows_bc_db_path(script: Any, tmp_path: Path) -> None:
+    target = tmp_path / "candidate.db"
+    assert script.db_path_from_env({"BC_DB_PATH": str(target)}) == target
+    assert script.db_path_from_env({}) == script.DEFAULT_DB_PATH

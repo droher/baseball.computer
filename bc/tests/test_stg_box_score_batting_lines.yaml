@@ -1,0 +1,46 @@
+stg_box_score_batting_lines_nulls_inconsistent_and_unknown_singles:
+  model: main_models.stg_box_score_batting_lines
+  inputs:
+    box_score.box_score_batting_lines:
+      columns:
+        game_id: VARCHAR
+        batter_id: VARCHAR
+        side: VARCHAR
+        lineup_position: UTINYINT
+        nth_player_at_position: UTINYINT
+        at_bats: UTINYINT
+        runs: UTINYINT
+        hits: UTINYINT
+        doubles: UTINYINT
+        triples: UTINYINT
+        home_runs: UTINYINT
+        rbi: UTINYINT
+        sacrifice_hits: UTINYINT
+        sacrifice_flies: UTINYINT
+        hit_by_pitch: UTINYINT
+        walks: UTINYINT
+        intentional_walks: UTINYINT
+        strikeouts: UTINYINT
+        stolen_bases: UTINYINT
+        caught_stealing: UTINYINT
+        grounded_into_double_plays: UTINYINT
+        reached_on_interference: UTINYINT
+      rows:
+        - {game_id: PTC193307042, batter_id: charo101, side: Home, lineup_position: 3, nth_player_at_position: 1, at_bats: 4, runs: 3, hits: 1, doubles: 1, triples: 0, home_runs: 1, walks: 1}
+        - {game_id: PH5193506030, batter_id: wrigb104, side: Away, lineup_position: 6, nth_player_at_position: 1, at_bats: 1, runs: 0, hits: 0, home_runs: 1}
+        - {game_id: TEST_MISSING_XBH, batter_id: missing, side: Away, lineup_position: 1, nth_player_at_position: 1, at_bats: 2, runs: 0, hits: 2, doubles: 1, home_runs: 0}
+        - {game_id: TEST_ZERO, batter_id: zero, side: Away, lineup_position: 2, nth_player_at_position: 1, at_bats: 0, runs: 0, hits: 0, doubles: 0, triples: 0, home_runs: 0}
+        - {game_id: TEST_VALID, batter_id: valid, side: Away, lineup_position: 3, nth_player_at_position: 1, at_bats: 8, runs: 0, hits: 8, doubles: 1, triples: 1, home_runs: 1}
+        - {game_id: TEST_NULL, batter_id: null_stats, side: Away, lineup_position: 4, nth_player_at_position: 1, at_bats: 0, runs: 0}
+        - {game_id: TEST_UINT8_EDGE, batter_id: edge, side: Away, lineup_position: 5, nth_player_at_position: 1, at_bats: 127, runs: 0, hits: 127, doubles: 127, triples: 0, home_runs: 0}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: PTC193307042, singles: null, total_bases: null}
+        - {game_id: PH5193506030, singles: null, total_bases: null}
+        - {game_id: TEST_MISSING_XBH, singles: null, total_bases: null}
+        - {game_id: TEST_ZERO, singles: 0, total_bases: 0}
+        - {game_id: TEST_VALID, singles: 5, total_bases: 14}
+        - {game_id: TEST_NULL, singles: null, total_bases: null}
+        - {game_id: TEST_UINT8_EDGE, singles: 0, total_bases: 254}

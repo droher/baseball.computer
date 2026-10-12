@@ -75,6 +75,26 @@ def test_every_active_team_has_exactly_one_open_span_ending_after_the_last_renam
         assert row["league"] or row["nickname"].endswith("All Stars"), row
 
 
+def test_eddie_mayo_all_stars_franchise_matches_retrosheet_team_metadata() -> None:
+    rows = [row for row in _rows(FRANCHISES_CSV) if row["team_id"] == "EMS"]
+
+    assert rows == [
+        {
+            "franchise_id": "EMS",
+            "team_id": "EMS",
+            "league": "",
+            "division": "",
+            "location": "Eddie Mayo",
+            "nickname": "All Stars",
+            "alternative_nicknames": "",
+            "date_start": "1934-09-19",
+            "date_end": "1934-09-19",
+            "city": "",
+            "state": "",
+        }
+    ]
+
+
 def test_game_type_overrides_are_well_formed_and_change_something() -> None:
     game_types = {r["game_type"] for r in _rows(GAME_TYPES_CSV)}
     rows = _rows(OVERRIDES_CSV)

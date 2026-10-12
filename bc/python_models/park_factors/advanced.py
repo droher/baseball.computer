@@ -170,6 +170,7 @@ self_joined AS (
     INNER JOIN with_priors AS other
         ON this.park_id != other.park_id
             AND this.season = other.season
+            AND this.league = other.league
             AND this.batter_id = other.batter_id
             AND this.pitcher_id = other.pitcher_id
 ),

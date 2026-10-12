@@ -55,6 +55,4 @@ Native raw-table samples identify canonical row digests and multiplicity; their 
 
 ## SQLMesh modeled comparison afterward
 
-Raw-source comparison does not establish that published models rebuild correctly. After review, build a separate SQLMesh dev candidate using the frozen parquet as the `event`, `game`, and `box_score` source roots; then use SQLMesh's environment/model `table_diff` against the baseline modeled environment. An already initialized dev database may retain old raw source tables because initialization uses `CREATE TABLE IF NOT EXISTS`.
-
-Do not use `BC_DB_PATH=bc_dev.db just preload --force-reload`: `scripts/preload_sources.py` currently hardcodes `bc.db`, so that command would replace production source tables. Prepare a fresh isolated dev SQLMesh database through its configured initialization path before candidate materialization. Promotion is a separate authorized action.
+Raw-source comparison does not establish that published models rebuild correctly. Build isolated candidates from the frozen release and compare the resulting `main_models` tables with the [modeled-table comparison routine](retrosheet-model-comparison.md). Its primary cohort is games that already had play-by-play accounts, excluding NLB games; new accounts are outside that cohort. Promotion is a separate authorized action.

@@ -2,6 +2,11 @@ MODEL (
   name main_models.player_game_pitching_stats,
   kind FULL,
   grain (game_id, player_id),
+  depends_on (
+    main_models.team_game_start_info,
+    main_models.team_game_data_issues,
+    main_models.box_score_data_issues
+  ),
   column_descriptions (
     game_id = @doc('game_id'),
     player_id = @doc('player_id'),
@@ -169,7 +174,8 @@ MODEL (
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
     relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
-    team_game_has_one_starter(),
+    team_game_has_one_starter(excused_population := FALSE),
+    team_game_has_one_starter(excused_population := TRUE, blocking := FALSE),
     bounded_range(column := walks, min_v := 0, max_v := batters_faced, condition := batters_faced IS NOT NULL),
     bounded_range(column := complete_games, min_v := 0, max_v := games_started, condition := NOT @team_game_data_issue_match(game_id, team_id, 'starting_pitcher_no_appearance')),
     bounded_range(column := perfect_games, min_v := 0, max_v := no_hitters),

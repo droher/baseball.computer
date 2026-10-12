@@ -111,11 +111,12 @@ renamed AS (
         grounded_into_double_plays,
         -- TODO: Change in source
         reached_on_interference AS reached_on_interferences,
-        -- TODO: Fix rows with 0 hits but 1+ XBH and where hits > AB
-        CASE WHEN hits = 0 AND doubles + triples + home_runs > 0 THEN NULL 
-            ELSE hits - home_runs - triples - doubles
+        CASE
+            WHEN hits IS NULL OR doubles IS NULL OR triples IS NULL OR home_runs IS NULL THEN NULL
+            WHEN hits::BIGINT < doubles::BIGINT + triples::BIGINT + home_runs::BIGINT THEN NULL
+            ELSE hits::BIGINT - home_runs::BIGINT - triples::BIGINT - doubles::BIGINT
         END::UTINYINT AS singles,
-        (singles + doubles * 2 + triples * 3 + home_runs * 4)::UTINYINT AS total_bases,
+        (singles::BIGINT + doubles::BIGINT * 2 + triples::BIGINT * 3 + home_runs::BIGINT * 4)::UTINYINT AS total_bases,
         (at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
         + COALESCE(sacrifice_hits, 0) + COALESCE(reached_on_interferences, 0))::UTINYINT
         AS plate_appearances,

@@ -21,12 +21,22 @@ which-env:
 
 # --- Lifecycle ---
 
-# Run preload_sources.py against PROD (bc.db). Idempotent. Pass --force-reload to wipe + reload.
+# Run preload_sources.py against PROD (bc.db; BC_DB_PATH overrides). Idempotent. Pass --force-reload to wipe + reload.
 preload *ARGS:
     uv run --group build python scripts/preload_sources.py "$@"
 
 compare-sources *ARGS:
     uv run --group build python scripts/compare_retrosheet_sources.py "$@"
+
+compare-models *ARGS:
+    uv run --group build python -m scripts.compare_retrosheet_models "$@"
+
+build-source-candidate *ARGS:
+    uv run --group build python -m scripts.build_retrosheet_candidate "$@"
+
+# Run every model audit read-only against a warehouse with its configured blocking status.
+audit-report *ARGS:
+    uv run --group build python -m scripts.audit_report "$@"
 
 # Copy prod bc.db + bc_state.db onto dev paths. Refuses if dev files are locked.
 bootstrap-dev:
