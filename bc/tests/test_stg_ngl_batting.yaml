@@ -1,0 +1,20 @@
+test_stg_ngl_batting_bounds:
+  model: main_models.stg_ngl_batting
+  inputs:
+    ngl_stats.batting:
+      rows:
+        - {gid: G1, id: known, team: T, b_lp: 1, b_seq: 1, stattype: value, b_ab: 4, b_r: 1, date: 19400501, ph: null}
+        - {gid: G1, id: lower, team: T, b_lp: 2, b_seq: 1, stattype: value, b_ab: null, b_r: 0, date: 19400501, ph: 1}
+        - {gid: G1, id: lower, team: T, b_lp: 2, b_seq: 1, stattype: lower, b_ab: 3, b_r: 0, date: 19400501, ph: null}
+        - {gid: G1, id: both, team: T, b_lp: 3, b_seq: 1, stattype: value, b_ab: 5, b_r: null, date: 19400501, ph: null}
+        - {gid: G1, id: both, team: T, b_lp: 3, b_seq: 1, stattype: lower, b_ab: 5, b_r: 1, date: 19400501, ph: null}
+        - {gid: G1, id: both, team: T, b_lp: 3, b_seq: 1, stattype: upper, b_ab: 5, b_r: 4, date: 19400501, ph: null}
+        - {gid: G1, id: only_lower, team: T, b_lp: 4, b_seq: 1, stattype: lower, b_ab: 2, b_r: null, date: 19400501, ph: null}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {player_id: known, is_pinch_hitter: null, b_ab: 4, b_ab_lower: 4, b_ab_upper: 4, b_r: 1, b_r_lower: 1, b_r_upper: 1}
+        - {player_id: lower, is_pinch_hitter: true, b_ab: null, b_ab_lower: 3, b_ab_upper: null, b_r: 0, b_r_lower: 0, b_r_upper: 0}
+        - {player_id: both, is_pinch_hitter: null, b_ab: 5, b_ab_lower: 5, b_ab_upper: 5, b_r: null, b_r_lower: 1, b_r_upper: 4}
+        - {player_id: only_lower, is_pinch_hitter: null, b_ab: null, b_ab_lower: 2, b_ab_upper: null, b_r: null, b_r_lower: null, b_r_upper: null}

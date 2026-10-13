@@ -48,7 +48,7 @@ joined AS (
         game_start_info.date,
         game_start_info.home_league AS league,
         game_start_info.source_type = 'PlayByPlay' AS has_play_by_play,
-        game_start_info.source_type IN ('Event', 'BoxScore') AS has_box_score,
+        game_start_info.source_type IN ('PlayByPlay', 'BoxScore') AS has_box_score,
         COALESCE(batted_balls.has_trajectory, FALSE) AS has_trajectory,
         COALESCE(batted_balls.has_location, FALSE) AS has_location,
         COALESCE(batted_balls.has_batted_to_fielder, FALSE) AS has_batted_to_fielder,

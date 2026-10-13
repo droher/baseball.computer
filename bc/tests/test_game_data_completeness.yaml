@@ -1,0 +1,95 @@
+test_game_data_completeness_source_types:
+  model: main_models.game_data_completeness
+  inputs:
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        season: SMALLINT
+        date: DATE
+        home_league: VARCHAR
+        source_type: VARCHAR
+        home_team_id: VARCHAR
+        away_team_id: VARCHAR
+        doubleheader_status: VARCHAR
+        time_of_day: VARCHAR
+        game_type: VARCHAR
+        bat_first_side: VARCHAR
+        sky: VARCHAR
+        field_condition: VARCHAR
+        precipitation: VARCHAR
+        wind_direction: VARCHAR
+        park_id: VARCHAR
+        away_franchise_id: VARCHAR
+        home_franchise_id: VARCHAR
+        lineup_map_away: VARCHAR
+        lineup_map_home: VARCHAR
+        fielding_map_away: VARCHAR
+        fielding_map_home: VARCHAR
+      rows:
+        - {game_id: PBP, season: 1990, date: 1990-05-01, home_league: AL, source_type: PlayByPlay}
+        - {game_id: BOX, season: 1990, date: 1990-05-01, home_league: AL, source_type: BoxScore}
+        - {game_id: LOG, season: 1990, date: 1990-05-01, home_league: AL, source_type: GameLog}
+        - {game_id: NGL, season: 1940, date: 1940-05-01, home_league: NNL2, source_type: NegroLeaguesStats}
+    main_models.calc_batted_ball_type:
+      columns:
+        game_id: VARCHAR
+        trajectory: VARCHAR
+        location_side: VARCHAR
+        batted_to_fielder: UTINYINT
+        plate_appearance_result: VARCHAR
+        recorded_trajectory: VARCHAR
+        recorded_location: VARCHAR
+        recorded_location_depth: VARCHAR
+        recorded_location_angle: VARCHAR
+      rows: []
+    main_seeds.seed_plate_appearance_result_types:
+      columns:
+        plate_appearance_result: VARCHAR
+        is_in_play: BOOLEAN
+      rows: []
+    main_models.stg_events:
+      columns:
+        game_id: VARCHAR
+        event_key: UINTEGER
+        batting_side: VARCHAR
+        frame: VARCHAR
+        batting_team_id: VARCHAR
+        fielding_team_id: VARCHAR
+        specified_batter_hand: VARCHAR
+        specified_pitcher_hand: VARCHAR
+        plate_appearance_result: VARCHAR
+        batted_trajectory: VARCHAR
+        batted_location_general: VARCHAR
+        batted_location_depth: VARCHAR
+        batted_location_angle: VARCHAR
+      rows: []
+    main_models.event_completeness_fielding_credit:
+      columns:
+        event_key: UINTEGER
+        has_fielder_putouts: BOOLEAN
+        has_fielder_assists: BOOLEAN
+        has_fielder_errors: BOOLEAN
+      rows: []
+    main_models.event_completeness_pitches:
+      columns:
+        event_key: UINTEGER
+        has_count_balls: BOOLEAN
+        has_count_strikes: BOOLEAN
+        has_count: BOOLEAN
+        has_pitches: BOOLEAN
+        has_pitch_results: BOOLEAN
+        has_strike_types: BOOLEAN
+      rows: []
+    main_models.stg_event_pitch_sequence_status:
+      columns:
+        event_key: UINTEGER
+        pitch_sequence_resolution_status: VARCHAR
+      rows: []
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: PBP, has_play_by_play: true, has_box_score: true}
+        - {game_id: BOX, has_play_by_play: false, has_box_score: true}
+        - {game_id: LOG, has_play_by_play: false, has_box_score: false}
+        - {game_id: NGL, has_play_by_play: false, has_box_score: false}

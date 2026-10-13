@@ -18,7 +18,7 @@ WHERE COALESCE(grouped.n_starters, 0) != 1
   AND (
     grouped.game_id IS NOT NULL
     OR info.source_type IS NULL
-    OR info.source_type != 'GameLog'
+    OR info.source_type NOT IN ('GameLog', 'NegroLeaguesStats')
   )
   AND (@is_less_complete_source(info) IS TRUE) = @excused_population
   AND NOT @team_game_data_issue_match(

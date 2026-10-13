@@ -144,6 +144,32 @@ add_gamelog AS (
         'Unknown'::WIND_DIRECTION AS wind_direction,
     FROM main_models.stg_gamelog
     WHERE game_id NOT IN (SELECT game_id FROM games)
+    UNION ALL BY NAME
+    SELECT
+        game_id,
+        date,
+        season,
+        home_team_id,
+        away_team_id,
+        doubleheader_status,
+        time_of_day,
+        game_type,
+        bat_first_side,
+        park_id,
+        attendance,
+        use_dh,
+        umpire_home_id,
+        umpire_first_id,
+        umpire_second_id,
+        umpire_third_id,
+        source_type,
+        home_starting_pitcher_id,
+        away_starting_pitcher_id,
+        'Unknown'::SKY AS sky,
+        'Unknown'::FIELD_CONDITION AS field_condition,
+        'Unknown'::PRECIPITATION AS precipitation,
+        'Unknown'::WIND_DIRECTION AS wind_direction,
+    FROM main_models.ngl_stats_only_games
 ),
 
 add_rest AS (
@@ -158,9 +184,9 @@ add_rest AS (
         game_types.is_regular_season,
         game_types.is_postseason,
         COALESCE(
-            add_gamelog.season >= 1947 AND add_gamelog.filename NOT LIKE '%.E%R', FALSE
-        ) AS is_integrated,
-        COALESCE(add_gamelog.filename LIKE '%.E%R', FALSE) AS is_negro_leagues,
+            add_gamelog.filename LIKE '%.E%R', add_gamelog.source_type = 'NegroLeaguesStats'
+        ) AS is_negro_leagues,
+        add_gamelog.season >= 1947 AND NOT is_negro_leagues AS is_integrated,
         (NOT is_integrated AND NOT is_negro_leagues) AS is_segregated_white,
         franchise_a.franchise_id::TEAM_ID AS away_franchise_id,
         franchise_h.franchise_id::TEAM_ID AS home_franchise_id,

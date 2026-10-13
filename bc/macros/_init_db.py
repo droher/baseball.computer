@@ -80,7 +80,8 @@ _ENUM_DEFS: list[tuple[str, str]] = [
             + "SELECT DISTINCT park_id FROM misc.park "
             + "UNION SELECT DISTINCT park_id FROM box_score.box_score_games WHERE park_id IS NOT NULL "
             + "UNION SELECT DISTINCT park_id FROM game.games WHERE park_id IS NOT NULL "
-            + "UNION SELECT DISTINCT park_id FROM misc.schedule WHERE park_id IS NOT NULL)"
+            + "UNION SELECT DISTINCT park_id FROM misc.schedule WHERE park_id IS NOT NULL "
+            + "UNION SELECT DISTINCT site FROM ngl_stats.gameinfo WHERE site IS NOT NULL)"
         ),
     ),
     (
@@ -91,7 +92,9 @@ _ENUM_DEFS: list[tuple[str, str]] = [
             + "UNION SELECT DISTINCT visiting_team FROM misc.gamelog "
             + "UNION SELECT DISTINCT home_team FROM misc.gamelog "
             + "UNION SELECT DISTINCT away_team_id FROM box_score.box_score_games "
-            + "UNION SELECT DISTINCT home_team_id FROM box_score.box_score_games)"
+            + "UNION SELECT DISTINCT home_team_id FROM box_score.box_score_games "
+            + "UNION SELECT DISTINCT visteam FROM ngl_stats.gameinfo "
+            + "UNION SELECT DISTINCT hometeam FROM ngl_stats.gameinfo)"
         ),
     ),
     ("game_id", "VARCHAR"),

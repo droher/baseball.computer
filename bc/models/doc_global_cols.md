@@ -227,6 +227,7 @@
     - PlayByPlay: Retrosheet play-by-play files (either from an account or deduced)
     - BoxScore: Retrosheet box score files
     - GameLog: Retrosheet game log files
+    - NegroLeaguesStats: Retrosheet's Negro Leagues stat files (negroleagues.zip), for games with no event or box file
 {% enddocs %}
 
 {% docs filename %}

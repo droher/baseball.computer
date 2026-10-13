@@ -1,7 +1,7 @@
 MODEL (
   name main_models.stg_umpires,
   kind FULL,
-  description 'Umpire career index from biodata/umpires0.csv. Replaces per-year `umpires/UMPIRES{YYYY}.txt` files which the new fetcher does not mirror.',
+  description 'Umpire career index from biodata/umpires0.csv. The yearly umpire lists, which name umpires this index lacks, are misc.umpire_roster.',
   column_descriptions (
     person_id = 'Retrosheet personnel id (joins stg_bio.player_id).',
     first_game_date = 'Date of first umpired game.',

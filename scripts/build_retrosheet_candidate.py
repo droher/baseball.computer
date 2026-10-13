@@ -27,7 +27,7 @@ from scripts.compare_retrosheet_sources import (
 LOGGER = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RETROSHEET_SCHEMAS = frozenset({"event", "game", "box_score"})
-SOURCE_SCHEMAS = ("event", "game", "box_score", "misc", "baseballdatabank", "biodata")
+SOURCE_SCHEMAS = ("event", "game", "box_score", "misc", "baseballdatabank", "biodata", "ngl_stats")
 PROJECT_DIRECTORIES = ("models", "macros", "audits", "seeds", "python_models", "tests")
 PROJECT_FILES = ("config.py", "external_models.yaml")
 SNAPSHOT_SCRIPTS = ("preload_sources.py", "audit_report.py")

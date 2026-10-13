@@ -61,9 +61,27 @@ gamelog_results AS (
     WHERE game_id NOT IN (SELECT game_id FROM event_and_box_results)
 ),
 
+ngl_stats_results AS (
+    SELECT
+        game_id,
+        date,
+        duration_minutes,
+        winning_pitcher_id,
+        losing_pitcher_id,
+        save_pitcher_id,
+        home_runs_scored,
+        away_runs_scored,
+        away_line_score,
+        home_line_score,
+    FROM main_models.ngl_stats_only_games
+),
+
 unioned AS (
     SELECT *
     FROM gamelog_results
+    UNION ALL BY NAME
+    SELECT *
+    FROM ngl_stats_results
     UNION ALL BY NAME
     SELECT *
     FROM event_and_box_results

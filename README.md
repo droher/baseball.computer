@@ -26,7 +26,7 @@ branch's development environment. If production databases already exist,
 existing dev databases. See the [build conventions](.claude/rules/sqlmesh.md)
 and [performance guidance](.claude/rules/performance.md) before a full build.
 
-Source-table metadata (45 parquet sources) lives in
+Source-table metadata (78 parquet sources) lives in
 `bc/external_models.yaml` — single source of truth for SQLMesh's external
 loader and `_init_db.py`'s DDL emission. Shared docstrings live in
 `bc/models/**/*.md` doc-block files; `@doc('key')` refs in MODEL blocks

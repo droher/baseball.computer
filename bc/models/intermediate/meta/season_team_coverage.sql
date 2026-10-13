@@ -33,7 +33,9 @@ WITH final AS (
                 THEN 'PlayByPlay'
             WHEN BOOL_AND(source_type = 'PlayByPlay' OR source_type = 'BoxScore')
                 THEN 'BoxScore'
-            ELSE 'GameLog'
+            WHEN BOOL_OR(source_type = 'GameLog')
+                THEN 'GameLog'
+            ELSE 'NegroLeaguesStats'
         END AS least_granular_source_type
     FROM main_models.team_game_start_info
     WHERE game_id NOT IN (SELECT game_id FROM main_models.game_forfeits)
