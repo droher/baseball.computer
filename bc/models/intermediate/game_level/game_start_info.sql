@@ -60,6 +60,7 @@ MODEL (
     relationships(column := away_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := home_team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    franchise_span_covers_game(),
     relationships(column := park_id, to_model := main_models.stg_parks, to_column := park_id),
     relationships(column := home_starting_pitcher_id, to_model := main_models.people, to_column := player_id),
     relationships(column := away_starting_pitcher_id, to_model := main_models.people, to_column := player_id)

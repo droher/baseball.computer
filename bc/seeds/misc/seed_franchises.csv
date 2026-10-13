@@ -282,6 +282,7 @@ CIA,CIA,NAL,,Cincinnati-Indianapolis,Clowns,,1944-01-01,1945-12-31,,
 CLG,CLG,,,Cleveland,Giants,,1928-01-01,1928-12-31,Cleveland,OH
 CNN,CNN,NN1,,Cincinnati,Cubans,,1921-01-01,1921-12-31,Cincinnati,OH
 CUE,CUE,ECL,,Cuban,Stars (East),,1916-01-01,1929-12-31,,
+CUE,CUE,,,Cuban,Stars (East),,1933-01-01,1933-12-31,,
 CUH,CUH,,,Cuban,House of David,,1931-01-01,1931-12-31,,
 CUP,CUP,EW,,Cuban,Stars,,1932-01-01,1932-12-31,,
 CUW,CUW,,,Cuban,Stars (West),,1906-01-01,1919-12-31,,
@@ -366,8 +367,10 @@ NYL,NYL,,,New York,Lincoln Giants,,1911-01-01,1922-12-31,New York,NY
 NYL,NYL,ECL,,New York,Lincoln Giants,,1923-01-01,1928-12-31,New York,NY
 NYL,NYL,ANL,,New York,Lincoln Giants,,1929-01-01,1929-12-31,New York,NY
 NYL,NYL,,,New York,Lincoln Giants,,1930-01-01,1930-12-31,New York,NY
+PH5,PH5,,,Philadelphia,Stars,,1933-01-01,1933-12-31,Philadelphia,PA
 PH5,PH5,NN2,,Philadelphia,Stars,,1934-01-01,1948-12-31,Philadelphia,PA
 PH5,PH5,NAL,,Philadelphia,Stars,,1949-01-01,1949-12-31,Philadelphia,PA
+PH6,PH6,,,Philadelphia,Bacharach Giants,,1933-01-01,1933-12-31,Philadelphia,PA
 PH6,PH6,,,Philadelphia,Bacharach Giants,,1934-01-01,1936-12-31,Philadelphia,PA
 PHB,PHB,,,Philadelphia-Birmingham,Baron Stars,,1945-01-01,1945-12-31,,
 PHE,PHE,,,Philadelphia,Tigers,,1928-01-01,1928-12-31,Philadelphia,PA
