@@ -62,14 +62,13 @@ batting AS (
     SELECT
         b.season,
         b.team_id::VARCHAR AS team_id,
-        people.retrosheet_player_id::VARCHAR AS player_id,
+        people.player_id::VARCHAR AS player_id,
         b.stint,
         SUM(COALESCE(b.plate_appearances, 0))::INTEGER AS plate_appearances,
         SUM(COALESCE(b.games, 0))::INTEGER AS games_played
     FROM {batting} AS b
     INNER JOIN {people} AS people USING (databank_player_id)
     INNER JOIN valid_team_seasons AS valid USING (season, team_id)
-    WHERE people.retrosheet_player_id IS NOT NULL
     GROUP BY 1, 2, 3, 4
 )
 

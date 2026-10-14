@@ -67,7 +67,7 @@ databank AS (
     SELECT
         field.season,
         field.team_id,
-        people.retrosheet_player_id AS player_id,
+        people.player_id,
         COALESCE(field.fielding_position, 0) AS fielding_position,
         ANY_VALUE('RegularSeason') AS game_type,
         ANY_VALUE(field.fielding_position_category) AS fielding_position_category,
@@ -105,8 +105,6 @@ databank AS (
         OR (
             field.is_negro_leagues
             AND field.season IN (SELECT season FROM databank_sourced_nlb_seasons)
-            AND field.team_id IS NOT NULL
-            AND people.retrosheet_player_id IS NOT NULL
         )
     GROUP BY 1, 2, 3, 4
 ),

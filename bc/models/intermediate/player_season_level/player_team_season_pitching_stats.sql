@@ -188,7 +188,7 @@ WITH databank AS (
     SELECT
         pitch.season,
         pitch.team_id,
-        people.retrosheet_player_id AS player_id,
+        people.player_id,
         'RegularSeason' AS game_type,
         pitch.is_negro_leagues,
         SUM(pitch.wins)::INT AS wins,
@@ -238,8 +238,6 @@ databank_nlb AS (
     FROM databank
     WHERE is_negro_leagues
         AND season IN (SELECT season FROM databank_sourced_nlb_seasons)
-        AND team_id IS NOT NULL
-        AND player_id IS NOT NULL
 ),
 
 retrosheet AS (

@@ -1,0 +1,34 @@
+version: 2
+seeds:
+  - name: seed_leagues
+    description: >-
+      Leagues, one row per league id. league_id is Retrosheet's code where
+      Retrosheet has the league and Lahman's lg_id otherwise. A team with no
+      league (Lahman lg_id IND) has no row. Major-league status follows
+      Major League Baseball's official recognition: the 1969 Special Baseball
+      Records Committee for the 19th- and 20th-century white major leagues
+      (which left out the National Association) and the 2020 decision for the
+      Negro Leagues of 1920-1948.
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: league_id
+        description: League code used in seed_franchises.league and the warehouse league columns.
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: databank_league_id
+        description: Lahman teams.lg_id for the league, if Lahman has it.
+        data_type: varchar
+      - name: league_name
+        description: League name.
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: major_league_first_season
+        description: First season the league counts as a major league; empty if it never does.
+        data_type: smallint
+      - name: major_league_last_season
+        description: Last season the league counts as a major league; empty if it still does or never did.
+        data_type: smallint

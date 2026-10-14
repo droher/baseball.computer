@@ -31,7 +31,7 @@ MODEL (
 WITH lahman_clubs AS (
     SELECT DISTINCT season, team_id
     FROM main_models.stg_databank_teams
-    WHERE is_negro_leagues AND team_id IS NOT NULL
+    WHERE is_negro_leagues
 ),
 
 final AS (

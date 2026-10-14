@@ -56,6 +56,7 @@ bootstrap-dev:
         echo "ERROR: {{ _prod_state }} does not exist." >&2
         exit 1
     fi
+    rm -f "{{ _dev_db }}.wal" "{{ _dev_state }}.wal"
     echo "Copying {{ _prod_db }} -> {{ _dev_db }}"
     cp "{{ _prod_db }}" "{{ _dev_db }}"
     echo "Copying {{ _prod_state }} -> {{ _dev_state }}"

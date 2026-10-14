@@ -1,7 +1,7 @@
 MODEL (
   name main_models.stg_databank_appearances,
   kind FULL,
-  description 'Long-form positional appearances for every (player, season, team, stint). Uses Databank fielding for stinted P/C/1B/2B/3B/SS/OF game counts and appearances.g_lf/g_cf/g_rf for the LF/CF/RF breakdown, with the project''s 1=P, 2=C, 3=1B, 4=2B, 5=3B, 6=SS, 7=LF, 8=CF, 9=RF convention. The OF breakdown comes from appearances rather than fielding_of because fielding_of has no team_id and its stint numbering is not consistent with fielding (browp102 1892 is one example), and because fielding_of has gaps where appearances has the full breakdown. The team-year LF/CF/RF total from appearances is allocated across fielding OF stints in proportion to each stint''s fielding.g; this only differs from a simple broadcast for the small handful of multi-stint same-team OF cases. Joins stg_people to translate databank player_id to retrosheet player_id; rows without a retrosheet id are dropped. team_id is translated from Databank to Retrosheet through stg_databank_teams: every fielding row LEFT JOINs the crosswalk and projects t.team_id directly. Negro Leagues rows with no resolved Retrosheet team are dropped. games_total and outs_played join on the Databank team, since two Databank teams can resolve to one Retrosheet team (the 1939 Toledo Crawfords played in both the NAL and NN2). The OF inner-join into appearances is keyed on the Databank team_id (which is never NULL) so unmapped rows are not silently dropped before the audit can see them. g_all from appearances is kept as games_total for optimizer targets because appearances has the full team total but no stint column. outs_played is the player-stint sum of fielding inn_outs across all non-pitcher positions; it is denormalized (same value across rows for the same player-stint) and is null-coalesced to 0 when the source data lacks inn_outs. g_dh is intentionally skipped because every gamelog-only game in scope is pre-1973.',
+  description 'Long-form positional appearances for every (player, season, team, stint). Uses Databank fielding for stinted P/C/1B/2B/3B/SS/OF game counts and appearances.g_lf/g_cf/g_rf for the LF/CF/RF breakdown, with the project''s 1=P, 2=C, 3=1B, 4=2B, 5=3B, 6=SS, 7=LF, 8=CF, 9=RF convention. The OF breakdown comes from appearances rather than fielding_of because fielding_of has no team_id and its stint numbering is not consistent with fielding (browp102 1892 is one example), and because fielding_of has gaps where appearances has the full breakdown. The team-year LF/CF/RF total from appearances is allocated across fielding OF stints in proportion to each stint''s fielding.g; this only differs from a simple broadcast for the small handful of multi-stint same-team OF cases. player_id is stg_people.player_id: the Retrosheet id, or the Databank id for people Retrosheet does not have. team_id comes from stg_databank_teams: every fielding row LEFT JOINs it and projects t.team_id directly, which is Lahman''s team id for Negro Leagues teams Retrosheet does not have. games_total and outs_played join on the Databank team, since two Databank teams can resolve to one Retrosheet team (the 1939 Toledo Crawfords played in both the NAL and NN2). The OF inner-join into appearances is keyed on the Databank team_id (which is never NULL) so unmapped rows are not silently dropped before the audit can see them. g_all from appearances is kept as games_total for optimizer targets because appearances has the full team total but no stint column. outs_played is the player-stint sum of fielding inn_outs across all non-pitcher positions; it is denormalized (same value across rows for the same player-stint) and is null-coalesced to 0 when the source data lacks inn_outs. g_dh is intentionally skipped because every gamelog-only game in scope is pre-1973.',
   grain (player_id, season, team_id, stint, fielding_position),
   columns (
     player_id VARCHAR,
@@ -166,9 +166,9 @@ non_pitcher_outs_played AS (
     GROUP BY 1, 2, 3, 4
 ),
 
-with_retrosheet_id AS (
+with_player_id AS (
     SELECT
-        people.retrosheet_player_id AS player_id,
+        people.player_id,
         position_games.databank_player_id,
         position_games.season::SMALLINT AS season,
         position_games.stint::SMALLINT AS stint,
@@ -184,11 +184,9 @@ with_retrosheet_id AS (
     LEFT JOIN games_total USING (databank_player_id, season, databank_team_id)
     LEFT JOIN non_pitcher_outs_played AS outs
         USING (databank_player_id, season, databank_team_id, stint)
-    WHERE people.retrosheet_player_id IS NOT NULL
 )
 
-SELECT * FROM with_retrosheet_id
+SELECT * FROM with_player_id
 WHERE games_at_position IS NOT NULL
   AND games_at_position > 0
   AND games_total IS NOT NULL
-  AND (team_id IS NOT NULL OR NOT is_negro_leagues)

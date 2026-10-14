@@ -53,7 +53,7 @@ _BATTING_SQL = """
 SELECT
     b.season,
     b.team_id,
-    people.retrosheet_player_id AS player_id,
+    people.player_id,
     SUM(COALESCE(b.plate_appearances, 0))::INTEGER AS plate_appearances,
     SUM(COALESCE(b.games, 0))::INTEGER AS games_played
 FROM {batting} AS b
@@ -62,8 +62,7 @@ INNER JOIN (
     SELECT DISTINCT season, team_id::VARCHAR AS team_id
     FROM {team_games}
 ) AS valid USING (season, team_id)
-WHERE people.retrosheet_player_id IS NOT NULL
-  AND NOT b.is_negro_leagues
+WHERE NOT b.is_negro_leagues
 GROUP BY 1, 2, 3
 """
 

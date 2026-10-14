@@ -99,6 +99,22 @@ test_people_keeps_nlb_line_ids_outside_player_pattern:
         side: VARCHAR
       rows: []
     main_models.stg_people:
+      rows:
+        - {databank_player_id: lahmo01, player_id: lahmo01, retrosheet_player_id: null, last_name: Lahmanonly}
+        - {databank_player_id: playerpl01, player_id: playr001, retrosheet_player_id: playr001, last_name: Player}
+        - {databank_player_id: goinewa01, player_id: goinw901, retrosheet_player_id: goinw901, last_name: Goines}
+        - {databank_player_id: mgronly99, player_id: umpmg801, retrosheet_player_id: umpmg801, last_name: Manager}
+    main_models.stg_databank_batting:
+      rows:
+        - {databank_player_id: lahmo01, season: 1910, stint: 1}
+        - {databank_player_id: goinewa01, season: 1932, stint: 1}
+    main_models.stg_databank_pitching:
+      columns:
+        databank_player_id: VARCHAR
+      rows: []
+    main_models.stg_databank_fielding:
+      columns:
+        databank_player_id: VARCHAR
       rows: []
     main_models.stg_nlb_batting:
       rows:
@@ -111,10 +127,13 @@ test_people_keeps_nlb_line_ids_outside_player_pattern:
     query:
       partial: true
       rows:
-        - {person_id: oneib801, player_id: oneib801}
-        - {person_id: umpir801, player_id: null}
-        - {person_id: umpir901, player_id: null}
-        - {person_id: playr001, player_id: playr001}
+        - {player_id: goinw901, person_id: goinw901}
+        - {player_id: lahmo01, person_id: lahmo01}
+        - {player_id: oneib801, person_id: oneib801}
+        - {player_id: playr001, person_id: playr001}
+        - {player_id: null, person_id: umpmg801}
+        - {player_id: null, person_id: umpir801}
+        - {player_id: null, person_id: umpir901}
 
 test_nlb_season_sources_threshold:
   model: main_models.nlb_season_sources
@@ -153,10 +172,12 @@ test_player_team_season_offense_stats_nlb_sources:
       rows:
         - {databank_player_id: dx, season: 1925, stint: 1, team_id: NLA, is_negro_leagues: true, games: 50, at_bats: 100, hits: 30, stolen_bases: 9}
         - {databank_player_id: dy, season: 1940, stint: 1, team_id: NLB, is_negro_leagues: true, games: 60, at_bats: 200, hits: 50, stolen_bases: 4}
+        - {databank_player_id: lahmo01, season: 1925, stint: 1, team_id: LTM, is_negro_leagues: true, games: 20, at_bats: 70, hits: 21, stolen_bases: 2}
     main_models.stg_people:
       rows:
-        - {databank_player_id: dx, retrosheet_player_id: playx001}
-        - {databank_player_id: dy, retrosheet_player_id: playy001}
+        - {databank_player_id: dx, player_id: playx001, retrosheet_player_id: playx001}
+        - {databank_player_id: dy, player_id: playy001, retrosheet_player_id: playy001}
+        - {databank_player_id: lahmo01, player_id: lahmo01, retrosheet_player_id: null}
     main_models.nlb_season_sources:
       rows:
         - {season: 1925, season_source: Databank}
@@ -353,6 +374,7 @@ test_player_team_season_offense_stats_nlb_sources:
       partial: true
       rows:
         - {season: 1925, team_id: NLA, player_id: playx001, game_type: RegularSeason, games: 50, at_bats: 100, hits: 30, stolen_bases: 9, stats_source: Databank}
+        - {season: 1925, team_id: LTM, player_id: lahmo01, game_type: RegularSeason, games: 20, at_bats: 70, hits: 21, stolen_bases: 2, stats_source: Databank}
         - {season: 1925, team_id: NLA, player_id: playx001, game_type: Exhibition, games: 1, at_bats: 3, hits: 0, stolen_bases: 0, stats_source: Retrosheet}
         - {season: 1940, team_id: NLB, player_id: playy001, game_type: RegularSeason, games: 1, at_bats: 4, hits: null, stolen_bases: 0, stats_source: Retrosheet}
 
@@ -365,33 +387,51 @@ test_stg_databank_teams_resolves_negro_leagues_team_ids:
         - {year_id: 1942, team_id: NYA, lg_id: AL, team_id_retro: NYA, name: Yankees, g: 154, w: 103, l: 51, rank: 1, lg_win: Y}
         - {year_id: 1910, team_id: XYZ, lg_id: IND, team_id_retro: null, name: Independents, g: 20, w: 10, l: 10, rank: null, lg_win: N}
         - {year_id: 1930, team_id: ABC, lg_id: NNL, team_id_retro: ZZZ, name: Unknowns, g: 60, w: 20, l: 40, rank: 6, lg_win: N}
+        - {year_id: 1914, team_id: NLS, lg_id: EAS, team_id_retro: null, name: Lincoln Stars, g: 30, w: 20, l: 10, rank: 1, lg_win: Y}
     main_seeds.seed_franchises:
       rows:
         - {team_id: CCB}
         - {team_id: CCA}
         - {team_id: NYA}
+        - {team_id: NLS}
     main_seeds.seed_nlb_lahman_team_crosswalk:
       rows:
         - {season: 1942, databank_team_id: CCB, team_id: CCB, reason: roster}
+        - {season: 1914, databank_team_id: NLS, team_id: NYS, reason: collision}
+    main_seeds.seed_leagues:
+      columns:
+        league_id: VARCHAR
+        databank_league_id: VARCHAR
+        league_name: VARCHAR
+        major_league_first_season: SMALLINT
+        major_league_last_season: SMALLINT
+      rows:
+        - {league_id: AL, databank_league_id: AL, league_name: American League, major_league_first_season: 1901, major_league_last_season: null}
+        - {league_id: NN1, databank_league_id: NNL, league_name: Negro National League (first), major_league_first_season: 1920, major_league_last_season: 1931}
+        - {league_id: ECL, databank_league_id: ECL, league_name: Eastern Colored League, major_league_first_season: 1923, major_league_last_season: 1928}
+        - {league_id: NN2, databank_league_id: NN2, league_name: Negro National League (second), major_league_first_season: 1933, major_league_last_season: 1948}
+        - {league_id: NAL, databank_league_id: NAL, league_name: Negro American League, major_league_first_season: 1937, major_league_last_season: 1948}
+        - {league_id: EAS, databank_league_id: EAS, league_name: Eastern independent clubs, major_league_first_season: null, major_league_last_season: null}
   outputs:
     query:
       partial: true
       rows:
-        - {season: 1942, databank_team_id: CCB, is_negro_leagues: true, team_id_retro: CCA, crosswalk_team_id: CCB, team_id: CCB, won_pennant: true}
-        - {season: 1942, databank_team_id: NYA, is_negro_leagues: false, team_id_retro: NYA, crosswalk_team_id: null, team_id: NYA, won_pennant: true}
-        - {season: 1910, databank_team_id: XYZ, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: null, team_id: null, won_pennant: false}
-        - {season: 1930, databank_team_id: ABC, is_negro_leagues: true, team_id_retro: ZZZ, crosswalk_team_id: null, team_id: null, won_pennant: false}
+        - {season: 1942, databank_team_id: CCB, databank_league_id: NAL, league_id: NAL, is_negro_leagues: true, team_id_retro: CCA, crosswalk_team_id: CCB, team_id: CCB, is_databank_team_id: false, won_pennant: true}
+        - {season: 1942, databank_team_id: NYA, databank_league_id: AL, league_id: AL, is_negro_leagues: false, team_id_retro: NYA, crosswalk_team_id: null, team_id: NYA, is_databank_team_id: false, won_pennant: true}
+        - {season: 1910, databank_team_id: XYZ, databank_league_id: IND, league_id: null, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: null, team_id: XYZ, is_databank_team_id: true, won_pennant: false}
+        - {season: 1930, databank_team_id: ABC, databank_league_id: NNL, league_id: NN1, is_negro_leagues: true, team_id_retro: ZZZ, crosswalk_team_id: null, team_id: ABC, is_databank_team_id: true, won_pennant: false}
+        - {season: 1914, databank_team_id: NLS, databank_league_id: EAS, league_id: EAS, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: NYS, team_id: NYS, is_databank_team_id: false, won_pennant: true}
 
 test_nlb_lahman_team_resolution_flags_roster_disagreement:
   model: main_models.nlb_lahman_team_resolution
   inputs:
     main_models.stg_databank_teams:
       rows:
-        - {season: 1935, databank_team_id: CEG, is_negro_leagues: true, team_id_retro: CB3, crosswalk_team_id: NSH, team_id: NSH}
-        - {season: 1935, databank_team_id: PC, is_negro_leagues: true, team_id_retro: PCR, crosswalk_team_id: null, team_id: PCR}
-        - {season: 1935, databank_team_id: UNM, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: null, team_id: null}
-        - {season: 1935, databank_team_id: ABS, is_negro_leagues: true, team_id_retro: ABX, crosswalk_team_id: null, team_id: ABX}
-        - {season: 1935, databank_team_id: NYA, is_negro_leagues: false, team_id_retro: NYA, crosswalk_team_id: null, team_id: NYA}
+        - {season: 1935, databank_team_id: CEG, is_negro_leagues: true, team_id_retro: CB3, crosswalk_team_id: NSH, team_id: NSH, is_databank_team_id: false}
+        - {season: 1935, databank_team_id: PC, is_negro_leagues: true, team_id_retro: PCR, crosswalk_team_id: null, team_id: PCR, is_databank_team_id: false}
+        - {season: 1935, databank_team_id: UNM, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: null, team_id: UNM, is_databank_team_id: true}
+        - {season: 1935, databank_team_id: ABS, is_negro_leagues: true, team_id_retro: ABX, crosswalk_team_id: null, team_id: ABX, is_databank_team_id: false}
+        - {season: 1935, databank_team_id: NYA, is_negro_leagues: false, team_id_retro: NYA, crosswalk_team_id: null, team_id: NYA, is_databank_team_id: false}
     main_models.stg_databank_batting:
       rows:
         - {season: 1935, databank_team_id: CEG, databank_player_id: l1, is_negro_leagues: true}
@@ -428,7 +468,7 @@ test_nlb_lahman_team_resolution_flags_roster_disagreement:
       rows:
         - {season: 1935, databank_team_id: CEG, lahman_players: 3, linked_lahman_players: 3, best_roster_team_id: CB3, best_roster_shared_players: 2, resolved_team_shared_players: 1, resolution_status: crosswalk_disagrees_with_rosters}
         - {season: 1935, databank_team_id: PC, lahman_players: 2, linked_lahman_players: 1, best_roster_team_id: PCR, best_roster_shared_players: 1, resolved_team_shared_players: 1, resolution_status: confirmed}
-        - {season: 1935, databank_team_id: UNM, lahman_players: 0, linked_lahman_players: 0, best_roster_team_id: null, best_roster_shared_players: 0, resolved_team_shared_players: 0, resolution_status: unmapped}
+        - {season: 1935, databank_team_id: UNM, lahman_players: 0, linked_lahman_players: 0, best_roster_team_id: null, best_roster_shared_players: 0, resolved_team_shared_players: 0, resolution_status: databank_team_id}
         - {season: 1935, databank_team_id: ABS, lahman_players: 1, linked_lahman_players: 1, best_roster_team_id: PCR, best_roster_shared_players: 1, resolved_team_shared_players: 0, resolution_status: no_retrosheet_games}
 
 test_nlb_lahman_player_resolution_shared_team_outranks_name_only:
@@ -616,7 +656,22 @@ test_team_season_standings_sources:
     main_models.nlb_season_sources:
       rows:
         - {season: 1926, season_source: Databank}
+        - {season: 1910, season_source: Databank}
         - {season: 1940, season_source: Retrosheet}
+    main_seeds.seed_leagues:
+      columns:
+        league_id: VARCHAR
+        databank_league_id: VARCHAR
+        league_name: VARCHAR
+        major_league_first_season: SMALLINT
+        major_league_last_season: SMALLINT
+      rows:
+        - {league_id: AL, databank_league_id: AL, league_name: American League, major_league_first_season: 1901, major_league_last_season: null}
+        - {league_id: NN1, databank_league_id: NNL, league_name: Negro National League (first), major_league_first_season: 1920, major_league_last_season: 1931}
+        - {league_id: ECL, databank_league_id: ECL, league_name: Eastern Colored League, major_league_first_season: 1923, major_league_last_season: 1928}
+        - {league_id: NN2, databank_league_id: NN2, league_name: Negro National League (second), major_league_first_season: 1933, major_league_last_season: 1948}
+        - {league_id: NAL, databank_league_id: NAL, league_name: Negro American League, major_league_first_season: 1937, major_league_last_season: 1948}
+        - {league_id: EAS, databank_league_id: EAS, league_name: Eastern independent clubs, major_league_first_season: null, major_league_last_season: null}
     main_models.team_game_start_info:
       columns:
         season: SMALLINT
@@ -630,6 +685,8 @@ test_team_season_standings_sources:
         - {season: 1926, team_id: HIL, game_type: RegularSeason, league: ECL, division: null, is_negro_leagues: true}
         - {season: 1940, team_id: BOS, game_type: RegularSeason, league: AL, division: null, is_negro_leagues: false}
         - {season: 1940, team_id: NYA, game_type: RegularSeason, league: AL, division: null, is_negro_leagues: false}
+        - {season: 1940, team_id: HOM, game_type: RegularSeason, league: null, division: null, is_negro_leagues: true}
+        - {season: 1940, team_id: IND, game_type: RegularSeason, league: null, division: null, is_negro_leagues: true}
     main_models.team_game_results:
       columns:
         season: SMALLINT
@@ -648,20 +705,29 @@ test_team_season_standings_sources:
         - {season: 1940, game_id: B3, team_id: BOS, game_type: RegularSeason, game_finish_date: 1940-05-03, wins: 0, losses: 0}
         - {season: 1940, game_id: B4, team_id: BOS, game_type: Exhibition, game_finish_date: 1940-05-04, wins: 1, losses: 0}
         - {season: 1940, game_id: N1, team_id: NYA, game_type: RegularSeason, game_finish_date: 1940-05-01, wins: 0, losses: 1}
+        - {season: 1940, game_id: H40, team_id: HOM, game_type: RegularSeason, game_finish_date: 1940-05-01, wins: 1, losses: 0}
+        - {season: 1940, game_id: I40, team_id: IND, game_type: RegularSeason, game_finish_date: 1940-05-01, wins: 0, losses: 1}
     main_models.stg_databank_teams:
       rows:
         - {season: 1926, databank_team_id: HIL, league_id: ECL, is_negro_leagues: true, team_id: HIL, games: 80, wins: 50, losses: 28, league_rank: 1, won_pennant: false}
         - {season: 1926, databank_team_id: ACB, league_id: ECL, is_negro_leagues: true, team_id: ACY, games: 70, wins: 40, losses: 30, league_rank: 2, won_pennant: true}
-        - {season: 1926, databank_team_id: UNM, league_id: ECL, is_negro_leagues: true, team_id: null, games: 30, wins: 10, losses: 20, league_rank: 3, won_pennant: false}
+        - {season: 1926, databank_team_id: UNM, league_id: ECL, is_negro_leagues: true, team_id: UNM, games: 30, wins: 10, losses: 20, league_rank: 3, won_pennant: false}
+        - {season: 1910, databank_team_id: PG, league_id: EAS, is_negro_leagues: true, team_id: PHG, games: 40, wins: 30, losses: 10, league_rank: 1, won_pennant: true}
         - {season: 1940, databank_team_id: BOS, league_id: AL, is_negro_leagues: false, team_id: BOS, games: 154, wins: 82, losses: 72, league_rank: 4, won_pennant: false}
+        - {season: 1940, databank_team_id: HG, league_id: NN2, is_negro_leagues: true, team_id: HOM, games: 60, wins: 40, losses: 20, league_rank: 1, won_pennant: true}
+        - {season: 1940, databank_team_id: IND1, league_id: null, is_negro_leagues: true, team_id: IND, games: 10, wins: 5, losses: 5, league_rank: null, won_pennant: false}
   outputs:
     query:
       partial: true
       rows:
-        - {season: 1926, team_id: HIL, league: ECL, games: 80, wins: 50, losses: 28, ties: 2, league_rank: 1, won_pennant: false, standings_source: Databank}
-        - {season: 1926, team_id: ACY, league: ECL, games: 70, wins: 40, losses: 30, ties: 0, league_rank: 2, won_pennant: true, standings_source: Databank}
-        - {season: 1940, team_id: BOS, league: AL, games: 3, wins: 2, losses: 0, ties: 1, league_rank: 1, won_pennant: null, standings_source: Retrosheet}
-        - {season: 1940, team_id: NYA, league: AL, games: 1, wins: 0, losses: 1, ties: 0, league_rank: 2, won_pennant: null, standings_source: Retrosheet}
+        - {season: 1926, team_id: HIL, league: ECL, is_major_league: true, games: 80, wins: 50, losses: 28, ties: 2, league_rank: 1, won_pennant: false, standings_source: Databank}
+        - {season: 1926, team_id: ACY, league: ECL, is_major_league: true, games: 70, wins: 40, losses: 30, ties: 0, league_rank: 2, won_pennant: true, standings_source: Databank}
+        - {season: 1926, team_id: UNM, league: ECL, is_major_league: true, games: 30, wins: 10, losses: 20, ties: 0, league_rank: 3, won_pennant: false, standings_source: Databank}
+        - {season: 1910, team_id: PHG, league: EAS, is_major_league: false, games: 40, wins: 30, losses: 10, ties: 0, league_rank: 1, won_pennant: true, standings_source: Databank}
+        - {season: 1940, team_id: BOS, league: AL, is_major_league: true, games: 3, wins: 2, losses: 0, ties: 1, league_rank: 1, won_pennant: null, standings_source: Retrosheet}
+        - {season: 1940, team_id: NYA, league: AL, is_major_league: true, games: 1, wins: 0, losses: 1, ties: 0, league_rank: 2, won_pennant: null, standings_source: Retrosheet}
+        - {season: 1940, team_id: HOM, league: NN2, is_major_league: true, games: 1, wins: 1, losses: 0, ties: 0, league_rank: 1, won_pennant: null, standings_source: Retrosheet}
+        - {season: 1940, team_id: IND, league: null, is_major_league: false, games: 1, wins: 0, losses: 1, ties: 0, league_rank: 1, won_pennant: null, standings_source: Retrosheet}
 
 test_team_game_pitching_stats_earned_runs_and_nlb_team_lines:
   model: main_models.team_game_pitching_stats
@@ -960,10 +1026,10 @@ test_stg_people_applies_id_corrections:
     query:
       partial: true
       rows:
-        - {databank_player_id: millebu02, retrosheet_player_id: null, baseball_reference_player_id: null}
-        - {databank_player_id: milleed04, retrosheet_player_id: mille001, baseball_reference_player_id: milleed04}
-        - {databank_player_id: kingwi01, retrosheet_player_id: null, baseball_reference_player_id: kingwi01}
-        - {databank_player_id: untouched, retrosheet_player_id: untou001, baseball_reference_player_id: untouch01}
+        - {databank_player_id: millebu02, player_id: millebu02, retrosheet_player_id: null, baseball_reference_player_id: null}
+        - {databank_player_id: milleed04, player_id: mille001, retrosheet_player_id: mille001, baseball_reference_player_id: milleed04}
+        - {databank_player_id: kingwi01, player_id: kingwi01, retrosheet_player_id: null, baseball_reference_player_id: kingwi01}
+        - {databank_player_id: untouched, player_id: untou001, retrosheet_player_id: untou001, baseball_reference_player_id: untouch01}
 
 test_stg_databank_batting_nulls_impossible_singles:
   model: main_models.stg_databank_batting
@@ -1019,7 +1085,7 @@ test_stg_databank_appearances_two_lahman_teams_one_retrosheet_team:
         - {player_id: clarkbu01, year_id: 1939, stint: 2, team_id: TC2, lg_id: NN2, pos: SS, g: 6, inn_outs: 177}
     main_models.stg_people:
       rows:
-        - {databank_player_id: clarkbu01, retrosheet_player_id: clarb101}
+        - {databank_player_id: clarkbu01, player_id: clarb101, retrosheet_player_id: clarb101}
   outputs:
     query:
       rows:

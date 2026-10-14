@@ -213,3 +213,12 @@ Details in `notes/nlb-stats-integration-plan.md` (Outcome section).
 - **Report to Lahman:** 21 Retrosheet ids and 12 Baseball-Reference ids shared by two people in the new release (for example `mcclb001` and `mcclubo01` on both Bob McClures; corrected locally in `seed_lahman_people_id_corrections`); tayloci99 1912 batting with 0 hits and 1 home run.
 - **Review `nlb_lahman_player_resolution`** and add reviewed matches to `seed_lahman_people_id_corrections`, starting with the people the seed unlinked from a shared Retrosheet id.
 - **Team fielding in Lahman-sourced NLB seasons** (before 1933) still comes from the few Retrosheet games, while player fielding comes from Lahman.
+
+## Lahman-only Negro Leagues teams, players, and leagues — 2026-10-14
+
+Details in `notes/nlb-stats-integration-plan.md` ("Lahman-only teams, players, and leagues").
+
+- **Promotion to prod.** `stg_people`, `people`, `stg_databank_teams`, and the Lahman staging and season models change, and two seeds changed rows that do not change fingerprints (`seed_lahman_people_id_corrections`, `seed_franchises`). Use `rebuild-prod`, or `promote-prod` restating `main_models.stg_people` and `main_models.stg_databank_teams`.
+- **Lahman-only people's birthplaces.** `people` takes birth city, state, and country only from Retrosheet, so the 918 Lahman-only people have none. Lahman has them, in a different country format.
+- **`is_major_league` beyond standings.** Only `team_season_standings` has it; the season and career models could carry it too.
+- **Report to Lahman:** Frank Warfield's `retro_id` is `warf101` (Retrosheet: `warff101`), and Walter Goines has the Retrosheet non-player id `goinw901`.

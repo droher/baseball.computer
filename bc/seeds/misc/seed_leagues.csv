@@ -1,0 +1,19 @@
+league_id,databank_league_id,league_name,major_league_first_season,major_league_last_season
+NA,NA,National Association,,
+NL,NL,National League,1876,
+AA,AA,American Association,1882,1891
+UA,UA,Union Association,1884,1884
+PL,PL,Players' League,1890,1890
+AL,AL,American League,1901,
+FL,FL,Federal League,1914,1915
+EAS,EAS,Eastern independent clubs,,
+WES,WES,Western independent clubs,,
+NAC,NAC,National Association of Colored Professional Base Ball Clubs,,
+INT,INT,International League of Colored Base Ball Clubs of America and Cuba,,
+NN1,NNL,Negro National League (first),1920,1931
+ECL,ECL,Eastern Colored League,1923,1928
+ANL,ANL,American Negro League,1929,1929
+EW,EWL,East-West League,1932,1932
+NSL,NSL,Negro Southern League,1932,1932
+NN2,NN2,Negro National League (second),1933,1948
+NAL,NAL,Negro American League,1937,1948

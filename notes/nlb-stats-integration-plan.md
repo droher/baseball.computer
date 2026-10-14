@@ -102,10 +102,10 @@ Update `game_data_completeness` and `season_team_coverage` so that NLB-only game
 - **Team crosswalk:** `team_id` comes from `seed_nlb_lahman_team_crosswalk` (season, databank_team_id, team_id) when a row exists there, otherwise from `teams.team_id_retro`.
   - Start the seed with the four `team_id_retro` values that disagree with the NLB file: 1935 CEG→NSH, 1942 CCB→CCB, 1946–47 CIC→IN9.
   - Verify each one by roster overlap in `nlb_lahman_team_resolution`.
-- **Unmapped teams:** the `not_null(team_id)` audit applies to MLB rows only. NLB rows with no Retrosheet team (54 team-seasons, mostly pre-1920) keep `team_id` NULL, are left out of the season models, and are listed in the resolution table.
+- **Teams Retrosheet does not have:** superseded on 2026-10-14 (see "Lahman-only teams, players, and leagues" below). These team-seasons keep their Lahman team id.
 - **Player crosswalk:** `seed_lahman_people_id_corrections` (databank_player_id, retrosheet_player_id, baseball_reference_player_id) replaces `people.retro_id` and `people.bbref_id` for the listed people.
   - It starts empty and is filled from reviewed matches in `nlb_lahman_player_resolution`.
-  - Lahman NLB rows whose person has no Retrosheet id are left out of the season models and listed there.
+  - Lahman NLB rows whose person has no Retrosheet id keep the Databank player id (2026-10-14, below).
 
 ### 8. Season models: Lahman for incomplete seasons
 
@@ -180,7 +180,7 @@ New models under `bc/models/analyses/nlb/`, built from `stg_nlb_*` and the Lahma
 - **`nlb_lahman_team_resolution`**: one row per Lahman NLB team-season.
   - Lahman id, name, league, `team_id_retro`, crosswalk override, resolved `team_id`, whether it exists in `seed_franchises`.
   - The Retrosheet team with the most shared linked players that season, and the overlap share.
-  - Status: `confirmed`, `override`, `crosswalk_disagrees_with_rosters`, `unmapped`, or `no_retrosheet_games`.
+  - Status: `confirmed`, `override`, `crosswalk_disagrees_with_rosters`, `databank_team_id`, or `no_retrosheet_games`.
 - **`nlb_lahman_player_resolution`**: one row per candidate pair (Lahman person, Retrosheet person), for Lahman NLB people whose `retro_id` is missing or doesn't appear in any Retrosheet NLB line or bio record.
   - Evidence: same last name (accent-folded), same first initial, birth year agreement, team-seasons shared with the candidate, and AB similarity on those team-seasons.
   - A rank, and a confidence tier derived from the evidence. Shared team-seasons dominate the tier, because names and birth years are too sparse to decide alone.
@@ -236,10 +236,20 @@ Validation on the branch env:
 - Rows added: about 19,000 player-game batting lines, 8,100 pitching lines, 14,600 fielding lines, 7,100 team-games, 5,600 player-team-season batting rows.
 - Remaining non-blocking audit warnings: `nlb_team_game_stat_ranges` team values outside summed player bounds (3,257 rows, a real disagreement in the source); 14 NLB team-games whose starter's line is missing; 3 NLB-only player lines with impossible counts (for example 10 strikeouts in 4 plate appearances); 3 exact duplicate rows in Retrosheet's NLB player file.
 
+## Lahman-only teams, players, and leagues (2026-10-14)
+
+Lahman has Negro Leagues teams, players, and leagues that Retrosheet does not. They now stay in the warehouse under Lahman's ids instead of being dropped.
+
+- **Teams:** `stg_databank_teams.team_id` is the crosswalk row, otherwise `team_id_retro` when it is in `seed_franchises`, otherwise Lahman's team id (`is_databank_team_id`). `nlb_lahman_team_resolution` reports these as `databank_team_id`.
+  - Crosswalk rows added from roster overlap and Lahman `franch_id`: Philadelphia Giants 1903–11 (PG→PHG), Cuban Stars of Havana 1906–15 (CSH→CUW), 1931 Chicago Columbia Giants (CC2→CAG).
+  - Two Lahman ids are already different Retrosheet teams, so they get new ids: New York Lincoln Stars 1914–16 (NLS→NYS) and West Baden Sprudels 1910–13 (WBS→WBD).
+  - `seed_franchises` gains a row for each Lahman-only team and span rows for Lahman seasons outside a Retrosheet team's span (for example the Brooklyn Royal Giants 1905–22). The `team_season_in_franchises` audit requires a franchise row covering every Negro Leagues team-season.
+- **Players:** `stg_people.player_id` is the Retrosheet id, or the Databank id when there is none. The season models and `stg_databank_appearances` use it, and `people` has a row for every such person. `people.player_id` is also set for anyone with a Lahman batting, pitching, or fielding line, which covers Walter Goines (Retrosheet non-player id `goinw901`). Frank Warfield's Lahman `retro_id` `warf101` is corrected to `warff101`.
+- **Leagues:** `seed_leagues` maps Lahman `lg_id` to Retrosheet's code (NNL→NN1, EWL→EW), keeps Lahman's code for leagues Retrosheet lacks (EAS, WES, NAC, INT), and leaves independents (IND) NULL. It records major-league seasons per MLB's recognition: the 1969 committee for the 19th- and 20th-century leagues, without the National Association, and 1920–48 for the seven Negro Leagues. `team_season_standings` gains `is_major_league`, and a Retrosheet row with no league takes Lahman's league for that team-season when Lahman gives exactly one.
+
 ## Out of scope
 
 - Fielding discrepancy tables. Batting and pitching come first.
-- Minting team or player ids for Lahman entities with no Retrosheet counterpart, such as the pre-1920 independent clubs. They stay unresolved until someone curates them.
 - Lahman team batting, pitching, and fielding totals (`teams` R, AB, H, ERA, and so on). Standings are in scope (step 9). These totals are partial sums and stay out.
 - Tightening ranges with team totals or within-line consistency, for example capping a player's runs at the team total minus teammates' known runs. It went to the retrosheet-mirror session as a candidate Retrosheet finding: 1,134 unknown player runs and 247 unknown hits are forced to 0 by the team totals, and 71 team-games have player minimums above the team total.
 - The Chadwick register as resolution evidence. It links 228 of the 822 unlinked Lahman people and exposes 23 conflicts, but it is not on R2 yet.

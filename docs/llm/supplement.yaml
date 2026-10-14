@@ -83,6 +83,18 @@ leagues:
   ANL:
     name: American Negro League
     aliases: []
+  NAC:
+    name: National Association of Colored Professional Base Ball Clubs
+    aliases: []
+  INT:
+    name: International League of Colored Base Ball Clubs of America and Cuba
+    aliases: [International League 1909]
+  EAS:
+    name: Eastern independent clubs
+    aliases: []
+  WES:
+    name: Western independent clubs
+    aliases: []
 
 ambiguities:
   - term: HR

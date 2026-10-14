@@ -1,7 +1,7 @@
 MODEL (
   name main_models.nlb_lahman_team_resolution,
   kind FULL,
-  description 'How each Lahman Negro Leagues team-season maps to a Retrosheet team, one row per Lahman team-season, checked against roster overlap. The roster check takes the Lahman players with a Retrosheet id (from stg_people) and finds the Retrosheet Negro Leagues team in that season (from stg_nlb_players) that shares the most of them. Status: confirmed (the resolved id is the best roster match), override (the same, through a seed_nlb_lahman_team_crosswalk row), crosswalk_disagrees_with_rosters (another team shares more players), unmapped (no resolved Retrosheet id), or no_retrosheet_games (the resolved team has no Retrosheet roster that season, or no linked Lahman player appears for any Retrosheet team that season).',
+  description 'How each Lahman Negro Leagues team-season maps to a Retrosheet team, one row per Lahman team-season, checked against roster overlap. The roster check takes the Lahman players with a Retrosheet id (from stg_people) and finds the Retrosheet Negro Leagues team in that season (from stg_nlb_players) that shares the most of them. Status: confirmed (the resolved id is the best roster match), override (the same, through a seed_nlb_lahman_team_crosswalk row), crosswalk_disagrees_with_rosters (another team shares more players), databank_team_id (no crosswalk row or Retrosheet id applies, so the team keeps its Lahman id), or no_retrosheet_games (the resolved team has no Retrosheet roster that season, or no linked Lahman player appears for any Retrosheet team that season).',
   grain (season, databank_team_id),
   columns (
     season SMALLINT,
@@ -24,10 +24,10 @@ MODEL (
     season = @doc('season'),
     databank_team_id = 'Lahman teams.team_id.',
     team_name = 'Lahman team name.',
-    league_id = 'Lahman lg_id.',
+    league_id = @doc('league'),
     team_id_retro = 'Lahman''s Retrosheet team id.',
     crosswalk_team_id = 'Team id from seed_nlb_lahman_team_crosswalk, if any.',
-    team_id = 'Retrosheet team id the Lahman staging models use; NULL when unmapped.',
+    team_id = 'Team id the Lahman staging models use.',
     team_id_in_seed_franchises = 'Whether the crosswalk or team_id_retro id is in seed_franchises.',
     lahman_players = 'Lahman people with a batting or pitching row for the team-season.',
     linked_lahman_players = 'Of those, the ones with a Retrosheet id.',
@@ -35,12 +35,12 @@ MODEL (
     best_roster_shared_players = 'Linked players shared with best_roster_team_id.',
     best_roster_overlap_share = 'best_roster_shared_players / linked_lahman_players.',
     resolved_team_shared_players = 'Linked players shared with the resolved team_id.',
-    resolution_status = 'confirmed, override, crosswalk_disagrees_with_rosters, unmapped, or no_retrosheet_games.'
+    resolution_status = 'confirmed, override, crosswalk_disagrees_with_rosters, databank_team_id, or no_retrosheet_games.'
   ),
   audits (
     not_null(columns := (season, databank_team_id, resolution_status)),
     unique_grain(columns := (season, databank_team_id)),
-    accepted_values(column := resolution_status, is_in := ('confirmed', 'override', 'crosswalk_disagrees_with_rosters', 'unmapped', 'no_retrosheet_games'))
+    accepted_values(column := resolution_status, is_in := ('confirmed', 'override', 'crosswalk_disagrees_with_rosters', 'databank_team_id', 'no_retrosheet_games'))
   ),
 );
 
@@ -127,7 +127,7 @@ final AS (
         best.best_roster_shared_players / NULLIF(counts.linked_lahman_players, 0) AS best_roster_overlap_share,
         COALESCE(resolved.shared_players, 0) AS resolved_team_shared_players,
         CASE
-            WHEN teams.team_id IS NULL THEN 'unmapped'
+            WHEN teams.is_databank_team_id THEN 'databank_team_id'
             WHEN best.best_roster_team_id IS NULL OR retro_teams.team_id IS NULL THEN 'no_retrosheet_games'
             WHEN COALESCE(resolved.shared_players, 0) < best.best_roster_shared_players
                 THEN 'crosswalk_disagrees_with_rosters'

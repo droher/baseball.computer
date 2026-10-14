@@ -1,12 +1,13 @@
 MODEL (
   name main_models.team_season_standings,
   kind FULL,
-  description 'Final regular-season standings, one row per team and season. Retrosheet rows total the team''s regular-season games in team_game_results, as the last daily row of standings does. In Negro Leagues seasons that nlb_season_sources assigns to Lahman, Negro Leagues teams come from Lahman''s teams table instead, since Retrosheet has only a few of their games; Lahman team-seasons with no resolved Retrosheet team id are left out (see nlb_lahman_team_resolution). For those seasons this table, not standings, is the season-level record.',
+  description 'Final regular-season standings, one row per team and season. Retrosheet rows total the team''s regular-season games in team_game_results, as the last daily row of standings does. In Negro Leagues seasons that nlb_season_sources assigns to Lahman, Negro Leagues teams come from Lahman''s teams table instead, since Retrosheet has only a few of their games; teams Retrosheet does not have keep their Lahman team id (see stg_databank_teams). For those seasons this table, not standings, is the season-level record. A Retrosheet row with no league takes Lahman''s league for the team-season when Lahman gives exactly one.',
   grain (season, team_id),
   columns (
     season SMALLINT,
     team_id VARCHAR,
     league VARCHAR,
+    is_major_league BOOLEAN,
     division VARCHAR,
     games USMALLINT,
     wins USMALLINT,
@@ -21,6 +22,7 @@ MODEL (
     season = @doc('season'),
     team_id = @doc('team_id'),
     league = @doc('league'),
+    is_major_league = 'Whether the league counts as a major league that season, per seed_leagues. FALSE for teams with no league.',
     division = 'Division, when the league had divisions.',
     games = 'Regular-season games.',
     wins = 'Regular-season wins.',
@@ -32,7 +34,8 @@ MODEL (
     standings_source = 'Retrosheet when the row totals Retrosheet games, Databank when it comes from Lahman''s teams table.'
   ),
   audits (
-    not_null(columns := (season, team_id, games, wins, losses, standings_source)),
+    not_null(columns := (season, team_id, games, wins, losses, standings_source, is_major_league)),
+    relationships(column := league, to_model := main_seeds.seed_leagues, to_column := league_id),
     unique_grain(columns := (season, team_id)),
     valid_baseball_season(column := season),
     relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
@@ -59,6 +62,16 @@ team_leagues AS (
     GROUP BY 1, 2
 ),
 
+databank_team_leagues AS (
+    SELECT
+        season,
+        team_id,
+        ANY_VALUE(league_id) AS league
+    FROM main_models.stg_databank_teams
+    GROUP BY 1, 2
+    HAVING COUNT(DISTINCT league_id) = 1
+),
+
 retrosheet AS (
     SELECT
         results.season::SMALLINT AS season,
@@ -75,7 +88,7 @@ retrosheet AS (
 retrosheet_standings AS (
     SELECT
         retrosheet.*,
-        team_leagues.league,
+        COALESCE(team_leagues.league, databank_team_leagues.league) AS league,
         team_leagues.division,
         NULL::UTINYINT AS lahman_rank,
         NULL::BOOLEAN AS won_pennant,
@@ -84,6 +97,9 @@ retrosheet_standings AS (
     INNER JOIN team_leagues
         ON retrosheet.season = team_leagues.season
             AND retrosheet.team_id = team_leagues.team_id::VARCHAR
+    LEFT JOIN databank_team_leagues
+        ON retrosheet.season = databank_team_leagues.season
+            AND retrosheet.team_id = databank_team_leagues.team_id
     WHERE NOT (
         team_leagues.is_negro_leagues
         AND retrosheet.season IN (SELECT season FROM databank_sourced_nlb_seasons)
@@ -104,7 +120,6 @@ databank_standings AS (
         'Databank' AS standings_source
     FROM main_models.stg_databank_teams
     WHERE is_negro_leagues
-        AND team_id IS NOT NULL
         AND season IN (SELECT season FROM databank_sourced_nlb_seasons)
 ),
 
@@ -116,10 +131,15 @@ unioned AS (
 
 final AS (
     SELECT
-        season,
-        team_id,
-        league,
-        division,
+        unioned.season,
+        unioned.team_id,
+        unioned.league,
+        COALESCE(
+            unioned.season BETWEEN leagues.major_league_first_season
+                AND COALESCE(leagues.major_league_last_season, unioned.season),
+            FALSE
+        ) AS is_major_league,
+        unioned.division,
         games,
         wins,
         losses,
@@ -135,6 +155,8 @@ final AS (
         won_pennant,
         standings_source
     FROM unioned
+    LEFT JOIN main_seeds.seed_leagues AS leagues
+        ON unioned.league = leagues.league_id
 )
 
 SELECT * FROM final

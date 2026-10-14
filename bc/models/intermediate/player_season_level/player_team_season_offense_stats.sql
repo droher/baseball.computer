@@ -169,7 +169,7 @@ WITH databank AS (
     SELECT
         bat.season,
         bat.team_id,
-        people.retrosheet_player_id AS player_id,
+        people.player_id,
         'RegularSeason' AS game_type,
         bat.is_negro_leagues,
         SUM(bat.games)::SMALLINT AS games,
@@ -216,14 +216,12 @@ databank_nlb AS (
     FROM databank
     WHERE is_negro_leagues
         AND season IN (SELECT season FROM databank_sourced_nlb_seasons)
-        AND team_id IS NOT NULL
-        AND player_id IS NOT NULL
 ),
 
 databank_running AS (
     SELECT
         bat.season,
-        people.retrosheet_player_id AS player_id,
+        people.player_id,
         bat.team_id,
         SUM(bat.stolen_bases)::SMALLINT AS stolen_bases,
         SUM(bat.caught_stealing)::SMALLINT AS caught_stealing,

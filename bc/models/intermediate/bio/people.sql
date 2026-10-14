@@ -1,7 +1,7 @@
 MODEL (
   name main_models.people,
   kind FULL,
-  description 'Table containing biographical data on each player, coach, umpire, or manager for whom we have data.',
+  description 'Table containing biographical data on each player, coach, umpire, or manager for whom we have data. People only Lahman has, with no Retrosheet id, are keyed by their Databank id. player_id is set for every person with a Retrosheet player id, a Retrosheet Negro Leagues line, or a Lahman batting, pitching, or fielding line.',
   grain (person_id),
   columns (
     person_id VARCHAR,
@@ -62,11 +62,23 @@ nlb_line_players AS (
     SELECT player_id FROM main_models.stg_nlb_fielding
 ),
 
+databank_line_players AS (
+    SELECT people.player_id
+    FROM main_models.stg_people AS people
+    WHERE people.databank_player_id IN (
+        SELECT databank_player_id FROM main_models.stg_databank_batting
+        UNION
+        SELECT databank_player_id FROM main_models.stg_databank_pitching
+        UNION
+        SELECT databank_player_id FROM main_models.stg_databank_fielding
+    )
+),
+
 joined AS (
     SELECT
         COALESCE(
             retro.player_id,
-            databank.retrosheet_player_id,
+            databank.player_id,
             roster_files.player_id,
             box_files.player_id,
             nlb_line_players.player_id
@@ -92,13 +104,6 @@ joined AS (
         ON databank.retrosheet_player_id = COALESCE(
             retro.player_id, roster_files.player_id, box_files.player_id, nlb_line_players.player_id
         )
-    WHERE COALESCE(
-            retro.player_id,
-            databank.retrosheet_player_id,
-            roster_files.player_id,
-            box_files.player_id,
-            nlb_line_players.player_id
-        ) IS NOT NULL
 ),
 
 final AS (
@@ -106,6 +111,7 @@ final AS (
         CASE
             WHEN person_id SIMILAR TO '[-a-z]{5}[01][0-9]{2}' THEN person_id
             WHEN person_id IN (SELECT player_id FROM nlb_line_players) THEN person_id
+            WHEN person_id IN (SELECT player_id FROM databank_line_players) THEN person_id
         END AS player_id,
         *
     FROM joined
