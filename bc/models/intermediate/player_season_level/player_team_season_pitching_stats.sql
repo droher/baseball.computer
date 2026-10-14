@@ -6,6 +6,7 @@ MODEL (
     season = @doc('season'),
     team_id = @doc('team_id'),
     player_id = @doc('player_id'),
+    stats_source = @doc('stats_source'),
     game_type = @doc('game_type'),
     innings_pitched = @doc('innings_pitched'),
     games = @doc('games'),
@@ -168,6 +169,7 @@ MODEL (
     valid_baseball_season(column := season),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
     relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := stats_source, is_in := ('Retrosheet', 'Databank')),
     accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
     pitch_totals_match_resolution_status()
   ),
@@ -188,6 +190,7 @@ WITH databank AS (
         pitch.team_id,
         people.retrosheet_player_id AS player_id,
         'RegularSeason' AS game_type,
+        pitch.is_negro_leagues,
         SUM(pitch.wins)::INT AS wins,
         SUM(pitch.losses)::INT AS losses,
         SUM(pitch.games)::INT AS games,
@@ -213,7 +216,30 @@ WITH databank AS (
         SUM(pitch.grounded_into_double_plays)::INT AS grounded_into_double_plays,
     FROM main_models.stg_databank_pitching AS pitch
     INNER JOIN main_models.stg_people AS people USING (databank_player_id)
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4, 5
+),
+
+databank_mlb AS (
+    SELECT * EXCLUDE (is_negro_leagues)
+    FROM databank
+    WHERE NOT is_negro_leagues
+),
+
+databank_sourced_nlb_seasons AS (
+    SELECT season
+    FROM main_models.nlb_season_sources
+    WHERE season_source = 'Databank'
+),
+
+databank_nlb AS (
+    SELECT
+        * EXCLUDE (is_negro_leagues),
+        ROUND(outs_recorded / 3, 2) AS innings_pitched
+    FROM databank
+    WHERE is_negro_leagues
+        AND season IN (SELECT season FROM databank_sourced_nlb_seasons)
+        AND team_id IS NOT NULL
+        AND player_id IS NOT NULL
 ),
 
 retrosheet AS (
@@ -225,8 +251,9 @@ retrosheet AS (
         COUNT(*)::INT AS games,
         @pitching_combined_sum_int(),
         @pitch_sequence_resolution_status_agg()
-    FROM main_models.stg_games AS games
+    FROM main_models.game_start_info AS games
     INNER JOIN main_models.player_game_pitching_stats AS stats USING (game_id)
+    WHERE @is_retrosheet_season_game(games)
     GROUP BY 1, 2, 3, 4
 ),
 
@@ -247,9 +274,9 @@ retrosheet_seasons AS (
 
 databank_only AS (
     SELECT
-        databank.*,
-        ROUND(databank.outs_recorded / 3, 2) AS innings_pitched
-    FROM databank
+        databank_mlb.*,
+        ROUND(databank_mlb.outs_recorded / 3, 2) AS innings_pitched
+    FROM databank_mlb
     LEFT JOIN retrosheet_seasons USING (season)
     WHERE retrosheet_seasons.season IS NULL
 ),
@@ -275,7 +302,7 @@ retrosheet_supplemented AS (
             ROUND(COALESCE(r.outs_recorded, d.outs_recorded) / 3, 2) AS innings_pitched
         )
     FROM retrosheet_keyed AS r
-    LEFT JOIN databank AS d
+    LEFT JOIN databank_mlb AS d
         ON r.season = d.season
             AND r.team_id_str = d.team_id
             AND r.player_id = d.player_id
@@ -285,6 +312,8 @@ retrosheet_supplemented AS (
             AND r.game_type_str = 'RegularSeason'
 )
 
-SELECT * FROM retrosheet_supplemented
+SELECT *, 'Retrosheet' AS stats_source FROM retrosheet_supplemented
 UNION ALL BY NAME
-SELECT * FROM databank_only
+SELECT *, 'Databank' AS stats_source FROM databank_only
+UNION ALL BY NAME
+SELECT *, 'Databank' AS stats_source FROM databank_nlb

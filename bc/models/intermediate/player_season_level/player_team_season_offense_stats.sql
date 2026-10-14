@@ -6,6 +6,7 @@ MODEL (
     season = @doc('season'),
     team_id = @doc('team_id'),
     player_id = @doc('player_id'),
+    stats_source = @doc('stats_source'),
     game_type = @doc('game_type'),
     games = @doc('games'),
     plate_appearances = @doc('plate_appearances'),
@@ -149,6 +150,7 @@ MODEL (
     valid_baseball_season(column := season),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
     relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := stats_source, is_in := ('Retrosheet', 'Databank')),
     accepted_values(column := pitch_sequence_resolution_status, is_in := ('Resolved', 'Unavailable', 'Unresolved')),
     pitch_totals_match_resolution_status()
   ),
@@ -169,6 +171,7 @@ WITH databank AS (
         bat.team_id,
         people.retrosheet_player_id AS player_id,
         'RegularSeason' AS game_type,
+        bat.is_negro_leagues,
         SUM(bat.games)::SMALLINT AS games,
         SUM(bat.at_bats)::SMALLINT AS at_bats,
         SUM(bat.runs)::SMALLINT AS runs,
@@ -193,7 +196,28 @@ WITH databank AS (
         SUM(bat.on_base_successes)::SMALLINT AS on_base_successes,
     FROM main_models.stg_databank_batting AS bat
     INNER JOIN main_models.stg_people AS people USING (databank_player_id)
-    GROUP BY 1, 2, 3
+    GROUP BY 1, 2, 3, 4, 5
+),
+
+databank_mlb AS (
+    SELECT * EXCLUDE (is_negro_leagues)
+    FROM databank
+    WHERE NOT is_negro_leagues
+),
+
+databank_sourced_nlb_seasons AS (
+    SELECT season
+    FROM main_models.nlb_season_sources
+    WHERE season_source = 'Databank'
+),
+
+databank_nlb AS (
+    SELECT * EXCLUDE (is_negro_leagues)
+    FROM databank
+    WHERE is_negro_leagues
+        AND season IN (SELECT season FROM databank_sourced_nlb_seasons)
+        AND team_id IS NOT NULL
+        AND player_id IS NOT NULL
 ),
 
 databank_running AS (
@@ -207,6 +231,7 @@ databank_running AS (
     INNER JOIN main_models.stg_people AS people USING (databank_player_id)
     -- TODO: Add var to indicate final databank override year
     WHERE bat.season < 1920
+        AND NOT bat.is_negro_leagues
     GROUP BY 1, 2, 3
 ),
 
@@ -219,8 +244,9 @@ retrosheet AS (
         COUNT(*)::SMALLINT AS games,
         @offense_sum_smallint(),
         @pitch_sequence_resolution_status_agg()
-    FROM main_models.stg_games AS games
+    FROM main_models.game_start_info AS games
     INNER JOIN main_models.player_game_offense_stats AS stats USING (game_id)
+    WHERE @is_retrosheet_season_game(games)
     GROUP BY 1, 2, 3, 4
 ),
 
@@ -240,8 +266,8 @@ retrosheet_seasons AS (
 ),
 
 databank_only AS (
-    SELECT databank.*
-    FROM databank
+    SELECT databank_mlb.*
+    FROM databank_mlb
     LEFT JOIN retrosheet_seasons USING (season)
     WHERE retrosheet_seasons.season IS NULL
 ),
@@ -270,7 +296,7 @@ retrosheet_supplemented AS (
             COALESCE(r.on_base_successes, d.on_base_successes) AS on_base_successes
         )
     FROM retrosheet_keyed AS r
-    LEFT JOIN databank AS d
+    LEFT JOIN databank_mlb AS d
         ON r.season = d.season
             AND r.team_id_str = d.team_id
             AND r.player_id = d.player_id
@@ -299,6 +325,8 @@ final AS (
     LEFT JOIN databank_running AS dr USING (season, player_id, team_id)
 )
 
-SELECT * FROM final
+SELECT *, 'Retrosheet' AS stats_source FROM final
 UNION ALL BY NAME
-SELECT * FROM databank_only
+SELECT *, 'Databank' AS stats_source FROM databank_only
+UNION ALL BY NAME
+SELECT *, 'Databank' AS stats_source FROM databank_nlb

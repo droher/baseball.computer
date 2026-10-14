@@ -45,6 +45,7 @@ INNER JOIN (
     SELECT DISTINCT season, team_id::VARCHAR AS team_id
     FROM {team_games}
 ) AS valid USING (season, team_id)
+WHERE NOT a.is_negro_leagues
 GROUP BY 1, 2, 3, 4
 """
 
@@ -62,6 +63,7 @@ INNER JOIN (
     FROM {team_games}
 ) AS valid USING (season, team_id)
 WHERE people.retrosheet_player_id IS NOT NULL
+  AND NOT b.is_negro_leagues
 GROUP BY 1, 2, 3
 """
 

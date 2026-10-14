@@ -50,7 +50,7 @@ DEFAULT_SOURCE_ROOTS: dict[str, str] = {
     "misc": "https://data.baseball.computer/misc",
     "baseballdatabank": "https://data.baseball.computer/baseballdatabank",
     "biodata": "https://data.baseball.computer/biodata",
-    "ngl_stats": "https://data.baseball.computer/ngl_stats",
+    "nlb_stats": "https://data.baseball.computer/ngl_stats",
 }
 
 # Same order as bc/macros/_init_db.py — child types before parents on drop.

@@ -160,29 +160,69 @@ players AS (
     GROUP BY 1, 2
 ),
 
+nlb_team_fielding AS (
+    SELECT
+        game_id,
+        team_id,
+        p_ipouts AS outs_played,
+        d_po AS putouts,
+        d_a AS assists,
+        d_e AS errors,
+        d_dp AS double_plays,
+        d_tp AS triple_plays,
+        d_pb AS passed_balls,
+        d_sb AS stolen_bases,
+        d_cs AS caught_stealing
+    FROM main_models.nlb_team_lines
+),
+
+team_games AS (
+    SELECT game_id, team_id FROM players
+    UNION
+    SELECT game_id, team_id FROM nlb_team_fielding
+),
+
 final AS (
     SELECT
         game_info.season,
         game_id,
         team_id,
-        COALESCE(t.outs_played, g.outs_played, p.outs_played)::UTINYINT AS outs_played,
+        CASE WHEN n.game_id IS NOT NULL THEN n.outs_played
+            ELSE COALESCE(t.outs_played, g.outs_played, p.outs_played)
+        END::UTINYINT AS outs_played,
         -- At the moment, there are some box score accounts that are less reliable
         -- than their PBP counterparts for fielding. The largest of the options here
         -- is the most likely to be consistent and correct.
         -- TODO: Revisit after NLB data quality improvements
-        GREATEST(t.putouts, p.putouts, g.putouts)::UTINYINT AS putouts,
-        GREATEST(t.assists, p.assists, g.assists)::UTINYINT AS assists,
-        GREATEST(t.errors, p.errors, g.errors)::UTINYINT AS errors,
+        CASE WHEN n.game_id IS NOT NULL THEN n.putouts
+            ELSE GREATEST(t.putouts, p.putouts, g.putouts)
+        END::UTINYINT AS putouts,
+        CASE WHEN n.game_id IS NOT NULL THEN n.assists
+            ELSE GREATEST(t.assists, p.assists, g.assists)
+        END::UTINYINT AS assists,
+        CASE WHEN n.game_id IS NOT NULL THEN n.errors
+            ELSE GREATEST(t.errors, p.errors, g.errors)
+        END::UTINYINT AS errors,
         p.fielders_choices,
         p.assisted_putouts,
         p.in_play_putouts,
         p.in_play_assists,
-        COALESCE(t.passed_balls, p.passed_balls)::UTINYINT AS passed_balls,
+        CASE WHEN n.game_id IS NOT NULL THEN n.passed_balls
+            ELSE COALESCE(t.passed_balls, p.passed_balls)
+        END::UTINYINT AS passed_balls,
         -- We trust PBP events over box events
-        COALESCE(g.stolen_bases, box_sb.stolen_bases, 0)::UTINYINT AS stolen_bases,
-        COALESCE(g.caught_stealing, box_cs.caught_stealing, 0)::UTINYINT AS caught_stealing,
-        COALESCE(g.double_plays, box_dp.double_plays, 0)::UTINYINT AS double_plays,
-        COALESCE(g.triple_plays, box_tp.triple_plays, 0)::UTINYINT AS triple_plays,
+        CASE WHEN n.game_id IS NOT NULL THEN n.stolen_bases
+            ELSE COALESCE(g.stolen_bases, box_sb.stolen_bases, 0)
+        END::UTINYINT AS stolen_bases,
+        CASE WHEN n.game_id IS NOT NULL THEN n.caught_stealing
+            ELSE COALESCE(g.caught_stealing, box_cs.caught_stealing, 0)
+        END::UTINYINT AS caught_stealing,
+        CASE WHEN n.game_id IS NOT NULL THEN n.double_plays
+            ELSE COALESCE(g.double_plays, box_dp.double_plays, 0)
+        END::UTINYINT AS double_plays,
+        CASE WHEN n.game_id IS NOT NULL THEN n.triple_plays
+            ELSE COALESCE(g.triple_plays, box_tp.triple_plays, 0)
+        END::UTINYINT AS triple_plays,
         g.pickoffs,
         g.plate_appearances_in_field,
         g.plate_appearances_in_field_with_ball_in_play,
@@ -190,8 +230,10 @@ final AS (
         g.reaching_errors,
         g.unknown_putouts,
         g.incomplete_events
-    FROM players AS p
+    FROM team_games
     INNER JOIN game_info USING (game_id, team_id)
+    LEFT JOIN players AS p USING (game_id, team_id)
+    LEFT JOIN nlb_team_fielding AS n USING (game_id, team_id)
     LEFT JOIN game_event_agg AS g USING (game_id, team_id)
     LEFT JOIN main_models.stg_box_score_team_fielding_lines AS t USING (game_id, side)
     LEFT JOIN box_sb USING (game_id, side)

@@ -1,14 +1,16 @@
 MODEL (
   name main_models.stg_databank_batting,
   kind FULL,
-  description 'Aggregate batting statistics by player, season, and stint with a given team. team_id is translated from Databank to Retrosheet via baseballdatabank.teams.team_id_retro and the not_null audit on team_id fails the build if any row is missing from the crosswalk.',
+  description 'Aggregate batting statistics by player, season, and stint with a given team. team_id is translated from Databank to Retrosheet through stg_databank_teams. The not_null audit on team_id fails the build if a major-league row is missing from the crosswalk; Negro Leagues rows with no resolved Retrosheet team keep team_id NULL. singles is NULL when a row''s hits are fewer than its extra-base hits.',
   grain (databank_player_id, season, stint),
   columns (
     databank_player_id VARCHAR,
     season SMALLINT,
     stint SMALLINT,
     team_id VARCHAR,
+    databank_team_id VARCHAR,
     league_id VARCHAR,
+    is_negro_leagues BOOLEAN,
     games USMALLINT,
     at_bats USMALLINT,
     runs USMALLINT,
@@ -33,6 +35,8 @@ MODEL (
     on_base_successes USMALLINT
   ),
   column_descriptions (
+    databank_team_id = 'Lahman teams.team_id.',
+    is_negro_leagues = 'Whether the Lahman league is a Negro Leagues league rather than a major league.',
     databank_player_id = @doc('databank_player_id'),
     season = @doc('season'),
     stint = @doc('stint'),
@@ -62,7 +66,8 @@ MODEL (
     on_base_successes = @doc('on_base_successes')
   ),
   audits (
-    not_null(columns := (databank_player_id, season, stint, team_id))
+    not_null(columns := (databank_player_id, season, stint, is_negro_leagues)),
+    not_null(columns := (team_id), condition := NOT is_negro_leagues)
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_databank_batting.parquet'
@@ -77,16 +82,19 @@ MODEL (
 
 WITH team_id_crosswalk AS (
     SELECT
-        year_id,
-        team_id AS databank_team_id,
-        team_id_retro AS team_id
-    FROM baseballdatabank.teams
+        season AS year_id,
+        databank_team_id,
+        team_id,
+        is_negro_leagues
+    FROM main_models.stg_databank_teams
 ),
 
 source AS (
     SELECT
         b.* EXCLUDE (team_id),
-        t.team_id AS team_id
+        b.team_id AS databank_team_id,
+        t.team_id AS team_id,
+        t.is_negro_leagues
     FROM baseballdatabank.batting AS b
     LEFT JOIN team_id_crosswalk AS t
         ON b.year_id = t.year_id AND b.team_id = t.databank_team_id
@@ -99,7 +107,9 @@ renamed AS (
         year_id AS season,
         stint,
         team_id AS team_id,
+        databank_team_id,
         lg_id AS league_id,
+        is_negro_leagues,
         g AS games,
         ab AS at_bats,
         r AS runs,
@@ -117,7 +127,9 @@ renamed AS (
         sh AS sacrifice_hits,
         sf AS sacrifice_flies,
         gidp AS grounded_into_double_plays,
-        hits - home_runs - triples - doubles AS singles,
+        CASE WHEN hits::INT - home_runs - triples - doubles >= 0
+            THEN hits - home_runs - triples - doubles
+        END AS singles,
         (singles + doubles * 2 + triples * 3 + home_runs * 4)::USMALLINT AS total_bases,
         (at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0)
         + COALESCE(sacrifice_hits, 0))::USMALLINT

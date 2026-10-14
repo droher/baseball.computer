@@ -20,6 +20,13 @@ test_player_game_offense_stats_pitch_totals_follow_status:
       columns:
         side: VARCHAR
       rows: []
+    main_models.nlb_batting_lines:
+      columns:
+        game_id: VARCHAR
+        batter_id: VARCHAR
+        team_id: VARCHAR
+        side: VARCHAR
+      rows: []
     main_models.game_start_info:
       columns:
         game_id: VARCHAR

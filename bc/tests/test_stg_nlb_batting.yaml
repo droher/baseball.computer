@@ -1,7 +1,7 @@
-test_stg_ngl_batting_bounds:
-  model: main_models.stg_ngl_batting
+test_stg_nlb_batting_bounds:
+  model: main_models.stg_nlb_batting
   inputs:
-    ngl_stats.batting:
+    nlb_stats.batting:
       rows:
         - {gid: G1, id: known, team: T, b_lp: 1, b_seq: 1, stattype: value, b_ab: 4, b_r: 1, date: 19400501, ph: null}
         - {gid: G1, id: lower, team: T, b_lp: 2, b_seq: 1, stattype: value, b_ab: null, b_r: 0, date: 19400501, ph: 1}

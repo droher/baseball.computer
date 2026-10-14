@@ -1,5 +1,5 @@
 MODEL (
-  name main_models.stg_ngl_batting,
+  name main_models.stg_nlb_batting,
   kind FULL,
   description 'Negro Leagues batting lines (batting.csv), one row per player line, from Retrosheet''s negroleagues.zip. Where Retrosheet does not know a stat exactly, its value is NULL and the _lower or _upper column holds the bound Retrosheet gives; a known value is its own lower and upper bound, and a NULL bound is unbounded. Stat names are Retrosheet''s.',
   grain (game_id, player_id, team_id, lineup_position, sequence),
@@ -53,7 +53,7 @@ WITH source AS (
         TRY_CAST(b_gdp AS INTEGER) AS b_gdp,
         TRY_CAST(b_xi AS INTEGER) AS b_xi,
         TRY_CAST(b_roe AS INTEGER) AS b_roe
-    FROM ngl_stats.batting
+    FROM nlb_stats.batting
 )
 
 SELECT

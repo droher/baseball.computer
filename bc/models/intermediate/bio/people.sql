@@ -54,13 +54,22 @@ box_files AS (
       SELECT DISTINCT fielder_id AS player_id FROM main_models.stg_box_score_fielding_lines
 ),
 
+nlb_line_players AS (
+    SELECT player_id FROM main_models.stg_nlb_batting
+    UNION
+    SELECT player_id FROM main_models.stg_nlb_pitching
+    UNION
+    SELECT player_id FROM main_models.stg_nlb_fielding
+),
+
 joined AS (
     SELECT
         COALESCE(
             retro.player_id,
             databank.retrosheet_player_id,
             roster_files.player_id,
-            box_files.player_id
+            box_files.player_id,
+            nlb_line_players.player_id
         ) AS person_id,
         databank.baseball_reference_player_id,
         COALESCE(retro.first_name, databank.first_name) AS first_name,
@@ -78,19 +87,26 @@ joined AS (
     FROM main_models.stg_bio AS retro
     FULL OUTER JOIN roster_files USING (player_id)
     FULL OUTER JOIN box_files USING (player_id)
+    FULL OUTER JOIN nlb_line_players USING (player_id)
     FULL OUTER JOIN main_models.stg_people AS databank
-        ON databank.retrosheet_player_id = COALESCE(retro.player_id, roster_files.player_id, box_files.player_id)
+        ON databank.retrosheet_player_id = COALESCE(
+            retro.player_id, roster_files.player_id, box_files.player_id, nlb_line_players.player_id
+        )
     WHERE COALESCE(
             retro.player_id,
             databank.retrosheet_player_id,
             roster_files.player_id,
-            box_files.player_id
+            box_files.player_id,
+            nlb_line_players.player_id
         ) IS NOT NULL
 ),
 
 final AS (
     SELECT
-        CASE WHEN person_id SIMILAR TO '[-a-z]{5}[01][0-9]{2}' THEN person_id ELSE NULL END AS player_id,
+        CASE
+            WHEN person_id SIMILAR TO '[-a-z]{5}[01][0-9]{2}' THEN person_id
+            WHEN person_id IN (SELECT player_id FROM nlb_line_players) THEN person_id
+        END AS player_id,
         *
     FROM joined
 )

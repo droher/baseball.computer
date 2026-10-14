@@ -9,6 +9,8 @@ proposal or handoff is not evidence that its implementation is still pending.
 ## Follow-ups and implementation
 
 - [Open follow-ups](followups.md): the shared backlog and recorded dispositions.
+- [Negro Leagues stats integration plan](nlb-stats-integration-plan.md): feeding `stg_nlb_*` player and team lines into the game, season, and career models.
+- [Negro Leagues batting: Lahman vs Retrosheet](nlb-lahman-retrosheet-comparison.md): where each source has more coverage, where they disagree, and the crosswalk gaps between them.
 
 ## Performance investigations
 

@@ -1,5 +1,5 @@
 MODEL (
-  name main_models.stg_ngl_fielding,
+  name main_models.stg_nlb_fielding,
   kind FULL,
   description 'Negro Leagues fielding lines (fielding.csv), one row per player, position, and sequence, from Retrosheet''s negroleagues.zip. Where Retrosheet does not know a stat exactly, its value is NULL and the _lower or _upper column holds the bound Retrosheet gives; a known value is its own lower and upper bound, and a NULL bound is unbounded. Stat names are Retrosheet''s.',
   grain (game_id, player_id, team_id, sequence, position),
@@ -42,7 +42,7 @@ WITH source AS (
         TRY_CAST(d_sb AS INTEGER) AS d_sb,
         TRY_CAST(d_cs AS INTEGER) AS d_cs,
         TRY_CAST(d_gs AS INTEGER) AS d_gs
-    FROM ngl_stats.fielding
+    FROM nlb_stats.fielding
 )
 
 SELECT

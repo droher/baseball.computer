@@ -61,7 +61,7 @@ gamelog_results AS (
     WHERE game_id NOT IN (SELECT game_id FROM event_and_box_results)
 ),
 
-ngl_stats_results AS (
+nlb_only_results AS (
     SELECT
         game_id,
         date,
@@ -73,7 +73,7 @@ ngl_stats_results AS (
         away_runs_scored,
         away_line_score,
         home_line_score,
-    FROM main_models.ngl_stats_only_games
+    FROM main_models.nlb_only_games
 ),
 
 unioned AS (
@@ -81,7 +81,7 @@ unioned AS (
     FROM gamelog_results
     UNION ALL BY NAME
     SELECT *
-    FROM ngl_stats_results
+    FROM nlb_only_results
     UNION ALL BY NAME
     SELECT *
     FROM event_and_box_results

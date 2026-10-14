@@ -1,7 +1,7 @@
 MODEL (
-  name main_models.stg_ngl_teams,
+  name main_models.stg_nlb_teams,
   kind FULL,
-  description 'Negro Leagues team lines (teamstats.csv), one row per team and game, with runs by inning and starting lineups, from Retrosheet''s negroleagues.zip. Where Retrosheet does not know a stat exactly, its value is NULL and the _lower or _upper column holds the bound Retrosheet gives; a known value is its own lower and upper bound, and a NULL bound is unbounded. Stat names are Retrosheet''s.',
+  description 'Negro Leagues team lines (teamstats.csv), one row per team and game, with runs by inning and starting lineups, from Retrosheet''s negroleagues.zip. Where Retrosheet does not know a stat exactly, its value is NULL and the _lower or _upper column holds the bound Retrosheet gives; a known value is its own lower and upper bound, and a NULL bound is unbounded. A negative left-on-base count is NULL. Stat names are Retrosheet''s.',
   grain (game_id, team_id),
   audits (
     not_null(columns := (game_id, team_id)),
@@ -76,7 +76,7 @@ WITH source AS (
         TRY_CAST(inn26 AS INTEGER) AS inn26,
         TRY_CAST(inn27 AS INTEGER) AS inn27,
         TRY_CAST(inn28 AS INTEGER) AS inn28,
-        TRY_CAST(lob AS INTEGER) AS lob,
+        CASE WHEN TRY_CAST(lob AS INTEGER) >= 0 THEN TRY_CAST(lob AS INTEGER) END AS lob,
         TRY_CAST(b_pa AS INTEGER) AS b_pa,
         TRY_CAST(b_ab AS INTEGER) AS b_ab,
         TRY_CAST(b_r AS INTEGER) AS b_r,
@@ -125,7 +125,7 @@ WITH source AS (
         TRY_CAST(d_wp AS INTEGER) AS d_wp,
         TRY_CAST(d_sb AS INTEGER) AS d_sb,
         TRY_CAST(d_cs AS INTEGER) AS d_cs
-    FROM ngl_stats.teamstats
+    FROM nlb_stats.teamstats
 )
 
 SELECT

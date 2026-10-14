@@ -53,7 +53,10 @@
   - team_id
   audits:
   - - not_null
-    - columns: (year_id, team_id, team_id_retro)
+    - columns: (year_id, team_id)
+  - - not_null
+    - columns: (team_id_retro)
+      condition: lg_id IN ('AL', 'NL', 'AA', 'UA', 'PL', 'FL', 'NA')
   - - unique_grain
     - columns: (year_id, team_id)
 - name: biodata.coaches
@@ -624,7 +627,7 @@
     umpire_id: VARCHAR
     last_name: VARCHAR
     first_name: VARCHAR
-- name: ngl_stats.allplayers
+- name: nlb_stats.allplayers
   description: Negro Leagues player seasons from Retrosheet's negroleagues.zip (allplayers.csv).
   columns:
     id: VARCHAR
@@ -652,7 +655,7 @@
     first_g: BIGINT
     last_g: BIGINT
     season: BIGINT
-- name: ngl_stats.batting
+- name: nlb_stats.batting
   description: Negro Leagues batting lines from Retrosheet's negroleagues.zip (batting.csv); stattype
     is value, lower, or upper.
   columns:
@@ -695,7 +698,7 @@
     gametype: VARCHAR
     box: VARCHAR
     pbp: VARCHAR
-- name: ngl_stats.fielding
+- name: nlb_stats.fielding
   description: Negro Leagues fielding lines from Retrosheet's negroleagues.zip (fielding.csv); stattype
     is value, lower, or upper.
   columns:
@@ -727,7 +730,7 @@
     gametype: VARCHAR
     box: VARCHAR
     pbp: VARCHAR
-- name: ngl_stats.gameinfo
+- name: nlb_stats.gameinfo
   description: Negro Leagues games from Retrosheet's negroleagues.zip (gameinfo.csv).
   columns:
     gid: VARCHAR
@@ -773,7 +776,7 @@
     box: VARCHAR
     pbp: VARCHAR
     season: BIGINT
-- name: ngl_stats.pitching
+- name: nlb_stats.pitching
   description: Negro Leagues pitching lines from Retrosheet's negroleagues.zip (pitching.csv); stattype
     is value, lower, or upper.
   columns:
@@ -819,7 +822,7 @@
     gametype: VARCHAR
     box: VARCHAR
     pbp: VARCHAR
-- name: ngl_stats.plays
+- name: nlb_stats.plays
   description: Negro Leagues plays from Retrosheet's negroleagues.zip (plays.csv).
   columns:
     gid: VARCHAR
@@ -999,7 +1002,7 @@
     date: BIGINT
     gametype: VARCHAR
     pbp: VARCHAR
-- name: ngl_stats.teamstats
+- name: nlb_stats.teamstats
   description: Negro Leagues team lines from Retrosheet's negroleagues.zip (teamstats.csv); stattype is
     value, lower, or upper.
   columns:

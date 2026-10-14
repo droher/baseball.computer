@@ -11,7 +11,8 @@ MODEL (
   column_descriptions (
     season = @doc('season'),
     team_id = @doc('team_id'),
-    league = @doc('league')
+    league = @doc('league'),
+    least_granular_source_type = 'The least detailed source among the team''s non-exhibition games: PlayByPlay, BoxScore, GameLog, or NegroLeaguesStats. A game recorded only in negroleagues.zip counts as BoxScore when Retrosheet has its box score, and as NegroLeaguesStats when it has only appearances.'
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_season_team_coverage.parquet'
@@ -24,7 +25,28 @@ MODEL (
 
 
 
-WITH final AS (
+WITH nlb_box_scores AS (
+    SELECT game_id
+    FROM main_models.stg_nlb_games
+    WHERE LOWER(box) = 'y'
+),
+
+team_games AS (
+    SELECT
+        season,
+        team_id,
+        league,
+        CASE
+            WHEN source_type = 'NegroLeaguesStats' AND game_id IN (SELECT game_id FROM nlb_box_scores)
+                THEN 'BoxScore'
+            ELSE source_type
+        END AS source_type
+    FROM main_models.team_game_start_info
+    WHERE game_id NOT IN (SELECT game_id FROM main_models.game_forfeits)
+        AND (game_type != 'Exhibition' OR league IS NULL)
+),
+
+final AS (
     SELECT
         season,
         team_id,
@@ -37,9 +59,7 @@ WITH final AS (
                 THEN 'GameLog'
             ELSE 'NegroLeaguesStats'
         END AS least_granular_source_type
-    FROM main_models.team_game_start_info
-    WHERE game_id NOT IN (SELECT game_id FROM main_models.game_forfeits)
-        AND (game_type != 'Exhibition' OR league IS NULL)
+    FROM team_games
     GROUP BY 1, 2
 )
 

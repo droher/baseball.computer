@@ -346,12 +346,73 @@ WITH initial_sum AS (
     GROUP BY 1, 2
 ),
 
+nlb_team_pitching AS (
+    SELECT
+        game_id,
+        team_id,
+        p_bfp::USMALLINT AS batters_faced,
+        p_ipouts::USMALLINT AS outs_recorded,
+        p_h::USMALLINT AS hits,
+        p_d::USMALLINT AS doubles,
+        p_t::USMALLINT AS triples,
+        p_hr::USMALLINT AS home_runs,
+        p_r::USMALLINT AS runs,
+        p_er::USMALLINT AS earned_runs,
+        p_w::USMALLINT AS walks,
+        p_iw::USMALLINT AS intentional_walks,
+        p_k::USMALLINT AS strikeouts,
+        p_hbp::USMALLINT AS hit_by_pitches,
+        p_wp::USMALLINT AS wild_pitches,
+        p_bk::USMALLINT AS balks,
+        p_sh::USMALLINT AS sacrifice_hits,
+        p_sf::USMALLINT AS sacrifice_flies,
+        CASE WHEN hits >= doubles + triples + home_runs THEN hits - doubles - triples - home_runs END::USMALLINT AS singles,
+        (singles + doubles * 2 + triples * 3 + home_runs * 4)::USMALLINT AS total_bases,
+        (batters_faced - COALESCE(sacrifice_hits, 0))::USMALLINT AS on_base_opportunities,
+        (hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0))::USMALLINT AS on_base_successes
+    FROM main_models.nlb_team_lines
+),
+
+team_totals AS (
+    SELECT
+        COALESCE(initial_sum.game_id, nlb.game_id) AS game_id,
+        COALESCE(initial_sum.team_id, nlb.team_id) AS team_id,
+        initial_sum.* EXCLUDE (game_id, team_id) REPLACE (
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.batters_faced ELSE initial_sum.batters_faced END AS batters_faced,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.outs_recorded ELSE initial_sum.outs_recorded END AS outs_recorded,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.hits ELSE initial_sum.hits END AS hits,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.doubles ELSE initial_sum.doubles END AS doubles,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.triples ELSE initial_sum.triples END AS triples,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.home_runs ELSE initial_sum.home_runs END AS home_runs,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.runs ELSE initial_sum.runs END AS runs,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.earned_runs ELSE initial_sum.earned_runs END AS earned_runs,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.walks ELSE initial_sum.walks END AS walks,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.intentional_walks ELSE initial_sum.intentional_walks END AS intentional_walks,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.strikeouts ELSE initial_sum.strikeouts END AS strikeouts,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.hit_by_pitches ELSE initial_sum.hit_by_pitches END AS hit_by_pitches,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.wild_pitches ELSE initial_sum.wild_pitches END AS wild_pitches,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.balks ELSE initial_sum.balks END AS balks,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.sacrifice_hits ELSE initial_sum.sacrifice_hits END AS sacrifice_hits,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.sacrifice_flies ELSE initial_sum.sacrifice_flies END AS sacrifice_flies,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.singles ELSE initial_sum.singles END AS singles,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.total_bases ELSE initial_sum.total_bases END AS total_bases,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.on_base_opportunities ELSE initial_sum.on_base_opportunities END AS on_base_opportunities,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.on_base_successes ELSE initial_sum.on_base_successes END AS on_base_successes
+        )
+    FROM initial_sum
+    FULL OUTER JOIN nlb_team_pitching AS nlb
+        ON initial_sum.game_id = nlb.game_id AND initial_sum.team_id = nlb.team_id
+),
+
 -- A few definitions change when aggregated at the team level
 final AS (
     SELECT
         * REPLACE (
             -- TODO: Investigate cases where team UER > team ER
-            GREATEST(0, earned_runs::INT - team_unearned_runs)::UTINYINT AS earned_runs,
+            CASE
+                WHEN team_unearned_runs IS NULL THEN earned_runs
+                ELSE GREATEST(0, earned_runs::INT - team_unearned_runs)
+            END::UTINYINT AS earned_runs,
             left_on_base_with_two_outs::UTINYINT AS left_on_base,
             -- Combined no-hitters and perfect games (latter hasn't happened yet)
             (hits = 0 AND outs_recorded >= 27)::UTINYINT AS no_hitters,
@@ -360,7 +421,7 @@ final AS (
             ROUND(outs_recorded / 3, 4)::DECIMAL(6, 4) AS innings_pitched
         ),
         earned_runs AS individual_earned_runs
-    FROM initial_sum
+    FROM team_totals
 
 )
 

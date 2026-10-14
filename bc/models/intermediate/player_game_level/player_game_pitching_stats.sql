@@ -238,11 +238,25 @@ events_with_flags AS (
     LEFT JOIN flag_agg USING (game_id, player_id)
 ),
 
+box_lines AS (
+    SELECT
+        CASE WHEN stats.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS team_id,
+        stats.*
+    FROM main_models.stg_box_score_pitching_lines AS stats
+    -- This join ensures that we only get the box score lines for games that
+    -- do not have an event file.
+    INNER JOIN main_models.stg_games AS games USING (game_id)
+    WHERE games.source_type = 'BoxScore'
+    UNION ALL BY NAME
+    SELECT *
+    FROM main_models.nlb_pitching_lines
+),
+
 box_agg AS (
     SELECT
         game_id,
         stats.pitcher_id AS player_id,
-        ANY_VALUE(CASE WHEN stats.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END) AS team_id,
+        ANY_VALUE(stats.team_id) AS team_id,
         SUM(stats.outs_recorded)::UTINYINT AS outs_recorded,
         SUM(stats.batters_faced)::UTINYINT AS batters_faced,
         SUM(stats.hits)::UTINYINT AS hits,
@@ -266,11 +280,7 @@ box_agg AS (
         SUM(stats.games_started)::UTINYINT AS games_started,
         SUM(stats.games_relieved)::UTINYINT AS games_relieved,
         SUM(stats.games_finished)::UTINYINT AS games_finished,
-    FROM main_models.stg_box_score_pitching_lines AS stats
-    -- This join ensures that we only get the box score lines for games that
-    -- do not have an event file.
-    INNER JOIN main_models.stg_games AS games USING (game_id)
-    WHERE games.source_type = 'BoxScore'
+    FROM box_lines AS stats
     GROUP BY 1, 2
 ),
 
@@ -294,7 +304,7 @@ with_game_info AS (
         unioned.* EXCLUDE (game_id, player_id, team_id, earned_runs),
         (saves + unioned.blown_saves)::UTINYINT AS save_opportunities,
     FROM unioned
-    LEFT JOIN main_models.stg_games AS games USING (game_id)
+    LEFT JOIN main_models.game_results AS games USING (game_id)
     LEFT JOIN main_models.stg_game_earned_runs AS earned_runs USING (game_id, player_id)
 ),
 

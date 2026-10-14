@@ -307,13 +307,81 @@ WITH initial_sum AS (
     GROUP BY 1, 2
 ),
 
+nlb_team_offense AS (
+    SELECT
+        game_id,
+        team_id,
+        b_pa::USMALLINT AS plate_appearances,
+        b_ab::USMALLINT AS at_bats,
+        b_r::USMALLINT AS runs,
+        b_h::USMALLINT AS hits,
+        b_d::USMALLINT AS doubles,
+        b_t::USMALLINT AS triples,
+        b_hr::USMALLINT AS home_runs,
+        b_rbi::USMALLINT AS runs_batted_in,
+        b_sh::USMALLINT AS sacrifice_hits,
+        b_sf::USMALLINT AS sacrifice_flies,
+        b_hbp::USMALLINT AS hit_by_pitches,
+        b_w::USMALLINT AS walks,
+        b_iw::USMALLINT AS intentional_walks,
+        b_k::USMALLINT AS strikeouts,
+        b_sb::USMALLINT AS stolen_bases,
+        b_cs::USMALLINT AS caught_stealing,
+        b_gdp::USMALLINT AS grounded_into_double_plays,
+        b_xi::USMALLINT AS reached_on_interferences,
+        b_roe::USMALLINT AS reached_on_errors,
+        lob::USMALLINT AS left_on_base,
+        CASE WHEN hits >= doubles + triples + home_runs THEN hits - doubles - triples - home_runs END::USMALLINT AS singles,
+        (singles + doubles * 2 + triples * 3 + home_runs * 4)::USMALLINT AS total_bases,
+        (at_bats + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0) + COALESCE(sacrifice_flies, 0))::USMALLINT AS on_base_opportunities,
+        (hits + COALESCE(walks, 0) + COALESCE(hit_by_pitches, 0))::USMALLINT AS on_base_successes,
+        CASE WHEN hits <= at_bats THEN at_bats - hits + COALESCE(grounded_into_double_plays, 0) END::USMALLINT AS batting_outs
+    FROM main_models.nlb_team_lines
+),
+
 -- A few definitions change when aggregated at the team level
-final AS (
+player_totals AS (
     SELECT
         * REPLACE (
             left_on_base_with_two_outs AS left_on_base,
     )
     FROM initial_sum
+),
+
+final AS (
+    SELECT
+        COALESCE(player_totals.game_id, nlb.game_id) AS game_id,
+        COALESCE(player_totals.team_id, nlb.team_id) AS team_id,
+        player_totals.* EXCLUDE (game_id, team_id) REPLACE (
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.plate_appearances ELSE player_totals.plate_appearances END AS plate_appearances,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.at_bats ELSE player_totals.at_bats END AS at_bats,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.runs ELSE player_totals.runs END AS runs,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.hits ELSE player_totals.hits END AS hits,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.doubles ELSE player_totals.doubles END AS doubles,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.triples ELSE player_totals.triples END AS triples,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.home_runs ELSE player_totals.home_runs END AS home_runs,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.runs_batted_in ELSE player_totals.runs_batted_in END AS runs_batted_in,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.sacrifice_hits ELSE player_totals.sacrifice_hits END AS sacrifice_hits,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.sacrifice_flies ELSE player_totals.sacrifice_flies END AS sacrifice_flies,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.hit_by_pitches ELSE player_totals.hit_by_pitches END AS hit_by_pitches,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.walks ELSE player_totals.walks END AS walks,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.intentional_walks ELSE player_totals.intentional_walks END AS intentional_walks,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.strikeouts ELSE player_totals.strikeouts END AS strikeouts,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.stolen_bases ELSE player_totals.stolen_bases END AS stolen_bases,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.caught_stealing ELSE player_totals.caught_stealing END AS caught_stealing,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.grounded_into_double_plays ELSE player_totals.grounded_into_double_plays END AS grounded_into_double_plays,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.reached_on_interferences ELSE player_totals.reached_on_interferences END AS reached_on_interferences,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.reached_on_errors ELSE player_totals.reached_on_errors END AS reached_on_errors,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.left_on_base ELSE player_totals.left_on_base END AS left_on_base,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.singles ELSE player_totals.singles END AS singles,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.total_bases ELSE player_totals.total_bases END AS total_bases,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.on_base_opportunities ELSE player_totals.on_base_opportunities END AS on_base_opportunities,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.on_base_successes ELSE player_totals.on_base_successes END AS on_base_successes,
+            CASE WHEN nlb.game_id IS NOT NULL THEN nlb.batting_outs ELSE player_totals.batting_outs END AS batting_outs
+        )
+    FROM player_totals
+    FULL OUTER JOIN nlb_team_offense AS nlb
+        ON player_totals.game_id = nlb.game_id AND player_totals.team_id = nlb.team_id
 )
 
 SELECT * FROM final

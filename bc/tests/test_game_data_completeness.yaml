@@ -29,7 +29,17 @@ test_game_data_completeness_source_types:
         - {game_id: PBP, season: 1990, date: 1990-05-01, home_league: AL, source_type: PlayByPlay}
         - {game_id: BOX, season: 1990, date: 1990-05-01, home_league: AL, source_type: BoxScore}
         - {game_id: LOG, season: 1990, date: 1990-05-01, home_league: AL, source_type: GameLog}
-        - {game_id: NGL, season: 1940, date: 1940-05-01, home_league: NNL2, source_type: NegroLeaguesStats}
+        - {game_id: NLB, season: 1940, date: 1940-05-01, home_league: NNL2, source_type: NegroLeaguesStats}
+        - {game_id: NLB_BOX, season: 1940, date: 1940-05-02, home_league: NNL2, source_type: NegroLeaguesStats}
+        - {game_id: BOX_ALSO_NLB, season: 1940, date: 1940-05-03, home_league: NNL2, source_type: BoxScore}
+    main_models.stg_nlb_games:
+      columns:
+        game_id: VARCHAR
+        box: VARCHAR
+      rows:
+        - {game_id: NLB, box: null}
+        - {game_id: NLB_BOX, box: y}
+        - {game_id: BOX_ALSO_NLB, box: y}
     main_models.calc_batted_ball_type:
       columns:
         game_id: VARCHAR
@@ -92,4 +102,6 @@ test_game_data_completeness_source_types:
         - {game_id: PBP, has_play_by_play: true, has_box_score: true}
         - {game_id: BOX, has_play_by_play: false, has_box_score: true}
         - {game_id: LOG, has_play_by_play: false, has_box_score: false}
-        - {game_id: NGL, has_play_by_play: false, has_box_score: false}
+        - {game_id: NLB, has_play_by_play: false, has_box_score: false}
+        - {game_id: NLB_BOX, has_play_by_play: false, has_box_score: true}
+        - {game_id: BOX_ALSO_NLB, has_play_by_play: false, has_box_score: true}

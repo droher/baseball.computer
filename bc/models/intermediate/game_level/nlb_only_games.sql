@@ -1,7 +1,7 @@
 MODEL (
-  name main_models.ngl_stats_only_games,
+  name main_models.nlb_only_games,
   kind FULL,
-  description 'Negro Leagues games that Retrosheet records only in negroleagues.zip, with no event or box file: one row per game, in the shape game_start_info and game_results take from stg_gamelog. Starting pitchers come from the pitching lines (p_gs). Line scores are NULL; the runs by inning are in stg_ngl_teams.',
+  description 'Negro Leagues games that Retrosheet records only in negroleagues.zip, with no event or box file: one row per game, in the shape game_start_info and game_results take from stg_gamelog. Starting pitchers come from the pitching lines (p_gs). Line scores are NULL; the runs by inning are in stg_nlb_teams.',
   grain (game_id),
   audits (
     not_null(columns := (game_id, date, home_team_id, away_team_id)),
@@ -14,7 +14,7 @@ WITH starters AS (
         game_id,
         ANY_VALUE(player_id) FILTER (WHERE is_home) AS home_starting_pitcher_id,
         ANY_VALUE(player_id) FILTER (WHERE NOT is_home) AS away_starting_pitcher_id,
-    FROM main_models.stg_ngl_pitching
+    FROM main_models.stg_nlb_pitching
     WHERE p_gs = 1
     GROUP BY game_id
 ),
@@ -62,7 +62,7 @@ games AS (
         g.lp AS losing_pitcher_id,
         g.save AS save_pitcher_id,
         'NegroLeaguesStats' AS source_type,
-    FROM main_models.stg_ngl_games AS g
+    FROM main_models.stg_nlb_games AS g
     LEFT JOIN starters USING (game_id)
     WHERE g.game_id NOT IN (SELECT game_id FROM main_models.stg_games)
         AND g.game_id NOT IN (SELECT game_id FROM main_models.stg_gamelog)

@@ -6,6 +6,7 @@ MODEL (
     season = @doc('season'),
     team_id = @doc('team_id'),
     player_id = @doc('player_id'),
+    stats_source = @doc('stats_source'),
     fielding_position = @doc('fielding_position'),
     game_type = @doc('game_type'),
     fielding_position_category = @doc('fielding_position_category'),
@@ -42,7 +43,8 @@ MODEL (
     unique_grain(columns := (season, team_id, player_id, fielding_position, game_type)),
     valid_baseball_season(column := season),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
-    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id)
+    relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
+    accepted_values(column := stats_source, is_in := ('Retrosheet', 'Databank'))
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_position_team_season_fielding_stats.parquet'
@@ -55,7 +57,13 @@ MODEL (
 
 
 
-WITH databank AS (
+WITH databank_sourced_nlb_seasons AS (
+    SELECT season
+    FROM main_models.nlb_season_sources
+    WHERE season_source = 'Databank'
+),
+
+databank AS (
     SELECT
         field.season,
         field.team_id,
@@ -90,7 +98,16 @@ WITH databank AS (
     INNER JOIN main_models.stg_people AS people USING (databank_player_id)
     -- We'd need to do something different for partial coverage seasons but
     -- currently box scores are all or nothing for a given year
-    WHERE field.season NOT IN (SELECT DISTINCT season FROM main_models.stg_games)
+    WHERE (
+            NOT field.is_negro_leagues
+            AND field.season NOT IN (SELECT DISTINCT season FROM main_models.stg_games)
+        )
+        OR (
+            field.is_negro_leagues
+            AND field.season IN (SELECT season FROM databank_sourced_nlb_seasons)
+            AND field.team_id IS NOT NULL
+            AND people.retrosheet_player_id IS NOT NULL
+        )
     GROUP BY 1, 2, 3, 4
 ),
 
@@ -135,15 +152,16 @@ game_agg AS (
         COUNT_IF(stats.fielding_position = 7)::USMALLINT AS games_left_field,
         COUNT_IF(stats.fielding_position = 8)::USMALLINT AS games_center_field,
         COUNT_IF(stats.fielding_position = 9)::USMALLINT AS games_right_field,
-    FROM main_models.stg_games AS games
+    FROM main_models.game_start_info AS games
     INNER JOIN main_models.player_position_game_fielding_stats AS stats USING (game_id)
+    WHERE @is_retrosheet_season_game(games)
     GROUP BY 1, 2, 3, 4, 5
 ),
 
 final AS (
-    SELECT * FROM game_agg
+    SELECT *, 'Retrosheet' AS stats_source FROM game_agg
     UNION ALL BY NAME
-    SELECT * FROM databank
+    SELECT *, 'Databank' AS stats_source FROM databank
 )
 
 SELECT * FROM final

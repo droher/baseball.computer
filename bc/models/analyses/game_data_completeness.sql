@@ -41,6 +41,12 @@ pitches AS (
     GROUP BY 1
 ),
 
+nlb_box_scores AS (
+    SELECT game_id
+    FROM main_models.stg_nlb_games
+    WHERE LOWER(box) = 'y'
+),
+
 joined AS (
     SELECT
         game_id,
@@ -48,7 +54,11 @@ joined AS (
         game_start_info.date,
         game_start_info.home_league AS league,
         game_start_info.source_type = 'PlayByPlay' AS has_play_by_play,
-        game_start_info.source_type IN ('PlayByPlay', 'BoxScore') AS has_box_score,
+        game_start_info.source_type IN ('PlayByPlay', 'BoxScore')
+            OR (
+                game_start_info.source_type = 'NegroLeaguesStats'
+                AND game_id IN (SELECT game_id FROM nlb_box_scores)
+            ) AS has_box_score,
         COALESCE(batted_balls.has_trajectory, FALSE) AS has_trajectory,
         COALESCE(batted_balls.has_location, FALSE) AS has_location,
         COALESCE(batted_balls.has_batted_to_fielder, FALSE) AS has_batted_to_fielder,

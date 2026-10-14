@@ -169,7 +169,7 @@ add_gamelog AS (
         'Unknown'::FIELD_CONDITION AS field_condition,
         'Unknown'::PRECIPITATION AS precipitation,
         'Unknown'::WIND_DIRECTION AS wind_direction,
-    FROM main_models.ngl_stats_only_games
+    FROM main_models.nlb_only_games
 ),
 
 add_rest AS (

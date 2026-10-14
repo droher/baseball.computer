@@ -1,0 +1,5 @@
+season,databank_team_id,team_id,reason
+1935,CEG,NSH,"Lahman team_id_retro CB3; the Retrosheet Negro Leagues file has the 1935 Elite Giants as NSH."
+1942,CCB,CCB,"Lahman team_id_retro CCA; the Retrosheet Negro Leagues file has the 1942 Cincinnati-Cleveland Buckeyes as CCB."
+1946,CIC,IN9,"Lahman team_id_retro CIA; the Retrosheet Negro Leagues file has the 1946 Indianapolis Clowns as IN9."
+1947,CIC,IN9,"Lahman team_id_retro CIA; the Retrosheet Negro Leagues file has the 1947 Indianapolis Clowns as IN9."

@@ -95,6 +95,7 @@ retrosheet AS (
         SUM(stats.ground_ball_double_plays)::USMALLINT AS ground_ball_double_plays
     FROM main_models.game_start_info AS games
     INNER JOIN main_models.team_game_fielding_stats AS stats USING (game_id)
+    WHERE games.game_type IS NOT NULL
     GROUP BY 1, 2, 3
 ),
 

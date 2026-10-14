@@ -1,0 +1,1030 @@
+test_nlb_batting_lines_merges_split_lines_for_nlb_only_games:
+  model: main_models.nlb_batting_lines
+  inputs:
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        home_team_id: VARCHAR
+        away_team_id: VARCHAR
+        source_type: VARCHAR
+      rows:
+        - {game_id: G_NLB, home_team_id: HOM, away_team_id: AWY, source_type: NegroLeaguesStats}
+        - {game_id: G_BOX, home_team_id: HOM, away_team_id: AWY, source_type: BoxScore}
+    main_models.stg_nlb_batting:
+      rows:
+        - {game_id: G_NLB, player_id: one, team_id: HOM, lineup_position: 1, sequence: 1, is_home: true, b_ab: 4, b_h: 2, b_d: 1, b_t: 0, b_hr: 0, b_w: 1, b_roe: 1}
+        - {game_id: G_NLB, player_id: split, team_id: AWY, lineup_position: 2, sequence: 1, is_home: false, b_ab: 2, b_h: 1, b_d: 0, b_t: 0, b_hr: 0}
+        - {game_id: G_NLB, player_id: split, team_id: AWY, lineup_position: 6, sequence: 2, is_home: false, b_ab: 1, b_h: null, b_d: 0, b_t: 0, b_hr: 0}
+        - {game_id: G_BOX, player_id: boxed, team_id: HOM, lineup_position: 1, sequence: 1, is_home: true, b_ab: 4, b_h: 1}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: G_NLB, batter_id: one, team_id: HOM, side: Home, lineup_position: 1, nth_player_at_position: 1, at_bats: 4, hits: 2, singles: 1, total_bases: 3, plate_appearances: 5, on_base_successes: 3, batting_outs: 2, reached_on_errors: 1}
+        - {game_id: G_NLB, batter_id: split, team_id: AWY, side: Away, lineup_position: 2, nth_player_at_position: 1, at_bats: 3, hits: null, singles: null, total_bases: null, plate_appearances: 3, on_base_successes: null, batting_outs: null, reached_on_errors: null}
+
+test_player_game_offense_stats_includes_nlb_lines:
+  model: main_models.player_game_offense_stats
+  inputs:
+    main_models.event_offense_stats:
+      columns:
+        game_id: VARCHAR
+        team_id: VARCHAR
+        player_id: VARCHAR
+        baserunner: VARCHAR
+      rows: []
+    main_models.stg_box_score_batting_lines:
+      columns:
+        game_id: VARCHAR
+        batter_id: VARCHAR
+        side: VARCHAR
+        at_bats: UTINYINT
+        reached_on_interferences: UTINYINT
+      rows:
+        - {game_id: G_BOX, batter_id: boxed, side: Home, at_bats: 4, reached_on_interferences: 1}
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        home_team_id: VARCHAR
+        away_team_id: VARCHAR
+        source_type: VARCHAR
+      rows:
+        - {game_id: G_BOX, home_team_id: HOM, away_team_id: AWY, source_type: BoxScore}
+    main_models.nlb_batting_lines:
+      columns:
+        team_id: VARCHAR
+        side: VARCHAR
+      rows:
+        - {game_id: G_NLB, batter_id: one, team_id: HOM, side: Home, at_bats: 4, hits: 2, reached_on_errors: 1, reached_on_interferences: 0}
+    main_models.box_score_data_issues:
+      columns:
+        source_table: VARCHAR
+        game_id: VARCHAR
+        player_id: VARCHAR
+        issue_type: VARCHAR
+        value_a: USMALLINT
+        value_b: USMALLINT
+      rows: []
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: G_BOX, team_id: HOM, player_id: boxed, at_bats: 4, reached_on_errors: null, reached_on_interferences: null}
+        - {game_id: G_NLB, team_id: HOM, player_id: one, at_bats: 4, hits: 2, reached_on_errors: 1, reached_on_interferences: 0}
+
+test_people_keeps_nlb_line_ids_outside_player_pattern:
+  model: main_models.people
+  inputs:
+    main_models.stg_bio:
+      rows:
+        - {player_id: oneib801, last_name: O'Neil}
+        - {player_id: umpir801, last_name: Ump}
+        - {player_id: umpir901, last_name: Ump}
+        - {player_id: playr001, last_name: Player}
+    main_models.stg_rosters:
+      columns:
+        player_id: VARCHAR
+        bats: VARCHAR
+        throws: VARCHAR
+        team_id: VARCHAR
+      rows: []
+    main_models.stg_box_score_batting_lines:
+      columns:
+        batter_id: VARCHAR
+        side: VARCHAR
+      rows: []
+    main_models.stg_box_score_fielding_lines:
+      columns:
+        fielder_id: VARCHAR
+        side: VARCHAR
+      rows: []
+    main_models.stg_people:
+      rows: []
+    main_models.stg_nlb_batting:
+      rows:
+        - {game_id: G1, player_id: oneib801}
+    main_models.stg_nlb_pitching:
+      rows: []
+    main_models.stg_nlb_fielding:
+      rows: []
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {person_id: oneib801, player_id: oneib801}
+        - {person_id: umpir801, player_id: null}
+        - {person_id: umpir901, player_id: null}
+        - {person_id: playr001, player_id: playr001}
+
+test_nlb_season_sources_threshold:
+  model: main_models.nlb_season_sources
+  inputs:
+    main_models.stg_databank_batting:
+      rows:
+        - {databank_player_id: a, season: 1925, at_bats: 1000, is_negro_leagues: true}
+        - {databank_player_id: b, season: 1940, at_bats: 1000, is_negro_leagues: true}
+        - {databank_player_id: c, season: 1949, at_bats: 500, is_negro_leagues: false}
+    main_models.nlb_game_scopes:
+      rows:
+        - {game_id: G25, season: 1925, is_matched_scope: true, has_box_score: true}
+        - {game_id: G40, season: 1940, is_matched_scope: true, has_box_score: true}
+        - {game_id: G40_NOBOX, season: 1940, is_matched_scope: true, has_box_score: false}
+        - {game_id: G40_EXH, season: 1940, is_matched_scope: false, has_box_score: true}
+        - {game_id: G49, season: 1949, is_matched_scope: true, has_box_score: true}
+    main_models.stg_nlb_batting:
+      rows:
+        - {game_id: G25, player_id: x, b_ab: 100}
+        - {game_id: G40, player_id: x, b_ab: 500}
+        - {game_id: G40_NOBOX, player_id: x, b_ab: 400}
+        - {game_id: G40_EXH, player_id: x, b_ab: 400}
+        - {game_id: G49, player_id: x, b_ab: 300}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {season: 1925, lahman_at_bats: 1000, retrosheet_at_bats: 100, season_source: Databank}
+        - {season: 1940, lahman_at_bats: 1000, retrosheet_at_bats: 500, season_source: Retrosheet}
+        - {season: 1949, lahman_at_bats: 0, retrosheet_at_bats: 300, season_source: Retrosheet}
+
+test_player_team_season_offense_stats_nlb_sources:
+  model: main_models.player_team_season_offense_stats
+  inputs:
+    main_models.stg_databank_batting:
+      rows:
+        - {databank_player_id: dx, season: 1925, stint: 1, team_id: NLA, is_negro_leagues: true, games: 50, at_bats: 100, hits: 30, stolen_bases: 9}
+        - {databank_player_id: dy, season: 1940, stint: 1, team_id: NLB, is_negro_leagues: true, games: 60, at_bats: 200, hits: 50, stolen_bases: 4}
+    main_models.stg_people:
+      rows:
+        - {databank_player_id: dx, retrosheet_player_id: playx001}
+        - {databank_player_id: dy, retrosheet_player_id: playy001}
+    main_models.nlb_season_sources:
+      rows:
+        - {season: 1925, season_source: Databank}
+        - {season: 1940, season_source: Retrosheet}
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        season: SMALLINT
+        game_type: VARCHAR
+        is_negro_leagues: BOOLEAN
+        doubleheader_status: VARCHAR
+        time_of_day: VARCHAR
+        bat_first_side: VARCHAR
+        sky: VARCHAR
+        field_condition: VARCHAR
+        precipitation: VARCHAR
+        wind_direction: VARCHAR
+        park_id: VARCHAR
+        home_team_id: VARCHAR
+        away_team_id: VARCHAR
+        away_franchise_id: VARCHAR
+        home_franchise_id: VARCHAR
+        lineup_map_away: VARCHAR
+        lineup_map_home: VARCHAR
+        fielding_map_away: VARCHAR
+        fielding_map_home: VARCHAR
+      rows:
+        - {game_id: R25, season: 1925, game_type: RegularSeason, is_negro_leagues: true}
+        - {game_id: E25, season: 1925, game_type: Exhibition, is_negro_leagues: true}
+        - {game_id: R40, season: 1940, game_type: RegularSeason, is_negro_leagues: true}
+    main_models.player_game_offense_stats:
+      columns:
+        game_id: VARCHAR
+        team_id: VARCHAR
+        player_id: VARCHAR
+        plate_appearances: UTINYINT
+        at_bats: UTINYINT
+        hits: UTINYINT
+        singles: UTINYINT
+        doubles: UTINYINT
+        triples: UTINYINT
+        home_runs: UTINYINT
+        total_bases: UTINYINT
+        strikeouts: UTINYINT
+        walks: UTINYINT
+        intentional_walks: UTINYINT
+        hit_by_pitches: UTINYINT
+        sacrifice_hits: UTINYINT
+        sacrifice_flies: UTINYINT
+        reached_on_errors: UTINYINT
+        reached_on_interferences: UTINYINT
+        inside_the_park_home_runs: UTINYINT
+        ground_rule_doubles: UTINYINT
+        infield_hits: UTINYINT
+        on_base_opportunities: UTINYINT
+        on_base_successes: UTINYINT
+        runs_batted_in: UTINYINT
+        grounded_into_double_plays: UTINYINT
+        double_plays: UTINYINT
+        triple_plays: UTINYINT
+        batting_outs: UTINYINT
+        balls_in_play: UTINYINT
+        balls_batted: UTINYINT
+        trajectory_fly_ball: UTINYINT
+        trajectory_ground_ball: UTINYINT
+        trajectory_line_drive: UTINYINT
+        trajectory_pop_up: UTINYINT
+        trajectory_unknown: UTINYINT
+        trajectory_known: UTINYINT
+        trajectory_broad_air_ball: UTINYINT
+        trajectory_broad_ground_ball: UTINYINT
+        trajectory_broad_unknown: UTINYINT
+        trajectory_broad_known: UTINYINT
+        bunts: UTINYINT
+        batted_distance_plate: UTINYINT
+        batted_distance_infield: UTINYINT
+        batted_distance_outfield: UTINYINT
+        batted_distance_unknown: UTINYINT
+        batted_distance_known: UTINYINT
+        fielded_by_battery: UTINYINT
+        fielded_by_infielder: UTINYINT
+        fielded_by_outfielder: UTINYINT
+        fielded_by_known: UTINYINT
+        fielded_by_unknown: UTINYINT
+        batted_angle_left: UTINYINT
+        batted_angle_right: UTINYINT
+        batted_angle_middle: UTINYINT
+        batted_angle_unknown: UTINYINT
+        batted_angle_known: UTINYINT
+        batted_location_plate: UTINYINT
+        batted_location_right_infield: UTINYINT
+        batted_location_middle_infield: UTINYINT
+        batted_location_left_infield: UTINYINT
+        batted_location_left_field: UTINYINT
+        batted_location_center_field: UTINYINT
+        batted_location_right_field: UTINYINT
+        batted_location_unknown: UTINYINT
+        batted_location_known: UTINYINT
+        batted_balls_pulled: UTINYINT
+        batted_balls_opposite_field: UTINYINT
+        runs: UTINYINT
+        times_reached_base: UTINYINT
+        times_lead_runner: UTINYINT
+        times_force_on_runner: UTINYINT
+        times_next_base_empty: UTINYINT
+        stolen_base_opportunities: UTINYINT
+        stolen_base_opportunities_second: UTINYINT
+        stolen_base_opportunities_third: UTINYINT
+        stolen_base_opportunities_home: UTINYINT
+        stolen_bases: UTINYINT
+        stolen_bases_second: UTINYINT
+        stolen_bases_third: UTINYINT
+        stolen_bases_home: UTINYINT
+        caught_stealing: UTINYINT
+        caught_stealing_second: UTINYINT
+        caught_stealing_third: UTINYINT
+        caught_stealing_home: UTINYINT
+        picked_off: UTINYINT
+        picked_off_first: UTINYINT
+        picked_off_second: UTINYINT
+        picked_off_third: UTINYINT
+        picked_off_caught_stealing: UTINYINT
+        outs_on_basepaths: UTINYINT
+        unforced_outs_on_basepaths: UTINYINT
+        outs_avoided_on_errors: UTINYINT
+        advances_on_wild_pitches: UTINYINT
+        advances_on_passed_balls: UTINYINT
+        advances_on_balks: UTINYINT
+        advances_on_unspecified_plays: UTINYINT
+        advances_on_defensive_indifference: UTINYINT
+        advances_on_errors: UTINYINT
+        plate_appearances_while_on_base: UTINYINT
+        balls_in_play_while_running: UTINYINT
+        balls_in_play_while_on_base: UTINYINT
+        batter_total_bases_while_running: UTINYINT
+        batter_total_bases_while_on_base: UTINYINT
+        extra_base_chances: UTINYINT
+        extra_base_advance_attempts: UTINYINT
+        extra_bases_taken: UTINYINT
+        bases_advanced: UTINYINT
+        bases_advanced_on_balls_in_play: UTINYINT
+        surplus_bases_advanced_on_balls_in_play: TINYINT
+        outs_on_extra_base_advance_attempts: UTINYINT
+        pitches: UTINYINT
+        swings: UTINYINT
+        swings_with_contact: UTINYINT
+        strikes: UTINYINT
+        strikes_called: UTINYINT
+        strikes_swinging: UTINYINT
+        strikes_foul: UTINYINT
+        strikes_foul_tip: UTINYINT
+        strikes_in_play: UTINYINT
+        strikes_unknown: UTINYINT
+        balls: UTINYINT
+        balls_called: UTINYINT
+        balls_intentional: UTINYINT
+        balls_automatic: UTINYINT
+        unknown_pitches: UTINYINT
+        pitchouts: UTINYINT
+        pitcher_pickoff_attempts: UTINYINT
+        catcher_pickoff_attempts: UTINYINT
+        pitches_blocked_by_catcher: UTINYINT
+        pitches_with_runners_going: UTINYINT
+        passed_balls: UTINYINT
+        wild_pitches: UTINYINT
+        balks: UTINYINT
+        left_on_base: UTINYINT
+        left_on_base_with_two_outs: UTINYINT
+        pitch_sequence_resolution_status: VARCHAR
+      rows:
+        - {game_id: R25, team_id: NLA, player_id: playx001, at_bats: 4, hits: 1, stolen_bases: 1}
+        - {game_id: E25, team_id: NLA, player_id: playx001, at_bats: 3, hits: 0, stolen_bases: 0}
+        - {game_id: R40, team_id: NLB, player_id: playy001, at_bats: 4, hits: null, stolen_bases: 0}
+    main_models.stg_games:
+      columns:
+        season: SMALLINT
+        doubleheader_status: VARCHAR
+        time_of_day: VARCHAR
+        game_type: VARCHAR
+        bat_first_side: VARCHAR
+        sky: VARCHAR
+        field_condition: VARCHAR
+        precipitation: VARCHAR
+        wind_direction: VARCHAR
+        park_id: VARCHAR
+        account_type: VARCHAR
+        away_team_id: VARCHAR
+        home_team_id: VARCHAR
+      rows:
+        - {season: 1925}
+        - {season: 1940}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {season: 1925, team_id: NLA, player_id: playx001, game_type: RegularSeason, games: 50, at_bats: 100, hits: 30, stolen_bases: 9, stats_source: Databank}
+        - {season: 1925, team_id: NLA, player_id: playx001, game_type: Exhibition, games: 1, at_bats: 3, hits: 0, stolen_bases: 0, stats_source: Retrosheet}
+        - {season: 1940, team_id: NLB, player_id: playy001, game_type: RegularSeason, games: 1, at_bats: 4, hits: null, stolen_bases: 0, stats_source: Retrosheet}
+
+test_stg_databank_teams_resolves_negro_leagues_team_ids:
+  model: main_models.stg_databank_teams
+  inputs:
+    baseballdatabank.teams:
+      rows:
+        - {year_id: 1942, team_id: CCB, lg_id: NAL, team_id_retro: CCA, name: Buckeyes, g: 80, w: 50, l: 30, rank: 1, lg_win: Y}
+        - {year_id: 1942, team_id: NYA, lg_id: AL, team_id_retro: NYA, name: Yankees, g: 154, w: 103, l: 51, rank: 1, lg_win: Y}
+        - {year_id: 1910, team_id: XYZ, lg_id: IND, team_id_retro: null, name: Independents, g: 20, w: 10, l: 10, rank: null, lg_win: N}
+        - {year_id: 1930, team_id: ABC, lg_id: NNL, team_id_retro: ZZZ, name: Unknowns, g: 60, w: 20, l: 40, rank: 6, lg_win: N}
+    main_seeds.seed_franchises:
+      rows:
+        - {team_id: CCB}
+        - {team_id: CCA}
+        - {team_id: NYA}
+    main_seeds.seed_nlb_lahman_team_crosswalk:
+      rows:
+        - {season: 1942, databank_team_id: CCB, team_id: CCB, reason: roster}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {season: 1942, databank_team_id: CCB, is_negro_leagues: true, team_id_retro: CCA, crosswalk_team_id: CCB, team_id: CCB, won_pennant: true}
+        - {season: 1942, databank_team_id: NYA, is_negro_leagues: false, team_id_retro: NYA, crosswalk_team_id: null, team_id: NYA, won_pennant: true}
+        - {season: 1910, databank_team_id: XYZ, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: null, team_id: null, won_pennant: false}
+        - {season: 1930, databank_team_id: ABC, is_negro_leagues: true, team_id_retro: ZZZ, crosswalk_team_id: null, team_id: null, won_pennant: false}
+
+test_nlb_lahman_team_resolution_flags_roster_disagreement:
+  model: main_models.nlb_lahman_team_resolution
+  inputs:
+    main_models.stg_databank_teams:
+      rows:
+        - {season: 1935, databank_team_id: CEG, is_negro_leagues: true, team_id_retro: CB3, crosswalk_team_id: NSH, team_id: NSH}
+        - {season: 1935, databank_team_id: PC, is_negro_leagues: true, team_id_retro: PCR, crosswalk_team_id: null, team_id: PCR}
+        - {season: 1935, databank_team_id: UNM, is_negro_leagues: true, team_id_retro: null, crosswalk_team_id: null, team_id: null}
+        - {season: 1935, databank_team_id: ABS, is_negro_leagues: true, team_id_retro: ABX, crosswalk_team_id: null, team_id: ABX}
+        - {season: 1935, databank_team_id: NYA, is_negro_leagues: false, team_id_retro: NYA, crosswalk_team_id: null, team_id: NYA}
+    main_models.stg_databank_batting:
+      rows:
+        - {season: 1935, databank_team_id: CEG, databank_player_id: l1, is_negro_leagues: true}
+        - {season: 1935, databank_team_id: CEG, databank_player_id: l2, is_negro_leagues: true}
+        - {season: 1935, databank_team_id: CEG, databank_player_id: l3, is_negro_leagues: true}
+        - {season: 1935, databank_team_id: PC, databank_player_id: l4, is_negro_leagues: true}
+        - {season: 1935, databank_team_id: PC, databank_player_id: l5, is_negro_leagues: true}
+        - {season: 1935, databank_team_id: ABS, databank_player_id: l6, is_negro_leagues: true}
+    main_models.stg_databank_pitching:
+      rows: []
+    main_models.stg_people:
+      rows:
+        - {databank_player_id: l1, retrosheet_player_id: r1}
+        - {databank_player_id: l2, retrosheet_player_id: r2}
+        - {databank_player_id: l3, retrosheet_player_id: r3}
+        - {databank_player_id: l4, retrosheet_player_id: r4}
+        - {databank_player_id: l5, retrosheet_player_id: null}
+        - {databank_player_id: l6, retrosheet_player_id: r6}
+    main_models.stg_nlb_players:
+      rows:
+        - {player_id: r1, team_id: CB3, season: 1935}
+        - {player_id: r2, team_id: CB3, season: 1935}
+        - {player_id: r3, team_id: NSH, season: 1935}
+        - {player_id: r4, team_id: PCR, season: 1935}
+        - {player_id: r6, team_id: PCR, season: 1935}
+    main_seeds.seed_franchises:
+      rows:
+        - {team_id: NSH}
+        - {team_id: CB3}
+        - {team_id: PCR}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {season: 1935, databank_team_id: CEG, lahman_players: 3, linked_lahman_players: 3, best_roster_team_id: CB3, best_roster_shared_players: 2, resolved_team_shared_players: 1, resolution_status: crosswalk_disagrees_with_rosters}
+        - {season: 1935, databank_team_id: PC, lahman_players: 2, linked_lahman_players: 1, best_roster_team_id: PCR, best_roster_shared_players: 1, resolved_team_shared_players: 1, resolution_status: confirmed}
+        - {season: 1935, databank_team_id: UNM, lahman_players: 0, linked_lahman_players: 0, best_roster_team_id: null, best_roster_shared_players: 0, resolved_team_shared_players: 0, resolution_status: unmapped}
+        - {season: 1935, databank_team_id: ABS, lahman_players: 1, linked_lahman_players: 1, best_roster_team_id: PCR, best_roster_shared_players: 1, resolved_team_shared_players: 0, resolution_status: no_retrosheet_games}
+
+test_nlb_lahman_player_resolution_shared_team_outranks_name_only:
+  model: main_models.nlb_lahman_player_resolution
+  inputs:
+    main_models.stg_databank_batting:
+      rows:
+        - {season: 1937, team_id: KCM, databank_player_id: stronte01, at_bats: 200, is_negro_leagues: true}
+    main_models.stg_databank_pitching:
+      rows:
+        - {season: 1937, team_id: KCM, databank_player_id: paigesa01, is_negro_leagues: true}
+    main_models.stg_people:
+      rows:
+        - {databank_player_id: stronte01, first_name: Ted, last_name: Strong, birth_year: 1914, retrosheet_player_id: null}
+        - {databank_player_id: paigesa01, first_name: Satchel, last_name: Paige, birth_year: null, retrosheet_player_id: null}
+    main_models.stg_bio:
+      rows:
+        - {player_id: strot101, birth_date: 08/17/1914}
+    main_models.stg_nlb_players:
+      rows:
+        - {player_id: strot101, team_id: KCM, season: 1937, first: Ted, last: Strong}
+        - {player_id: strot102, team_id: CAG, season: 1937, first: Tom, last: Stróng}
+        - {player_id: paigs101, team_id: KCM, season: 1937, first: Satchel, last: Paige}
+    main_models.stg_nlb_batting:
+      rows:
+        - {game_id: G1, player_id: strot101, team_id: KCM, b_ab: 180}
+        - {game_id: G1, player_id: paigs101, team_id: KCM, b_ab: 10}
+    main_models.nlb_game_scopes:
+      rows:
+        - {game_id: G1, season: 1937}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {databank_player_id: stronte01, candidate_player_id: strot101, is_same_first_initial: true, is_birth_year_match: true, shared_team_seasons: 1, at_bats_similarity: 0.9, candidate_rank: 1, confidence_tier: high}
+        - {databank_player_id: stronte01, candidate_player_id: strot102, is_same_first_initial: true, is_birth_year_match: null, shared_team_seasons: 0, at_bats_similarity: null, candidate_rank: 2, confidence_tier: low}
+        - {databank_player_id: paigesa01, candidate_player_id: paigs101, is_same_first_initial: true, is_birth_year_match: null, shared_team_seasons: 1, at_bats_similarity: null, candidate_rank: 1, confidence_tier: high}
+
+test_nlb_player_game_stat_ranges_bounds:
+  model: main_models.nlb_player_game_stat_ranges
+  inputs:
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        season: SMALLINT
+        game_type: VARCHAR
+      rows:
+        - {game_id: G1, season: 1940, game_type: RegularSeason}
+        - {game_id: G25, season: 1925, game_type: RegularSeason}
+    main_models.stg_nlb_games:
+      rows:
+        - {game_id: G1}
+        - {game_id: G25}
+    main_models.nlb_season_sources:
+      rows:
+        - {season: 1925, season_source: Databank}
+        - {season: 1940, season_source: Retrosheet}
+    main_models.stg_nlb_batting:
+      rows:
+        - {game_id: G1, player_id: p, team_id: T, b_pa: null, b_pa_lower: null, b_pa_upper: null, b_ab: null, b_ab_lower: 3, b_ab_upper: null, b_r: null, b_r_lower: null, b_r_upper: 4, b_h: 2, b_h_lower: 2, b_h_upper: 2, b_d: null, b_d_lower: null, b_d_upper: null, b_t: null, b_t_lower: null, b_t_upper: null, b_hr: null, b_hr_lower: null, b_hr_upper: null, b_rbi: null, b_rbi_lower: null, b_rbi_upper: null, b_sh: null, b_sh_lower: null, b_sh_upper: null, b_sf: null, b_sf_lower: null, b_sf_upper: null, b_hbp: null, b_hbp_lower: null, b_hbp_upper: null, b_w: null, b_w_lower: null, b_w_upper: null, b_iw: null, b_iw_lower: null, b_iw_upper: null, b_k: null, b_k_lower: null, b_k_upper: null, b_sb: null, b_sb_lower: null, b_sb_upper: null, b_cs: null, b_cs_lower: null, b_cs_upper: null, b_gdp: null, b_gdp_lower: null, b_gdp_upper: null, b_xi: null, b_xi_lower: null, b_xi_upper: null, b_roe: null, b_roe_lower: null, b_roe_upper: null}
+        - {game_id: G25, player_id: p, team_id: T, b_h: 1, b_h_lower: 1, b_h_upper: 1}
+    main_models.stg_nlb_pitching:
+      rows: []
+    main_models.stg_nlb_fielding:
+      rows: []
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: G1, player_id: p, line_type: Batting, stat: plate_appearances, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: at_bats, value: null, lower_bound: 3, upper_bound: null, range_basis: ReportedBound}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: runs, value: null, lower_bound: 0, upper_bound: 4, range_basis: ReportedBound}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: hits, value: 2, lower_bound: 2, upper_bound: 2, range_basis: Exact}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: doubles, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: triples, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: home_runs, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: runs_batted_in, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: sacrifice_hits, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: sacrifice_flies, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: hit_by_pitches, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: walks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: intentional_walks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: strikeouts, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: stolen_bases, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: caught_stealing, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: grounded_into_double_plays, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: reached_on_interferences, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, player_id: p, line_type: Batting, stat: reached_on_errors, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+
+test_nlb_player_season_stat_ranges_sums_games:
+  model: main_models.nlb_player_season_stat_ranges
+  inputs:
+    main_models.nlb_player_game_stat_ranges:
+      columns:
+        game_type: VARCHAR
+      rows:
+        - {game_id: G1, season: 1940, game_type: RegularSeason, player_id: p, team_id: T, line_type: Batting, fielding_position: null, stat: hits, value: 2, lower_bound: 2, upper_bound: 2, range_basis: Exact}
+        - {game_id: G2, season: 1940, game_type: RegularSeason, player_id: p, team_id: T, line_type: Batting, fielding_position: null, stat: hits, value: null, lower_bound: 1, upper_bound: null, range_basis: ReportedBound}
+        - {game_id: G3, season: 1940, game_type: RegularSeason, player_id: p, team_id: T, line_type: Batting, fielding_position: null, stat: hits, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown}
+        - {game_id: G1, season: 1940, game_type: RegularSeason, player_id: q, team_id: T, line_type: Batting, fielding_position: null, stat: hits, value: 1, lower_bound: 1, upper_bound: 1, range_basis: Exact}
+        - {game_id: G2, season: 1940, game_type: RegularSeason, player_id: q, team_id: T, line_type: Batting, fielding_position: null, stat: hits, value: null, lower_bound: 0, upper_bound: 3, range_basis: ReportedBound}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {season: 1940, team_id: T, player_id: p, stat: hits, lower_bound: 3, upper_bound: null, games: 3, exact_games: 1, bounded_games: 1, unknown_games: 1}
+        - {season: 1940, team_id: T, player_id: q, stat: hits, lower_bound: 1, upper_bound: 4, games: 2, exact_games: 1, bounded_games: 1, unknown_games: 0}
+
+test_nlb_team_game_stat_ranges_flags_team_outside_player_bounds:
+  model: main_models.nlb_team_game_stat_ranges
+  inputs:
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        season: SMALLINT
+        game_type: VARCHAR
+      rows:
+        - {game_id: G1, season: 1940, game_type: RegularSeason}
+    main_models.stg_nlb_games:
+      rows:
+        - {game_id: G1}
+    main_models.nlb_season_sources:
+      rows:
+        - {season: 1940, season_source: Retrosheet}
+    main_models.stg_nlb_teams:
+      rows:
+        - {game_id: G1, team_id: T, b_pa: null, b_pa_lower: null, b_pa_upper: null, b_ab: null, b_ab_lower: null, b_ab_upper: null, b_r: 5, b_r_lower: 5, b_r_upper: 5, b_h: 3, b_h_lower: 3, b_h_upper: 3, b_d: null, b_d_lower: null, b_d_upper: null, b_t: null, b_t_lower: null, b_t_upper: null, b_hr: null, b_hr_lower: null, b_hr_upper: null, b_rbi: null, b_rbi_lower: null, b_rbi_upper: null, b_sh: null, b_sh_lower: null, b_sh_upper: null, b_sf: null, b_sf_lower: null, b_sf_upper: null, b_hbp: null, b_hbp_lower: null, b_hbp_upper: null, b_w: null, b_w_lower: null, b_w_upper: null, b_iw: null, b_iw_lower: null, b_iw_upper: null, b_k: null, b_k_lower: null, b_k_upper: null, b_sb: null, b_sb_lower: null, b_sb_upper: null, b_cs: null, b_cs_lower: null, b_cs_upper: null, b_gdp: null, b_gdp_lower: null, b_gdp_upper: null, b_xi: null, b_xi_lower: null, b_xi_upper: null, b_roe: null, b_roe_lower: null, b_roe_upper: null, p_ipouts: null, p_ipouts_lower: null, p_ipouts_upper: null, p_bfp: null, p_bfp_lower: null, p_bfp_upper: null, p_h: null, p_h_lower: null, p_h_upper: null, p_d: null, p_d_lower: null, p_d_upper: null, p_t: null, p_t_lower: null, p_t_upper: null, p_hr: null, p_hr_lower: null, p_hr_upper: null, p_r: null, p_r_lower: null, p_r_upper: null, p_er: null, p_er_lower: null, p_er_upper: null, p_w: null, p_w_lower: null, p_w_upper: null, p_iw: null, p_iw_lower: null, p_iw_upper: null, p_k: null, p_k_lower: null, p_k_upper: null, p_hbp: null, p_hbp_lower: null, p_hbp_upper: null, p_wp: null, p_wp_lower: null, p_wp_upper: null, p_bk: null, p_bk_lower: null, p_bk_upper: null, p_sh: null, p_sh_lower: null, p_sh_upper: null, p_sf: null, p_sf_lower: null, p_sf_upper: null, d_po: null, d_po_lower: null, d_po_upper: null, d_a: null, d_a_lower: null, d_a_upper: null, d_e: null, d_e_lower: null, d_e_upper: null, d_dp: null, d_dp_lower: null, d_dp_upper: null, d_tp: null, d_tp_lower: null, d_tp_upper: null, d_pb: null, d_pb_lower: null, d_pb_upper: null, d_sb: null, d_sb_lower: null, d_sb_upper: null, d_cs: null, d_cs_lower: null, d_cs_upper: null}
+    main_models.nlb_player_game_stat_ranges:
+      columns:
+        game_type: VARCHAR
+      rows:
+        - {game_id: G1, season: 1940, player_id: p, team_id: T, line_type: Batting, stat: runs, value: 6, lower_bound: 6, upper_bound: 6, range_basis: Exact}
+        - {game_id: G1, season: 1940, player_id: p, team_id: T, line_type: Batting, stat: hits, value: null, lower_bound: 1, upper_bound: null, range_basis: ReportedBound}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: G1, team_id: T, line_type: Batting, stat: plate_appearances, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: at_bats, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: runs, value: 5, lower_bound: 5, upper_bound: 5, range_basis: Exact, player_lines: 1, player_lower_bound: 6, player_upper_bound: 6, is_outside_player_bounds: true}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: hits, value: 3, lower_bound: 3, upper_bound: 3, range_basis: Exact, player_lines: 1, player_lower_bound: 1, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: doubles, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: triples, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: home_runs, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: runs_batted_in, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: sacrifice_hits, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: sacrifice_flies, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: hit_by_pitches, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: walks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: intentional_walks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: strikeouts, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: stolen_bases, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: caught_stealing, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: grounded_into_double_plays, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: reached_on_interferences, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Batting, stat: reached_on_errors, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: outs_recorded, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: batters_faced, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: hits, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: doubles, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: triples, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: home_runs, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: runs, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: earned_runs, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: walks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: intentional_walks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: strikeouts, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: hit_by_pitches, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: wild_pitches, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: balks, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: sacrifice_hits, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Pitching, stat: sacrifice_flies, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: putouts, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: assists, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: errors, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: double_plays, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: triple_plays, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: passed_balls, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: stolen_bases, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+        - {game_id: G1, team_id: T, line_type: Fielding, stat: caught_stealing, value: null, lower_bound: 0, upper_bound: null, range_basis: Unknown, player_lines: 0, player_lower_bound: null, player_upper_bound: null, is_outside_player_bounds: false}
+
+test_team_season_standings_sources:
+  model: main_models.team_season_standings
+  inputs:
+    main_models.nlb_season_sources:
+      rows:
+        - {season: 1926, season_source: Databank}
+        - {season: 1940, season_source: Retrosheet}
+    main_models.team_game_start_info:
+      columns:
+        season: SMALLINT
+        team_id: VARCHAR
+        game_type: VARCHAR
+        league: VARCHAR
+        division: VARCHAR
+        is_negro_leagues: BOOLEAN
+        team_side: VARCHAR
+      rows:
+        - {season: 1926, team_id: HIL, game_type: RegularSeason, league: ECL, division: null, is_negro_leagues: true}
+        - {season: 1940, team_id: BOS, game_type: RegularSeason, league: AL, division: null, is_negro_leagues: false}
+        - {season: 1940, team_id: NYA, game_type: RegularSeason, league: AL, division: null, is_negro_leagues: false}
+    main_models.team_game_results:
+      columns:
+        season: SMALLINT
+        game_id: VARCHAR
+        team_id: VARCHAR
+        game_type: VARCHAR
+        game_finish_date: DATE
+        wins: INTEGER
+        losses: INTEGER
+        team_side: VARCHAR
+        opponent_team_id: VARCHAR
+      rows:
+        - {season: 1926, game_id: H1, team_id: HIL, game_type: RegularSeason, game_finish_date: 1926-05-01, wins: 1, losses: 0}
+        - {season: 1940, game_id: B1, team_id: BOS, game_type: RegularSeason, game_finish_date: 1940-05-01, wins: 1, losses: 0}
+        - {season: 1940, game_id: B2, team_id: BOS, game_type: RegularSeason, game_finish_date: 1940-05-02, wins: 1, losses: 0}
+        - {season: 1940, game_id: B3, team_id: BOS, game_type: RegularSeason, game_finish_date: 1940-05-03, wins: 0, losses: 0}
+        - {season: 1940, game_id: B4, team_id: BOS, game_type: Exhibition, game_finish_date: 1940-05-04, wins: 1, losses: 0}
+        - {season: 1940, game_id: N1, team_id: NYA, game_type: RegularSeason, game_finish_date: 1940-05-01, wins: 0, losses: 1}
+    main_models.stg_databank_teams:
+      rows:
+        - {season: 1926, databank_team_id: HIL, league_id: ECL, is_negro_leagues: true, team_id: HIL, games: 80, wins: 50, losses: 28, league_rank: 1, won_pennant: false}
+        - {season: 1926, databank_team_id: ACB, league_id: ECL, is_negro_leagues: true, team_id: ACY, games: 70, wins: 40, losses: 30, league_rank: 2, won_pennant: true}
+        - {season: 1926, databank_team_id: UNM, league_id: ECL, is_negro_leagues: true, team_id: null, games: 30, wins: 10, losses: 20, league_rank: 3, won_pennant: false}
+        - {season: 1940, databank_team_id: BOS, league_id: AL, is_negro_leagues: false, team_id: BOS, games: 154, wins: 82, losses: 72, league_rank: 4, won_pennant: false}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {season: 1926, team_id: HIL, league: ECL, games: 80, wins: 50, losses: 28, ties: 2, league_rank: 1, won_pennant: false, standings_source: Databank}
+        - {season: 1926, team_id: ACY, league: ECL, games: 70, wins: 40, losses: 30, ties: 0, league_rank: 2, won_pennant: true, standings_source: Databank}
+        - {season: 1940, team_id: BOS, league: AL, games: 3, wins: 2, losses: 0, ties: 1, league_rank: 1, won_pennant: null, standings_source: Retrosheet}
+        - {season: 1940, team_id: NYA, league: AL, games: 1, wins: 0, losses: 1, ties: 0, league_rank: 2, won_pennant: null, standings_source: Retrosheet}
+
+test_team_game_pitching_stats_earned_runs_and_nlb_team_lines:
+  model: main_models.team_game_pitching_stats
+  inputs:
+    main_models.player_game_pitching_stats:
+      columns:
+        game_id: VARCHAR
+        player_id: VARCHAR
+        team_id: VARCHAR
+        innings_pitched: DECIMAL(6,4)
+        wins: UTINYINT
+        losses: UTINYINT
+        saves: UTINYINT
+        earned_runs: UTINYINT
+        batters_faced: UTINYINT
+        outs_recorded: UTINYINT
+        inherited_runners_scored: UTINYINT
+        bequeathed_runners_scored: UTINYINT
+        team_unearned_runs: UTINYINT
+        plate_appearances: UTINYINT
+        at_bats: UTINYINT
+        hits: UTINYINT
+        singles: UTINYINT
+        doubles: UTINYINT
+        triples: UTINYINT
+        home_runs: UTINYINT
+        total_bases: UTINYINT
+        strikeouts: UTINYINT
+        walks: UTINYINT
+        intentional_walks: UTINYINT
+        hit_by_pitches: UTINYINT
+        sacrifice_hits: UTINYINT
+        sacrifice_flies: UTINYINT
+        reached_on_errors: UTINYINT
+        reached_on_interferences: UTINYINT
+        inside_the_park_home_runs: UTINYINT
+        ground_rule_doubles: UTINYINT
+        infield_hits: UTINYINT
+        on_base_opportunities: UTINYINT
+        on_base_successes: UTINYINT
+        grounded_into_double_plays: UTINYINT
+        double_plays: UTINYINT
+        triple_plays: UTINYINT
+        batting_outs: UTINYINT
+        balls_in_play: UTINYINT
+        balls_batted: UTINYINT
+        trajectory_fly_ball: UTINYINT
+        trajectory_ground_ball: UTINYINT
+        trajectory_line_drive: UTINYINT
+        trajectory_pop_up: UTINYINT
+        trajectory_unknown: UTINYINT
+        trajectory_known: UTINYINT
+        trajectory_broad_air_ball: UTINYINT
+        trajectory_broad_ground_ball: UTINYINT
+        trajectory_broad_unknown: UTINYINT
+        trajectory_broad_known: UTINYINT
+        bunts: UTINYINT
+        batted_distance_plate: UTINYINT
+        batted_distance_infield: UTINYINT
+        batted_distance_outfield: UTINYINT
+        batted_distance_unknown: UTINYINT
+        batted_distance_known: UTINYINT
+        fielded_by_battery: UTINYINT
+        fielded_by_infielder: UTINYINT
+        fielded_by_outfielder: UTINYINT
+        fielded_by_known: UTINYINT
+        fielded_by_unknown: UTINYINT
+        batted_angle_left: UTINYINT
+        batted_angle_right: UTINYINT
+        batted_angle_middle: UTINYINT
+        batted_angle_unknown: UTINYINT
+        batted_angle_known: UTINYINT
+        batted_location_plate: UTINYINT
+        batted_location_right_infield: UTINYINT
+        batted_location_middle_infield: UTINYINT
+        batted_location_left_infield: UTINYINT
+        batted_location_left_field: UTINYINT
+        batted_location_center_field: UTINYINT
+        batted_location_right_field: UTINYINT
+        batted_location_unknown: UTINYINT
+        batted_location_known: UTINYINT
+        batted_balls_pulled: UTINYINT
+        batted_balls_opposite_field: UTINYINT
+        runs: UTINYINT
+        times_reached_base: UTINYINT
+        stolen_base_opportunities: UTINYINT
+        stolen_base_opportunities_second: UTINYINT
+        stolen_base_opportunities_third: UTINYINT
+        stolen_base_opportunities_home: UTINYINT
+        stolen_bases: UTINYINT
+        stolen_bases_second: UTINYINT
+        stolen_bases_third: UTINYINT
+        stolen_bases_home: UTINYINT
+        caught_stealing: UTINYINT
+        caught_stealing_second: UTINYINT
+        caught_stealing_third: UTINYINT
+        caught_stealing_home: UTINYINT
+        picked_off: UTINYINT
+        picked_off_first: UTINYINT
+        picked_off_second: UTINYINT
+        picked_off_third: UTINYINT
+        picked_off_caught_stealing: UTINYINT
+        outs_on_basepaths: UTINYINT
+        unforced_outs_on_basepaths: UTINYINT
+        outs_avoided_on_errors: UTINYINT
+        advances_on_wild_pitches: UTINYINT
+        advances_on_passed_balls: UTINYINT
+        advances_on_balks: UTINYINT
+        advances_on_unspecified_plays: UTINYINT
+        advances_on_defensive_indifference: UTINYINT
+        advances_on_errors: UTINYINT
+        extra_base_chances: UTINYINT
+        extra_base_advance_attempts: UTINYINT
+        extra_bases_taken: UTINYINT
+        bases_advanced: SMALLINT
+        bases_advanced_on_balls_in_play: SMALLINT
+        surplus_bases_advanced_on_balls_in_play: SMALLINT
+        outs_on_extra_base_advance_attempts: UTINYINT
+        pitches: USMALLINT
+        swings: UTINYINT
+        swings_with_contact: UTINYINT
+        strikes: UTINYINT
+        strikes_called: UTINYINT
+        strikes_swinging: UTINYINT
+        strikes_foul: UTINYINT
+        strikes_foul_tip: UTINYINT
+        strikes_in_play: UTINYINT
+        strikes_unknown: UTINYINT
+        balls: UTINYINT
+        balls_called: UTINYINT
+        balls_intentional: UTINYINT
+        balls_automatic: UTINYINT
+        unknown_pitches: UTINYINT
+        pitchouts: UTINYINT
+        pitcher_pickoff_attempts: UTINYINT
+        catcher_pickoff_attempts: UTINYINT
+        pitches_blocked_by_catcher: USMALLINT
+        pitches_with_runners_going: USMALLINT
+        passed_balls: UTINYINT
+        wild_pitches: UTINYINT
+        balks: UTINYINT
+        left_on_base: UTINYINT
+        left_on_base_with_two_outs: UTINYINT
+        pitch_sequence_resolution_status: VARCHAR
+        games_started: UTINYINT
+        inherited_runners: UTINYINT
+        bequeathed_runners: UTINYINT
+        games_relieved: UTINYINT
+        games_finished: UTINYINT
+        save_situations_entered: UTINYINT
+        holds: UTINYINT
+        blown_saves: UTINYINT
+        saves_by_rule: UTINYINT
+        save_opportunities: UTINYINT
+        complete_games: UTINYINT
+        shutouts: UTINYINT
+        quality_starts: UTINYINT
+        cheap_wins: UTINYINT
+        tough_losses: UTINYINT
+        no_decisions: UTINYINT
+        no_hitters: UTINYINT
+        perfect_games: UTINYINT
+      rows:
+        - {game_id: BOX, team_id: HOM, player_id: p1, earned_runs: 3, team_unearned_runs: null, hits: 7, outs_recorded: 27}
+        - {game_id: PBP, team_id: HOM, player_id: p2, earned_runs: 3, team_unearned_runs: 1, hits: 5, outs_recorded: 27}
+        - {game_id: NLB, team_id: HOM, player_id: p3, earned_runs: 1, team_unearned_runs: null, hits: 2, outs_recorded: 6}
+    main_models.nlb_team_lines:
+      columns:
+        team_id: VARCHAR
+        side: VARCHAR
+        game_id: VARCHAR
+        lob: INTEGER
+        b_pa: INTEGER
+        b_ab: INTEGER
+        b_r: INTEGER
+        b_h: INTEGER
+        b_d: INTEGER
+        b_t: INTEGER
+        b_hr: INTEGER
+        b_rbi: INTEGER
+        b_sh: INTEGER
+        b_sf: INTEGER
+        b_hbp: INTEGER
+        b_w: INTEGER
+        b_iw: INTEGER
+        b_k: INTEGER
+        b_sb: INTEGER
+        b_cs: INTEGER
+        b_gdp: INTEGER
+        b_xi: INTEGER
+        b_roe: INTEGER
+        p_ipouts: INTEGER
+        p_bfp: INTEGER
+        p_h: INTEGER
+        p_d: INTEGER
+        p_t: INTEGER
+        p_hr: INTEGER
+        p_r: INTEGER
+        p_er: INTEGER
+        p_w: INTEGER
+        p_iw: INTEGER
+        p_k: INTEGER
+        p_hbp: INTEGER
+        p_wp: INTEGER
+        p_bk: INTEGER
+        p_sh: INTEGER
+        p_sf: INTEGER
+        d_po: INTEGER
+        d_a: INTEGER
+        d_e: INTEGER
+        d_dp: INTEGER
+        d_tp: INTEGER
+        d_pb: INTEGER
+        d_sb: INTEGER
+        d_cs: INTEGER
+      rows:
+        - {game_id: NLB, team_id: HOM, side: Home, p_ipouts: 27, p_h: 9, p_r: 6, p_er: 4, p_d: 1, p_t: 0, p_hr: 1}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: BOX, team_id: HOM, earned_runs: 3, individual_earned_runs: 3, hits: 7, outs_recorded: 27, singles: null, total_bases: null}
+        - {game_id: PBP, team_id: HOM, earned_runs: 2, individual_earned_runs: 3, hits: 5, outs_recorded: 27, singles: null, total_bases: null}
+        - {game_id: NLB, team_id: HOM, earned_runs: 4, individual_earned_runs: 4, hits: 9, outs_recorded: 27, singles: 7, total_bases: 13}
+
+test_nlb_pitching_lines_starts_use_flags_when_any_pitcher_has_one:
+  model: main_models.nlb_pitching_lines
+  inputs:
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+        home_team_id: VARCHAR
+        away_team_id: VARCHAR
+        source_type: VARCHAR
+      rows:
+        - {game_id: G_NLB, home_team_id: HOM, away_team_id: AWY, source_type: NegroLeaguesStats}
+    main_models.stg_nlb_pitching:
+      rows:
+        - {game_id: G_NLB, player_id: first, is_home: true, sequence: 1, p_gs: null, p_gf: null, p_ipouts: 3}
+        - {game_id: G_NLB, player_id: flagged, is_home: true, sequence: 2, p_gs: 1, p_gf: 1, p_ipouts: 24}
+        - {game_id: G_NLB, player_id: opener, is_home: false, sequence: 1, p_gs: null, p_gf: null, p_ipouts: 21}
+        - {game_id: G_NLB, player_id: closer, is_home: false, sequence: 2, p_gs: null, p_gf: null, p_ipouts: 6}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: G_NLB, pitcher_id: first, team_id: HOM, games_started: 0, games_relieved: 1, games_finished: 0}
+        - {game_id: G_NLB, pitcher_id: flagged, team_id: HOM, games_started: 1, games_relieved: 0, games_finished: 1}
+        - {game_id: G_NLB, pitcher_id: opener, team_id: AWY, games_started: 1, games_relieved: 0, games_finished: 0}
+        - {game_id: G_NLB, pitcher_id: closer, team_id: AWY, games_started: 0, games_relieved: 1, games_finished: 1}
+
+test_stg_people_keeps_shared_retrosheet_id_for_best_bio_match:
+  model: main_models.stg_people
+  inputs:
+    baseballdatabank.people:
+      columns:
+        player_id: VARCHAR
+        retro_id: VARCHAR
+        bbref_id: VARCHAR
+        birth_year: INTEGER
+        birth_month: INTEGER
+        birth_day: INTEGER
+        birth_country: VARCHAR
+        birth_state: VARCHAR
+        birth_city: VARCHAR
+        death_year: INTEGER
+        death_month: INTEGER
+        death_day: INTEGER
+        death_country: VARCHAR
+        death_state: VARCHAR
+        death_city: VARCHAR
+        name_first: VARCHAR
+        name_last: VARCHAR
+        name_given: VARCHAR
+        weight: INTEGER
+        height: DOUBLE
+        bats: VARCHAR
+        throws: VARCHAR
+        debut: TIMESTAMP
+        final_game: TIMESTAMP
+      rows:
+        - {player_id: millebu02, retro_id: mille001, bbref_id: null, name_first: Buck, birth_year: 1901}
+        - {player_id: milleed04, retro_id: mille001, bbref_id: milleed04, name_first: Eddie, birth_year: 1957}
+        - {player_id: smithch11, retro_id: smitc109, bbref_id: smithch11, name_first: Chino, birth_year: 1901}
+        - {player_id: smithch12, retro_id: smitc109, bbref_id: smithch11, name_first: Charlie, birth_year: 1901}
+        - {player_id: crossed, retro_id: lahm001, bbref_id: null, name_first: Al, birth_year: 1910}
+        - {player_id: lahmanpick, retro_id: lahm001, bbref_id: lahmanpick, name_first: Al, birth_year: 1910}
+    main_seeds.seed_nlb_lahman_player_crosswalk:
+      rows:
+        - {databank_player_id: crossed, retrosheet_player_id: lahm001}
+    main_models.stg_bio:
+      rows:
+        - {player_id: mille001, official_name: Edward Lee, first_name: Eddie, birth_date: '1957-05-21'}
+        - {player_id: smitc109, official_name: Charles E., first_name: Chino, birth_date: '1901-??-??'}
+        - {player_id: lahm001, official_name: Albert, first_name: Al, birth_date: '1910-01-01'}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {databank_player_id: crossed, retrosheet_player_id: lahm001}
+        - {databank_player_id: lahmanpick, retrosheet_player_id: null}
+        - {databank_player_id: millebu02, retrosheet_player_id: null}
+        - {databank_player_id: milleed04, retrosheet_player_id: mille001}
+        - {databank_player_id: smithch11, retrosheet_player_id: smitc109}
+        - {databank_player_id: smithch12, retrosheet_player_id: null}
+
+test_stg_databank_batting_nulls_impossible_singles:
+  model: main_models.stg_databank_batting
+  inputs:
+    baseballdatabank.batting:
+      columns:
+        player_id: VARCHAR
+        year_id: INTEGER
+        stint: INTEGER
+        team_id: VARCHAR
+        lg_id: VARCHAR
+      rows:
+        - {player_id: ok, year_id: 1912, stint: 1, team_id: WBS, lg_id: WES, g: 3, ab: 7, h: 3, _2b: 1, _3b: 0, hr: 1}
+        - {player_id: bad, year_id: 1912, stint: 1, team_id: WBS, lg_id: WES, g: 3, ab: 7, h: 0, _2b: 0, _3b: 0, hr: 1}
+    main_models.stg_databank_teams:
+      rows:
+        - {season: 1912, databank_team_id: WBS, team_id: null, is_negro_leagues: true}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {databank_player_id: ok, hits: 3, singles: 1, total_bases: 7}
+        - {databank_player_id: bad, hits: 0, singles: null, total_bases: null}
+
+test_stg_nlb_teams_nulls_negative_left_on_base:
+  model: main_models.stg_nlb_teams
+  inputs:
+    nlb_stats.teamstats:
+      rows:
+        - {gid: G1, team: AAA, date: 19410704, vishome: h, stattype: value, lob: 7, b_ab: 30}
+        - {gid: G1, team: BBB, date: 19410704, vishome: v, stattype: value, lob: -31, b_ab: 4}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {game_id: G1, team_id: AAA, lob: 7, b_ab: 30}
+        - {game_id: G1, team_id: BBB, lob: null, b_ab: 4}
+
+test_stg_databank_appearances_two_lahman_teams_one_retrosheet_team:
+  model: main_models.stg_databank_appearances
+  inputs:
+    main_models.stg_databank_teams:
+      rows:
+        - {season: 1939, databank_team_id: TC, team_id: TLC, is_negro_leagues: true}
+        - {season: 1939, databank_team_id: TC2, team_id: TLC, is_negro_leagues: true}
+    baseballdatabank.appearances:
+      rows:
+        - {player_id: clarkbu01, year_id: 1939, team_id: TC, lg_id: NAL, g_all: 12, g_lf: 0, g_cf: 0, g_rf: 0}
+        - {player_id: clarkbu01, year_id: 1939, team_id: TC2, lg_id: NN2, g_all: 7, g_lf: 0, g_cf: 0, g_rf: 0}
+    baseballdatabank.fielding:
+      rows:
+        - {player_id: clarkbu01, year_id: 1939, stint: 1, team_id: TC, lg_id: NAL, pos: 2B, g: 11, inn_outs: 283}
+        - {player_id: clarkbu01, year_id: 1939, stint: 2, team_id: TC2, lg_id: NN2, pos: SS, g: 6, inn_outs: 177}
+    main_models.stg_people:
+      rows:
+        - {databank_player_id: clarkbu01, retrosheet_player_id: clarb101}
+  outputs:
+    query:
+      rows:
+        - {player_id: clarb101, databank_player_id: clarkbu01, season: 1939, stint: 1, team_id: TLC, league_id: NAL, is_negro_leagues: true, fielding_position: 4, games_at_position: 11, games_total: 12, outs_played: 283}
+        - {player_id: clarb101, databank_player_id: clarkbu01, season: 1939, stint: 2, team_id: TLC, league_id: NN2, is_negro_leagues: true, fielding_position: 6, games_at_position: 6, games_total: 7, outs_played: 177}

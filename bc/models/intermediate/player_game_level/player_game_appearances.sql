@@ -67,6 +67,20 @@ box_offense AS (
         ON pinch_run.game_id = bat.game_id
             AND pinch_run.pinch_runner_id = bat.batter_id
             AND pinch_run.side = bat.side
+    UNION ALL
+    SELECT
+        game_id,
+        batter_id AS player_id,
+        side,
+        lineup_position,
+        CASE
+            WHEN nth_player_at_position = 1 THEN 'Starter'
+            WHEN is_pinch_hitter THEN 'PinchHitter'
+            WHEN is_pinch_runner THEN 'PinchRunner'
+            WHEN nth_player_at_position > 1 THEN 'DefensiveSubstitution'
+        END AS entered_game_as,
+        nth_player_at_position AS position_order
+    FROM main_models.nlb_batting_lines
 ),
 
 offense_union AS (
@@ -108,6 +122,14 @@ fielding_union AS (
         nth_position_played_by_player AS position_order
     FROM main_models.stg_box_score_fielding_lines
     WHERE game_id NOT IN (SELECT game_id FROM event_based)
+    UNION ALL
+    SELECT
+        game_id,
+        fielder_id AS player_id,
+        side,
+        fielding_position,
+        nth_position_played_by_player AS position_order
+    FROM main_models.nlb_fielding_lines
 ),
 
 offense_agg AS (
@@ -123,7 +145,7 @@ offense_agg AS (
         FIRST(lineup_position) AS lineup_position
     -- Ignore pitcher in DH lineups
     FROM offense_union
-    WHERE lineup_position > 0
+    WHERE lineup_position > 0 OR lineup_position IS NULL
     GROUP BY 1, 2
 ),
 

@@ -1,0 +1,32 @@
+version: 2
+seeds:
+  - name: seed_nlb_lahman_team_crosswalk
+    description: >-
+      Retrosheet team ids for Lahman Negro Leagues team-seasons whose
+      teams.team_id_retro is wrong or missing. stg_databank_teams uses a row
+      here in place of team_id_retro. Check each row against the roster
+      overlap in nlb_lahman_team_resolution.
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: season
+        description: Season of the Lahman team row.
+        data_type: smallint
+        constraints:
+          - type: not_null
+      - name: databank_team_id
+        description: Lahman teams.team_id.
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: team_id
+        description: Retrosheet team id; a value of seed_franchises.team_id.
+        data_type: varchar
+        constraints:
+          - type: not_null
+      - name: reason
+        description: Evidence for the mapping.
+        data_type: varchar
+        constraints:
+          - type: not_null

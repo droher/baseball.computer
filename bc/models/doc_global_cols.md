@@ -230,6 +230,12 @@
     - NegroLeaguesStats: Retrosheet's Negro Leagues stat files (negroleagues.zip), for games with no event or box file
 {% enddocs %}
 
+{% docs stats_source %}
+    Where the row's totals come from.
+    - Retrosheet: summed from Retrosheet game-level data
+    - Databank: Lahman season totals, for seasons Retrosheet does not cover and for Negro Leagues regular seasons that nlb_season_sources assigns to Lahman
+{% enddocs %}
+
 {% docs filename %}
     Name of the Retrosheet file that this data is derived from.
     Helpful for debugging.

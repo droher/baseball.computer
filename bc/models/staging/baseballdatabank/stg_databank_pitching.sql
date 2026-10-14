@@ -1,14 +1,16 @@
 MODEL (
   name main_models.stg_databank_pitching,
   kind FULL,
-  description 'Aggregate pitching statistics by player, season, and stint with a given team. team_id is translated from Databank to Retrosheet via baseballdatabank.teams.team_id_retro and the not_null audit on team_id fails the build if any row is missing from the crosswalk.',
+  description 'Aggregate pitching statistics by player, season, and stint with a given team. team_id is translated from Databank to Retrosheet through stg_databank_teams. The not_null audit on team_id fails the build if a major-league row is missing from the crosswalk; Negro Leagues rows with no resolved Retrosheet team keep team_id NULL.',
   grain (databank_player_id, season, stint),
   columns (
     databank_player_id VARCHAR,
     season SMALLINT,
     stint SMALLINT,
     team_id VARCHAR,
+    databank_team_id VARCHAR,
     league_id VARCHAR,
+    is_negro_leagues BOOLEAN,
     wins SMALLINT,
     losses SMALLINT,
     games SMALLINT,
@@ -36,6 +38,8 @@ MODEL (
     grounded_into_double_plays SMALLINT
   ),
   column_descriptions (
+    databank_team_id = 'Lahman teams.team_id.',
+    is_negro_leagues = 'Whether the Lahman league is a Negro Leagues league rather than a major league.',
     databank_player_id = @doc('databank_player_id'),
     season = @doc('season'),
     stint = @doc('stint'),
@@ -67,7 +71,8 @@ MODEL (
     grounded_into_double_plays = @doc('grounded_into_double_plays')
   ),
   audits (
-    not_null(columns := (databank_player_id, season, stint, team_id))
+    not_null(columns := (databank_player_id, season, stint, is_negro_leagues)),
+    not_null(columns := (team_id), condition := NOT is_negro_leagues)
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_databank_pitching.parquet'
@@ -82,16 +87,19 @@ MODEL (
 
 WITH team_id_crosswalk AS (
     SELECT
-        year_id,
-        team_id AS databank_team_id,
-        team_id_retro AS team_id
-    FROM baseballdatabank.teams
+        season AS year_id,
+        databank_team_id,
+        team_id,
+        is_negro_leagues
+    FROM main_models.stg_databank_teams
 ),
 
 source AS (
     SELECT
         p.* EXCLUDE (team_id),
-        t.team_id AS team_id
+        p.team_id AS databank_team_id,
+        t.team_id AS team_id,
+        t.is_negro_leagues
     FROM baseballdatabank.pitching AS p
     LEFT JOIN team_id_crosswalk AS t
         ON p.year_id = t.year_id AND p.team_id = t.databank_team_id
@@ -103,7 +111,9 @@ renamed AS (
         year_id AS season,
         stint,
         team_id AS team_id,
+        databank_team_id,
         lg_id AS league_id,
+        is_negro_leagues,
         w AS wins,
         l AS losses,
         g AS games,

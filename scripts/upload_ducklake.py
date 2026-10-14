@@ -496,8 +496,8 @@ def sql_literal(value: str) -> str:
 
 
 def catalog_metadata(
-    catalog_path: Path = CATALOG_PATH,
-    data_path: Path = DATA_PATH,
+    catalog_path: Path,
+    data_path: Path,
 ) -> dict[str, object]:
     con = duckdb.connect(":memory:")
     _ = con.execute("INSTALL ducklake")
@@ -531,9 +531,9 @@ def catalog_metadata(
 
 
 def write_catalog_metadata(
-    catalog_path: Path = CATALOG_PATH,
-    data_path: Path = DATA_PATH,
-    output_path: Path = CATALOG_METADATA_PATH,
+    catalog_path: Path,
+    data_path: Path,
+    output_path: Path,
 ) -> Path:
     output_path.write_text(
         json.dumps(catalog_metadata(catalog_path, data_path), sort_keys=True),
@@ -542,7 +542,7 @@ def write_catalog_metadata(
     return output_path
 
 
-def assert_packet_valid(packet_path: Path = PACKET_PATH) -> None:
+def assert_packet_valid(packet_path: Path) -> None:
     """Refuse to upload a packet the LSF-1 validator rejects."""
     if not packet_path.exists():
         raise SystemExit(
@@ -594,13 +594,15 @@ def upload_artifact(
         )
     if not DATA_PATH.is_dir():
         raise SystemExit(f"data dir not found at {DATA_PATH}")
-    assert_packet_valid()
+    assert_packet_valid(PACKET_PATH)
 
     data_uploads = data_file_uploads(prefix)
     _log.info(
         "uploading %d data files under %s/%s/", len(data_uploads), prefix, DATA_DIR_NAME
     )
-    metadata_path = write_catalog_metadata()
+    metadata_path = write_catalog_metadata(
+        CATALOG_PATH, DATA_PATH, CATALOG_METADATA_PATH
+    )
     catalog_key, metadata_key, packet_key = metadata_keys(prefix)
     preflight_uploads(
         uploader,

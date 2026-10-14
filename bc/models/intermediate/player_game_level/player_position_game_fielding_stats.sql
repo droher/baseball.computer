@@ -69,14 +69,14 @@ MODEL (
     relationships(column := game_id, to_model := main_models.game_results, to_column := game_id),
     relationships(column := player_id, to_model := main_models.people, to_column := player_id),
     relationships(column := team_id, to_model := main_seeds.seed_franchises, to_column := team_id),
-    not_null_proportion(column := outs_played, threshold := 0.995),
-    not_null_proportion(column := putouts, threshold := 0.995),
-    not_null_proportion(column := assists, threshold := 0.995),
-    not_null_proportion(column := errors, threshold := 0.995),
-    not_null_proportion(column := double_plays, threshold := 0.995),
-    not_null_proportion(column := triple_plays, threshold := 0.995),
-    not_null_proportion(column := stolen_bases, threshold := 0.93),
-    not_null_proportion(column := caught_stealing, threshold := 0.93)
+    not_null_proportion(column := outs_played, threshold := 0.995, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := putouts, threshold := 0.995, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := assists, threshold := 0.995, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := errors, threshold := 0.995, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := double_plays, threshold := 0.995, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := triple_plays, threshold := 0.995, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := stolen_bases, threshold := 0.93, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines)),
+    not_null_proportion(column := caught_stealing, threshold := 0.93, condition := game_id NOT IN (SELECT game_id FROM main_models.nlb_fielding_lines))
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_player_position_game_fielding_stats.parquet'
@@ -89,21 +89,34 @@ MODEL (
 
 
 
-WITH box_agg AS (
+WITH box_lines AS (
+    SELECT
+        CASE WHEN stats.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS team_id,
+        stats.*
+    FROM main_models.stg_box_score_fielding_lines AS stats
+    INNER JOIN main_models.stg_games AS games USING (game_id)
+    UNION ALL BY NAME
+    SELECT *
+    FROM main_models.nlb_fielding_lines
+),
+
+box_agg AS (
     SELECT
         game_id,
         stats.fielder_id AS player_id,
         stats.fielding_position,
-        MIN(CASE WHEN stats.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END) AS team_id,
+        MIN(stats.team_id) AS team_id,
+        MAX(stats.games_started) AS games_started,
         SUM(stats.outs_played) AS outs_played,
         CASE WHEN BOOL_OR(stats.putouts IS NULL) THEN NULL ELSE SUM(stats.putouts) END AS putouts,
         CASE WHEN BOOL_OR(stats.assists IS NULL) THEN NULL ELSE SUM(stats.assists) END AS assists,
         CASE WHEN BOOL_OR(stats.errors IS NULL) THEN NULL ELSE SUM(stats.errors) END AS errors,
         CASE WHEN BOOL_OR(stats.double_plays IS NULL) THEN NULL ELSE SUM(stats.double_plays) END AS double_plays,
         CASE WHEN BOOL_OR(stats.triple_plays IS NULL) THEN NULL ELSE SUM(stats.triple_plays) END AS triple_plays,
-        CASE WHEN BOOL_OR(stats.passed_balls IS NULL) THEN NULL ELSE SUM(stats.passed_balls) END AS passed_balls
-    FROM main_models.stg_box_score_fielding_lines AS stats
-    INNER JOIN main_models.stg_games AS games USING (game_id)
+        CASE WHEN BOOL_OR(stats.passed_balls IS NULL) THEN NULL ELSE SUM(stats.passed_balls) END AS passed_balls,
+        CASE WHEN BOOL_OR(stats.stolen_bases IS NULL) THEN NULL ELSE SUM(stats.stolen_bases) END AS stolen_bases,
+        CASE WHEN BOOL_OR(stats.caught_stealing IS NULL) THEN NULL ELSE SUM(stats.caught_stealing) END AS caught_stealing
+    FROM box_lines AS stats
     GROUP BY 1, 2, 3
 ),
 
@@ -148,6 +161,7 @@ final AS (
         fielding_position,
         COALESCE(event_agg.team_id, box_agg.team_id) AS team_id,
         CASE
+            WHEN box_agg.games_started IS NOT NULL THEN box_agg.games_started
             WHEN appearances.first_fielding_position = fielding_position
                 OR appearances.games_ohtani_rule = 1 AND fielding_position IN (1, 10)
                 THEN appearances.games_started
@@ -190,8 +204,8 @@ final AS (
         event_agg.balls_hit_to,
         event_agg.ground_ball_double_plays,
         COALESCE(box_agg.passed_balls, event_agg.passed_balls)::UTINYINT AS passed_balls,
-        event_agg.stolen_bases,
-        event_agg.caught_stealing,
+        COALESCE(event_agg.stolen_bases, box_agg.stolen_bases)::UTINYINT AS stolen_bases,
+        COALESCE(event_agg.caught_stealing, box_agg.caught_stealing)::UTINYINT AS caught_stealing,
         event_agg.unknown_putouts_while_fielding,
         event_agg.pickoffs,
         event_agg.double_plays_started,

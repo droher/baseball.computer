@@ -170,12 +170,15 @@ MODEL (
 WITH box_score AS (
     SELECT
         CASE WHEN bat.side = 'Home' THEN games.home_team_id ELSE games.away_team_id END AS team_id,
-        bat.*
+        bat.* REPLACE (NULL::UTINYINT AS reached_on_interferences)
     FROM main_models.stg_box_score_batting_lines AS bat
     -- This join ensures that we only get the box score lines for games that
     -- do not have an event file.
     INNER JOIN main_models.game_start_info AS games USING (game_id)
     WHERE games.source_type = 'BoxScore'
+    UNION ALL BY NAME
+    SELECT * EXCLUDE (is_pinch_hitter, is_pinch_runner)
+    FROM main_models.nlb_batting_lines
 ),
 
 final AS (
@@ -205,8 +208,8 @@ final AS (
         SUM(hit_by_pitches)::UTINYINT AS hit_by_pitches,
         SUM(sacrifice_hits)::UTINYINT AS sacrifice_hits,
         SUM(sacrifice_flies)::UTINYINT AS sacrifice_flies,
-        NULL AS reached_on_errors,
-        NULL AS reached_on_interferences,
+        SUM(reached_on_errors)::UTINYINT AS reached_on_errors,
+        SUM(reached_on_interferences)::UTINYINT AS reached_on_interferences,
         SUM(grounded_into_double_plays)::UTINYINT AS grounded_into_double_plays,
         NULL AS double_plays,
         NULL AS triple_plays,

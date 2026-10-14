@@ -1,5 +1,5 @@
 MODEL (
-  name main_models.stg_ngl_plays,
+  name main_models.stg_nlb_plays,
   kind FULL,
   description 'Negro Leagues plays (plays.csv), one row per play, from Retrosheet''s negroleagues.zip. Columns other than game_id and date keep Retrosheet''s names.',
   audits (
@@ -11,4 +11,4 @@ SELECT
     gid AS game_id,
     STRPTIME(date::VARCHAR, '%Y%m%d')::DATE AS date,
     * EXCLUDE (gid, date)
-FROM ngl_stats.plays
+FROM nlb_stats.plays

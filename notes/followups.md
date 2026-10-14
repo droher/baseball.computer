@@ -203,3 +203,13 @@ Resolved. The four Databank stagings (`stg_databank_appearances`, `stg_databank_
 **Fielding is the weakest component.** Range runs compare assists (infield) or putouts plus assists (outfield) with the league rate per ball in play, so they can't see staff ground-ball mix, batter handedness, or a teammate taking balls in the hole. Brooks Robinson gets +137 career runs against Baseball-Reference's +293; Mazeroski (+274 vs +148) and Schmidt (+270 vs +127) run high because second-base double-play pivots and third-base assist volume count as range. Building expected plays from event-level batted-ball location and type, where Retrosheet has them, is the real fix. Splitting team credit between infield and outfield by league share was tried and made Vizquel and Arenado worse.
 
 **Other known gaps:** catchers get only caught-stealing runs; pitching uses all runs allowed, so team defense counts in both pitching and fielding; relievers get no leverage credit; 1880s pitcher seasons run high (Radbourn 1884: 24.7).
+
+## Negro Leagues stats integration — 2026-10-13
+
+Details in `notes/nlb-stats-integration-plan.md` (Outcome section).
+
+- **Promotion to prod.** Several upstream models change (`people`, `stg_people`, the Databank staging models, every player-game and team-game model), so a `rebuild-prod` after `just preload` is simpler than a long `promote-prod` list. The team earned-runs fix changes 14,203 box-score team-games in prod.
+- **Report to Retrosheet:** two NLB-only games with no game type (CAG193305290, DI1193305290); MEM194107041 SNO team line with left-on-base -31 and 8 hits in 4 at-bats; NLB player lines with impossible counts (willj111 in NW2194408250, 10 strikeouts in 4 plate appearances); exact duplicate rows in `allplayers.csv` for coopa103 1934 CV8, dixor101 1933 PH5, willr106 1933 NY5.
+- **Report to Lahman:** 21 Retrosheet ids shared by two people in the new release (for example `mcclb001` on both Bob McClures); tayloci99 1912 batting with 0 hits and 1 home run.
+- **Review `nlb_lahman_player_resolution`** and fill `seed_nlb_lahman_player_crosswalk`, starting with the people `stg_people` unlinked from a shared Retrosheet id (smithch12 and woolred01 may be the same person as the Lahman entry that kept the id).
+- **Team fielding in Lahman-sourced NLB seasons** (before 1933) still comes from the few Retrosheet games, while player fielding comes from Lahman.
