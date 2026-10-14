@@ -913,7 +913,7 @@ test_nlb_pitching_lines_starts_use_flags_when_any_pitcher_has_one:
         - {game_id: G_NLB, pitcher_id: opener, team_id: AWY, games_started: 1, games_relieved: 0, games_finished: 0}
         - {game_id: G_NLB, pitcher_id: closer, team_id: AWY, games_started: 0, games_relieved: 1, games_finished: 1}
 
-test_stg_people_keeps_shared_retrosheet_id_for_best_bio_match:
+test_stg_people_applies_id_corrections:
   model: main_models.stg_people
   inputs:
     baseballdatabank.people:
@@ -943,30 +943,27 @@ test_stg_people_keeps_shared_retrosheet_id_for_best_bio_match:
         debut: TIMESTAMP
         final_game: TIMESTAMP
       rows:
-        - {player_id: millebu02, retro_id: mille001, bbref_id: null, name_first: Buck, birth_year: 1901}
-        - {player_id: milleed04, retro_id: mille001, bbref_id: milleed04, name_first: Eddie, birth_year: 1957}
-        - {player_id: smithch11, retro_id: smitc109, bbref_id: smithch11, name_first: Chino, birth_year: 1901}
-        - {player_id: smithch12, retro_id: smitc109, bbref_id: smithch11, name_first: Charlie, birth_year: 1901}
-        - {player_id: crossed, retro_id: lahm001, bbref_id: null, name_first: Al, birth_year: 1910}
-        - {player_id: lahmanpick, retro_id: lahm001, bbref_id: lahmanpick, name_first: Al, birth_year: 1910}
-    main_seeds.seed_nlb_lahman_player_crosswalk:
+        - {player_id: millebu02, retro_id: mille001, bbref_id: milleed04, name_first: Buck}
+        - {player_id: milleed04, retro_id: mille001, bbref_id: milleed04, name_first: Eddie}
+        - {player_id: kingwi01, retro_id: kingd101, bbref_id: kingdo01, name_first: Wilbert}
+        - {player_id: untouched, retro_id: untou001, bbref_id: untouch01, name_first: Al}
+    main_seeds.seed_lahman_people_id_corrections:
+      columns:
+        databank_player_id: VARCHAR
+        retrosheet_player_id: VARCHAR
+        baseball_reference_player_id: VARCHAR
+        reason: VARCHAR
       rows:
-        - {databank_player_id: crossed, retrosheet_player_id: lahm001}
-    main_models.stg_bio:
-      rows:
-        - {player_id: mille001, official_name: Edward Lee, first_name: Eddie, birth_date: '1957-05-21'}
-        - {player_id: smitc109, official_name: Charles E., first_name: Chino, birth_date: '1901-??-??'}
-        - {player_id: lahm001, official_name: Albert, first_name: Al, birth_date: '1910-01-01'}
+        - {databank_player_id: millebu02, retrosheet_player_id: null, baseball_reference_player_id: null, reason: shared}
+        - {databank_player_id: kingwi01, retrosheet_player_id: null, baseball_reference_player_id: kingwi01, reason: shared}
   outputs:
     query:
       partial: true
       rows:
-        - {databank_player_id: crossed, retrosheet_player_id: lahm001}
-        - {databank_player_id: lahmanpick, retrosheet_player_id: null}
-        - {databank_player_id: millebu02, retrosheet_player_id: null}
-        - {databank_player_id: milleed04, retrosheet_player_id: mille001}
-        - {databank_player_id: smithch11, retrosheet_player_id: smitc109}
-        - {databank_player_id: smithch12, retrosheet_player_id: null}
+        - {databank_player_id: millebu02, retrosheet_player_id: null, baseball_reference_player_id: null}
+        - {databank_player_id: milleed04, retrosheet_player_id: mille001, baseball_reference_player_id: milleed04}
+        - {databank_player_id: kingwi01, retrosheet_player_id: null, baseball_reference_player_id: kingwi01}
+        - {databank_player_id: untouched, retrosheet_player_id: untou001, baseball_reference_player_id: untouch01}
 
 test_stg_databank_batting_nulls_impossible_singles:
   model: main_models.stg_databank_batting
@@ -1028,3 +1025,49 @@ test_stg_databank_appearances_two_lahman_teams_one_retrosheet_team:
       rows:
         - {player_id: clarb101, databank_player_id: clarkbu01, season: 1939, stint: 1, team_id: TLC, league_id: NAL, is_negro_leagues: true, fielding_position: 4, games_at_position: 11, games_total: 12, outs_played: 283}
         - {player_id: clarb101, databank_player_id: clarkbu01, season: 1939, stint: 2, team_id: TLC, league_id: NN2, is_negro_leagues: true, fielding_position: 6, games_at_position: 6, games_total: 7, outs_played: 177}
+
+test_box_score_data_issues_registers_nlb_lines:
+  model: main_models.box_score_data_issues
+  inputs:
+    main_models.game_start_info:
+      columns:
+        game_id: VARCHAR
+      rows: []
+    main_models.stg_box_score_batting_lines:
+      columns:
+        game_id: VARCHAR
+        batter_id: VARCHAR
+        side: VARCHAR
+        team_id: VARCHAR
+      rows:
+        - {game_id: BOX, batter_id: ok, hits: 1, at_bats: 4, strikeouts: 1, plate_appearances: 4, doubles: 0, triples: 0, home_runs: 0}
+    main_models.nlb_batting_lines:
+      columns:
+        game_id: VARCHAR
+        batter_id: VARCHAR
+        side: VARCHAR
+        team_id: VARCHAR
+      rows:
+        - {game_id: NLB, batter_id: whiffer, hits: 0, at_bats: 4, strikeouts: 10, plate_appearances: 4, doubles: 0, triples: 0, home_runs: 0}
+        - {game_id: NLB, batter_id: fine, hits: 2, at_bats: 4, strikeouts: 0, plate_appearances: 4, doubles: 1, triples: 0, home_runs: 0}
+    main_models.stg_box_score_pitching_lines:
+      columns:
+        game_id: VARCHAR
+        pitcher_id: VARCHAR
+        side: VARCHAR
+        team_id: VARCHAR
+      rows: []
+    main_models.nlb_pitching_lines:
+      columns:
+        game_id: VARCHAR
+        pitcher_id: VARCHAR
+        side: VARCHAR
+        team_id: VARCHAR
+      rows:
+        - {game_id: NLB, pitcher_id: shelled, hits: 8, batters_faced: 4, home_runs: 0, strikeouts: 0, earned_runs: 3, runs: 5}
+  outputs:
+    query:
+      partial: true
+      rows:
+        - {source_table: nlb_batting_lines, game_id: NLB, player_id: whiffer, issue_type: strikeouts_gt_plate_appearances, value_a: 10, value_b: 4}
+        - {source_table: nlb_pitching_lines, game_id: NLB, player_id: shelled, issue_type: hits_gt_batters_faced, value_a: 8, value_b: 4}

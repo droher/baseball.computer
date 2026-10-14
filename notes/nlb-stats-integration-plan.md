@@ -103,7 +103,7 @@ Update `game_data_completeness` and `season_team_coverage` so that NLB-only game
   - Start the seed with the four `team_id_retro` values that disagree with the NLB file: 1935 CEG→NSH, 1942 CCB→CCB, 1946–47 CIC→IN9.
   - Verify each one by roster overlap in `nlb_lahman_team_resolution`.
 - **Unmapped teams:** the `not_null(team_id)` audit applies to MLB rows only. NLB rows with no Retrosheet team (54 team-seasons, mostly pre-1920) keep `team_id` NULL, are left out of the season models, and are listed in the resolution table.
-- **Player crosswalk:** `seed_nlb_lahman_player_crosswalk` (databank_player_id, retrosheet_player_id) fills or overrides `people.retro_id`.
+- **Player crosswalk:** `seed_lahman_people_id_corrections` (databank_player_id, retrosheet_player_id, baseball_reference_player_id) replaces `people.retro_id` and `people.bbref_id` for the listed people.
   - It starts empty and is filled from reviewed matches in `nlb_lahman_player_resolution`.
   - Lahman NLB rows whose person has no Retrosheet id are left out of the season models and listed there.
 
@@ -220,7 +220,7 @@ Implemented as planned, with these differences:
 - Team-game totals for NLB-only games come from Retrosheet's team lines (`nlb_team_lines`), not from summed player lines, because the player lines often leave stats unknown that the team line knows.
 - `has_box_score` counts an NLB-only game when `gameinfo.box = 'y'`, not when it has player lines.
 - NLB pitching starts and finishes use `p_gs`/`p_gf` for every pitcher on a team-game when any pitcher there has one, and fall back to pitching order only when all are blank. Mixing the two produced two starters in 7 team-games.
-- `stg_people` keeps a Retrosheet id shared by several Lahman people (21 ids in the new Lahman release) for one person only: crosswalk seed, then birth year and first initial matching the Retrosheet biofile, then Lahman's own `bbref_id`. The others get NULL and show up in `nlb_lahman_player_resolution`. Without this, every model joining `people` duplicated rows.
+- The new Lahman release gives 21 Retrosheet ids and 12 Baseball-Reference ids to two people each. `seed_lahman_people_id_corrections` (which replaces the planned `seed_nlb_lahman_player_crosswalk`) fixes the 24 affected people from the Retrosheet biofile, and the uniqueness audits for both ids moved from the raw `baseballdatabank.people` table to `stg_people`. Without this, every model joining `people` duplicated rows, and the raw-table audits stopped the prod rebuild.
 - `stg_databank_appearances` joins `games_total` and `outs_played` on the Databank team, since the 1939 Toledo Crawfords are two Lahman teams (NAL and NN2) and one Retrosheet team.
 - The two NLB-only games with no Retrosheet game type (CAG193305290, DI1193305290) stay in the game-level models but are left out of the season models (`@is_retrosheet_season_game`).
 - `nlb_team_game_stat_ranges` does not compare fielding double and triple plays with player sums, since every fielder in the play is credited.

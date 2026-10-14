@@ -1,0 +1,29 @@
+version: 2
+seeds:
+  - name: seed_lahman_people_id_corrections
+    description: >-
+      Corrected Retrosheet and Baseball-Reference ids for Lahman people whose
+      people.retro_id or people.bbref_id is wrong, missing, or shared with
+      another person. A row replaces both ids in stg_people; an empty id
+      means the person has none. Fill new rows from reviewed candidates in
+      nlb_lahman_player_resolution.
+    config:
+      contracts:
+        enforced: true
+    columns:
+      - name: databank_player_id
+        description: Lahman people.player_id.
+        data_type: varchar
+        constraints:
+          - type: primary_key
+      - name: retrosheet_player_id
+        description: Retrosheet player id, or empty when the person has none.
+        data_type: varchar
+      - name: baseball_reference_player_id
+        description: Baseball-Reference player id, or empty when the person has none.
+        data_type: varchar
+      - name: reason
+        description: Evidence for the correction.
+        data_type: varchar
+        constraints:
+          - type: not_null

@@ -1,7 +1,7 @@
 MODEL (
   name main_models.stg_people,
   kind FULL,
-  description 'Lahman people, one row per Databank player. retrosheet_player_id is Lahman''s retro_id unless seed_nlb_lahman_player_crosswalk has a row for the player. When several Lahman people share a Retrosheet id, only one keeps it: a crosswalk row first, then a birth year matching the Retrosheet biofile, then a first initial matching it, then Lahman''s own bbref_id matching the player id; the others get NULL and appear in nlb_lahman_player_resolution.',
+  description 'Lahman people, one row per Databank player. retrosheet_player_id and baseball_reference_player_id are Lahman''s retro_id and bbref_id unless seed_lahman_people_id_corrections has a row for the player, which replaces both. The corrections fix ids that Lahman gives to more than one person, so both ids are unique here.',
   grain (databank_player_id),
   columns (
     retrosheet_player_id VARCHAR,
@@ -35,7 +35,8 @@ MODEL (
   ),
   audits (
     unique_values(columns := (databank_player_id)),
-    unique_values(columns := (retrosheet_player_id), condition := retrosheet_player_id IS NOT NULL)
+    unique_values(columns := (retrosheet_player_id), condition := retrosheet_player_id IS NOT NULL),
+    unique_values(columns := (baseball_reference_player_id), condition := baseball_reference_player_id IS NOT NULL)
   ),
   physical_properties (
     download_parquet = 'https://data.baseball.computer/dbt/main_models_stg_people.parquet'
@@ -48,42 +49,19 @@ MODEL (
 
 
 
-WITH linked AS (
+WITH source AS (
     SELECT
-        people.*,
-        COALESCE(crosswalk.retrosheet_player_id, people.retro_id) AS linked_retro_id,
-        crosswalk.retrosheet_player_id IS NOT NULL AS is_crosswalk_link
+        people.* REPLACE (
+            CASE WHEN corrections.databank_player_id IS NOT NULL
+                THEN corrections.retrosheet_player_id ELSE people.retro_id
+            END AS retro_id,
+            CASE WHEN corrections.databank_player_id IS NOT NULL
+                THEN corrections.baseball_reference_player_id ELSE people.bbref_id
+            END AS bbref_id
+        )
     FROM baseballdatabank.people AS people
-    LEFT JOIN main_seeds.seed_nlb_lahman_player_crosswalk AS crosswalk
-        ON people.player_id = crosswalk.databank_player_id
-),
-
-ranked AS (
-    SELECT
-        linked.*,
-        ROW_NUMBER() OVER (
-            PARTITION BY linked.linked_retro_id
-            ORDER BY
-                linked.is_crosswalk_link DESC,
-                COALESCE(linked.birth_year = TRY_CAST(REGEXP_EXTRACT(bio.birth_date, '(\d{4})', 1) AS INTEGER), FALSE) DESC,
-                COALESCE(
-                    LEFT(LOWER(linked.name_first), 1) IN (
-                        LEFT(LOWER(bio.official_name), 1), LEFT(LOWER(bio.first_name), 1)
-                    ),
-                    FALSE
-                ) DESC,
-                COALESCE(linked.bbref_id = linked.player_id, FALSE) DESC,
-                linked.player_id
-        ) AS retro_id_rank
-    FROM linked
-    LEFT JOIN main_models.stg_bio AS bio ON linked.linked_retro_id = bio.player_id
-),
-
-source AS (
-    SELECT
-        * EXCLUDE (linked_retro_id, is_crosswalk_link, retro_id_rank)
-            REPLACE (CASE WHEN retro_id_rank = 1 THEN linked_retro_id END AS retro_id)
-    FROM ranked
+    LEFT JOIN main_seeds.seed_lahman_people_id_corrections AS corrections
+        ON people.player_id = corrections.databank_player_id
 ),
 
 renamed AS (

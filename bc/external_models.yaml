@@ -37,14 +37,8 @@
   - - not_null
     - columns: (player_id)
   - - unique_values
-    - columns: (bbref_id)
-      condition: bbref_id IS NOT NULL
-  - - unique_values
     - columns: (player_id)
       condition: player_id IS NOT NULL
-  - - unique_values
-    - columns: (retro_id)
-      condition: retro_id IS NOT NULL
 - name: baseballdatabank.pitching
 - name: baseballdatabank.teams
   description: 'Per-team-season Lahman master with the team_id_retro crosswalk used to translate Databank team codes to Retrosheet team codes.'

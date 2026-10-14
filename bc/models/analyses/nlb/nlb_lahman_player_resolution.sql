@@ -1,7 +1,7 @@
 MODEL (
   name main_models.nlb_lahman_player_resolution,
   kind FULL,
-  description 'Candidate Retrosheet matches for Lahman Negro Leagues people who do not link to a Retrosheet Negro Leagues player, one row per candidate pair. A Lahman person needs resolution when stg_people has no Retrosheet id for them, or the id is in neither the Retrosheet biofile nor the Negro Leagues player file. Candidates are Retrosheet Negro Leagues players with the same accent-folded last name. Evidence: first initial, birth year, team-seasons the two share (Lahman team resolved through stg_databank_teams), and at-bat similarity on those team-seasons. Shared team-seasons dominate the rank and the confidence tier, since names and birth years are too sparse to decide alone. Reviewed matches go in seed_nlb_lahman_player_crosswalk; nothing here is applied automatically.',
+  description 'Candidate Retrosheet matches for Lahman Negro Leagues people who do not link to a Retrosheet Negro Leagues player, one row per candidate pair. A Lahman person needs resolution when stg_people has no Retrosheet id for them, or the id is in neither the Retrosheet biofile nor the Negro Leagues player file. Candidates are Retrosheet Negro Leagues players with the same accent-folded last name. Evidence: first initial, birth year, team-seasons the two share (Lahman team resolved through stg_databank_teams), and at-bat similarity on those team-seasons. Shared team-seasons dominate the rank and the confidence tier, since names and birth years are too sparse to decide alone. Reviewed matches go in seed_lahman_people_id_corrections; nothing here is applied automatically.',
   grain (databank_player_id, candidate_player_id),
   columns (
     databank_player_id VARCHAR,
