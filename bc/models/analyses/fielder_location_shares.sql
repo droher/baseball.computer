@@ -45,7 +45,7 @@ t2 AS (
         SUM(at_bats) AS at_bats,
         SUM(hits)/SUM(at_bats) AS batting_average,
     FROM t
-    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
     WINDOW
         s1 AS (PARTITION BY batter_hand, is_shift_era, base_state, under_two_outs, recorded_location, recorded_location_angle, recorded_location_depth, batted_to_fielder, trajectory),
         s2 AS (PARTITION BY batter_hand, recorded_location, recorded_location_angle, recorded_location_depth, batted_to_fielder, trajectory),
