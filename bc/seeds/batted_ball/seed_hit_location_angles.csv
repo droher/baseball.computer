@@ -6,7 +6,7 @@ Catcher,Default,-45,45
 CatcherFirst,Foul,46,105
 CatcherFirst,Default,23,45
 CatcherThird,Foul,-105,-46
-CatcherThird,Default,23,45
+CatcherThird,Default,-45,-23
 Pitcher,Default,-10,11
 PitcherFirst,Default,12,23
 PitcherThird,Default,-22,-11

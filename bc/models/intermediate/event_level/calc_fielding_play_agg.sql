@@ -65,11 +65,22 @@ grouper AS (
     WINDOW w AS (PARTITION BY event_key ORDER BY sequence_id)
 ),
 
+self_assist_tracker AS (
+    SELECT
+        *,
+        fielding_play = 'Assist'
+            AND MIN(fielding_position) OVER w = MAX(fielding_position) OVER w
+            AND fielding_position > 0
+            AND BOOL_OR(fielding_play = 'Putout') OVER w AS is_self_assist
+    FROM grouper
+    WINDOW w AS (PARTITION BY event_key, group_id)
+),
+
 assist_tracker AS (
     SELECT
         *,
-        COUNT(CASE WHEN fielding_play = 'Assist' THEN 1 END) OVER w AS assists_in_group
-    FROM grouper
+        COUNT(CASE WHEN fielding_play = 'Assist' AND NOT is_self_assist THEN 1 END) OVER w AS assists_in_group
+    FROM self_assist_tracker
     WINDOW w AS (PARTITION BY event_key, group_id)
 ),
 
@@ -89,7 +100,7 @@ final AS (
         COUNT(*) FILTER (WHERE fielding_play = 'Putout')::UTINYINT AS putouts,
         -- A fielder can appear multiple times in one segment (on a rundown)
         -- but is only credited with one assist per putout
-        COUNT(DISTINCT CASE WHEN fielding_play = 'Assist' THEN group_id END)::UTINYINT AS assists,
+        COUNT(DISTINCT CASE WHEN fielding_play = 'Assist' AND NOT is_self_assist THEN group_id END)::UTINYINT AS assists,
         COUNT(*) FILTER (WHERE fielding_play = 'Error')::UTINYINT AS errors,
         COUNT(*) FILTER (WHERE fielding_play = 'FieldersChoice')::UTINYINT AS fielders_choices,
         COUNT(*) FILTER (WHERE sequence_id = 1 AND fielding_play != 'Error' AND is_batted_ball)::UTINYINT AS plays_started,

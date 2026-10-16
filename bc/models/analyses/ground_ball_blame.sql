@@ -6,7 +6,7 @@ MODEL (
 WITH base AS (
     SELECT DISTINCT ON (s.batter_hand, is_shift_era, base_state, under_two_outs, c.recorded_location, c.recorded_location_angle, c.batted_to_fielder)
         s.batter_hand,
-        s.season >= 2010 AS is_shift_era,
+        s.season BETWEEN 2010 AND 2022 AS is_shift_era,
         s.base_state_start AS base_state,
         s.outs_start < 2 AS under_two_outs,
         c.recorded_location,

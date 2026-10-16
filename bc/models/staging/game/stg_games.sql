@@ -138,7 +138,14 @@ renamed AS (
                 THEN NULL
             ELSE attendance
         END::UINTEGER AS attendance,
-        wind_speed_mph,
+        CASE
+            WHEN wind_speed_mph = 0
+                AND wind_direction = 'Unknown'
+                AND temperature_fahrenheit IS NULL
+                AND sky != 'Dome'
+                THEN NULL
+            ELSE wind_speed_mph
+        END::UTINYINT AS wind_speed_mph,
         use_dh,
         -- TODO: Change in source
         winning_pitcher AS winning_pitcher_id,

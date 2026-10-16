@@ -8,8 +8,6 @@ seeds:
       - name: general_location
         description: ''
         data_type: varchar
-        constraints:
-          - type: primary_key
       - name: depth
         description: ''
         data_type: varchar

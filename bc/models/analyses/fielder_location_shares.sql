@@ -6,7 +6,7 @@ MODEL (
 WITH t AS (
     SELECT
         p.batter_hand,
-        p.season > 2010 AS is_shift_era,
+        p.season BETWEEN 2010 AND 2022 AS is_shift_era,
         p.base_state_start AS base_state,
         p.outs_start < 2 AS under_two_outs,
         c.recorded_location,
@@ -35,7 +35,7 @@ t2 AS (
         batter_hand,
         is_shift_era,
         base_state,
-        under_two_outs
+        under_two_outs,
         recorded_location,
         recorded_location_angle,
         recorded_location_depth,

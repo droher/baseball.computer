@@ -2,7 +2,7 @@ MODEL (
   name main_models.team_game_data_issues,
   kind FULL,
   grain (game_id, team_id, issue_type),
-  description 'Team-game cross-table data artifacts that ordinary game-grain audits would otherwise flag as bugs. `starting_pitcher_no_appearance`: PlayByPlay-source games where `game_start_info` records a starting pitcher who never threw a pitch (e.g. a last-minute scratch). Per MLB rules a scratched starter is still the SP, so `player_game_pitching_stats` legitimately has zero rows with `games_started = 1` for the team-game; `team_game_has_one_starter` and the relief-CG carve-out exclude these team-games. `nlb_box_score_starting_pitcher_order_ambiguous`: Negro League or pre-1875 box-score team-games where the recorded pitching lines do not mark exactly one pitcher as first. These rows are informational: they document why such team-games appear in the non-blocking `team_game_has_one_starter` warning, and no audit excludes them.',
+  description 'Team-game cross-table data artifacts that ordinary game-grain audits would otherwise flag as bugs. `starting_pitcher_no_appearance`: PlayByPlay-source games where `game_start_info` records a starting pitcher who never threw a pitch (e.g. a last-minute scratch). Per MLB rules a scratched starter is still the SP, so `player_game_pitching_stats` legitimately has zero rows with `games_started = 1` for the team-game; `team_game_has_one_starter` and the relief-CG carve-out exclude these team-games. `nlb_box_score_starting_pitcher_order_ambiguous`: Negro League or pre-1875 box-score team-games where the recorded pitching lines do not mark exactly one pitcher as first. These rows are informational: they document why such team-games appear in the non-blocking `team_game_has_one_starter` warning, and no audit excludes them. `box_score_putouts_short`: team-games where the box score putouts, less the putouts the play-by-play records, fall below the unknown putouts in the play-by-play, so the box score fielding lines are incomplete.',
   column_descriptions (
     game_id = @doc('game_id'),
     team_id = @doc('team_id'),
@@ -91,8 +91,51 @@ box_score_pitcher_order AS (
         AND p.side = sides.side
     GROUP BY sides.game_id, sides.team_id
     HAVING COUNT(p.nth_pitcher) FILTER (WHERE p.nth_pitcher = 1) != 1
+),
+
+box_score_putouts AS (
+    SELECT
+        b.game_id,
+        CASE WHEN b.side = 'Home' THEN g.home_team_id ELSE g.away_team_id END AS team_id,
+        SUM(b.putouts) AS box_putouts
+    FROM main_models.stg_box_score_fielding_lines AS b
+    INNER JOIN main_models.stg_games AS g USING (game_id)
+    GROUP BY ALL
+),
+
+event_putouts AS (
+    SELECT
+        game_id,
+        team_id,
+        SUM(putouts) AS recorded_putouts,
+        SUM(unknown_putouts) AS unknown_putouts
+    FROM (
+        SELECT
+            game_id,
+            team_id,
+            event_key,
+            SUM(putouts) AS putouts,
+            MAX(unknown_putouts_while_fielding) AS unknown_putouts
+        FROM main_models.event_player_fielding_stats
+        GROUP BY ALL
+    )
+    GROUP BY ALL
+),
+
+box_score_putouts_short AS (
+    SELECT
+        game_id,
+        team_id,
+        'box_score_putouts_short'::VARCHAR AS issue_type,
+        ('box putouts ' || box_putouts || ' less recorded ' || recorded_putouts || ' is below unknown ' || unknown_putouts)::VARCHAR AS notes,
+    FROM box_score_putouts
+    INNER JOIN event_putouts USING (game_id, team_id)
+    WHERE unknown_putouts > 0
+        AND box_putouts - recorded_putouts < unknown_putouts
 )
 
 SELECT * FROM scratched
 UNION ALL BY NAME
 SELECT * FROM box_score_pitcher_order
+UNION ALL BY NAME
+SELECT * FROM box_score_putouts_short

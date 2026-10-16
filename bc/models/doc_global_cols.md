@@ -215,7 +215,7 @@
 {% enddocs %}
 
 {% docs wind_speed_mph %}
-    Wind speed in miles per hour.
+    Wind speed in miles per hour. A recorded 0 is kept for domed games and for games with a known wind direction or temperature. A 0 with unknown direction and no temperature in an open-air park is treated as missing and set to NULL.
 {% enddocs %}
 
 {% docs temperature_fahrenheit %}

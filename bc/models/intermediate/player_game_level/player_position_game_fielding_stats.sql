@@ -29,6 +29,9 @@ MODEL (
     surplus_box_putouts TINYINT,
     surplus_box_assists TINYINT,
     surplus_box_errors TINYINT,
+    box_putouts UTINYINT,
+    box_assists UTINYINT,
+    box_errors UTINYINT,
     unknown_putouts_while_fielding UTINYINT,
     pickoffs UTINYINT,
     double_plays_started UTINYINT,
@@ -58,6 +61,9 @@ MODEL (
     passed_balls = @doc('passed_balls'),
     stolen_bases = @doc('stolen_bases'),
     caught_stealing = @doc('caught_stealing'),
+    box_putouts = 'Putouts exactly as in the Retrosheet box score fielding line, never replaced by the play-by-play. The box score often credits the last fielder of a chain of throws (K/R63, K+SB2/R6U8, 43/R32) rather than the fielder who made the out, so per-fielder values can differ from putouts while the team total agrees.',
+    box_assists = 'Assists exactly as in the Retrosheet box score fielding line.',
+    box_errors = 'Errors exactly as in the Retrosheet box score fielding line.',
     unknown_putouts_while_fielding = @doc('unknown_putouts_while_fielding'),
     pickoffs = @doc('pickoffs'),
     double_plays_started = @doc('double_plays_started'),
@@ -213,6 +219,9 @@ final AS (
         (box_agg.putouts - event_agg.putouts)::TINYINT AS surplus_box_putouts,
         (box_agg.assists - event_agg.assists)::TINYINT AS surplus_box_assists,
         (box_agg.errors - event_agg.errors)::TINYINT AS surplus_box_errors,
+        box_agg.putouts::UTINYINT AS box_putouts,
+        box_agg.assists::UTINYINT AS box_assists,
+        box_agg.errors::UTINYINT AS box_errors,
     FROM box_agg
     FULL OUTER JOIN event_agg USING (game_id, player_id, fielding_position)
     LEFT JOIN main_models.player_game_appearances AS appearances USING (game_id, player_id)
