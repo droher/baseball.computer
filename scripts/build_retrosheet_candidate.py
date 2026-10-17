@@ -27,7 +27,25 @@ from scripts.compare_retrosheet_sources import (
 LOGGER = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RETROSHEET_SCHEMAS = frozenset({"event", "game", "box_score"})
-SOURCE_SCHEMAS = ("event", "game", "box_score", "misc", "baseballdatabank", "biodata", "nlb_stats")
+SOURCE_SCHEMAS = (
+    "event",
+    "game",
+    "box_score",
+    "misc",
+    "baseballdatabank",
+    "biodata",
+    "nlb_stats",
+)
+SOURCE_FOLDERS = {
+    "event": "event",
+    "game": "event",
+    "box_score": "event",
+    "misc": "misc",
+    "baseballdatabank": "baseballdatabank",
+    "biodata": "biodata",
+    "nlb_stats": "ngl_stats",
+}
+SOURCES_MANIFEST = "sources.json"
 PROJECT_DIRECTORIES = ("models", "macros", "audits", "seeds", "python_models", "tests")
 PROJECT_FILES = ("config.py", "external_models.yaml")
 SNAPSHOT_SCRIPTS = ("preload_sources.py", "audit_report.py")
@@ -43,6 +61,7 @@ class FrozenFile(BaseModel):
 
 class SourceManifest(BaseModel):
     model_config = ConfigDict(extra="ignore")
+    revision: str
     files: dict[str, FrozenFile]
 
 
@@ -56,13 +75,16 @@ class BuildOptions:
     project: Path
     prod_db: Path
     prod_state: Path
-    release: Path
-    release_manifest: Path
+    sources: Path
     output: Path
     memory_limit: str = "32GB"
     threads: int = 10
     tasks: int = 2
     always_build_a: bool = False
+
+    @property
+    def sources_manifest(self) -> Path:
+        return self.sources / SOURCES_MANIFEST
 
     @property
     def snapshot(self) -> Path:
@@ -111,8 +133,7 @@ def validate_options(options: BuildOptions) -> None:
         options.project,
         options.prod_db,
         options.prod_state,
-        options.release,
-        options.release_manifest,
+        options.sources,
     ):
         if _overlaps(resolved, protected):
             raise ValueError(f"Output must not overlap protected input: {protected}")
@@ -126,11 +147,11 @@ def validate_options(options: BuildOptions) -> None:
                 raise ValueError(f"Output descendant must not be a hardlink: {path}")
         if any(output.iterdir()) and not (output / CHECKPOINT).is_file():
             raise ValueError("Output must be empty or a resumable candidate directory")
-    for path in (options.prod_db, options.prod_state, options.release_manifest):
+    for path in (options.prod_db, options.prod_state, options.sources_manifest):
         if not path.is_file():
             raise ValueError(f"Required file does not exist: {path}")
-    if not options.release.is_dir() or not (options.project / "config.py").is_file():
-        raise ValueError("Release directory and SQLMesh project must exist")
+    if not (options.project / "config.py").is_file():
+        raise ValueError("SQLMesh project must exist")
     if options.threads < 1 or options.tasks < 1:
         raise ValueError("Threads and tasks must be positive")
 
@@ -171,37 +192,38 @@ def run_step(
     return result
 
 
-def release_files(options: BuildOptions, names: list[str]) -> dict[str, Path]:
-    return {
-        name: options.release / f"{name.split('.')[1]}.parquet"
-        for name in names
-        if name.split(".")[0] in RETROSHEET_SCHEMAS
-    }
+def source_file(name: str) -> str:
+    schema, table = name.split(".")
+    return f"{SOURCE_FOLDERS[schema]}/{table}.parquet"
 
 
-def release_identities(
+def source_identities(
     options: BuildOptions, names: list[str]
 ) -> dict[str, dict[str, int] | None]:
+    paths = {name: options.sources / source_file(name) for name in names}
     return {
         name: stat_identity(path) if path.is_file() else None
-        for name, path in release_files(options, names).items()
+        for name, path in paths.items()
     }
 
 
-def verify_release(options: BuildOptions, names: list[str]) -> dict[str, str]:
-    manifest = SourceManifest.model_validate_json(options.release_manifest.read_text())
+def verify_sources(options: BuildOptions, names: list[str]) -> dict[str, str]:
+    manifest = SourceManifest.model_validate_json(options.sources_manifest.read_text())
     files: dict[str, str] = {}
-    for name, path in release_files(options, names).items():
-        expected = manifest.files.get(name)
+    for name in names:
+        relative = source_file(name)
+        expected = manifest.files.get(relative)
         if expected is None:
-            raise ValueError(f"Release manifest lacks source {name}")
+            raise ValueError(f"Sources manifest lacks {relative} for {name}")
+        path = options.sources / relative
         if (
             not path.is_file()
             or path.stat().st_size != expected.bytes
             or digest(path) != expected.sha256
         ):
-            raise ValueError(f"Release file differs from its manifest: {path}")
+            raise ValueError(f"Source file differs from its manifest: {path}")
         files[name] = expected.sha256
+    LOGGER.info("Verified %d sources for revision %s", len(files), manifest.revision)
     return files
 
 
@@ -270,8 +292,8 @@ def copy_project(options: BuildOptions) -> dict[str, object]:
 
 def source_roots(options: BuildOptions, side: Side) -> dict[str, Path]:
     return {
-        schema: options.release
-        if side == "B" and schema in RETROSHEET_SCHEMAS
+        schema: options.sources / SOURCE_FOLDERS[schema]
+        if side == "B"
         else options.prod_sources / schema
         for schema in SOURCE_SCHEMAS
     }
@@ -428,15 +450,13 @@ def seed_digests(db: Path) -> dict[str, list[str]]:
     return digests
 
 
-def side_record(
-    db: Path, state: Path, retrosheet: str, other_sources: str
-) -> dict[str, object]:
+def side_record(db: Path, state: Path, files: Mapping[str, str]) -> dict[str, object]:
     return {
         "db": str(db),
         "state": str(state),
         "identity": stat_identity(db),
-        "retrosheet_sources_sha256": retrosheet,
-        "other_sources_sha256": other_sources,
+        "retrosheet_sources_sha256": schema_digest(files, retrosheet=True),
+        "other_sources_sha256": schema_digest(files, retrosheet=False),
         "fingerprints_sha256": json_digest(fingerprints(state)),
         "seeds_sha256": json_digest(seed_digests(db)),
     }
@@ -468,14 +488,14 @@ def build(options: BuildOptions) -> dict[str, object]:
     names = externals(options.project)
     inputs: dict[str, object] = {
         **prod_inputs(options),
-        "release": str(options.release),
-        "release_manifest_sha256": digest(options.release_manifest),
-        "release_identities": release_identities(options, names),
+        "sources": str(options.sources),
+        "sources_manifest_sha256": digest(options.sources_manifest),
+        "source_identities": source_identities(options, names),
         "externals": names,
     }
     checkpoint = load_checkpoint(options, inputs)
     verified = run_step(
-        options, checkpoint, "verify_release", lambda: verify_release(options, names)
+        options, checkpoint, "verify_sources", lambda: verify_sources(options, names)
     )
     release = TypeAdapter(dict[str, str]).validate_python(verified)
     frozen = run_step(
@@ -485,20 +505,15 @@ def build(options: BuildOptions) -> dict[str, object]:
         lambda: freeze_prod_sources(options, names),
     )
     prod_files = TypeAdapter(dict[str, str]).validate_python(frozen)
-    other_sources = schema_digest(prod_files, retrosheet=False)
-    prod_retrosheet = schema_digest(prod_files, retrosheet=True)
     code = run_step(options, checkpoint, "snapshot_code", lambda: copy_project(options))
     _ = run_step(options, checkpoint, "build_B", lambda: build_side(options, "B"))
     _ = run_step(options, checkpoint, "audit_B", lambda: audit_side(options, "B"))
     require_unchanged_prod(options, inputs)
-    prod = side_record(
-        options.prod_db, options.prod_state, prod_retrosheet, other_sources
-    )
+    prod = side_record(options.prod_db, options.prod_state, prod_files)
     candidate = side_record(
         options.side_directory("B") / "bc.db",
         options.side_directory("B") / "bc_state.db",
-        schema_digest(release, retrosheet=True),
-        other_sources,
+        release,
     )
     sides: dict[str, object] = {"prod": prod, "B": candidate}
     if not options.always_build_a and same_code(prod, candidate):
@@ -510,14 +525,16 @@ def build(options: BuildOptions) -> dict[str, object]:
         sides["A"] = side_record(
             options.side_directory("A") / "bc.db",
             options.side_directory("A") / "bc_state.db",
-            prod_retrosheet,
-            other_sources,
+            prod_files,
         )
     require_unchanged_prod(options, inputs)
     steps = checkpoint["steps"]
     assert isinstance(steps, dict)
     candidates: dict[str, object] = {
-        "release_manifest_sha256": inputs["release_manifest_sha256"],
+        "revision": SourceManifest.model_validate_json(
+            options.sources_manifest.read_text()
+        ).revision,
+        "sources_manifest_sha256": inputs["sources_manifest_sha256"],
         "code": code,
         "sides": sides,
         "audits": {side: steps.get(f"audit_{side}") for side in ("A", "B")},
@@ -530,15 +547,19 @@ def build(options: BuildOptions) -> dict[str, object]:
 
 def parse_args(argv: list[str] | None = None) -> BuildOptions:
     parser = argparse.ArgumentParser(
-        description="Build isolated A (current sources) and B (release) candidates."
+        description="Build isolated A (prod sources) and B (one sources folder) candidates."
     )
     parser.add_argument("--project", type=Path, default=REPO_ROOT / "bc")
     parser.add_argument("--prod-db", type=Path, default=REPO_ROOT / "bc.db")
     parser.add_argument(
         "--prod-state", type=Path, default=REPO_ROOT / "bc" / "bc_state.db"
     )
-    parser.add_argument("--release", type=Path, required=True)
-    parser.add_argument("--release-manifest", type=Path, required=True)
+    parser.add_argument(
+        "--sources",
+        type=Path,
+        required=True,
+        help="Folder written by baseball.computer.rs bin/build_sources.py",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--memory-limit", default="32GB")
     parser.add_argument("--threads", type=int, default=10)
@@ -549,8 +570,7 @@ def parse_args(argv: list[str] | None = None) -> BuildOptions:
         project=arguments.project.resolve(),
         prod_db=arguments.prod_db.resolve(),
         prod_state=arguments.prod_state.resolve(),
-        release=arguments.release.resolve(),
-        release_manifest=arguments.release_manifest.resolve(),
+        sources=arguments.sources.resolve(),
         output=arguments.output.absolute(),
         memory_limit=arguments.memory_limit,
         threads=arguments.threads,

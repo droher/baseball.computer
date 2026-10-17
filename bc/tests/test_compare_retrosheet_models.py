@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 from pathlib import Path
 from typing import cast
@@ -8,7 +9,11 @@ from typing import cast
 import duckdb
 import pytest
 
+from scripts.build_retrosheet_candidate import schema_digest
 from scripts.compare_retrosheet_models import run
+
+RELEASE_FILES = {"event.events": "e", "game.games": "g"}
+RELEASE_SOURCES = schema_digest(RELEASE_FILES, retrosheet=True)
 
 
 def literal(value: str) -> str:
@@ -33,11 +38,9 @@ def side(
     }
 
 
-def write_candidates(
-    tmp_path: Path, sides: dict[str, dict[str, object]], release: str = "capture"
-) -> Path:
+def write_candidates(tmp_path: Path, sides: dict[str, dict[str, object]]) -> Path:
     path = tmp_path / "candidates.json"
-    path.write_text(json.dumps({"release_manifest_sha256": release, "sides": sides}))
+    path.write_text(json.dumps({"sources_manifest_sha256": "sources", "sides": sides}))
     return path
 
 
@@ -103,15 +106,26 @@ def capture(
                 "ALTER TABLE bc.sqlmesh__main_models.details ADD COLUMN source_annotation VARCHAR DEFAULT 'recovered'"
             )
         connection.close()
-    alignment = tmp_path / "event-alignment.csv"
+    manifest = tmp_path / "source-manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {"files": {name: {"sha256": sha} for name, sha in RELEASE_FILES.items()}}
+        )
+    )
+    (tmp_path / "full").mkdir()
+    alignment = tmp_path / "full" / "event-alignment.csv"
     alignment.write_text("game_id,aligned\nA,true\nB,false\nN,true\nD,true\n")
     identity = stat_identity(baseline)
-    (tmp_path / "summary.json").write_text(
+    (tmp_path / "full" / "summary.json").write_text(
         json.dumps(
             {
                 "baseline_db": str(baseline.resolve()),
                 "baseline_stat_after": identity,
-                "supplemental_integrity": {"source_manifest_sha256": "capture"},
+                "supplemental_integrity": {
+                    "source_manifest_sha256": hashlib.sha256(
+                        manifest.read_bytes()
+                    ).hexdigest()
+                },
             }
         )
     )
@@ -120,7 +134,7 @@ def capture(
         {
             "prod": side(baseline, "prod-sources"),
             "A": {"same_as": "prod"},
-            "B": side(candidate, "release-sources"),
+            "B": side(candidate, RELEASE_SOURCES),
         },
     )
     return baseline, candidate, alignment, candidates
@@ -211,10 +225,10 @@ def test_parquet_transport_preserves_hugeint_values(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("fingerprints", "seeds", "retrosheet", "label"),
     [
-        ("code", "seeds", "release-sources", "Source change only"),
+        ("code", "seeds", RELEASE_SOURCES, "Source change only"),
         ("other-code", "seeds", "prod-sources", "Code change only"),
         ("code", "other-seeds", "prod-sources", "Code change only"),
-        ("other-code", "seeds", "release-sources", "Code and source change"),
+        ("other-code", "seeds", RELEASE_SOURCES, "Code and source change"),
     ],
 )
 def test_attribution_follows_recorded_code_and_source_identity(
@@ -242,7 +256,7 @@ def test_same_sources_need_no_alignment_and_align_every_game(tmp_path: Path) -> 
         {
             "prod": side(baseline, "prod-sources"),
             "A": side(candidate, "prod-sources", "other-code"),
-            "B": side(candidate, "release-sources", "other-code"),
+            "B": side(candidate, RELEASE_SOURCES, "other-code"),
         },
     )
     result = compare(
@@ -258,7 +272,7 @@ def test_same_sources_need_no_alignment_and_align_every_game(tmp_path: Path) -> 
         ({"baseline_stat_after": {"size": 0}}, "Alignment baseline differs"),
         (
             {"supplemental_integrity": {"source_manifest_sha256": "other"}},
-            "Alignment release manifest differs",
+            "different source manifest",
         ),
     ],
 )
@@ -266,11 +280,25 @@ def test_alignment_must_match_prod_and_release(
     tmp_path: Path, summary_change: dict[str, object], message: str
 ) -> None:
     _, _, alignment, candidates = capture(tmp_path)
-    summary_path = tmp_path / "summary.json"
+    summary_path = tmp_path / "full" / "summary.json"
     summary = json.loads(summary_path.read_text())
     summary.update(summary_change)
     summary_path.write_text(json.dumps(summary))
     with pytest.raises(ValueError, match=message):
+        compare(candidates, alignment, tmp_path / "results", ["game_data_completeness"])
+
+
+def test_alignment_must_cover_the_candidates_b_sources(tmp_path: Path) -> None:
+    baseline, candidate, alignment, _ = capture(tmp_path)
+    candidates = write_candidates(
+        tmp_path,
+        {
+            "prod": side(baseline, "prod-sources"),
+            "A": {"same_as": "prod"},
+            "B": side(candidate, "other-release"),
+        },
+    )
+    with pytest.raises(ValueError, match="differ from the candidates' B sources"):
         compare(candidates, alignment, tmp_path / "results", ["game_data_completeness"])
 
 
@@ -317,7 +345,7 @@ def test_duplicate_stable_event_grain_rejected(tmp_path: Path) -> None:
         {
             "prod": side(baseline, "prod-sources"),
             "A": {"same_as": "prod"},
-            "B": side(candidate, "release-sources"),
+            "B": side(candidate, RELEASE_SOURCES),
         },
     )
     with pytest.raises(ValueError, match="Nonunique or null stable key"):

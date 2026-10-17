@@ -10,7 +10,7 @@ import pytest
 from sqlmesh.core.snapshot import SnapshotTableInfo
 
 from scripts.build_retrosheet_candidate import (
-    RETROSHEET_SCHEMAS,
+    SOURCE_FOLDERS,
     SOURCE_SCHEMAS,
     BuildOptions,
     command_environment,
@@ -19,14 +19,14 @@ from scripts.build_retrosheet_candidate import (
     freeze_prod_sources,
     load_checkpoint,
     prod_inputs,
-    release_identities,
+    source_identities,
     require_unchanged_prod,
     run_step,
     same_code,
     seed_digests,
     side_record,
     validate_options,
-    verify_release,
+    verify_sources,
 )
 
 FINGERPRINT = {
@@ -49,20 +49,19 @@ def options(tmp_path: Path, output: Path | None = None) -> BuildOptions:
     (project / "external_models.yaml").write_text(
         "- name: event.events\n- name: misc.parks\n"
     )
-    release = tmp_path / "release"
-    release.mkdir(exist_ok=True)
-    events = release / "events.parquet"
-    events.write_bytes(b"release events")
-    manifest = tmp_path / "release-manifest.json"
-    manifest.write_text(
+    sources = tmp_path / "sources"
+    files = {"event/events.parquet": b"release events", "misc/parks.parquet": b"parks"}
+    for name, content in files.items():
+        (sources / name).parent.mkdir(parents=True, exist_ok=True)
+        (sources / name).write_bytes(content)
+    (sources / "sources.json").write_text(
         json.dumps(
             {
+                "revision": "2026.08-c5",
                 "files": {
-                    "event.events": {
-                        "sha256": sha256(events),
-                        "bytes": events.stat().st_size,
-                    }
-                }
+                    name: {"sha256": sha256(sources / name), "bytes": len(content)}
+                    for name, content in files.items()
+                },
             }
         )
     )
@@ -80,8 +79,7 @@ def options(tmp_path: Path, output: Path | None = None) -> BuildOptions:
         project=project,
         prod_db=prod_db,
         prod_state=prod_state,
-        release=release,
-        release_manifest=manifest,
+        sources=sources,
         output=output or tmp_path / "out",
     )
 
@@ -130,14 +128,14 @@ def db_with_seed(path: Path, value: str) -> None:
         )
 
 
-@pytest.mark.parametrize("protected", ["prod", "release", "project"])
+@pytest.mark.parametrize("protected", ["prod", "sources", "project"])
 def test_output_may_not_overlap_protected_inputs(
     tmp_path: Path, protected: str
 ) -> None:
     base = options(tmp_path)
     inside = {
         "prod": base.prod_db.parent,
-        "release": base.release / "out",
+        "sources": base.sources / "out",
         "project": base.project / "out",
     }[protected]
     with pytest.raises(ValueError, match="overlap protected input"):
@@ -152,14 +150,32 @@ def test_nonempty_output_without_checkpoint_is_refused(tmp_path: Path) -> None:
         validate_options(build)
 
 
-def test_changed_release_file_is_refused(tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", ["event/events.parquet", "misc/parks.parquet"])
+def test_changed_source_file_is_refused(tmp_path: Path, name: str) -> None:
     build = options(tmp_path)
-    (build.release / "events.parquet").write_bytes(b"tampered events")
+    (build.sources / name).write_bytes(b"tampered")
     with pytest.raises(ValueError, match="differs from its manifest"):
-        verify_release(build, ["event.events", "misc.parks"])
+        verify_sources(build, ["event.events", "misc.parks"])
 
 
-def test_release_routes_only_retrosheet_schemas_on_side_b(tmp_path: Path) -> None:
+def test_source_missing_from_the_manifest_is_refused(tmp_path: Path) -> None:
+    build = options(tmp_path)
+    (build.sources / "ngl_stats").mkdir()
+    (build.sources / "ngl_stats" / "batting.parquet").write_bytes(b"stray")
+    with pytest.raises(ValueError, match="lacks ngl_stats/batting.parquet"):
+        verify_sources(build, ["event.events", "nlb_stats.batting"])
+
+
+def test_verified_sources_are_keyed_by_external_name(tmp_path: Path) -> None:
+    build = options(tmp_path)
+    files = verify_sources(build, ["event.events", "misc.parks"])
+    assert files == {
+        "event.events": sha256(build.sources / "event" / "events.parquet"),
+        "misc.parks": sha256(build.sources / "misc" / "parks.parquet"),
+    }
+
+
+def test_side_b_reads_every_schema_from_the_sources_folder(tmp_path: Path) -> None:
     build = options(tmp_path)
     inherited = {"BC_DB_PATH": "production.db", "SQLMESH__X": "1", "PATH": "/bin"}
     environments = {
@@ -171,12 +187,15 @@ def test_release_routes_only_retrosheet_schemas_on_side_b(tmp_path: Path) -> Non
         assert environment["BC_DB_PATH"] == str(build.output / side / "bc.db")
         for schema in SOURCE_SCHEMAS:
             expected = (
-                build.release
-                if side == "B" and schema in RETROSHEET_SCHEMAS
+                build.sources / SOURCE_FOLDERS[schema]
+                if side == "B"
                 else build.prod_sources / schema
             )
             assert environment[f"BC_SOURCE_ROOT_{schema.upper()}"] == expected.as_uri()
     assert inherited["BC_DB_PATH"] == "production.db"
+    b = environments["B"]
+    assert b["BC_SOURCE_ROOT_BOX_SCORE"] == (build.sources / "event").as_uri()
+    assert b["BC_SOURCE_ROOT_NLB_STATS"] == (build.sources / "ngl_stats").as_uri()
 
 
 def test_prod_sources_freeze_every_external_and_leave_prod_untouched(
@@ -255,7 +274,7 @@ def test_a_is_prod_only_when_fingerprints_and_seeds_match(
         db = tmp_path / f"{name}.db"
         state_with_prod(state, fingerprint)
         db_with_seed(db, seed)
-        records.append(side_record(db, state, "sources", "other"))
+        records.append(side_record(db, state, {"event.events": "e", "misc.parks": "p"}))
     assert same_code(records[0], records[1]) is expected
 
 
@@ -301,11 +320,10 @@ def test_prod_change_during_build_is_refused(tmp_path: Path) -> None:
         require_unchanged_prod(build, inputs)
 
 
-def test_resume_refuses_a_rewritten_release_file(tmp_path: Path) -> None:
+def test_resume_refuses_a_rewritten_source_file(tmp_path: Path) -> None:
     build = options(tmp_path)
     names = ["event.events", "misc.parks"]
-    _ = load_checkpoint(build, {"release": release_identities(build, names)})
-    events = build.release / "events.parquet"
-    events.write_bytes(b"other events!!")
+    _ = load_checkpoint(build, {"sources": source_identities(build, names)})
+    (build.sources / "misc" / "parks.parquet").write_bytes(b"other parks!!")
     with pytest.raises(ValueError, match="Inputs changed"):
-        load_checkpoint(build, {"release": release_identities(build, names)})
+        load_checkpoint(build, {"sources": source_identities(build, names)})

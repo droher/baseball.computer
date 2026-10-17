@@ -397,15 +397,25 @@ def test_ambiguous_box_score_pitcher_order_is_recorded_and_excused(
         games,
     )
     connection.execute(
-        "CREATE TABLE bc.main_models.stg_games (game_id VARCHAR, source_type VARCHAR)"
+        "CREATE TABLE bc.main_models.stg_games (game_id VARCHAR, source_type VARCHAR, "
+        "home_team_id VARCHAR, away_team_id VARCHAR)"
     )
     connection.executemany(
-        "INSERT INTO bc.main_models.stg_games VALUES (?, ?)",
-        [(game[0], game[6]) for game in games],
+        "INSERT INTO bc.main_models.stg_games VALUES (?, ?, ?, ?)",
+        [(game[0], game[6], game[1], game[2]) for game in games],
     )
     connection.execute(
         "CREATE TABLE bc.main_models.event_pitching_stats "
         "(game_id VARCHAR, team_id VARCHAR, player_id VARCHAR)"
+    )
+    connection.execute(
+        "CREATE TABLE bc.main_models.stg_box_score_fielding_lines "
+        "(game_id VARCHAR, side VARCHAR, putouts UTINYINT)"
+    )
+    connection.execute(
+        "CREATE TABLE bc.main_models.event_player_fielding_stats (game_id VARCHAR, "
+        "team_id VARCHAR, event_key UINTEGER, putouts UTINYINT, "
+        "unknown_putouts_while_fielding UTINYINT)"
     )
     connection.execute(
         "CREATE TABLE bc.main_models.stg_box_score_pitching_lines "

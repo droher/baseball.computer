@@ -10,6 +10,7 @@ import duckdb
 from sqlmesh.core.engine_adapter.duckdb import DuckDBEngineAdapter
 from sqlmesh.core.table_diff import TableDiff
 
+from scripts.build_retrosheet_candidate import schema_digest
 from scripts.compare_retrosheet_sources import (
     CsvWriter,
     digest,
@@ -124,10 +125,10 @@ def attribution_message(old: dict[str, object], new: dict[str, object]) -> str:
     if code_equal and sources_equal:
         return "No change: model code, seeds and sources are identical."
     if code_equal:
-        return "Source change only: model code and seeds are identical; differences come from the Retrosheet release."
+        return "Source change only: model code and seeds are identical; differences come from the sources."
     if sources_equal:
         return "Code change only: sources are identical; differences come from model code or seeds."
-    return "Code and source change: differences combine model code, seeds and the Retrosheet release."
+    return "Code and source change: differences combine model code, seeds and sources."
 
 
 def validate_alignment(
@@ -147,7 +148,8 @@ def validate_alignment(
         or new["retrosheet_sources_sha256"] != release["retrosheet_sources_sha256"]
     ):
         raise ValueError("Event alignment pairs prod sources with the release only")
-    for path in (alignment, alignment.parent / "summary.json"):
+    manifest_path = alignment.parent.parent / "source-manifest.json"
+    for path in (alignment, alignment.parent / "summary.json", manifest_path):
         if not path.is_file():
             raise ValueError(f"Event alignment input does not exist: {path}")
     summary = cast(
@@ -158,9 +160,16 @@ def validate_alignment(
         raise ValueError(
             "Alignment baseline differs from the candidates' prod database"
         )
-    if integrity.get("source_manifest_sha256") != candidates["release_manifest_sha256"]:
+    if integrity.get("source_manifest_sha256") != digest(manifest_path):
+        raise ValueError("Alignment was computed from a different source manifest")
+    manifest = cast(dict[str, object], json.loads(manifest_path.read_text()))
+    files = {
+        name: cast(str, item["sha256"])
+        for name, item in cast(dict[str, dict[str, object]], manifest["files"]).items()
+    }
+    if schema_digest(files, retrosheet=True) != release["retrosheet_sources_sha256"]:
         raise ValueError(
-            "Alignment release manifest differs from the candidates' release"
+            "Alignment release sources differ from the candidates' B sources"
         )
     return alignment
 
